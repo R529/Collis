@@ -204,6 +204,56 @@ function isToolFolder(path) {
   return dir.split("/").some((part) => EXCLUDED_DIR_NAMES.has(part));
 }
 
+// 模块对应的文件夹：没单独配置 folder 时用模块自己的名字。
+// 视图和宿主（启动同步）都要用，抽成公共函数，避免两处逻辑不一致。
+function moduleFolderOf(mod) {
+  const raw = String((mod && (mod.folder || mod.name || mod.id || mod.module)) || "").trim();
+  return raw.replace(/^\/+|\/+$/g, "").replace(/[\\:*?"<>|]/g, "_");
+}
+
+/* ---------------- 文件树顺序 ----------------
+ * 直接沿用 Obsidian 文件浏览器的比较器（getSortedFolderItems → fm）：
+ * 文件夹一律「文件夹在前、名称升序」，且是数字自然排序、忽略大小写与重音。
+ * 这条规则不受「修改时间/倒序」等排序设置影响——文件夹在文件树里始终这么排。 */
+const FILE_TREE_COLLATOR = new Intl.Collator(undefined, {
+  usage: "sort",
+  sensitivity: "base",
+  numeric: true
+});
+
+function compareVaultNodes(a, b) {
+  return FILE_TREE_COLLATOR.compare(String((a && a.name) || ""), String((b && b.name) || ""));
+}
+
+/* 文件夹在文件树里的位置：从库根目录一路下来的同级序号，形如 [2, 0]。
+ * 用它排序，层级关系自然保留，子模块永远跟着父模块。 */
+function vaultNodeRank(app, dir, cache) {
+  const store = cache || new Map();
+  const path = String(dir || "").replace(/^\/+|\/+$/g, "");
+  if (!path) return [];
+  const key = path.toLowerCase();
+  if (store.has(key)) return store.get(key);
+  store.set(key, null); // 防环
+  const vault = app && app.vault;
+  if (!vault) return null;
+  const node = vault.getAbstractFileByPath(path);
+  if (!node) return null;
+  const parentPath = path.split("/").slice(0, -1).join("/");
+  const root = typeof vault.getRoot === "function" ? vault.getRoot() : null;
+  const parent = parentPath ? vault.getAbstractFileByPath(parentPath) : root;
+  if (!parent || !Array.isArray(parent.children)) return null;
+  const parentRank = parentPath ? vaultNodeRank(app, parentPath, store) : [];
+  if (!parentRank) return null;
+  const siblings = parent.children
+    .filter((child) => Array.isArray(child.children))
+    .sort(compareVaultNodes);
+  const index = siblings.indexOf(node);
+  if (index < 0) return null;
+  const rank = parentRank.concat(index);
+  store.set(key, rank);
+  return rank;
+}
+
 const DEFAULT_MODULES = [
   {
     id: "learning",
@@ -1449,8 +1499,7 @@ class NovalView extends ItemView {
 
   // 模块没有单独设置文件夹时，用模块名建一个同名目录。
   moduleTargetFolder(mod) {
-    const raw = String((mod && (mod.folder || mod.name || mod.id || mod.module)) || "").trim();
-    return raw.replace(/^\/+|\/+$/g, "").replace(/[\\:*?"<>|]/g, "_");
+    return moduleFolderOf(mod);
   }
 
   // 目标同名时加 -1 / -2，避免覆盖模块目录里已有的文件。
@@ -1575,12 +1624,13 @@ class NovalView extends ItemView {
     if (!dir) return [];
     const node = this.app.vault.getAbstractFileByPath(dir);
     if (!node || !Array.isArray(node.children)) return [];
+    // 子模块顺序同样跟文件树一致，而不是单独按名字排
     return node.children
       .filter((child) => Array.isArray(child.children))
       .filter((child) => !this.isModuleFolderIgnored(child.path))
+      .sort(compareVaultNodes)
       .map((child) => this.moduleForFolder(child.path))
-      .filter(Boolean)
-      .sort((a, b) => String(a.name).localeCompare(String(b.name), "zh"));
+      .filter(Boolean);
   }
 
   moduleNoteFiles(mod) {
@@ -5016,10 +5066,39 @@ module.exports = class NovalPlugin extends Plugin {
     return folder || "画布";
   }
 
+  /* 按文件树顺序重排模块配置：
+   *   - 同一层级按文件夹在文件树里的先后排，子模块紧跟父模块；
+   *   - 文件树里找不到的模块排在同级最后，保持原有相对顺序。 */
+  orderModulesByFileTree(list) {
+    const mods = Array.isArray(list) ? list.slice() : [];
+    if (mods.length < 2) return mods;
+    const cache = new Map();
+    const entries = mods.map((mod, index) => {
+      const dir = moduleFolderOf(mod);
+      return { mod, index, rank: dir ? vaultNodeRank(this.app, dir, cache) : null };
+    });
+    entries.sort((a, b) => {
+      if (a.rank && b.rank) {
+        const len = Math.max(a.rank.length, b.rank.length);
+        for (let i = 0; i < len; i += 1) {
+          if (a.rank[i] === undefined) return -1; // 父文件夹排在子模块前面
+          if (b.rank[i] === undefined) return 1;
+          if (a.rank[i] !== b.rank[i]) return a.rank[i] - b.rank[i];
+        }
+        return a.index - b.index;
+      }
+      if (a.rank) return -1;
+      if (b.rank) return 1;
+      return a.index - b.index;
+    });
+    return entries.map((entry) => entry.mod);
+  }
+
   /* 启动同步：把库根目录下已有的文件夹同步成模块入口。
    * 只跳过工具/AI/构建目录（vault-scripts、node_modules、.claude …）和画布目录；
    * 附件、媒体文件等普通文件夹同样同步。子文件夹由模块页按文件树自动生成，
-   * 用户手动删除的模块记录在 hiddenModuleFolders 里，不会被重新加回。 */
+   * 用户手动删除的模块记录在 hiddenModuleFolders 里，不会被重新加回。
+   * 同步出来的模块顺序与文件树一致。 */
   syncModulesFromVault() {
     const root = this.app.vault.getRoot && this.app.vault.getRoot();
     if (!root || !Array.isArray(root.children)) return false;
@@ -5045,7 +5124,6 @@ module.exports = class NovalPlugin extends Plugin {
         if (keyOf(path) === canvasKey) return false;
         return !isToolFolder(path);
       })
-      .sort((a, b) => String(a.name).localeCompare(String(b.name), "zh"))
       .forEach((folder) => {
         const path = normalize(folder.path);
         const key = keyOf(path);
@@ -5059,6 +5137,12 @@ module.exports = class NovalPlugin extends Plugin {
         configured.add(key);
         changed = true;
       });
+    // 顺序跟随文件树：文件树里谁在前，模块就排在前面（子模块跟着父模块）
+    const ordered = this.orderModulesByFileTree(this.settings.modules);
+    if (ordered.some((mod, index) => mod !== this.settings.modules[index])) {
+      this.settings.modules = ordered;
+      changed = true;
+    }
     return changed;
   }
 

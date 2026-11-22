@@ -1,6 +1,10 @@
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 
 // vendor/noval-notes-core.js
@@ -52,22 +56,18 @@ var require_noval_notes_core = __commonJS({
     }
     function qmSelbarGap(viewBottom, statusTop, base) {
       const fallback = typeof base === "number" ? base : 10;
-      if (typeof viewBottom !== "number" || typeof statusTop !== "number")
-        return fallback;
+      if (typeof viewBottom !== "number" || typeof statusTop !== "number") return fallback;
       const overlap = Math.round(viewBottom - statusTop);
-      if (overlap <= 0)
-        return fallback;
+      if (overlap <= 0) return fallback;
       return overlap + 6;
     }
     function qmStatusCover(viewBottom, statusTop) {
-      if (typeof viewBottom !== "number" || typeof statusTop !== "number")
-        return 0;
+      if (typeof viewBottom !== "number" || typeof statusTop !== "number") return 0;
       const overlap = Math.round(viewBottom - statusTop);
       return overlap > 0 ? overlap : 0;
     }
     function qmHasBlockRef(text, id) {
-      if (!text || !id)
-        return false;
+      if (!text || !id) return false;
       try {
         const esc = String(id).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         return new RegExp("\\^" + esc + "(?![A-Za-z0-9-])").test(String(text));
@@ -87,8 +87,7 @@ var require_noval_notes_core = __commonJS({
       return a;
     }
     function qmIcon(parent, name) {
-      if (!parent || !QM_ICONS[name])
-        return;
+      if (!parent || !QM_ICONS[name]) return;
       parent.innerHTML = QM_ICONS[name];
     }
     var ICON_ID = "noval-mark";
@@ -113,14 +112,12 @@ var require_noval_notes_core = __commonJS({
     function genId() {
       let s = "";
       const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-      for (let i = 0; i < 6; i++)
-        s += chars[Math.floor(Math.random() * chars.length)];
+      for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
       return s;
     }
     function padTime(t) {
       const m = String(t).match(/^(\d{1,2}):(\d{2})$/);
-      if (!m)
-        return String(t);
+      if (!m) return String(t);
       return (m[1].length === 1 ? "0" + m[1] : m[1]) + ":" + m[2];
     }
     function baseOf(path) {
@@ -131,10 +128,8 @@ var require_noval_notes_core = __commonJS({
     var QM_CONT_INDENT = "  ";
     function qmBodyLines(text) {
       const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n").map((l) => l.replace(/[ \t]+$/, ""));
-      while (lines.length && !lines[0].trim())
-        lines.shift();
-      while (lines.length && !lines[lines.length - 1].trim())
-        lines.pop();
+      while (lines.length && !lines[0].trim()) lines.shift();
+      while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
       return lines;
     }
     function qmFormatEntry(time, bodyLines, id) {
@@ -145,15 +140,13 @@ var require_noval_notes_core = __commonJS({
         return prefix + l + hardBreak;
       });
       const last = out.length - 1;
-      if (id)
-        out[last] = out[last].replace(/[ \t]+$/, "") + " ^" + id;
+      if (id) out[last] = out[last].replace(/[ \t]+$/, "") + " ^" + id;
       return out;
     }
     function qmCardBlockEnd(lines, start) {
       let end = start;
       for (let i = start + 1; i < lines.length; i++) {
-        if (!/^[ \t]/.test(lines[i]))
-          break;
+        if (!/^[ \t]/.test(lines[i])) break;
         end = i;
       }
       if (end > start) {
@@ -164,8 +157,7 @@ var require_noval_notes_core = __commonJS({
           }
         }
       }
-      while (end > start && lines[end].trim() === "")
-        end--;
+      while (end > start && lines[end].trim() === "") end--;
       return end;
     }
     var QM_APPEND_RE = /^〔追加[ \t]+([^〕]+)〕$/;
@@ -185,10 +177,8 @@ var require_noval_notes_core = __commonJS({
         (cur ? cur.lines : original).push(line);
       }
       const tidy = (arr) => {
-        while (arr.length && !arr[0].trim())
-          arr.shift();
-        while (arr.length && !arr[arr.length - 1].trim())
-          arr.pop();
+        while (arr.length && !arr[0].trim()) arr.shift();
+        while (arr.length && !arr[arr.length - 1].trim()) arr.pop();
         return arr.join("\n");
       };
       return {
@@ -200,8 +190,7 @@ var require_noval_notes_core = __commonJS({
       const out = qmBodyLines(original || "");
       for (const a of appends || []) {
         out.push("\u3014\u8FFD\u52A0 " + a.label + "\u3015");
-        for (const l of qmBodyLines(a.text || ""))
-          out.push(l);
+        for (const l of qmBodyLines(a.text || "")) out.push(l);
       }
       return out.join("\n");
     }
@@ -209,10 +198,8 @@ var require_noval_notes_core = __commonJS({
       const out = [];
       for (let i = hit.lineIndex; i <= hit.lineEnd; i++) {
         let s = String(lines[i] == null ? "" : lines[i]);
-        if (i === hit.lineIndex)
-          s = s.replace(/^[-*][ \t]+(\d{1,2}:\d{2})[ \t]+/, "");
-        else
-          s = s.replace(/^ {2}|^\t/, "");
+        if (i === hit.lineIndex) s = s.replace(/^[-*][ \t]+(\d{1,2}:\d{2})[ \t]+/, "");
+        else s = s.replace(/^ {2}|^\t/, "");
         s = s.replace(/[ \t]*\^[A-Za-z0-9-]+[ \t]*$/, "");
         out.push(s.replace(/[ \t]+$/, ""));
       }
@@ -227,28 +214,22 @@ var require_noval_notes_core = __commonJS({
       const ids = /* @__PURE__ */ new Set();
       const re = /[ \t]\^([A-Za-z0-9-]+)[ \t]*$/gm;
       let m;
-      while ((m = re.exec(String(content || ""))) !== null)
-        ids.add(m[1]);
+      while ((m = re.exec(String(content || ""))) !== null) ids.add(m[1]);
       return ids;
     }
     function qmLooksLikeCardFile(content) {
       const lines = String(content || "").replace(/\r\n?/g, "\n").split("\n");
       let inDate = false;
       for (const line of lines) {
-        if (!line.trim())
-          continue;
+        if (!line.trim()) continue;
         if (/^##[ \t]+\d{4}-\d{2}-\d{2}[ \t]*$/.test(line)) {
           inDate = true;
           continue;
         }
-        if (!inDate)
-          return false;
-        if (/^##?[ \t]/.test(line))
-          return false;
-        if (QM_CARD_RE.test(line))
-          continue;
-        if (/^[ \t]/.test(line))
-          continue;
+        if (!inDate) return false;
+        if (/^##?[ \t]/.test(line)) return false;
+        if (QM_CARD_RE.test(line)) continue;
+        if (/^[ \t]/.test(line)) continue;
         return false;
       }
       return true;
@@ -266,16 +247,13 @@ var require_noval_notes_core = __commonJS({
       }
       if (hi === -1) {
         let body = raw.replace(/\s+$/, "");
-        if (body)
-          body += "\n\n";
+        if (body) body += "\n\n";
         return body + "## " + date + "\n\n" + entryLines.join("\n") + "\n";
       }
       let last = -1;
       for (let i = hi + 1; i < lines.length; i++) {
-        if (/^##[ \t]/.test(lines[i]))
-          break;
-        if (lines[i].trim())
-          last = i;
+        if (/^##[ \t]/.test(lines[i])) break;
+        if (lines[i].trim()) last = i;
       }
       if (last >= 0) {
         lines.splice(last + 1, 0, ...entryLines);
@@ -313,13 +291,10 @@ var require_noval_notes_core = __commonJS({
           continue;
         }
         i = j - 1;
-        while (out.length && !out[out.length - 1].trim())
-          out.pop();
-        if (out.length)
-          out.push("");
+        while (out.length && !out[out.length - 1].trim()) out.pop();
+        if (out.length) out.push("");
       }
-      while (out.length && !out[out.length - 1].trim())
-        out.pop();
+      while (out.length && !out[out.length - 1].trim()) out.pop();
       return out.length ? out.join("\n") + "\n" : "";
     }
     function qmStripEmptyDateSections(content, skipDates) {
@@ -337,8 +312,7 @@ var require_noval_notes_core = __commonJS({
         let j = i + 1;
         let hasContent = false;
         while (j < lines.length) {
-          if (headerRe.test(lines[j]))
-            break;
+          if (headerRe.test(lines[j])) break;
           if (lines[j].trim()) {
             hasContent = true;
             break;
@@ -351,21 +325,17 @@ var require_noval_notes_core = __commonJS({
         }
         removed.push(hm[1]);
         i = j - 1;
-        while (out.length && !out[out.length - 1].trim())
-          out.pop();
-        if (out.length)
-          out.push("");
+        while (out.length && !out[out.length - 1].trim()) out.pop();
+        if (out.length) out.push("");
       }
-      while (out.length && !out[out.length - 1].trim())
-        out.pop();
+      while (out.length && !out[out.length - 1].trim()) out.pop();
       return { text: out.length ? out.join("\n") + "\n" : "", removed };
     }
     function qmInsertRestoredCard(content, date, time, entryLines) {
       const raw = String(content || "").replace(/\r\n?/g, "\n");
       const lines = raw.split("\n");
       if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) {
-        while (lines.length && !lines[lines.length - 1].trim())
-          lines.pop();
+        while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
         const out = lines.concat(lines.length ? [""] : [], entryLines);
         return out.join("\n").replace(/\n+$/, "") + "\n";
       }
@@ -389,32 +359,24 @@ var require_noval_notes_core = __commonJS({
         }
         const head = lines.slice(0, at2);
         const tail = lines.slice(at2);
-        while (head.length && !head[head.length - 1].trim())
-          head.pop();
-        while (tail.length && !tail[0].trim())
-          tail.shift();
+        while (head.length && !head[head.length - 1].trim()) head.pop();
+        while (tail.length && !tail[0].trim()) tail.shift();
         const out = head.concat(head.length ? [""] : [], ["## " + date, ""], entryLines);
-        if (tail.length)
-          out.push("", ...tail);
+        if (tail.length) out.push("", ...tail);
         return out.join("\n").replace(/\n+$/, "") + "\n";
       }
       let at = hi + 1;
       for (let i = hi + 1; i < lines.length; i++) {
-        if (/^##[ \t]/.test(lines[i]))
-          break;
+        if (/^##[ \t]/.test(lines[i])) break;
         const cm = lines[i].match(QM_CARD_RE);
-        if (!cm)
-          continue;
+        if (!cm) continue;
         const end = qmCardBlockEnd(lines, i);
-        if (padTime(cm[1]) <= time)
-          at = end + 1;
+        if (padTime(cm[1]) <= time) at = end + 1;
         i = end;
       }
       if (at === hi + 1) {
-        if (lines[at] !== void 0 && !lines[at].trim())
-          lines.splice(at + 1, 0, ...entryLines);
-        else
-          lines.splice(at, 0, "", ...entryLines);
+        if (lines[at] !== void 0 && !lines[at].trim()) lines.splice(at + 1, 0, ...entryLines);
+        else lines.splice(at, 0, "", ...entryLines);
       } else {
         lines.splice(at, 0, ...entryLines);
       }
@@ -436,40 +398,32 @@ var require_noval_notes_core = __commonJS({
     function qmParseBlockRef(raw) {
       const s = String(raw || "");
       const at = s.indexOf("#^");
-      if (at < 0)
-        return null;
+      if (at < 0) return null;
       let target = s.slice(0, at).replace(/^!?\[\[/, "").replace(/\]\]$/, "").trim();
       let id = s.slice(at + 2);
       const cut = id.search(/[|\]\s]/);
-      if (cut >= 0)
-        id = id.slice(0, cut);
+      if (cut >= 0) id = id.slice(0, cut);
       id = id.trim().toLowerCase();
-      if (!id)
-        return null;
+      if (!id) return null;
       return { target, id };
     }
     function qmRefFolder(path) {
       const parts = String(path == null ? "" : path).split("/");
-      if (parts.length < 2)
-        return "";
+      if (parts.length < 2) return "";
       return parts.slice(0, -1).join("/");
     }
     function qmBigrams(text) {
       const t = String(text == null ? "" : text).toLowerCase().replace(/\s+/g, "");
       const out = /* @__PURE__ */ new Set();
-      for (let i = 0; i < t.length - 1; i++)
-        out.add(t.slice(i, i + 2));
+      for (let i = 0; i < t.length - 1; i++) out.add(t.slice(i, i + 2));
       return out;
     }
     function qmBigramScore(a, b) {
       const A = qmBigrams(a);
       const B = qmBigrams(b);
-      if (!A.size || !B.size)
-        return 0;
+      if (!A.size || !B.size) return 0;
       let hit = 0;
-      for (const g of A)
-        if (B.has(g))
-          hit++;
+      for (const g of A) if (B.has(g)) hit++;
       return hit / A.size;
     }
     function qmAppendHits(parent, text, words) {
@@ -478,8 +432,7 @@ var require_noval_notes_core = __commonJS({
       const marks = [];
       for (const w of words || []) {
         const needle = String(w || "").toLowerCase();
-        if (!needle)
-          continue;
+        if (!needle) continue;
         let i = low.indexOf(needle);
         while (i !== -1 && marks.length < 64) {
           marks.push([i, i + needle.length]);
@@ -494,20 +447,16 @@ var require_noval_notes_core = __commonJS({
       const merged = [];
       for (const m of marks) {
         const last = merged[merged.length - 1];
-        if (last && m[0] <= last[1])
-          last[1] = Math.max(last[1], m[1]);
-        else
-          merged.push([m[0], m[1]]);
+        if (last && m[0] <= last[1]) last[1] = Math.max(last[1], m[1]);
+        else merged.push([m[0], m[1]]);
       }
       let at = 0;
       for (const span of merged) {
-        if (span[0] > at)
-          parent.createSpan({ text: src.slice(at, span[0]) });
+        if (span[0] > at) parent.createSpan({ text: src.slice(at, span[0]) });
         parent.createSpan({ text: src.slice(span[0], span[1]), cls: "qm-hit" });
         at = span[1];
       }
-      if (at < src.length)
-        parent.createSpan({ text: src.slice(at) });
+      if (at < src.length) parent.createSpan({ text: src.slice(at) });
     }
     function qmLinkLine(link) {
       try {
@@ -522,46 +471,39 @@ var require_noval_notes_core = __commonJS({
     function qmAggregateRefs(items) {
       const out = /* @__PURE__ */ new Map();
       for (const it of items || []) {
-        if (!it || !it.destPath || !it.id)
-          continue;
+        if (!it || !it.destPath || !it.id) continue;
         const key = it.destPath + "#^" + String(it.id).toLowerCase();
         let e = out.get(key);
-        if (!e)
-          out.set(key, e = { notes: /* @__PURE__ */ new Set(), places: 0, ambiguous: false, by: /* @__PURE__ */ new Map() });
+        if (!e) out.set(key, e = { notes: /* @__PURE__ */ new Set(), places: 0, ambiguous: false, by: /* @__PURE__ */ new Map() });
         e.places += 1;
         if (it.sourcePath) {
           e.notes.add(it.sourcePath);
           const line = typeof it.line === "number" && it.line >= 0 ? it.line : -1;
           const lines = e.by.get(it.sourcePath);
           if (lines) {
-            if (line >= 0)
-              lines.push(line);
+            if (line >= 0) lines.push(line);
           } else {
             e.by.set(it.sourcePath, line >= 0 ? [line] : []);
           }
         }
-        if (it.ambiguous)
-          e.ambiguous = true;
+        if (it.ambiguous) e.ambiguous = true;
       }
       return out;
     }
     function qmBodySegments(body) {
       const text = String(body == null ? "" : body);
       const out = [];
-      if (!text)
-        return out;
+      if (!text) return out;
       const re = /#([^\s#\[\]()]+)|\bhttps?:\/\/[^\s<>"'，。；：！？、（）【】《》]+/g;
       const pushText = (s) => {
-        if (s)
-          out.push({ kind: "text", text: s });
+        if (s) out.push({ kind: "text", text: s });
       };
       let last = 0;
       let m;
       while ((m = re.exec(text)) !== null) {
         const raw = m[0];
         const at = m.index;
-        if (at > last)
-          pushText(text.slice(last, at));
+        if (at > last) pushText(text.slice(last, at));
         if (raw.charAt(0) === "#") {
           out.push({ kind: "tag", text: raw, value: m[1] });
           last = at + raw.length;
@@ -572,8 +514,7 @@ var require_noval_notes_core = __commonJS({
         last = at + trimmed.length;
         re.lastIndex = last;
       }
-      if (last < text.length)
-        pushText(text.slice(last));
+      if (last < text.length) pushText(text.slice(last));
       return out;
     }
     function parseCards(content, filePath, opts) {
@@ -591,8 +532,7 @@ var require_noval_notes_core = __commonJS({
           continue;
         }
         const cm = line.match(QM_CARD_RE);
-        if (!cm)
-          continue;
+        if (!cm) continue;
         const end = qmCardBlockEnd(lines, i);
         const parts = [cm[2] || ""];
         for (let j = i + 1; j <= end; j++) {
@@ -625,8 +565,7 @@ var require_noval_notes_core = __commonJS({
         const tags = [];
         const tagRe = /#([^\s#\[\]()]+)/g;
         let tm;
-        while ((tm = tagRe.exec(body)) !== null)
-          tags.push(tm[1]);
+        while ((tm = tagRe.exec(body)) !== null) tags.push(tm[1]);
         const dupKey = (curDate || "") + "\0" + line;
         const dupIndex = dupSeen.get(dupKey) || 0;
         dupSeen.set(dupKey, dupIndex + 1);
@@ -655,23 +594,18 @@ var require_noval_notes_core = __commonJS({
       const strict = !(opts && opts.strict === false);
       const visible = parseCards(content, filePath, { strict });
       const covered = /* @__PURE__ */ new Set();
-      for (const c of visible)
-        for (let i = c.lineIndex; i <= c.lineEnd; i++)
-          covered.add(i);
+      for (const c of visible) for (let i = c.lineIndex; i <= c.lineEnd; i++) covered.add(i);
       const headerRe = /^##[ \t]+\d{4}-\d{2}-\d{2}[ \t]*$/;
       const itemRe = /^[-*][ \t]+/;
       const idRe = /[ \t]\^([A-Za-z0-9-]{4,})[ \t]*$/;
       const timeRe = /^[-*][ \t]+\d{1,2}:\d{1,2}[ \t]/;
       const out = [];
       for (let start = 0; start < lines.length; start++) {
-        if (!itemRe.test(lines[start]) || covered.has(start))
-          continue;
+        if (!itemRe.test(lines[start]) || covered.has(start)) continue;
         let end = start;
         for (let j = start + 1; j < lines.length; j++) {
-          if (headerRe.test(lines[j]) || itemRe.test(lines[j]))
-            break;
-          if (lines[j].trim())
-            end = j;
+          if (headerRe.test(lines[j]) || itemRe.test(lines[j])) break;
+          if (lines[j].trim()) end = j;
         }
         let overlap = false;
         for (let j = start; j <= end; j++) {
@@ -687,8 +621,7 @@ var require_noval_notes_core = __commonJS({
         let mainId = "";
         for (let j = start; j <= end; j++) {
           const mm = lines[j].match(idRe);
-          if (mm)
-            mainId = mm[1];
+          if (mm) mainId = mm[1];
         }
         let date = "";
         for (let j = start; j >= 0; j--) {
@@ -720,24 +653,20 @@ var require_noval_notes_core = __commonJS({
       return first.replace(/^[-*][ \t]+/, "").replace(/^\d{1,2}:\d{1,2}[ \t]+/, "").replace(/[ \t]*\^([A-Za-z0-9-]{4,})[ \t]*$/, "").replace(/[ \t]+$/, "").trim();
     }
     function qmMatchOrphan(list, item) {
-      if (!Array.isArray(list) || !item)
-        return null;
+      if (!Array.isArray(list) || !item) return null;
       if (item.id) {
         const byId = list.filter((o) => o.id === item.id);
-        if (byId.length === 1)
-          return byId[0];
+        if (byId.length === 1) return byId[0];
         if (byId.length > 1) {
           const fp2 = qmOrphanFingerprint(item);
           const same = byId.filter((o) => qmOrphanFingerprint(o) === fp2);
-          if (same.length)
-            return typeof item.lineStart === "number" ? same.sort((a, b) => Math.abs(a.lineStart - item.lineStart) - Math.abs(b.lineStart - item.lineStart))[0] : same[0];
+          if (same.length) return typeof item.lineStart === "number" ? same.sort((a, b) => Math.abs(a.lineStart - item.lineStart) - Math.abs(b.lineStart - item.lineStart))[0] : same[0];
         }
       }
       const fp = qmOrphanFingerprint(item);
       if (fp) {
         const byBody = list.filter((o) => qmOrphanFingerprint(o) === fp);
-        if (byBody.length === 1)
-          return byBody[0];
+        if (byBody.length === 1) return byBody[0];
         if (byBody.length > 1 && typeof item.lineStart === "number") {
           return byBody.sort((a, b) => Math.abs(a.lineStart - item.lineStart) - Math.abs(b.lineStart - item.lineStart))[0];
         }
@@ -747,12 +676,10 @@ var require_noval_notes_core = __commonJS({
     function qmSuggestOrphanTime(content, filePath, orphan, opts) {
       const want = String(opts && opts.time || "").trim();
       const wm = want.match(/^(\d{1,2}):(\d{1,2})$/);
-      if (wm)
-        return wm[1].padStart(2, "0") + ":" + wm[2].padStart(2, "0");
+      if (wm) return wm[1].padStart(2, "0") + ":" + wm[2].padStart(2, "0");
       const cards = parseCards(content, filePath, { strict: false }).filter((c) => !orphan.date || c.date === orphan.date);
       const times = cards.map((c) => c.time).filter((t) => /^\d{2}:\d{2}$/.test(t)).sort();
-      if (!times.length)
-        return "00:00";
+      if (!times.length) return "00:00";
       const p = times[times.length - 1].split(":").map(Number);
       let h = p[0], m = p[1] + 1;
       if (m >= 60) {
@@ -771,28 +698,22 @@ var require_noval_notes_core = __commonJS({
           return "";
         });
         s = idx === 0 ? s.replace(/^[-*][ \t]+/, "") : s.replace(/^ {2}|^\t/, "");
-        if (idx === 0)
-          s = s.replace(/^\d{1,2}:\d{1,2}[ \t]+/, "");
+        if (idx === 0) s = s.replace(/^\d{1,2}:\d{1,2}[ \t]+/, "");
         return s.replace(/[ \t]+$/, "");
       });
-      while (body.length && !body[0].trim())
-        body.shift();
-      while (body.length && !body[body.length - 1].trim())
-        body.pop();
-      if (!body.length)
-        return null;
+      while (body.length && !body[0].trim()) body.shift();
+      while (body.length && !body[body.length - 1].trim()) body.pop();
+      if (!body.length) return null;
       const t = /^\d{1,2}:\d{2}$/.test(String(time || "")) ? padTime(time) : "00:00";
       const id = String(newId || "") || (ids.length ? ids[ids.length - 1] : "");
       return qmFormatEntry(t, body, id);
     }
     function qmLocateCard(content, card, opts) {
-      if (!card || !card.filePath)
-        return null;
+      if (!card || !card.filePath) return null;
       const cards = parseCards(content, card.filePath, opts);
       if (card.id) {
         const hits = cards.filter((c) => c.id === card.id);
-        if (hits.length === 1)
-          return hits[0];
+        if (hits.length === 1) return hits[0];
         if (hits.length > 1) {
           const exact = hits.filter((c) => c.time === card.time && c.body === card.body);
           return exact.length === 1 ? exact[0] : null;
@@ -800,26 +721,22 @@ var require_noval_notes_core = __commonJS({
         return null;
       }
       const same = cards.filter((c) => c.date === card.date && c.raw === card.raw);
-      if (!same.length)
-        return null;
+      if (!same.length) return null;
       const i = typeof card.dupIndex === "number" ? card.dupIndex : 0;
-      if (same[i] && same[i].body === card.body)
-        return same[i];
+      if (same[i] && same[i].body === card.body) return same[i];
       const byBody = same.filter((c) => c.body === card.body);
       return byBody.length === 1 ? byBody[0] : null;
     }
     function qmParseQuery(input) {
       const raw = String(input || "").trim();
-      if (!raw)
-        return [];
+      if (!raw) return [];
       const out = [];
       const re = /"([^"]+)"|(\S+)/g;
       let m;
       while ((m = re.exec(raw)) !== null) {
         const phrase = m[1];
         const tok = phrase !== void 0 ? phrase : m[2];
-        if (!tok)
-          continue;
+        if (!tok) continue;
         if (phrase !== void 0) {
           out.push({ kind: "text", value: tok.toLowerCase() });
           continue;
@@ -849,27 +766,21 @@ var require_noval_notes_core = __commonJS({
       return out;
     }
     function qmCardMatches(card, conds) {
-      if (!conds || !conds.length)
-        return true;
+      if (!conds || !conds.length) return true;
       const date = String(card && card.date || "");
       const time = String(card && card.time || "");
       const text = card && typeof card.bodyLower === "string" ? card.bodyLower : String(card && card.body || "").toLowerCase();
       for (const c of conds) {
         if (c.kind === "tag") {
-          if (!qmCardHasPath(card, c.value))
-            return false;
+          if (!qmCardHasPath(card, c.value)) return false;
         } else if (c.kind === "date") {
-          if (date !== c.value)
-            return false;
+          if (date !== c.value) return false;
         } else if (c.kind === "month") {
-          if (date.slice(0, 7) !== c.value)
-            return false;
+          if (date.slice(0, 7) !== c.value) return false;
         } else if (c.kind === "md") {
-          if (date.slice(5) !== c.value)
-            return false;
+          if (date.slice(5) !== c.value) return false;
         } else if (c.kind === "time") {
-          if (time !== c.value)
-            return false;
+          if (time !== c.value) return false;
         } else if (text.indexOf(c.value) === -1) {
           return false;
         }
@@ -878,12 +789,9 @@ var require_noval_notes_core = __commonJS({
     }
     function sortCards(cards) {
       cards.sort((a, b) => {
-        if (a.date !== b.date)
-          return a.date < b.date ? 1 : -1;
-        if (a.time !== b.time)
-          return a.time < b.time ? 1 : -1;
-        if (a.filePath !== b.filePath)
-          return a.filePath < b.filePath ? 1 : -1;
+        if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+        if (a.time !== b.time) return a.time < b.time ? 1 : -1;
+        if (a.filePath !== b.filePath) return a.filePath < b.filePath ? 1 : -1;
         return b.lineIndex - a.lineIndex;
       });
       return cards;
@@ -896,24 +804,20 @@ var require_noval_notes_core = __commonJS({
       for (const c of cards || []) {
         for (const t of c.tags || []) {
           const tag = String(t || "").trim();
-          if (!tag)
-            continue;
+          if (!tag) continue;
           count.set(tag, (count.get(tag) || 0) + 1);
         }
       }
       const prefer = /* @__PURE__ */ new Map();
       for (const t of quickTags || []) {
         const tag = String(t || "").replace(/^#/, "").trim();
-        if (tag && count.has(tag))
-          prefer.set(tag, 1);
+        if (tag && count.has(tag)) prefer.set(tag, 1);
       }
       return Array.from(count.entries()).sort((a, b) => {
         const pa = prefer.has(a[0]) ? 1 : 0;
         const pb = prefer.has(b[0]) ? 1 : 0;
-        if (pa !== pb)
-          return pb - pa;
-        if (b[1] !== a[1])
-          return b[1] - a[1];
+        if (pa !== pb) return pb - pa;
+        if (b[1] !== a[1]) return b[1] - a[1];
         return a[0] < b[0] ? -1 : 1;
       }).map((x) => x[0]);
     }
@@ -934,8 +838,7 @@ var require_noval_notes_core = __commonJS({
         this._onBlur = () => window.setTimeout(() => this.hide(), 160);
         this._onClick = () => this.update();
         this._onKeyup = (e) => {
-          if (["ArrowLeft", "ArrowRight", "Home", "End"].indexOf(e.key) !== -1)
-            this.update();
+          if (["ArrowLeft", "ArrowRight", "Home", "End"].indexOf(e.key) !== -1) this.update();
         };
         textarea.addEventListener("input", this._onInput);
         textarea.addEventListener("keydown", this._onKey, true);
@@ -954,15 +857,12 @@ var require_noval_notes_core = __commonJS({
       /** 取光标前正在输入的 #片段 */
       query() {
         const pos = this.ta.selectionStart;
-        if (pos === null || pos === void 0)
-          return null;
+        if (pos === null || pos === void 0) return null;
         const before = String(this.ta.value || "").slice(0, pos);
         const m = before.match(/#([^\s#\[\]()]*)$/);
-        if (!m)
-          return null;
+        if (!m) return null;
         const start = pos - m[0].length;
-        if (start > 0 && !/[\s]/.test(before.charAt(start - 1)))
-          return null;
+        if (start > 0 && !/[\s]/.test(before.charAt(start - 1))) return null;
         return { start, end: pos, partial: m[1] };
       }
       update() {
@@ -973,8 +873,7 @@ var require_noval_notes_core = __commonJS({
         }
         const mySeq = ++this.seq;
         Promise.resolve().then(() => this.getTags()).then((all) => {
-          if (mySeq !== this.seq)
-            return;
+          if (mySeq !== this.seq) return;
           this.applyQuery(q, Array.isArray(all) ? all : []);
         }).catch(() => {
         });
@@ -984,8 +883,7 @@ var require_noval_notes_core = __commonJS({
         const matched = all.filter((t) => String(t).toLowerCase().indexOf(p) !== -1).slice(0, 20);
         const exact = all.some((t) => String(t).toLowerCase() === p);
         const items = matched.map((t) => ({ tag: t, create: false }));
-        if (p && !exact)
-          items.push({ tag: q.partial, create: true });
+        if (p && !exact) items.push({ tag: q.partial, create: true });
         if (!items.length) {
           this.hide();
           return;
@@ -1025,13 +923,10 @@ var require_noval_notes_core = __commonJS({
         this.active = true;
       }
       highlight() {
-        if (!this.el)
-          return;
+        if (!this.el) return;
         Array.from(this.el.children).forEach((r, i) => {
-          if (i === this.index)
-            r.addClass("is-active");
-          else
-            r.removeClass("is-active");
+          if (i === this.index) r.addClass("is-active");
+          else r.removeClass("is-active");
         });
       }
       hide() {
@@ -1045,8 +940,7 @@ var require_noval_notes_core = __commonJS({
         }
       }
       onKey(e) {
-        if (!this.active || !this.items.length)
-          return;
+        if (!this.active || !this.items.length) return;
         const n = this.items.length;
         if (e.key === "ArrowDown") {
           e.preventDefault();
@@ -1061,8 +955,7 @@ var require_noval_notes_core = __commonJS({
           this.index = (this.index - 1 + n) % n;
           this.highlight();
         } else if (e.key === "Enter" || e.key === "Tab") {
-          if ((e.ctrlKey || e.metaKey) && e.key === "Enter")
-            return;
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") return;
           if (e.key === "Enter" && !this.navigated) {
             this.hide();
             return;
@@ -1078,8 +971,7 @@ var require_noval_notes_core = __commonJS({
       }
       pick(i) {
         const it = this.items[i];
-        if (!it || !this.q)
-          return;
+        if (!it || !this.q) return;
         const v = String(this.ta.value || "");
         const q = this.q;
         const head = v.slice(0, q.start);
@@ -1107,8 +999,7 @@ var require_noval_notes_core = __commonJS({
       onOpen() {
         const { contentEl, modalEl } = this;
         contentEl.empty();
-        if (modalEl && modalEl.addClass)
-          modalEl.addClass("qm-modal");
+        if (modalEl && modalEl.addClass) modalEl.addClass("qm-modal");
         contentEl.createEl("div", { text: this.text, cls: "qm-confirm-text" });
         if (this.detail) {
           contentEl.createEl("div", { text: this.detail, cls: "qm-confirm-detail" });
@@ -1134,8 +1025,7 @@ var require_noval_notes_core = __commonJS({
       onOpen() {
         const { contentEl, modalEl } = this;
         contentEl.empty();
-        if (modalEl && modalEl.addClass)
-          modalEl.addClass("qm-modal");
+        if (modalEl && modalEl.addClass) modalEl.addClass("qm-modal");
         contentEl.createEl("div", { text: "\u53E6\u4E00\u6761\u5361\u7247\u8FD8\u6CA1\u4FDD\u5B58", cls: "qm-confirm-text" });
         contentEl.createEl("div", {
           text: "\u300C" + String(this.opts.preview || "") + "\u300D\u6539\u8FC7\u4F46\u6CA1\u4FDD\u5B58\u3002\u8981\u5148\u5B58\u4E0B\u6765\uFF0C\u518D\u7F16\u8F91\u8FD9\u6761\u5417\uFF1F",
@@ -1147,8 +1037,7 @@ var require_noval_notes_core = __commonJS({
         const drop = bar.createEl("button", { text: "\u653E\u5F03\u4FEE\u6539", cls: "qm-mini-btn" });
         drop.onclick = () => {
           this.close();
-          if (typeof this.opts.onDiscard === "function")
-            this.opts.onDiscard();
+          if (typeof this.opts.onDiscard === "function") this.opts.onDiscard();
         };
         const save = bar.createEl("button", { text: "\u4FDD\u5B58\u5E76\u7EE7\u7EED", cls: "qm-mini-btn is-primary" });
         save.onclick = async () => {
@@ -1157,8 +1046,7 @@ var require_noval_notes_core = __commonJS({
             return;
           }
           const okSaved = await this.opts.onSave();
-          if (okSaved !== false)
-            this.close();
+          if (okSaved !== false) this.close();
         };
       }
       onClose() {
@@ -1180,10 +1068,8 @@ var require_noval_notes_core = __commonJS({
         this._rows = rows;
         if (this.modalEl) {
           const recent = !String(query || "").trim() && rows.length > 0;
-          if (recent)
-            this.modalEl.addClass("is-recent");
-          else
-            this.modalEl.removeClass("is-recent");
+          if (recent) this.modalEl.addClass("is-recent");
+          else this.modalEl.removeClass("is-recent");
         }
         return rows;
       }
@@ -1199,15 +1085,12 @@ var require_noval_notes_core = __commonJS({
         const list = this.suggestions;
         if (Array.isArray(list) && list.length) {
           let i = this.selectedSuggestion;
-          if (typeof i !== "number" || i < 0 || i >= list.length)
-            i = 0;
-          if (list[i])
-            return list[i];
+          if (typeof i !== "number" || i < 0 || i >= list.length) i = 0;
+          if (list[i]) return list[i];
         }
         const rows = this._rows || [];
         const root = this.resultContainerEl || this.modalEl;
-        if (!rows.length || !root || typeof root.querySelectorAll !== "function")
-          return null;
+        if (!rows.length || !root || typeof root.querySelectorAll !== "function") return null;
         const items = root.querySelectorAll(".suggestion-item");
         let at = 0;
         for (let i = 0; i < items.length; i++) {
@@ -1219,8 +1102,7 @@ var require_noval_notes_core = __commonJS({
         return rows[at] || rows[0] || null;
       }
       onChooseSuggestion(item, evt) {
-        if (this._chosen)
-          return;
+        if (this._chosen) return;
         this._chosen = true;
         const plain = !!(evt && evt.shiftKey);
         const ed = this.opts.editor || this.plugin.currentEditor();
@@ -1232,10 +1114,8 @@ var require_noval_notes_core = __commonJS({
       }
       onOpen() {
         super.onOpen();
-        if (this.modalEl)
-          this.modalEl.addClass("qm-picker-modal");
-        if (this.modalEl)
-          this.modalEl.removeClass("is-recent");
+        if (this.modalEl) this.modalEl.addClass("qm-picker-modal");
+        if (this.modalEl) this.modalEl.removeClass("is-recent");
         if (typeof this.setInstructions === "function") {
           this.setInstructions([
             { command: "\u2191\u2193", purpose: "\u9009\u62E9" },
@@ -1244,13 +1124,10 @@ var require_noval_notes_core = __commonJS({
           ]);
         }
         this._shiftEnter = (e) => {
-          if (!e || e.key !== "Enter" || !e.shiftKey || e.isComposing)
-            return;
-          if (!this.inputEl || e.target !== this.inputEl)
-            return;
+          if (!e || e.key !== "Enter" || !e.shiftKey || e.isComposing) return;
+          if (!this.inputEl || e.target !== this.inputEl) return;
           const item = this.currentRow();
-          if (!item)
-            return;
+          if (!item) return;
           e.preventDefault();
           e.stopPropagation();
           this.onChooseSuggestion(item, { shiftKey: true });
@@ -1278,8 +1155,7 @@ var require_noval_notes_core = __commonJS({
         const { contentEl, modalEl } = this;
         contentEl.empty();
         contentEl.addClass("qm-refpanel");
-        if (modalEl)
-          modalEl.addClass("qm-modal-wide");
+        if (modalEl) modalEl.addClass("qm-modal-wide");
         const n = this.info.notes || 0;
         const places = this.info.places || n;
         contentEl.createEl("div", { text: "\u88AB " + n + " \u7BC7\u7B14\u8BB0\u5F15\u7528", cls: "qm-refpanel-title" });
@@ -1294,14 +1170,11 @@ var require_noval_notes_core = __commonJS({
           const main = row.createDiv({ cls: "qm-reflist-main" });
           main.createEl("span", { text: r.name, cls: "qm-reflist-name" });
           const folder = qmRefFolder(r.path);
-          if (folder)
-            main.createEl("span", { text: folder, cls: "qm-reflist-path" });
-          if (r.places > 1)
-            row.createEl("span", { text: r.places + " \u5904", cls: "qm-reflist-n" });
+          if (folder) main.createEl("span", { text: folder, cls: "qm-reflist-path" });
+          if (r.places > 1) row.createEl("span", { text: r.places + " \u5904", cls: "qm-reflist-n" });
           const go = () => {
             this.close();
-            if (typeof this.onPick === "function")
-              this.onPick(r);
+            if (typeof this.onPick === "function") this.onPick(r);
           };
           row.onclick = go;
           row.addEventListener("keydown", (e) => {
@@ -1324,8 +1197,7 @@ var require_noval_notes_core = __commonJS({
       onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        if (this.modalEl && this.modalEl.addClass)
-          this.modalEl.addClass("qm-trash-modal");
+        if (this.modalEl && this.modalEl.addClass) this.modalEl.addClass("qm-trash-modal");
         contentEl.createEl("div", { text: "\u6700\u8FD1\u5220\u9664", cls: "qm-modal-title" });
         const list = Array.isArray(this.plugin.settings.trash) ? this.plugin.settings.trash : [];
         if (!list.length) {
@@ -1411,8 +1283,7 @@ var require_noval_notes_core = __commonJS({
       async onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        if (this.modalEl && this.modalEl.addClass)
-          this.modalEl.addClass("qm-orphan-modal");
+        if (this.modalEl && this.modalEl.addClass) this.modalEl.addClass("qm-orphan-modal");
         contentEl.createEl("div", { text: "\u68C0\u67E5\u5B64\u513F\u5361\u7247", cls: "qm-modal-title" });
         contentEl.createEl("div", {
           text: "\u300C\u6062\u590D\u5361\u7247\u300D\u4F1A\u628A\u5B83\u53D8\u6210\u6B63\u5E38\u5361\u7247\u5E76\u4FDD\u7559\u539F\u6765\u7684\u5F15\u7528\uFF1B\u300C\u5220\u9664\u300D\u4F1A\u79FB\u5165\u300C\u6700\u8FD1\u5220\u9664\u300D\uFF0C\u53EF\u4EE5\u6062\u590D\u3002",
@@ -1436,8 +1307,7 @@ var require_noval_notes_core = __commonJS({
             restore.setAttr("title", "\u6309\u5F53\u524D\u89C4\u5219\u6539\u6210\u6807\u51C6\u5361\u7247\u5E76\u663E\u793A\u5728\u5217\u8868\u91CC");
             restore.onclick = async () => {
               const ok = await this.plugin.restoreOrphan(it);
-              if (ok)
-                this.onOpen();
+              if (ok) this.onOpen();
             };
             const drop = acts.createEl("button", { text: "\u5220\u9664", cls: "qm-mini-btn qm-mini-btn-danger" });
             drop.setAttr("title", "\u5F7B\u5E95\u6E05\u7406\u8FD9\u4E00\u6BB5\uFF08\u53EF\u5728\u6700\u8FD1\u5220\u9664\u91CC\u6062\u590D\uFF09");
@@ -1447,8 +1317,7 @@ var require_noval_notes_core = __commonJS({
                 "\u5220\u9664\u8FD9\u6BB5\u5B64\u513F\u5361\u7247\uFF1F",
                 async () => {
                   const ok = await this.plugin.deleteOrphan(it);
-                  if (ok)
-                    this.onOpen();
+                  if (ok) this.onOpen();
                 },
                 "\u8FD9\u4E00\u6BB5\u4F1A\u4ECE\u901F\u8BB0\u6587\u4EF6\u91CC\u79FB\u9664\uFF0C\u4F46\u53EF\u4EE5\u5728\u300C\u6700\u8FD1\u5220\u9664\u300D\u91CC\u6062\u590D\u3002",
                 "\u5220\u9664"
@@ -1491,8 +1360,7 @@ var require_noval_notes_core = __commonJS({
       onOpen() {
         const { contentEl, modalEl } = this;
         contentEl.empty();
-        if (modalEl && modalEl.addClass)
-          modalEl.addClass("qm-modal");
+        if (modalEl && modalEl.addClass) modalEl.addClass("qm-modal");
         contentEl.createEl("div", { text: "\u8BB0\u4E00\u6761", cls: "qm-modal-title" });
         const taWrap = contentEl.createDiv({ cls: "qm-modal-wrap" });
         const ta = taWrap.createEl("textarea", { cls: "qm-input qm-modal-input" });
@@ -1526,8 +1394,7 @@ var require_noval_notes_core = __commonJS({
           } catch (e) {
             tags = [];
           }
-          if (!tags.length)
-            return;
+          if (!tags.length) return;
           tagList.push(...tags);
           suggest.update();
           const bar = contentEl.createDiv({ cls: "qm-quick-tags" });
@@ -1560,8 +1427,7 @@ var require_noval_notes_core = __commonJS({
       }
       /** 开始改动就把「已恢复上次没记完的内容」收掉，不再一直显示 */
       dismissDraftHint() {
-        if (!this._draftHintEl)
-          return;
+        if (!this._draftHintEl) return;
         this._draftHintEl.remove();
         this._draftHintEl = null;
       }
@@ -1584,10 +1450,8 @@ var require_noval_notes_core = __commonJS({
       onClose() {
         if (!this._closingBySubmit && this._ta) {
           const v = String(this._ta.value || "");
-          if (v.trim())
-            void this.plugin.saveDraft(v);
-          else if (this._draftRestored)
-            void this.plugin.clearDraft();
+          if (v.trim()) void this.plugin.saveDraft(v);
+          else if (this._draftRestored) void this.plugin.clearDraft();
         }
         this._draftHintEl = null;
         if (this._suggest) {
@@ -1599,13 +1463,11 @@ var require_noval_notes_core = __commonJS({
     };
     var QM_TAG_SEP = "/";
     function qmSegs(tag) {
-      if (typeof tag !== "string")
-        return [];
+      if (typeof tag !== "string") return [];
       const out = [];
       for (const raw of tag.split(QM_TAG_SEP)) {
         const s = raw.trim();
-        if (s)
-          out.push(s);
+        if (s) out.push(s);
       }
       return out;
     }
@@ -1635,8 +1497,7 @@ var require_noval_notes_core = __commonJS({
         let hasTag = false;
         for (const t of card.tags || []) {
           const segs = qmSegs(t);
-          if (!segs.length)
-            continue;
+          if (!segs.length) continue;
           hasTag = true;
           for (let d = 1; d <= segs.length; d++) {
             const part = segs.slice(0, d);
@@ -1654,8 +1515,7 @@ var require_noval_notes_core = __commonJS({
             }
           }
         }
-        if (!hasTag)
-          untagged++;
+        if (!hasTag) untagged++;
       }
       const nodes = /* @__PURE__ */ new Map();
       for (const [key, n] of index) {
@@ -1672,15 +1532,12 @@ var require_noval_notes_core = __commonJS({
       for (const [key, node] of nodes) {
         const cut = key.lastIndexOf(QM_TAG_SEP);
         const parent = cut < 0 ? null : nodes.get(key.slice(0, cut));
-        if (parent)
-          parent.children.push(node);
-        else
-          roots.push(node);
+        if (parent) parent.children.push(node);
+        else roots.push(node);
       }
       const sortNodes = (arr) => {
         arr.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "zh"));
-        for (const n of arr)
-          sortNodes(n.children);
+        for (const n of arr) sortNodes(n.children);
       };
       sortNodes(roots);
       return { tree: roots, untagged };
@@ -1694,8 +1551,7 @@ var require_noval_notes_core = __commonJS({
     }
     function qmDaysAgo(date) {
       const m = String(date || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (!m)
-        return 0;
+      if (!m) return 0;
       const today = /* @__PURE__ */ new Date();
       today.setHours(0, 0, 0, 0);
       const then = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
@@ -1704,12 +1560,10 @@ var require_noval_notes_core = __commonJS({
     }
     function qmCardHasPath(card, pathLower) {
       const want = qmSegs(pathLower).map((s) => s.toLowerCase());
-      if (!want.length)
-        return false;
+      if (!want.length) return false;
       for (const t of card && card.tags || []) {
         const segs = qmSegs(t).map((x) => x.toLowerCase());
-        if (segs.length < want.length)
-          continue;
+        if (segs.length < want.length) continue;
         let ok = true;
         for (let i = 0; i < want.length; i++) {
           if (segs[i] !== want[i]) {
@@ -1717,15 +1571,13 @@ var require_noval_notes_core = __commonJS({
             break;
           }
         }
-        if (ok)
-          return true;
+        if (ok) return true;
       }
       return false;
     }
     function qmCardIsUntagged(card) {
       for (const t of card && card.tags || []) {
-        if (qmSegs(t).length)
-          return false;
+        if (qmSegs(t).length) return false;
       }
       return true;
     }
@@ -1794,8 +1646,7 @@ var require_noval_notes_core = __commonJS({
         this.inputEl.rows = 2;
         this._manualH = false;
         this.autoGrow = () => {
-          if (this._manualH)
-            return;
+          if (this._manualH) return;
           const el = this.inputEl;
           el.style.height = "auto";
           el.style.height = Math.min(160, el.scrollHeight) + "px";
@@ -1821,8 +1672,7 @@ var require_noval_notes_core = __commonJS({
         grip.setAttr("aria-label", "\u8C03\u6574\u8F93\u5165\u6846\u9AD8\u5EA6");
         grip.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M10 3 3 10"/><path d="M10 6.4 6.4 10"/></svg>';
         grip.addEventListener("pointerdown", (e) => {
-          if (e.pointerType === "mouse" && e.button !== 0)
-            return;
+          if (e.pointerType === "mouse" && e.button !== 0) return;
           e.preventDefault();
           e.stopPropagation();
           this._manualH = true;
@@ -1830,8 +1680,7 @@ var require_noval_notes_core = __commonJS({
           const startH = this.inputEl.offsetHeight || 38;
           const doc = this.inputEl.ownerDocument || document;
           try {
-            if (grip.setPointerCapture && e.pointerId != null)
-              grip.setPointerCapture(e.pointerId);
+            if (grip.setPointerCapture && e.pointerId != null) grip.setPointerCapture(e.pointerId);
           } catch (err) {
           }
           const onMove = (ev) => {
@@ -1843,8 +1692,7 @@ var require_noval_notes_core = __commonJS({
             doc.removeEventListener("pointerup", stop);
             doc.removeEventListener("pointercancel", stop);
             try {
-              if (grip.releasePointerCapture && e.pointerId != null)
-                grip.releasePointerCapture(e.pointerId);
+              if (grip.releasePointerCapture && e.pointerId != null) grip.releasePointerCapture(e.pointerId);
             } catch (err) {
             }
           };
@@ -1859,8 +1707,7 @@ var require_noval_notes_core = __commonJS({
           this.autoGrow();
         });
         this.syncSaveBtn = () => {
-          if (!this.saveBtnEl)
-            return;
+          if (!this.saveBtnEl) return;
           const empty = !String(this.inputEl.value || "").trim();
           this.saveBtnEl.disabled = empty;
           this.saveBtnEl.toggleClass("is-disabled", empty);
@@ -1888,19 +1735,16 @@ var require_noval_notes_core = __commonJS({
         this.searchEl.setAttr("type", "text");
         this.searchEl.setAttr("placeholder", "\u641C\u7D22\u5361\u7247\u3001#\u6807\u7B7E\u3001\u65E5\u671F");
         this.syncSearchClear = () => {
-          if (!this.searchClearEl)
-            return;
+          if (!this.searchClearEl) return;
           this.searchClearEl.toggleClass("is-visible", !!String(this.searchEl.value || "").trim());
         };
         this.searchEl.addEventListener("input", () => {
           this.syncSearchClear();
-          if (this._searchTimer)
-            clearTimeout(this._searchTimer);
+          if (this._searchTimer) clearTimeout(this._searchTimer);
           this._searchTimer = setTimeout(() => {
             this._searchTimer = null;
             this.state.search = this.searchEl.value.trim();
-            if (this.state.selectMode)
-              this.state.selected.clear();
+            if (this.state.selectMode) this.state.selected.clear();
             this.renderChips();
             this.renderFilterBtnState();
             this.renderList();
@@ -1915,8 +1759,7 @@ var require_noval_notes_core = __commonJS({
           this.searchEl.value = "";
           this.state.search = "";
           this.syncSearchClear();
-          if (this.state.selectMode)
-            this.state.selected.clear();
+          if (this.state.selectMode) this.state.selected.clear();
           this.renderChips();
           this.renderFilterBtnState();
           this.renderList();
@@ -1928,8 +1771,7 @@ var require_noval_notes_core = __commonJS({
         reviewBtn.setAttr("title", "\u56DE\u770B\uFF08\u7FFB\u51E0\u5F20\u65E7\u5361\u7247\uFF09");
         qmIcon(reviewBtn, "review");
         reviewBtn.onclick = (e) => {
-          if (e && e.stopPropagation)
-            e.stopPropagation();
+          if (e && e.stopPropagation) e.stopPropagation();
           this.openReview();
         };
         this.filterBtnEl = toolrow.createEl("button", { cls: "qm-icon-btn" });
@@ -1939,8 +1781,7 @@ var require_noval_notes_core = __commonJS({
         qmIcon(this.filterBtnEl, "filter");
         this.filterDotEl = this.filterBtnEl.createSpan({ cls: "qm-filter-dot is-hidden" });
         this.filterBtnEl.onclick = (e) => {
-          if (e && e.stopPropagation)
-            e.stopPropagation();
+          if (e && e.stopPropagation) e.stopPropagation();
           this.toggleFilterPanel();
         };
         this.moreBtnEl = toolrow.createEl("button", { cls: "qm-icon-btn" });
@@ -1949,8 +1790,7 @@ var require_noval_notes_core = __commonJS({
         this.moreBtnEl.setAttr("title", "\u66F4\u591A");
         qmIcon(this.moreBtnEl, "more");
         this.moreBtnEl.onclick = (e) => {
-          if (e && e.stopPropagation)
-            e.stopPropagation();
+          if (e && e.stopPropagation) e.stopPropagation();
           this.openMoreMenu(e);
         };
         this.popEl = wrap.createDiv({ cls: "qm-pop" });
@@ -1959,16 +1799,12 @@ var require_noval_notes_core = __commonJS({
         this.selectBarEl = wrap.createDiv({ cls: "qm-selbar" });
         this.reviewEl = wrap.createDiv({ cls: "qm-review" });
         this._onDocDown = (e) => {
-          if (!this.state || !this.state.filterOpen)
-            return;
+          if (!this.state || !this.state.filterOpen) return;
           const t = e.target;
-          if (t && t.isConnected === false)
-            return;
-          if (t && typeof t.closest === "function" && t.closest(".qm-pop"))
-            return;
+          if (t && t.isConnected === false) return;
+          if (t && typeof t.closest === "function" && t.closest(".qm-pop")) return;
           if (t && this.filterBtnEl && typeof this.filterBtnEl.contains === "function") {
-            if (t === this.filterBtnEl || this.filterBtnEl.contains(t))
-              return;
+            if (t === this.filterBtnEl || this.filterBtnEl.contains(t)) return;
           }
           this.closeFilterPanel();
         };
@@ -1985,13 +1821,10 @@ var require_noval_notes_core = __commonJS({
         } catch (e) {
         }
         const onChange = async (f, oldPath) => {
-          if (!(f instanceof TFile))
-            return;
+          if (!(f instanceof TFile)) return;
           const inFolder = this.plugin.isCardFilePath(f.path) || oldPath && this.plugin.isCardFilePath(oldPath);
-          if (!inFolder)
-            return;
-          if (await this.plugin.isOwnWrite(f))
-            return;
+          if (!inFolder) return;
+          if (await this.plugin.isOwnWrite(f)) return;
           this.scheduleRefresh();
         };
         this.registerEvent(this.app.vault.on("modify", onChange));
@@ -2012,10 +1845,8 @@ var require_noval_notes_core = __commonJS({
         }
         if (this.inputEl) {
           const v = String(this.inputEl.value || "");
-          if (v.trim())
-            void this.plugin.saveDraft(v);
-          else if (this._draftRestored)
-            void this.plugin.clearDraft();
+          if (v.trim()) void this.plugin.saveDraft(v);
+          else if (this._draftRestored) void this.plugin.clearDraft();
         }
         if (this._searchTimer) {
           clearTimeout(this._searchTimer);
@@ -2047,8 +1878,7 @@ var require_noval_notes_core = __commonJS({
        * 编辑器里连续敲字会连发很多次 modify，合并成一次，别每敲一下重建整个列表。
        */
       scheduleRefresh() {
-        if (this._reloadTimer)
-          clearTimeout(this._reloadTimer);
+        if (this._reloadTimer) clearTimeout(this._reloadTimer);
         this._reloadTimer = setTimeout(() => {
           this._reloadTimer = null;
           this.refresh();
@@ -2056,8 +1886,7 @@ var require_noval_notes_core = __commonJS({
       }
       /** 开始改动就把「已恢复上次没记完的内容」收掉，不再一直显示 */
       dismissDraftHint() {
-        if (!this.draftHintEl)
-          return;
+        if (!this.draftHintEl) return;
         this.draftHintEl.remove();
         this.draftHintEl = null;
       }
@@ -2076,16 +1905,12 @@ var require_noval_notes_core = __commonJS({
           return;
         }
         const ok = await this.plugin.appendCard(text);
-        if (!ok)
-          return;
+        if (!ok) return;
         this.inputEl.value = "";
         this._manualH = false;
-        if (this.inputEl.style)
-          this.inputEl.style.height = "";
-        if (this.autoGrow)
-          this.autoGrow();
-        if (this.syncSaveBtn)
-          this.syncSaveBtn();
+        if (this.inputEl.style) this.inputEl.style.height = "";
+        if (this.autoGrow) this.autoGrow();
+        if (this.syncSaveBtn) this.syncSaveBtn();
         this.dismissDraftHint();
         this._draftRestored = false;
         await this.plugin.clearDraft();
@@ -2099,8 +1924,7 @@ var require_noval_notes_core = __commonJS({
         this._refreshing = true;
         try {
           const cards = await this.plugin.readAllCards();
-          if (!this.state)
-            return;
+          if (!this.state) return;
           this.state.cards = cards;
           this._loadedOnce = true;
           this.plugin.refreshRefs();
@@ -2123,8 +1947,7 @@ var require_noval_notes_core = __commonJS({
        * 换掉它在列表里的那部分，其它月份不重读。省掉一次整文件夹重读。
        */
       applyFileCards(path, content) {
-        if (!this.state)
-          return;
+        if (!this.state) return;
         if (!this._loadedOnce) {
           this.refresh();
           return;
@@ -2137,8 +1960,7 @@ var require_noval_notes_core = __commonJS({
         if (this.state.selected && this.state.selected.size) {
           const alive = new Set(this.state.cards.map((c) => this.cardKey(c)));
           for (const k of Array.from(this.state.selected)) {
-            if (!alive.has(k))
-              this.state.selected.delete(k);
+            if (!alive.has(k)) this.state.selected.delete(k);
           }
         }
         this.renderFilters();
@@ -2147,13 +1969,11 @@ var require_noval_notes_core = __commonJS({
           this.syncReview();
           this.renderReview();
         }
-        if (this._refreshing)
-          this._dirty = true;
+        if (this._refreshing) this._dirty = true;
       }
       /** 数据没变、只是要更新一下界面文字（比如「最近删除」条数） */
       rerender() {
-        if (!this.state || !this._loadedOnce)
-          return;
+        if (!this.state || !this._loadedOnce) return;
         this.renderFilters();
         this.renderList();
         if (this.state.reviewOpen) {
@@ -2166,8 +1986,7 @@ var require_noval_notes_core = __commonJS({
        * 否则展开追加、编辑时改的还是旧内容。找不到的就从这一批里移除。
        */
       syncReview() {
-        if (!Array.isArray(this.state.review))
-          return;
+        if (!Array.isArray(this.state.review)) return;
         const cards = this.state.cards || [];
         const used = /* @__PURE__ */ new Set();
         const next = [];
@@ -2179,8 +1998,7 @@ var require_noval_notes_core = __commonJS({
               (c) => !used.has(this.cardKey(c)) && c.filePath === old.filePath && c.date === old.date && c.time === old.time
             );
           }
-          if (!hit)
-            continue;
+          if (!hit) continue;
           used.add(this.cardKey(hit));
           next.push(hit);
         }
@@ -2189,16 +2007,13 @@ var require_noval_notes_core = __commonJS({
       /** 引用筛选的实际生效值：索引没建好时一律按「全部」，免得把卡片全判成未引用 */
       effectiveRefFilter() {
         const v = this.state.refFilter;
-        if (!v)
-          return "";
-        if (!this.plugin.refsReady())
-          return "";
+        if (!v) return "";
+        if (!this.plugin.refsReady()) return "";
         return v;
       }
       setRefFilter(v) {
         this.state.refFilter = v || "";
-        if (this.state.selectMode)
-          this.state.selected.clear();
+        if (this.state.selectMode) this.state.selected.clear();
         this.renderFilters();
         this.renderList();
       }
@@ -2209,12 +2024,10 @@ var require_noval_notes_core = __commonJS({
       }
       /** 筛选按钮的「亮着」与右下小圆点：有生效条件才亮 */
       renderFilterBtnState() {
-        if (!this.filterBtnEl)
-          return;
+        if (!this.filterBtnEl) return;
         const n = this.activeFilterCount();
         this.filterBtnEl.toggleClass("is-active", n > 0);
-        if (this.filterDotEl)
-          this.filterDotEl.toggleClass("is-hidden", !n);
+        if (this.filterDotEl) this.filterDotEl.toggleClass("is-hidden", !n);
       }
       /** chips / 面板 / 按钮一次性对齐；数据没变（比如只改了引用索引）时也能安全调用 */
       renderFilters() {
@@ -2247,24 +2060,21 @@ var require_noval_notes_core = __commonJS({
         for (let i = parts.length - 1; i >= 1; i--) {
           const p = parts.slice(0, i).join(QM_TAG_SEP);
           const hit = (this.state.tags || []).find((t) => qmLowerPath(t) === p);
-          if (hit)
-            return hit;
+          if (hit) return hit;
         }
         return "";
       }
       /** 这个节点的后代里有没有被选中的（用于半选状态） */
       hasSelectedBelow(node) {
         for (const ch of node.children || []) {
-          if (this.isTagSelected(ch.key) || this.hasSelectedBelow(ch))
-            return true;
+          if (this.isTagSelected(ch.key) || this.hasSelectedBelow(ch)) return true;
         }
         return false;
       }
       /** 勾一个标签：被祖先覆盖时忽略；已选则取消；未选则加入，并把它下面已选的子标签合并掉 */
       toggleTagFilter(path) {
         const key = qmLowerPath(path);
-        if (!key)
-          return;
+        if (!key) return;
         const anc = this.selectedAncestorPath(key);
         if (anc) {
           new Notice2("\u5DF2\u5305\u542B\u5728 #" + anc + " \u91CC");
@@ -2277,24 +2087,20 @@ var require_noval_notes_core = __commonJS({
         } else {
           const rest = cur.filter((t) => qmLowerPath(t).indexOf(key + QM_TAG_SEP) !== 0);
           cur.length = 0;
-          for (const t of rest)
-            cur.push(t);
+          for (const t of rest) cur.push(t);
           cur.push(path);
           this.state.expanded[key] = true;
         }
         this.state.untagged = false;
         this.state.tags = cur;
-        if (this.state.selectMode)
-          this.state.selected.clear();
+        if (this.state.selectMode) this.state.selected.clear();
         this.renderFilters();
         this.renderList();
       }
       setFilterTags(list) {
         this.state.tags = (list || []).filter(Boolean);
-        if (this.state.tags.length)
-          this.state.untagged = false;
-        if (this.state.selectMode)
-          this.state.selected.clear();
+        if (this.state.tags.length) this.state.untagged = false;
+        if (this.state.selectMode) this.state.selected.clear();
         this.renderFilters();
         this.renderList();
       }
@@ -2303,12 +2109,9 @@ var require_noval_notes_core = __commonJS({
         this.state.tags = [];
         this.state.untagged = false;
         this.state.search = "";
-        if (this.searchEl)
-          this.searchEl.value = "";
-        if (this.syncSearchClear)
-          this.syncSearchClear();
-        if (this.state.selectMode)
-          this.state.selected.clear();
+        if (this.searchEl) this.searchEl.value = "";
+        if (this.syncSearchClear) this.syncSearchClear();
+        if (this.state.selectMode) this.state.selected.clear();
         this.renderFilters();
         this.renderList();
       }
@@ -2322,12 +2125,9 @@ var require_noval_notes_core = __commonJS({
             sub: "",
             clear: () => {
               this.state.search = "";
-              if (this.searchEl)
-                this.searchEl.value = "";
-              if (this.syncSearchClear)
-                this.syncSearchClear();
-              if (this.state.selectMode)
-                this.state.selected.clear();
+              if (this.searchEl) this.searchEl.value = "";
+              if (this.syncSearchClear) this.syncSearchClear();
+              if (this.state.selectMode) this.state.selected.clear();
               this.renderFilters();
               this.renderList();
             }
@@ -2374,8 +2174,7 @@ var require_noval_notes_core = __commonJS({
       }
       renderChips() {
         const el = this.chipsEl;
-        if (!el)
-          return;
+        if (!el) return;
         el.empty();
         const parts = this.chipParts();
         if (!parts.length) {
@@ -2388,13 +2187,11 @@ var require_noval_notes_core = __commonJS({
         for (const p of shown) {
           const chip = el.createSpan({ cls: "qm-chip" });
           chip.createSpan({ text: p.text });
-          if (p.sub)
-            chip.createEl("em", { text: p.sub });
+          if (p.sub) chip.createEl("em", { text: p.sub });
           const x = chip.createEl("button", { text: "\xD7" });
           x.setAttr("aria-label", "\u6E05\u9664");
           x.onclick = (e) => {
-            if (e && e.stopPropagation)
-              e.stopPropagation();
+            if (e && e.stopPropagation) e.stopPropagation();
             p.clear();
           };
         }
@@ -2403,44 +2200,37 @@ var require_noval_notes_core = __commonJS({
           const more = el.createSpan({ cls: "qm-chip qm-chip-more", text: "+" + rest });
           more.setAttr("title", "\u8FD8\u6709 " + rest + " \u4E2A\u6761\u4EF6");
           more.onclick = (e) => {
-            if (e && e.stopPropagation)
-              e.stopPropagation();
+            if (e && e.stopPropagation) e.stopPropagation();
             this.openFilterPanel();
           };
         }
-        if (this.state && this.state.filterOpen)
-          this.positionPop();
+        if (this.state && this.state.filterOpen) this.positionPop();
       }
       /* ---------------- 筛选浮层 ---------------- */
       toggleFilterPanel() {
-        if (this.state.filterOpen)
-          this.closeFilterPanel();
-        else
-          this.openFilterPanel();
+        if (this.state.filterOpen) this.closeFilterPanel();
+        else this.openFilterPanel();
       }
       openFilterPanel() {
         this.state.filterOpen = true;
         this.renderChips();
         this.renderFilterPanel();
         this.positionPop();
-        if (this.popEl)
-          this.popEl.addClass("show");
+        if (this.popEl) this.popEl.addClass("show");
         this.fitPopHeight();
         this.updateTreeMore();
         this.syncListGap();
       }
       closeFilterPanel() {
         this.state.filterOpen = false;
-        if (this.popEl)
-          this.popEl.removeClass("show");
+        if (this.popEl) this.popEl.removeClass("show");
         this.syncListGap();
       }
       /** 浮层跟着工具行（和 chips）走：面板不参与布局，位置只能自己算 */
       positionPop() {
         const pop = this.popEl;
         const bar = this.toolRowEl;
-        if (!pop || !bar)
-          return;
+        if (!pop || !bar) return;
         let top = 0;
         if (typeof bar.offsetTop === "number") {
           top = bar.offsetTop + bar.offsetHeight + 6;
@@ -2462,10 +2252,8 @@ var require_noval_notes_core = __commonJS({
         const pop = this.popEl;
         const wrap = this.wrapEl;
         const tree = this.treeEl;
-        if (!pop || !wrap || !tree)
-          return;
-        if (!wrap.clientHeight)
-          return;
+        if (!pop || !wrap || !tree) return;
+        if (!wrap.clientHeight) return;
         tree.style.height = "";
         const top = parseFloat(pop.style.top || "0") || 0;
         const avail = wrap.clientHeight - top - 10;
@@ -2482,15 +2270,12 @@ var require_noval_notes_core = __commonJS({
        */
       syncListGap() {
         const list = this.listEl;
-        if (!list)
-          return;
-        if (list.style.paddingTop)
-          list.style.paddingTop = "";
+        if (!list) return;
+        if (list.style.paddingTop) list.style.paddingTop = "";
       }
       renderFilterPanel() {
         const el = this.popEl;
-        if (!el)
-          return;
+        if (!el) return;
         const keepTop = this.treeEl ? this.treeEl.scrollTop || 0 : 0;
         el.empty();
         el.createDiv({ cls: "qm-pop-title", text: "\u7B5B\u9009" });
@@ -2503,8 +2288,7 @@ var require_noval_notes_core = __commonJS({
             cls: this.state.refFilter === v ? "on" : ""
           });
           b.onclick = (e) => {
-            if (e && e.stopPropagation)
-              e.stopPropagation();
+            if (e && e.stopPropagation) e.stopPropagation();
             this.setRefFilter(v);
           };
         }
@@ -2528,20 +2312,16 @@ var require_noval_notes_core = __commonJS({
         un.createSpan({ cls: "qm-tmark", text: "\u2713" });
         un.onclick = () => {
           this.state.untagged = !this.state.untagged;
-          if (this.state.untagged)
-            this.state.tags = [];
-          if (this.state.selectMode)
-            this.state.selected.clear();
+          if (this.state.untagged) this.state.tags = [];
+          if (this.state.selectMode) this.state.selected.clear();
           this.renderFilters();
           this.renderList();
         };
-        for (const node of forest.tree)
-          this.renderTagNode(tree, node, 0);
+        for (const node of forest.tree) this.renderTagNode(tree, node, 0);
         const foot = el.createDiv({ cls: "qm-pop-foot" });
         const clear = foot.createEl("button", { cls: "qm-link-btn", text: "\u6E05\u9664\u7B5B\u9009" });
         clear.onclick = (e) => {
-          if (e && e.stopPropagation)
-            e.stopPropagation();
+          if (e && e.stopPropagation) e.stopPropagation();
           this.clearFilters();
         };
         const n = this.activeFilterCount();
@@ -2550,8 +2330,7 @@ var require_noval_notes_core = __commonJS({
           text: n ? "\u5DF2\u751F\u6548 " + n + " \u9879" : "\u6CA1\u6709\u751F\u6548\u7684\u7B5B\u9009"
         });
         this.updateTreeMore();
-        if (keepTop && tree.scrollTop !== keepTop)
-          tree.scrollTop = keepTop;
+        if (keepTop && tree.scrollTop !== keepTop) tree.scrollTop = keepTop;
       }
       /**
        * 标签树的一行：折叠三角 / 名字 / 命中数 / 勾选框。
@@ -2573,14 +2352,10 @@ var require_noval_notes_core = __commonJS({
           text: kids ? open ? "\u25BE" : "\u25B8" : ""
         });
         caret.onclick = (e) => {
-          if (e && e.stopPropagation)
-            e.stopPropagation();
-          if (!kids)
-            return;
-          if (this.state.expanded[key])
-            delete this.state.expanded[key];
-          else
-            this.state.expanded[key] = true;
+          if (e && e.stopPropagation) e.stopPropagation();
+          if (!kids) return;
+          if (this.state.expanded[key]) delete this.state.expanded[key];
+          else this.state.expanded[key] = true;
           this.renderFilterPanel();
           this.syncListGap();
         };
@@ -2590,16 +2365,14 @@ var require_noval_notes_core = __commonJS({
         row.onclick = () => this.toggleTagFilter(node.path);
         if (kids && open) {
           const box = parent.createDiv({ cls: "qm-tchildren" });
-          for (const ch of node.children)
-            this.renderTagNode(box, ch, depth + 1);
+          for (const ch of node.children) this.renderTagNode(box, ch, depth + 1);
         }
       }
       /** 标签窗口还有内容没露出来时，底部渐隐提示「还能往下翻」 */
       updateTreeMore() {
         const tree = this.treeEl;
         const wrap = tree && (tree.parentNode || tree.parent);
-        if (!tree || !wrap)
-          return;
+        if (!tree || !wrap) return;
         const rest = (tree.scrollHeight || 0) - (tree.scrollTop || 0) - (tree.clientHeight || 0);
         wrap.toggleClass("more", rest > 0.5);
       }
@@ -2613,8 +2386,7 @@ var require_noval_notes_core = __commonJS({
         for (const it of items) {
           if (!it.click) {
             it.click = () => {
-              if (!it.disabled && it.onClick)
-                it.onClick();
+              if (!it.disabled && it.onClick) it.onClick();
             };
           }
         }
@@ -2626,10 +2398,8 @@ var require_noval_notes_core = __commonJS({
         this.closeMenu();
         const root = this.wrapEl;
         const canPaint = typeof document !== "undefined" && !!document.body && !!anchor && typeof anchor.getBoundingClientRect === "function" && !!root && typeof root.getBoundingClientRect === "function" && typeof root.createDiv === "function";
-        if (!canPaint)
-          return { items };
-        if (this.state && this.state.filterOpen)
-          this.closeFilterPanel();
+        if (!canPaint) return { items };
+        if (this.state && this.state.filterOpen) this.closeFilterPanel();
         const menu = root.createDiv({ cls: "qm-menu" });
         for (const it of items) {
           if (it.separator) {
@@ -2640,17 +2410,14 @@ var require_noval_notes_core = __commonJS({
             cls: "qm-menu-item" + (it.disabled ? " is-disabled" : "") + (it.danger ? " is-danger" : "")
           });
           const ico = row.createSpan({ cls: "qm-menu-ico" });
-          if (it.icon)
-            setIcon2(ico, it.icon);
+          if (it.icon) setIcon2(ico, it.icon);
           row.createSpan({ cls: "qm-menu-label", text: it.title });
           if (!it.disabled) {
             row.onclick = (e) => {
-              if (e && e.stopPropagation)
-                e.stopPropagation();
+              if (e && e.stopPropagation) e.stopPropagation();
               const fn = it.onClick;
               this.closeMenu();
-              if (fn)
-                fn();
+              if (fn) fn();
             };
           }
         }
@@ -2664,15 +2431,12 @@ var require_noval_notes_core = __commonJS({
         this.menuOpen = true;
         const onDown = (e) => {
           const t = e.target;
-          if (t && menu.contains && menu.contains(t))
-            return;
-          if (t && anchor.contains && anchor.contains(t))
-            return;
+          if (t && menu.contains && menu.contains(t)) return;
+          if (t && anchor.contains && anchor.contains(t)) return;
           this.closeMenu();
         };
         const onKey = (e) => {
-          if (e.key === "Escape")
-            this.closeMenu();
+          if (e.key === "Escape") this.closeMenu();
         };
         const onScroll = () => this.closeMenu();
         document.addEventListener("mousedown", onDown, true);
@@ -2741,8 +2505,7 @@ var require_noval_notes_core = __commonJS({
           new Notice2("\u5148\u9000\u51FA\u591A\u9009\uFF0C\u518D\u770B\u56DE\u770B");
           return;
         }
-        if (this.state.filterOpen)
-          this.closeFilterPanel();
+        if (this.state.filterOpen) this.closeFilterPanel();
         this.state.reviewOpen = true;
         this.state.reviewDone = {};
         this.state.insertedIds = /* @__PURE__ */ new Set();
@@ -2765,13 +2528,10 @@ var require_noval_notes_core = __commonJS({
         const shown = this.state.reviewShown;
         if (shown && shown.size) {
           const rest = pool.filter((c) => !shown.has(this.cardKey(c)));
-          if (rest.length >= QM_REVIEW_N)
-            pool = rest;
+          if (rest.length >= QM_REVIEW_N) pool = rest;
         }
         this.state.review = pool.slice(0, QM_REVIEW_N);
-        if (shown)
-          for (const c of this.state.review)
-            shown.add(this.cardKey(c));
+        if (shown) for (const c of this.state.review) shown.add(this.cardKey(c));
       }
       /** 扫当前笔记里已有的块引用，用于判断「这张已经插过了」 */
       async scanInserted() {
@@ -2792,14 +2552,10 @@ var require_noval_notes_core = __commonJS({
           }
         } catch (e) {
         }
-        if (token !== this._scanToken)
-          return;
-        if (!this.state.insertedIds)
-          this.state.insertedIds = /* @__PURE__ */ new Set();
-        for (const id of ids)
-          this.state.insertedIds.add(id);
-        if (this.state.reviewOpen)
-          this.syncReviewInsertButtons();
+        if (token !== this._scanToken) return;
+        if (!this.state.insertedIds) this.state.insertedIds = /* @__PURE__ */ new Set();
+        for (const id of ids) this.state.insertedIds.add(id);
+        if (this.state.reviewOpen) this.syncReviewInsertButtons();
       }
       /** 换了目标笔记：旧的「已插入」全部作废，按新笔记重扫 */
       rescanInserted() {
@@ -2810,27 +2566,21 @@ var require_noval_notes_core = __commonJS({
       /** 按当前笔记内容刷新回看里所有「插入」按钮（不重画 DOM，滚动位置不动） */
       syncReviewInsertButtons() {
         const list = this._insertBtns || [];
-        for (const it of list)
-          this.paintInsertBtn(it.card, it.btn);
+        for (const it of list) this.paintInsertBtn(it.card, it.btn);
       }
       /** 一张卡的插入按钮该长什么样：已插入 / 插入全文（无块 ID）/ 插入到这篇 */
       paintInsertBtn(card, btn) {
-        if (!card || !btn)
-          return;
+        if (!card || !btn) return;
         const done = this.isInserted(card);
         const noId = !card.id;
         btn.setText(done ? "\u5DF2\u63D2\u5165" : noId ? "\u63D2\u5165\u5168\u6587" : "\u63D2\u5165\u5230\u8FD9\u7BC7");
-        if (done)
-          btn.addClass("is-done");
-        else
-          btn.removeClass("is-done");
+        if (done) btn.addClass("is-done");
+        else btn.removeClass("is-done");
       }
       /** 这张卡在这篇里了吗？有块 ID 就看笔记内容，没有就退回本轮标记 */
       isInserted(card) {
-        if (!card)
-          return false;
-        if (card.id)
-          return !!(this.state.insertedIds && this.state.insertedIds.has(card.id));
+        if (!card) return false;
+        if (card.id) return !!(this.state.insertedIds && this.state.insertedIds.has(card.id));
         return !!(this.state.reviewDone && this.state.reviewDone[this.cardKey(card)]);
       }
       closeReview() {
@@ -2844,8 +2594,7 @@ var require_noval_notes_core = __commonJS({
       }
       renderReview() {
         const el = this.reviewEl;
-        if (!el)
-          return;
+        if (!el) return;
         el.empty();
         this._insertBtns = [];
         if (!this.state.reviewOpen) {
@@ -2898,8 +2647,7 @@ var require_noval_notes_core = __commonJS({
             if (t && typeof t.closest === "function" && t.closest("a, .qm-tag, .qm-more, .qm-rv-more, button, .qm-append-badge, textarea")) {
               return;
             }
-            if (e.preventDefault)
-              e.preventDefault();
+            if (e.preventDefault) e.preventDefault();
             this.requestEdit(card);
           });
           if (this.state.editingKey === key) {
@@ -2913,14 +2661,11 @@ var require_noval_notes_core = __commonJS({
             } else if (seg.kind === "tag") {
               const tag = body.createSpan({ cls: "qm-tag", text: seg.text });
               tag.onclick = (e) => {
-                if (e && e.stopPropagation)
-                  e.stopPropagation();
+                if (e && e.stopPropagation) e.stopPropagation();
                 this.closeReview();
                 this.state.search = "";
-                if (this.searchEl)
-                  this.searchEl.value = "";
-                if (this.syncSearchClear)
-                  this.syncSearchClear();
+                if (this.searchEl) this.searchEl.value = "";
+                if (this.syncSearchClear) this.syncSearchClear();
                 this.setFilterTags([seg.value]);
               };
             } else {
@@ -2931,22 +2676,18 @@ var require_noval_notes_core = __commonJS({
           const foot = box.createDiv({ cls: "qm-rv-foot" });
           const noId = !card.id;
           const btn = foot.createEl("button", { cls: "qm-rv-insert" });
-          if (noId)
-            btn.setAttr("title", "\u8FD9\u5F20\u5361\u7247\u6CA1\u6709\u5757 ID\uFF0C\u53EA\u80FD\u63D2\u6B63\u6587\uFF0C\u6CA1\u6CD5\u5224\u65AD\u662F\u5426\u63D2\u8FC7");
+          if (noId) btn.setAttr("title", "\u8FD9\u5F20\u5361\u7247\u6CA1\u6709\u5757 ID\uFF0C\u53EA\u80FD\u63D2\u6B63\u6587\uFF0C\u6CA1\u6CD5\u5224\u65AD\u662F\u5426\u63D2\u8FC7");
           this.paintInsertBtn(card, btn);
-          if (this._insertBtns)
-            this._insertBtns.push({ card, btn });
+          if (this._insertBtns) this._insertBtns.push({ card, btn });
           btn.onclick = async () => {
             if (this.isInserted(card)) {
               new Notice2("\u8FD9\u5F20\u5361\u7247\u5DF2\u7ECF\u5728\u8FD9\u7BC7\u7B14\u8BB0\u91CC\u4E86");
               return;
             }
             const okInserted = await this.plugin.insertIntoCurrentNote(card, false);
-            if (!okInserted)
-              return;
+            if (!okInserted) return;
             if (card.id) {
-              if (!this.state.insertedIds)
-                this.state.insertedIds = /* @__PURE__ */ new Set();
+              if (!this.state.insertedIds) this.state.insertedIds = /* @__PURE__ */ new Set();
               this.state.insertedIds.add(card.id);
             } else {
               this.state.reviewDone[key] = true;
@@ -2988,28 +2729,24 @@ var require_noval_notes_core = __commonJS({
       /** 底部浮条：跟着多选状态出现/消失，不占常态布局 */
       renderSelectBar() {
         const el = this.selectBarEl;
-        if (!el)
-          return;
+        if (!el) return;
         el.empty();
         if (!this.state.selectMode) {
           el.removeClass("show");
-          if (this.listEl)
-            this.listEl.removeClass("has-selbar");
+          if (this.listEl) this.listEl.removeClass("has-selbar");
           this._selInfoEl = null;
           this._selDelEl = null;
           return;
         }
         el.addClass("show");
-        if (this.listEl)
-          this.listEl.addClass("has-selbar");
+        if (this.listEl) this.listEl.addClass("has-selbar");
         this.syncSelbarGap();
         const n = this.state.selected.size;
         this._selInfoEl = el.createSpan({ cls: "qm-selbar-info", text: "\u5DF2\u9009 " + n + " \u6761" });
         const acts = el.createDiv({ cls: "qm-selbar-acts" });
         const cancel = acts.createEl("button", { text: "\u53D6\u6D88" });
         cancel.onclick = (e) => {
-          if (e && e.stopPropagation)
-            e.stopPropagation();
+          if (e && e.stopPropagation) e.stopPropagation();
           this.toggleSelectMode(false);
         };
         const del = acts.createEl("button", {
@@ -3018,10 +2755,8 @@ var require_noval_notes_core = __commonJS({
         });
         del.disabled = !n;
         del.onclick = (e) => {
-          if (e && e.stopPropagation)
-            e.stopPropagation();
-          if (!this.state.selected.size)
-            return;
+          if (e && e.stopPropagation) e.stopPropagation();
+          if (!this.state.selected.size) return;
           this.deleteSelected();
         };
         this._selDelEl = del;
@@ -3039,10 +2774,8 @@ var require_noval_notes_core = __commonJS({
       toggleSelected(card) {
         const key = this.cardKey(card);
         const on = !this.state.selected.has(key);
-        if (on)
-          this.state.selected.add(key);
-        else
-          this.state.selected.delete(key);
+        if (on) this.state.selected.add(key);
+        else this.state.selected.delete(key);
         this.paintSelected(key, on);
         this.updateSelectBarCount();
       }
@@ -3056,16 +2789,13 @@ var require_noval_notes_core = __commonJS({
           this.renderList({ keepScroll: true });
           return;
         }
-        if (on)
-          box.addClass("is-picked");
-        else
-          box.removeClass("is-picked");
+        if (on) box.addClass("is-picked");
+        else box.removeClass("is-picked");
       }
       /** 只改浮条上的计数文字，不重画浮条：重画会让鼠标下的按钮闪一下 */
       updateSelectBarCount() {
         const n = this.state.selected.size;
-        if (this._selInfoEl)
-          this._selInfoEl.setText("\u5DF2\u9009 " + n + " \u6761");
+        if (this._selInfoEl) this._selInfoEl.setText("\u5DF2\u9009 " + n + " \u6761");
         if (this._selDelEl) {
           this._selDelEl.setText(n ? "\u5220\u9664\u6240\u9009 " + n : "\u5220\u9664\u6240\u9009");
           this._selDelEl.disabled = !n;
@@ -3098,16 +2828,13 @@ var require_noval_notes_core = __commonJS({
           new Notice2("\u641C\u7D22\u65F6\u65E5\u671F\u4F1A\u81EA\u52A8\u5C55\u5F00");
           return;
         }
-        if (this.state.collapsed.has(date))
-          this.state.collapsed.delete(date);
-        else
-          this.state.collapsed.add(date);
+        if (this.state.collapsed.has(date)) this.state.collapsed.delete(date);
+        else this.state.collapsed.add(date);
         this.saveCollapsed();
         this.renderList();
       }
       saveCollapsed() {
-        if (!this.state.collapsed)
-          return;
+        if (!this.state.collapsed) return;
         this.plugin.settings.collapsedDates = Array.from(this.state.collapsed).slice(-60);
         this.plugin.saveData(this.plugin.settings);
       }
@@ -3118,8 +2845,7 @@ var require_noval_notes_core = __commonJS({
         const rf = this.effectiveRefFilter();
         return this.state.cards.filter((c) => {
           if (untagged) {
-            if (!qmCardIsUntagged(c))
-              return false;
+            if (!qmCardIsUntagged(c)) return false;
           } else if (tags.length) {
             let hit = false;
             for (const t of tags) {
@@ -3128,22 +2854,17 @@ var require_noval_notes_core = __commonJS({
                 break;
               }
             }
-            if (!hit)
-              return false;
+            if (!hit) return false;
           }
-          if (rf === "has" && this.plugin.refCount(c) === 0)
-            return false;
-          if (rf === "none" && this.plugin.refCount(c) > 0)
-            return false;
+          if (rf === "has" && this.plugin.refCount(c) === 0) return false;
+          if (rf === "none" && this.plugin.refCount(c) > 0) return false;
           return qmCardMatches(c, conds);
         });
       }
       renderList(opts) {
         const el = this.listEl;
-        if (!el)
-          return;
-        if (this.menuOpen)
-          this.closeMenu();
+        if (!el) return;
+        if (this.menuOpen) this.closeMenu();
         const keepScroll = opts && opts.keepScroll ? el.scrollTop || 0 : 0;
         el.empty();
         this._refBadges = /* @__PURE__ */ new Map();
@@ -3168,10 +2889,8 @@ var require_noval_notes_core = __commonJS({
         const groups = [];
         for (const card of list) {
           const last = groups[groups.length - 1];
-          if (last && last.date === card.date)
-            last.cards.push(card);
-          else
-            groups.push({ date: card.date, cards: [card] });
+          if (last && last.date === card.date) last.cards.push(card);
+          else groups.push({ date: card.date, cards: [card] });
         }
         for (const g of groups) {
           const collapsed = !searching && this.state.collapsed.has(g.date);
@@ -3189,10 +2908,8 @@ var require_noval_notes_core = __commonJS({
             }
             this.toggleDay(g.date);
           };
-          if (collapsed)
-            continue;
-          for (const card of g.cards)
-            this.renderCard(el, card);
+          if (collapsed) continue;
+          for (const card of g.cards) this.renderCard(el, card);
         }
         el.scrollTop = keepScroll;
       }
@@ -3202,14 +2919,12 @@ var require_noval_notes_core = __commonJS({
        */
       mountRefDot(parent, card, key) {
         const el = parent.createSpan({ cls: "qm-ref" });
-        if (this._refBadges)
-          this._refBadges.set(key, { el, card });
+        if (this._refBadges) this._refBadges.set(key, { el, card });
         this.paintRefDot(el, card);
         return el;
       }
       paintRefDot(el, card) {
-        if (!el)
-          return;
+        if (!el) return;
         const info = this.plugin.refSummary(card);
         const n = info ? info.notes : 0;
         if (!n) {
@@ -3219,12 +2934,9 @@ var require_noval_notes_core = __commonJS({
         }
         el.removeClass("is-hidden");
         const lines = ["\u88AB " + n + " \u7BC7\u7B14\u8BB0\u5F15\u7528" + (info.places > n ? " \xB7 \u5171 " + info.places + " \u5904" : "")];
-        for (const nm of info.names.slice(0, 8))
-          lines.push("\xB7 " + nm);
-        if (info.names.length > 8)
-          lines.push("\xB7 \u2026\u8FD8\u6709 " + (info.names.length - 8) + " \u7BC7");
-        if (info.ambiguous)
-          lines.push("\uFF08\u6709\u540C\u540D\u6587\u4EF6\uFF0C\u94FE\u63A5\u53EF\u80FD\u6307\u9519\uFF0C\u6CE8\u610F\uFF09");
+        for (const nm of info.names.slice(0, 8)) lines.push("\xB7 " + nm);
+        if (info.names.length > 8) lines.push("\xB7 \u2026\u8FD8\u6709 " + (info.names.length - 8) + " \u7BC7");
+        if (info.ambiguous) lines.push("\uFF08\u6709\u540C\u540D\u6587\u4EF6\uFF0C\u94FE\u63A5\u53EF\u80FD\u6307\u9519\uFF0C\u6CE8\u610F\uFF09");
         el.setAttr("title", lines.join("\n"));
       }
       /**
@@ -3232,40 +2944,32 @@ var require_noval_notes_core = __commonJS({
        * 只有「只看已引用 / 只看未引用」开着时结果集会变，才重画一次并保留滚动位置。
        */
       updateRefs() {
-        if (!this.state)
-          return;
+        if (!this.state) return;
         if (this.effectiveRefFilter()) {
           this.renderList({ keepScroll: true });
           return;
         }
-        if (!this._refBadges || !this._refBadges.size)
-          return;
-        for (const { el, card } of this._refBadges.values())
-          this.paintRefDot(el, card);
+        if (!this._refBadges || !this._refBadges.size) return;
+        for (const { el, card } of this._refBadges.values()) this.paintRefDot(el, card);
       }
       cardKey(card) {
-        if (card.id)
-          return (card.filePath || "") + "|" + card.id;
+        if (card.id) return (card.filePath || "") + "|" + card.id;
         return (card.filePath || "") + "|" + card.date + "|" + card.time + "|" + (typeof card.dupIndex === "number" ? card.dupIndex : 0) + "|" + card.body;
       }
       /** 删除前的提醒：这些卡片还被哪些笔记引用着（没被引用就返回空串） */
       refDeleteDetail(cards) {
         const list = Array.isArray(cards) ? cards : [cards];
         const hits = list.filter((c) => this.plugin.refCount(c) > 0);
-        if (!hits.length)
-          return "";
+        if (!hits.length) return "";
         const names = [];
         for (const c of hits) {
           const info = this.plugin.refSummary(c);
-          if (!info)
-            continue;
+          if (!info) continue;
           for (const n of info.names) {
-            if (names.indexOf(n) === -1)
-              names.push(n);
+            if (names.indexOf(n) === -1) names.push(n);
           }
         }
-        if (!names.length)
-          return "";
+        if (!names.length) return "";
         const shown = names.slice(0, 3).join("\u3001") + (names.length > 3 ? " \u7B49" : "");
         const head = list.length === 1 ? "\u8FD9\u5F20\u5361\u7247\u88AB " + this.plugin.refCount(hits[0]) + " \u7BC7\u7B14\u8BB0\u5F15\u7528\u7740" : "\u5176\u4E2D " + hits.length + " \u6761\u88AB\u7B14\u8BB0\u5F15\u7528\uFF0C\u6D89\u53CA " + names.length + " \u7BC7\u7B14\u8BB0";
         return head + "\uFF1A" + shown + "\u3002\u5220\u9664\u540E\u8FD9\u4E9B\u5730\u65B9\u7684\u94FE\u63A5\u4F1A\u5931\u6548\uFF08\u663E\u793A\u4E3A\u300C\u627E\u4E0D\u5230\u8BE5\u5757\u300D\uFF09\u3002";
@@ -3284,12 +2988,10 @@ var require_noval_notes_core = __commonJS({
         for (; ; ) {
           const at = hay.indexOf(needle, i);
           if (at < 0) {
-            if (i < src.length)
-              parent.appendChild(document.createTextNode(src.slice(i)));
+            if (i < src.length) parent.appendChild(document.createTextNode(src.slice(i)));
             return;
           }
-          if (at > i)
-            parent.appendChild(document.createTextNode(src.slice(i, at)));
+          if (at > i) parent.appendChild(document.createTextNode(src.slice(i, at)));
           parent.createEl("mark", { text: src.slice(at, at + q.length) });
           i = at + q.length;
         }
@@ -3298,8 +3000,7 @@ var require_noval_notes_core = __commonJS({
         const key = this.cardKey(card);
         const picked = this.state.selectMode && this.state.selected.has(key);
         const box = parent.createDiv({ cls: "qm-card" + (picked ? " is-picked" : "") });
-        if (this._cardEls)
-          this._cardEls.set(key, box);
+        if (this._cardEls) this._cardEls.set(key, box);
         if (this.state.selectMode) {
           box.addClass("is-selectable");
           box.onclick = (e) => {
@@ -3356,8 +3057,7 @@ var require_noval_notes_core = __commonJS({
           };
         }
         this.renderAppendArea(box, card, sections);
-        if (this.state.selectMode)
-          return;
+        if (this.state.selectMode) return;
         this.mountCardMenuButton(head, card);
         this.bindCardEdit(box, card);
         this.bindCardDrag(box, card);
@@ -3503,8 +3203,7 @@ var require_noval_notes_core = __commonJS({
       requestEdit(card) {
         const key = this.cardKey(card);
         const cur = this.state.editingKey;
-        if (cur === key)
-          return;
+        if (cur === key) return;
         if (!cur) {
           this.beginEdit(key);
           return;
@@ -3546,8 +3245,7 @@ var require_noval_notes_core = __commonJS({
       /** 列表与回看共用一次刷新：回看打开时两个都要重画 */
       refreshLists(opts) {
         this.renderList(opts);
-        if (this.state.reviewOpen)
-          this.renderReview();
+        if (this.state.reviewOpen) this.renderReview();
       }
       /** 编辑原始内容区的输入框：列表和回看共用一套 */
       renderEditor(box, card, key) {
@@ -3578,8 +3276,7 @@ var require_noval_notes_core = __commonJS({
             return;
           }
           const saved = await this.plugin.updateCard(card, v);
-          if (!saved)
-            return;
+          if (!saved) return;
           this.state.editingKey = null;
           this.state.editingDraft = null;
           this.refreshLists({ keepScroll: true });
@@ -3597,16 +3294,13 @@ var require_noval_notes_core = __commonJS({
       /* ---------------- 追加区（列表 / 回看共用） ---------------- */
       /** 时间后面的「追加 N」徽标：只有存在追加时才出现，点一下展开 / 收起 */
       mountAppendBadge(head, card, sections) {
-        if (!sections.appends.length)
-          return null;
+        if (!sections.appends.length) return null;
         const key = this.cardKey(card);
         const badge = head.createSpan({ cls: "qm-append-badge", text: "\u8FFD\u52A0 " + sections.appends.length });
         badge.onclick = (e) => {
           e.stopPropagation();
-          if (this.state.appendOpen.has(key))
-            this.state.appendOpen.delete(key);
-          else
-            this.state.appendOpen.add(key);
+          if (this.state.appendOpen.has(key)) this.state.appendOpen.delete(key);
+          else this.state.appendOpen.add(key);
           this.refreshLists({ keepScroll: true });
         };
         return badge;
@@ -3620,8 +3314,7 @@ var require_noval_notes_core = __commonJS({
           });
         }
         const draft = this.state.appendDraft;
-        if (draft && draft.key === key)
-          this.renderAppendComposer(box, card, key);
+        if (draft && draft.key === key) this.renderAppendComposer(box, card, key);
       }
       renderAppendItem(list, card, item, index, key) {
         const row = list.createDiv({ cls: "qm-append-item" });
@@ -3649,12 +3342,10 @@ var require_noval_notes_core = __commonJS({
           };
           const save = editBar.createEl("button", { text: "\u4FDD\u5B58", cls: "qm-mini-btn is-primary" });
           save.onclick = async (e) => {
-            if (e && e.stopPropagation)
-              e.stopPropagation();
+            if (e && e.stopPropagation) e.stopPropagation();
             const text = this.state.appendEdit && this.state.appendEdit.key === key ? this.state.appendEdit.text : String(ta.value);
             const ok = await this.plugin.updateAppend(card, index, text);
-            if (!ok)
-              return;
+            if (!ok) return;
             this.state.appendEdit = null;
             this.refreshLists({ keepScroll: true });
           };
@@ -3673,8 +3364,7 @@ var require_noval_notes_core = __commonJS({
           e.stopPropagation();
           new ConfirmModal(this.app, "\u5220\u9664\u8FD9\u6761\u8FFD\u52A0\uFF1F", async () => {
             const ok = await this.plugin.deleteAppend(card, index);
-            if (!ok)
-              return;
+            if (!ok) return;
             this.state.appendEdit = null;
             this.refreshLists({ keepScroll: true });
           }).open();
@@ -3739,12 +3429,10 @@ var require_noval_notes_core = __commonJS({
         };
         const save = bar.createEl("button", { text: "\u8FFD\u52A0", cls: "qm-mini-btn is-primary" });
         save.onclick = async (e) => {
-          if (e && e.stopPropagation)
-            e.stopPropagation();
+          if (e && e.stopPropagation) e.stopPropagation();
           const text = this.state.appendDraft && this.state.appendDraft.key === key ? this.state.appendDraft.text : String(ta.value);
           const ok = await this.plugin.appendToCard(card, text);
-          if (!ok)
-            return;
+          if (!ok) return;
           this.state.appendDraft = null;
           this.state.appendOpen.add(key);
           this.refreshLists({ keepScroll: true });
@@ -3768,14 +3456,12 @@ var require_noval_notes_core = __commonJS({
       }
       bindCardEdit(box, card) {
         box.addEventListener("dblclick", (e) => {
-          if (this.state.selectMode)
-            return;
+          if (this.state.selectMode) return;
           const t = e.target;
           if (t && typeof t.closest === "function" && t.closest("a, .qm-tag, .qm-more, .qm-ref, .qm-append-badge, button, textarea")) {
             return;
           }
-          if (e.preventDefault)
-            e.preventDefault();
+          if (e.preventDefault) e.preventDefault();
           this.requestEdit(card);
         });
       }
@@ -3792,15 +3478,12 @@ var require_noval_notes_core = __commonJS({
         });
         box.addEventListener("dragstart", (e) => {
           if (this._dblRisk || this.state.selectMode || this.state.editingKey) {
-            if (e.preventDefault)
-              e.preventDefault();
+            if (e.preventDefault) e.preventDefault();
             return;
           }
           const t = e.target;
-          if (t && typeof t.closest === "function" && t.closest("a"))
-            return;
-          if (e.stopPropagation)
-            e.stopPropagation();
+          if (t && typeof t.closest === "function" && t.closest("a")) return;
+          if (e.stopPropagation) e.stopPropagation();
           const text = this.dragPayload(card);
           if (e.dataTransfer) {
             try {
@@ -3896,8 +3579,7 @@ var require_noval_notes_core = __commonJS({
           (tg) => tg.setValue(this.plugin.settings.strictCardId !== false).onChange(async (v) => {
             this.plugin.settings.strictCardId = v;
             await this.plugin.saveSettings();
-            if (v)
-              this.plugin.checkUnmanagedEntries();
+            if (v) this.plugin.checkUnmanagedEntries();
           })
         );
         new Setting2(containerEl).setName("\u5757\u5F15\u7528\u4F7F\u7528\u5D4C\u5165\u5F62\u5F0F").setDesc(
@@ -3922,8 +3604,7 @@ var require_noval_notes_core = __commonJS({
        */
       buildRefIndex() {
         const items = [];
-        if (!this.app || !this.app.metadataCache)
-          return /* @__PURE__ */ new Map();
+        if (!this.app || !this.app.metadataCache) return /* @__PURE__ */ new Map();
         let files = [];
         try {
           files = this.app.vault.getMarkdownFiles() || [];
@@ -3936,34 +3617,28 @@ var require_noval_notes_core = __commonJS({
           nameCount.set(b, (nameCount.get(b) || 0) + 1);
         }
         for (const f of files) {
-          if (this.isCardFilePath(f.path))
-            continue;
+          if (this.isCardFilePath(f.path)) continue;
           let cache = null;
           try {
             cache = this.app.metadataCache.getFileCache(f);
           } catch (e) {
             cache = null;
           }
-          if (!cache)
-            continue;
+          if (!cache) continue;
           const lists = [cache.links, cache.embeds, cache.frontmatterLinks];
           for (const arr of lists) {
-            if (!arr || !arr.length)
-              continue;
+            if (!arr || !arr.length) continue;
             for (const l of arr) {
               const ref = qmParseBlockRef(l && (l.link || l.original) || "");
-              if (!ref || !ref.target)
-                continue;
+              if (!ref || !ref.target) continue;
               let dest = null;
               try {
                 dest = this.app.metadataCache.getFirstLinkpathDest(ref.target, f.path);
               } catch (e) {
                 dest = null;
               }
-              if (!dest || !dest.path)
-                continue;
-              if (!this.isCardFilePath(dest.path))
-                continue;
+              if (!dest || !dest.path) continue;
+              if (!this.isCardFilePath(dest.path)) continue;
               const base = qmBaseName(dest.path);
               items.push({
                 sourcePath: f.path,
@@ -3991,8 +3666,7 @@ var require_noval_notes_core = __commonJS({
       }
       /** 别处改了文件后合并重算，避免连续敲字触发多次 */
       queueRefs(delay) {
-        if (this._refTimer)
-          clearTimeout(this._refTimer);
+        if (this._refTimer) clearTimeout(this._refTimer);
         this._refTimer = setTimeout(() => {
           this._refTimer = null;
           this.refreshRefs();
@@ -4000,10 +3674,8 @@ var require_noval_notes_core = __commonJS({
         }, typeof delay === "number" ? delay : 800);
       }
       refEntry(card) {
-        if (!card || !card.id)
-          return null;
-        if (!this._refIndex)
-          return null;
+        if (!card || !card.id) return null;
+        if (!this._refIndex) return null;
         return this._refIndex.get(card.filePath + "#^" + String(card.id).toLowerCase()) || null;
       }
       /** 被几篇笔记引用 */
@@ -4018,8 +3690,7 @@ var require_noval_notes_core = __commonJS({
        */
       refSummary(card) {
         const e = this.refEntry(card);
-        if (!e)
-          return null;
+        if (!e) return null;
         const rows = [];
         const seen = /* @__PURE__ */ new Map();
         for (const p of e.notes) {
@@ -4032,8 +3703,7 @@ var require_noval_notes_core = __commonJS({
         for (const r of rows) {
           if ((seen.get(r.name) || 0) > 1) {
             const parts = r.path.split("/");
-            if (parts.length > 1)
-              r.name = r.name + " \xB7 " + parts[parts.length - 2];
+            if (parts.length > 1) r.name = r.name + " \xB7 " + parts[parts.length - 2];
           }
         }
         rows.sort((a, b) => (a.line < 0 ? 1 : 0) - (b.line < 0 ? 1 : 0) || a.line - b.line || a.name.localeCompare(b.name));
@@ -4049,8 +3719,7 @@ var require_noval_notes_core = __commonJS({
       notifyRefs() {
         for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_QM)) {
           const v = leaf.view;
-          if (v && typeof v.updateRefs === "function")
-            v.updateRefs();
+          if (v && typeof v.updateRefs === "function") v.updateRefs();
         }
       }
       /** 换了目标笔记：回看开着就让视图重算「已插入」（按钮状态跟着笔记走） */
@@ -4113,8 +3782,7 @@ var require_noval_notes_core = __commonJS({
             } catch (e) {
               sel = "";
             }
-            if (!String(sel || "").trim())
-              return;
+            if (!String(sel || "").trim()) return;
             menu.addItem(
               (i) => i.setTitle("\u5B58\u4E3A\u5361\u7247").setIcon(ICON_ID).onClick(() => this.captureSelection(editor))
             );
@@ -4142,11 +3810,9 @@ var require_noval_notes_core = __commonJS({
         this.registerDomEvent(document, "selectionchange", () => {
           try {
             const sel = window.getSelection();
-            if (!sel || sel.isCollapsed)
-              return;
+            if (!sel || sel.isCollapsed) return;
             const t = String(sel).trim();
-            if (!t)
-              return;
+            if (!t) return;
             this._lastSelection = t;
             this._lastSelectionAt = Date.now();
           } catch (e) {
@@ -4172,15 +3838,12 @@ var require_noval_notes_core = __commonJS({
           check();
           this.warmCards();
         };
-        if (this.app.workspace.onLayoutReady)
-          this.app.workspace.onLayoutReady(boot);
-        else
-          boot();
+        if (this.app.workspace.onLayoutReady) this.app.workspace.onLayoutReady(boot);
+        else boot();
       }
       onunload() {
         if (this._pruneTimers) {
-          for (const t of this._pruneTimers.values())
-            clearTimeout(t);
+          for (const t of this._pruneTimers.values()) clearTimeout(t);
           this._pruneTimers.clear();
         }
         if (this._refTimer) {
@@ -4237,18 +3900,14 @@ var require_noval_notes_core = __commonJS({
       /** 还有效的草稿内容；没有、为空白或超过 7 天都返回空串 */
       draftAlive() {
         const d = this.settings.draft;
-        if (!d || typeof d.text !== "string")
-          return "";
-        if (!d.text.trim())
-          return "";
-        if (!d.at || Date.now() - d.at > DRAFT_TTL)
-          return "";
+        if (!d || typeof d.text !== "string") return "";
+        if (!d.text.trim()) return "";
+        if (!d.at || Date.now() - d.at > DRAFT_TTL) return "";
         return d.text;
       }
       /** 打字时用这个：停顿 1.5 秒才写盘，不打断输入 */
       queueDraft(text) {
-        if (this._draftTimer)
-          clearTimeout(this._draftTimer);
+        if (this._draftTimer) clearTimeout(this._draftTimer);
         this._draftTimer = setTimeout(() => {
           this._draftTimer = null;
           this.saveDraft(text);
@@ -4278,8 +3937,7 @@ var require_noval_notes_core = __commonJS({
           this._draftTimer = null;
         }
         const d = this.settings.draft;
-        if (!d || !d.text && !d.at)
-          return;
+        if (!d || !d.text && !d.at) return;
         this.settings.draft = { text: "", at: 0 };
         try {
           await this.saveData(this.settings);
@@ -4302,15 +3960,11 @@ var require_noval_notes_core = __commonJS({
        */
       checkManagedFile(file, cardDate) {
         const folder = this.folderPathSafe();
-        if (!folder)
-          return { ok: false, reason: "\u8FD8\u6CA1\u6709\u8BBE\u7F6E\u5361\u7247\u6587\u4EF6\u5939" };
-        if (!(file instanceof TFile))
-          return { ok: false, reason: "\u5361\u7247\u6587\u4EF6\u5DF2\u4E0D\u5B58\u5728" };
-        if (!MONTH_FILE_RE.test(file.name))
-          return { ok: false, reason: "\u76EE\u6807\u6587\u4EF6\u4E0D\u662F\u6309\u6708\u5361\u7247\u6587\u4EF6" };
+        if (!folder) return { ok: false, reason: "\u8FD8\u6CA1\u6709\u8BBE\u7F6E\u5361\u7247\u6587\u4EF6\u5939" };
+        if (!(file instanceof TFile)) return { ok: false, reason: "\u5361\u7247\u6587\u4EF6\u5DF2\u4E0D\u5B58\u5728" };
+        if (!MONTH_FILE_RE.test(file.name)) return { ok: false, reason: "\u76EE\u6807\u6587\u4EF6\u4E0D\u662F\u6309\u6708\u5361\u7247\u6587\u4EF6" };
         const parent = String(file.path).split("/").slice(0, -1).join("/");
-        if (parent !== folder)
-          return { ok: false, reason: "\u5361\u7247\u6587\u4EF6\u4E0D\u5728\u5F53\u524D\u6587\u4EF6\u5939\u91CC" };
+        if (parent !== folder) return { ok: false, reason: "\u5361\u7247\u6587\u4EF6\u4E0D\u5728\u5F53\u524D\u6587\u4EF6\u5939\u91CC" };
         if (cardDate && /^\d{4}-\d{2}-\d{2}$/.test(cardDate) && cardDate.slice(0, 7) !== baseOf(file.path)) {
           return { ok: false, reason: "\u5361\u7247\u65E5\u671F\u4E0E\u6587\u4EF6\u6708\u4EFD\u4E0D\u4E00\u81F4" };
         }
@@ -4319,18 +3973,14 @@ var require_noval_notes_core = __commonJS({
       /** 切换文件夹前的体检：不允许把不像卡片的年月文件接管过来 */
       async validateFolderTarget(path) {
         const val = String(path || "").trim().replace(/^\/+|\/+$/g, "");
-        if (!val)
-          return { ok: false, reason: "\u6587\u4EF6\u5939\u4E0D\u80FD\u4E3A\u7A7A" };
-        if (val.indexOf("..") !== -1)
-          return { ok: false, reason: "\u8DEF\u5F84\u91CC\u4E0D\u80FD\u51FA\u73B0 .." };
+        if (!val) return { ok: false, reason: "\u6587\u4EF6\u5939\u4E0D\u80FD\u4E3A\u7A7A" };
+        if (val.indexOf("..") !== -1) return { ok: false, reason: "\u8DEF\u5F84\u91CC\u4E0D\u80FD\u51FA\u73B0 .." };
         if (val === ".obsidian" || val.indexOf(".obsidian/") === 0) {
           return { ok: false, reason: "\u4E0D\u80FD\u653E\u5728 .obsidian \u91CC" };
         }
         const af = this.app.vault.getAbstractFileByPath(val);
-        if (af && !(af instanceof TFolder))
-          return { ok: false, reason: "\u8FD9\u662F\u4E00\u4E2A\u6587\u4EF6\uFF0C\u4E0D\u662F\u6587\u4EF6\u5939" };
-        if (!(af instanceof TFolder))
-          return { ok: true };
+        if (af && !(af instanceof TFolder)) return { ok: false, reason: "\u8FD9\u662F\u4E00\u4E2A\u6587\u4EF6\uFF0C\u4E0D\u662F\u6587\u4EF6\u5939" };
+        if (!(af instanceof TFolder)) return { ok: true };
         const months = af.children.filter((f) => f instanceof TFile && MONTH_FILE_RE.test(f.name));
         for (const f of months) {
           let content = "";
@@ -4360,34 +4010,28 @@ var require_noval_notes_core = __commonJS({
       }
       async ensureFileAt(path) {
         const exist = this.app.vault.getAbstractFileByPath(path);
-        if (exist instanceof TFile)
-          return exist;
+        if (exist instanceof TFile) return exist;
         const idx = path.lastIndexOf("/");
-        if (idx > 0)
-          await this.ensureFolder(path.slice(0, idx));
+        if (idx > 0) await this.ensureFolder(path.slice(0, idx));
         try {
           return await this.app.vault.create(path, "");
         } catch (e) {
           const again = this.app.vault.getAbstractFileByPath(path);
-          if (again instanceof TFile)
-            return again;
+          if (again instanceof TFile) return again;
           throw e;
         }
       }
       /* ---------------- 读取 ---------------- */
       listCardFiles() {
         const folder = this.app.vault.getAbstractFileByPath(this.settings.folderPath);
-        if (!(folder instanceof TFolder))
-          return [];
+        if (!(folder instanceof TFolder)) return [];
         return folder.children.filter((f) => f instanceof TFile && MONTH_FILE_RE.test(f.name)).sort((a, b) => a.name < b.name ? -1 : 1);
       }
       isCardFilePath(path) {
         const folder = this.folderPathSafe();
-        if (!folder)
-          return false;
+        if (!folder) return false;
         const p = String(path || "");
-        if (p.indexOf(folder + "/") !== 0)
-          return false;
+        if (p.indexOf(folder + "/") !== 0) return false;
         return MONTH_FILE_RE.test(p.split("/").pop() || "");
       }
       async readAllCards() {
@@ -4409,16 +4053,14 @@ var require_noval_notes_core = __commonJS({
           })
         );
         const all = [];
-        for (const c of chunks)
-          all.push(...c);
+        for (const c of chunks) all.push(...c);
         return sortCards(all);
       }
       /** 快速记录弹窗用：面板已加载就直接用内存里的，避免每次开弹窗都读盘 */
       async cardsForSuggest() {
         for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_QM)) {
           const v = leaf.view;
-          if (v && v._loadedOnce && v.state && Array.isArray(v.state.cards))
-            return v.state.cards;
+          if (v && v._loadedOnce && v.state && Array.isArray(v.state.cards)) return v.state.cards;
         }
         return await this.readAllCards();
       }
@@ -4434,8 +4076,7 @@ var require_noval_notes_core = __commonJS({
         await this.app.vault.process(file, (data) => {
           const res = fn(String(data || ""));
           const next = typeof res === "string" ? res : data;
-          if (next !== data)
-            written = next;
+          if (next !== data) written = next;
           return next;
         });
         if (written !== null) {
@@ -4452,8 +4093,7 @@ var require_noval_notes_core = __commonJS({
       async mutateCardFile(card, fn) {
         const file = this.app.vault.getAbstractFileByPath(card.filePath);
         const guard = this.checkManagedFile(file, card.date);
-        if (!guard.ok)
-          return guard;
+        if (!guard.ok) return guard;
         let out = { ok: false, reason: "\u6587\u4EF6\u5DF2\u5728\u522B\u5904\u4FEE\u6539\uFF0C\u5DF2\u5237\u65B0" };
         let written = null;
         const opts = { strict: this.settings.strictCardId !== false };
@@ -4470,8 +4110,7 @@ var require_noval_notes_core = __commonJS({
             return data;
           }
           out = { ok: true, hit };
-          if (res !== data)
-            written = res;
+          if (res !== data) written = res;
           return res;
         });
         if (written !== null) {
@@ -4486,8 +4125,7 @@ var require_noval_notes_core = __commonJS({
         const ids = qmCollectIds(content);
         let id = genId();
         let guard = 0;
-        while (ids.has(id) && guard++ < 50)
-          id = genId();
+        while (ids.has(id) && guard++ < 50) id = genId();
         return id;
       }
       /**
@@ -4497,8 +4135,7 @@ var require_noval_notes_core = __commonJS({
       notifyViews(info) {
         for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_QM)) {
           const v = leaf.view;
-          if (!v)
-            continue;
+          if (!v) continue;
           if (info && info.path && typeof v.applyFileCards === "function") {
             v.applyFileCards(info.path, info.content);
           } else if (info && info.light && typeof v.rerender === "function") {
@@ -4510,8 +4147,7 @@ var require_noval_notes_core = __commonJS({
       }
       /* ---------------- 认出「这是我自己刚写的」 ---------------- */
       rememberWrite(path, content) {
-        if (!this._ownWrites)
-          this._ownWrites = /* @__PURE__ */ new Map();
+        if (!this._ownWrites) this._ownWrites = /* @__PURE__ */ new Map();
         this._ownWrites.set(path, { content, at: Date.now() });
         while (this._ownWrites.size > 8) {
           const first = this._ownWrites.keys().next().value;
@@ -4523,11 +4159,9 @@ var require_noval_notes_core = __commonJS({
        * 说明就是自己那次写入，不用再重读一遍。内容变了就当作外部改动。
        */
       async isOwnWrite(file) {
-        if (!this._ownWrites || !file)
-          return false;
+        if (!this._ownWrites || !file) return false;
         const rec = this._ownWrites.get(file.path);
-        if (!rec)
-          return false;
+        if (!rec) return false;
         if (Date.now() - rec.at > 3e3) {
           this._ownWrites.delete(file.path);
           return false;
@@ -4538,8 +4172,7 @@ var require_noval_notes_core = __commonJS({
         } catch (e) {
           return false;
         }
-        if (data === rec.content)
-          return true;
+        if (data === rec.content) return true;
         this._ownWrites.delete(file.path);
         return false;
       }
@@ -4549,8 +4182,7 @@ var require_noval_notes_core = __commonJS({
        * 这里只做一次提示（不改任何文件），防止旧卡片「悄悄消失」却不知道为什么。
        */
       async checkUnmanagedEntries() {
-        if (this.settings.strictCardId === false)
-          return;
+        if (this.settings.strictCardId === false) return;
         let total = 0;
         for (const f of this.listCardFiles()) {
           let content = "";
@@ -4560,8 +4192,7 @@ var require_noval_notes_core = __commonJS({
             continue;
           }
           for (const c of parseCards(content, f.path, { strict: false })) {
-            if (!c.id)
-              total++;
+            if (!c.id) total++;
           }
         }
         if (!total) {
@@ -4574,8 +4205,7 @@ var require_noval_notes_core = __commonJS({
           }
           return;
         }
-        if (total === this.settings.strictNoticeCount)
-          return;
+        if (total === this.settings.strictNoticeCount) return;
         this.settings.strictNoticeCount = total;
         try {
           await this.saveData(this.settings);
@@ -4598,8 +4228,7 @@ var require_noval_notes_core = __commonJS({
           } catch (e) {
             continue;
           }
-          for (const o of qmFindOrphans(content, f.path, opts))
-            out.push(o);
+          for (const o of qmFindOrphans(content, f.path, opts)) out.push(o);
         }
         return out;
       }
@@ -4636,16 +4265,14 @@ var require_noval_notes_core = __commonJS({
           const all = text.replace(/\r\n?/g, "\n").split("\n");
           all.forEach((l, i) => {
             if (i < hit.lineStart || i > hit.lineEnd) {
-              for (const id of qmCollectIds(l))
-                others.add(id);
+              for (const id of qmCollectIds(l)) others.add(id);
             }
           });
           let newId = hit.id || "";
           if (!newId || others.has(newId)) {
             let nid = genId();
             let guardN = 0;
-            while (others.has(nid) && guardN++ < 50)
-              nid = genId();
+            while (others.has(nid) && guardN++ < 50) nid = genId();
             newId = nid;
           }
           const lines = qmRebuildOrphanLines(hit, usedTime, newId);
@@ -4705,8 +4332,7 @@ var require_noval_notes_core = __commonJS({
           new Notice2("\u6CA1\u6709\u5220\u9664\uFF1A" + (reason || "\u76EE\u6807\u6587\u4EF6\u4E0D\u53EF\u5199"), 8e3);
           return false;
         }
-        if (removed.length)
-          await this.pushTrashMany(removed);
+        if (removed.length) await this.pushTrashMany(removed);
         this.rememberWrite(item.filePath, written);
         this.notifyViews({ path: item.filePath, content: written });
         new Notice2("\u5DF2\u5220\u9664 \xB7 \u53EF\u5728\u300C\u6700\u8FD1\u5220\u9664\u300D\u6062\u590D", 7e3);
@@ -4725,8 +4351,7 @@ var require_noval_notes_core = __commonJS({
             failed.push(it);
             continue;
           }
-          if (!byFile.has(p))
-            byFile.set(p, []);
+          if (!byFile.has(p)) byFile.set(p, []);
           byFile.get(p).push(it);
         }
         const writes = [];
@@ -4752,8 +4377,7 @@ var require_noval_notes_core = __commonJS({
                 used.add(hit.lineStart);
                 ranges.push(hit);
               }
-              if (!ranges.length)
-                return data;
+              if (!ranges.length) return data;
               const lines = text.replace(/\r\n?/g, "\n").split("\n");
               ranges.sort((a, b) => b.lineStart - a.lineStart);
               const removed = [];
@@ -4782,12 +4406,9 @@ var require_noval_notes_core = __commonJS({
             failed.push(...group);
           }
         }
-        if (saved.length)
-          await this.pushTrashMany(saved);
-        if (writes.length === 1)
-          this.notifyViews({ path: writes[0].path, content: writes[0].content });
-        else if (writes.length > 1)
-          this.notifyViews();
+        if (saved.length) await this.pushTrashMany(saved);
+        if (writes.length === 1) this.notifyViews({ path: writes[0].path, content: writes[0].content });
+        else if (writes.length > 1) this.notifyViews();
         return { deleted: saved.length, failed: failed.length };
       }
       /* ---------------- 空日期标题自动清理 ---------------- */
@@ -4797,11 +4418,9 @@ var require_noval_notes_core = __commonJS({
         const leaves = this.app.workspace.getLeavesOfType("markdown");
         for (const leaf of leaves) {
           const view = leaf.view;
-          if (!view || !view.file || view.file.path !== file.path)
-            continue;
+          if (!view || !view.file || view.file.path !== file.path) continue;
           const editor = view.editor;
-          if (!editor)
-            continue;
+          if (!editor) continue;
           let lines = [];
           let line = 0;
           try {
@@ -4825,17 +4444,12 @@ var require_noval_notes_core = __commonJS({
        * 只要某一天的卡片全没了，这个日期标题就会被收走。
        */
       pruneSoon(file) {
-        if (!this.settings.autoPruneEmptyDates)
-          return;
-        if (!(file instanceof TFile))
-          return;
-        if (!this.checkManagedFile(file).ok)
-          return;
-        if (!this._pruneTimers)
-          this._pruneTimers = /* @__PURE__ */ new Map();
+        if (!this.settings.autoPruneEmptyDates) return;
+        if (!(file instanceof TFile)) return;
+        if (!this.checkManagedFile(file).ok) return;
+        if (!this._pruneTimers) this._pruneTimers = /* @__PURE__ */ new Map();
         const old = this._pruneTimers.get(file.path);
-        if (old)
-          clearTimeout(old);
+        if (old) clearTimeout(old);
         const timer = setTimeout(() => {
           this._pruneTimers.delete(file.path);
           this.pruneEmptyDates(file);
@@ -4843,32 +4457,25 @@ var require_noval_notes_core = __commonJS({
         this._pruneTimers.set(file.path, timer);
       }
       async pruneEmptyDates(file) {
-        if (!this.settings.autoPruneEmptyDates)
-          return;
+        if (!this.settings.autoPruneEmptyDates) return;
         const target = this.app.vault.getAbstractFileByPath(file.path);
-        if (!(target instanceof TFile))
-          return;
-        if (!this.checkManagedFile(target).ok)
-          return;
-        if (await this.isOwnWrite(target))
-          return;
+        if (!(target instanceof TFile)) return;
+        if (!this.checkManagedFile(target).ok) return;
+        if (await this.isOwnWrite(target)) return;
         let content = "";
         try {
           content = await this.app.vault.read(target);
         } catch (e) {
           return;
         }
-        if (!content || content.indexOf("##") === -1)
-          return;
+        if (!content || content.indexOf("##") === -1) return;
         const skip = this.cursorDatesIn(target);
-        if (!qmStripEmptyDateSections(content, skip).removed.length)
-          return;
+        if (!qmStripEmptyDateSections(content, skip).removed.length) return;
         let changed = null;
         try {
           await this.app.vault.process(target, (data) => {
             const res = qmStripEmptyDateSections(String(data || ""), skip);
-            if (!res.removed.length)
-              return data;
+            if (!res.removed.length) return data;
             changed = res.text;
             return res.text;
           });
@@ -4903,8 +4510,7 @@ var require_noval_notes_core = __commonJS({
           return false;
         }
         this._lastAppended = { path, date, time, id: madeId, body: bodyLines.join("\n") };
-        if (!(opts && opts.silent))
-          new Notice2("\u5DF2\u8BB0\u4E0B");
+        if (!(opts && opts.silent)) new Notice2("\u5DF2\u8BB0\u4E0B");
         return true;
       }
       /**
@@ -4915,15 +4521,13 @@ var require_noval_notes_core = __commonJS({
       async captureSelection(editor) {
         let text = "";
         try {
-          if (editor && typeof editor.getSelection === "function")
-            text = editor.getSelection();
+          if (editor && typeof editor.getSelection === "function") text = editor.getSelection();
         } catch (e) {
           text = "";
         }
         if (!String(text || "").trim()) {
           const fresh = Date.now() - (this._lastSelectionAt || 0) < 6e4;
-          if (fresh)
-            text = this._lastSelection || "";
+          if (fresh) text = this._lastSelection || "";
         }
         text = String(text || "").replace(/\r\n?/g, "\n").trim();
         if (!text) {
@@ -4931,8 +4535,7 @@ var require_noval_notes_core = __commonJS({
           return false;
         }
         const ok = await this.appendCard(text, { silent: true });
-        if (!ok)
-          return false;
+        if (!ok) return false;
         const long = text.length > 300;
         const msg = long ? "\u5DF2\u5B58\u4E3A\u5361\u7247\uFF08" + text.length + " \u5B57\uFF0C\u504F\u957F\uFF09\xB7 \u70B9\u6B64\u64A4\u9500" : "\u5DF2\u5B58\u4E3A\u5361\u7247 \xB7 \u70B9\u6B64\u64A4\u9500";
         const n = new Notice2(msg, 8e3);
@@ -4951,8 +4554,7 @@ var require_noval_notes_core = __commonJS({
       /** 撤销刚存的卡片：走正常删除流程（进回收站），但不弹第二个「已删除·撤销」 */
       async undoLastCapture() {
         const made = this._lastAppended;
-        if (!made)
-          return;
+        if (!made) return;
         this._lastAppended = null;
         await this.deleteCard(
           { filePath: made.path, date: made.date, time: made.time, body: made.body, id: made.id },
@@ -4966,13 +4568,10 @@ var require_noval_notes_core = __commonJS({
        */
       isPreviewView(view) {
         try {
-          if (!view)
-            return false;
-          if (typeof view.getMode === "function" && view.getMode() === "preview")
-            return true;
+          if (!view) return false;
+          if (typeof view.getMode === "function" && view.getMode() === "preview") return true;
           const cm = view.currentMode;
-          if (cm && cm.type === "preview")
-            return true;
+          if (cm && cm.type === "preview") return true;
         } catch (e) {
         }
         return false;
@@ -4989,22 +4588,19 @@ var require_noval_notes_core = __commonJS({
         const ws = this.app.workspace;
         try {
           const ae = ws.activeEditor;
-          if (ae && ae.editor && !this.isPreviewView(ae))
-            return ae.editor;
+          if (ae && ae.editor && !this.isPreviewView(ae)) return ae.editor;
         } catch (e) {
         }
         try {
           const leaf = this._lastMdLeaf;
           const ed = leaf && leaf.view && leaf.view.editor;
-          if (ed && !this.isPreviewView(leaf.view) && this.leafAlive(leaf))
-            return ed;
+          if (ed && !this.isPreviewView(leaf.view) && this.leafAlive(leaf)) return ed;
         } catch (e) {
         }
         try {
           const leaf = ws.getMostRecentLeaf ? ws.getMostRecentLeaf(ws.rootSplit) : null;
           const ed = leaf && leaf.view && leaf.view.editor;
-          if (ed && !this.isPreviewView(leaf.view))
-            return ed;
+          if (ed && !this.isPreviewView(leaf.view)) return ed;
         } catch (e) {
         }
         try {
@@ -5012,24 +4608,18 @@ var require_noval_notes_core = __commonJS({
           let side = null;
           for (const leaf of leaves) {
             const ed = leaf && leaf.view && leaf.view.editor;
-            if (!ed)
-              continue;
-            if (this.isPreviewView(leaf.view))
-              continue;
+            if (!ed) continue;
+            if (this.isPreviewView(leaf.view)) continue;
             const root = leaf.getRoot ? leaf.getRoot() : null;
-            if (!root || !ws.rootSplit || root === ws.rootSplit)
-              return ed;
-            if (!side)
-              side = ed;
+            if (!root || !ws.rootSplit || root === ws.rootSplit) return ed;
+            if (!side) side = ed;
           }
-          if (side)
-            return side;
+          if (side) return side;
         } catch (e) {
         }
         try {
           const view = ws.getActiveViewOfType ? ws.getActiveViewOfType(MarkdownView) : null;
-          if (view && view.editor && !this.isPreviewView(view))
-            return view.editor;
+          if (view && view.editor && !this.isPreviewView(view)) return view.editor;
         } catch (e) {
         }
         return null;
@@ -5042,12 +4632,10 @@ var require_noval_notes_core = __commonJS({
       rememberEditorLeaf(leaf) {
         try {
           const ed = leaf && leaf.view && leaf.view.editor;
-          if (!ed)
-            return;
+          if (!ed) return;
           const ws = this.app.workspace;
           const root = leaf.getRoot ? leaf.getRoot() : null;
-          if (root && ws.rootSplit && root !== ws.rootSplit)
-            return;
+          if (root && ws.rootSplit && root !== ws.rootSplit) return;
           this._lastMdLeaf = leaf;
         } catch (e) {
         }
@@ -5056,10 +4644,8 @@ var require_noval_notes_core = __commonJS({
       leafAlive(leaf) {
         try {
           const ws = this.app.workspace;
-          if (!leaf || !leaf.view)
-            return false;
-          if (typeof ws.getLeavesOfType !== "function")
-            return true;
+          if (!leaf || !leaf.view) return false;
+          if (typeof ws.getLeavesOfType !== "function") return true;
           return ws.getLeavesOfType("markdown").indexOf(leaf) >= 0;
         } catch (e) {
           return true;
@@ -5070,8 +4656,7 @@ var require_noval_notes_core = __commonJS({
         const ws = this.app.workspace;
         try {
           const f = ws.getActiveFile ? ws.getActiveFile() : null;
-          if (f)
-            return f;
+          if (f) return f;
         } catch (e) {
         }
         const fromLeaf = (leaf) => {
@@ -5082,21 +4667,18 @@ var require_noval_notes_core = __commonJS({
           }
         };
         const cached = fromLeaf(this._lastMdLeaf);
-        if (cached)
-          return cached;
+        if (cached) return cached;
         try {
           const leaf = ws.getMostRecentLeaf ? ws.getMostRecentLeaf(ws.rootSplit) : null;
           const f = fromLeaf(leaf);
-          if (f)
-            return f;
+          if (f) return f;
         } catch (e) {
         }
         try {
           const leaves = ws.getLeavesOfType ? ws.getLeavesOfType("markdown") : [];
           for (const leaf of leaves) {
             const f = fromLeaf(leaf);
-            if (f)
-              return f;
+            if (f) return f;
           }
         } catch (e) {
         }
@@ -5115,8 +4697,7 @@ var require_noval_notes_core = __commonJS({
           let text = "";
           try {
             text = ed && typeof ed.getValue === "function" ? ed.getValue() : "";
-            if (!text && file)
-              text = String(await this.app.vault.cachedRead(file));
+            if (!text && file) text = String(await this.app.vault.cachedRead(file));
           } catch (e) {
             text = "";
           }
@@ -5147,8 +4728,7 @@ var require_noval_notes_core = __commonJS({
         try {
           await this.app.vault.process(file, (data) => {
             const text = String(data || "");
-            if (!text)
-              return insert + "\n";
+            if (!text) return insert + "\n";
             const head = text.endsWith("\n") ? text : text + "\n";
             return head + "\n" + insert + "\n";
           });
@@ -5166,8 +4746,7 @@ var require_noval_notes_core = __commonJS({
        * 打开面板就是一片空白。留着旧数据最多晚 1.2 秒。
        */
       invalidateCards() {
-        if (this._cardWarmTimer)
-          clearTimeout(this._cardWarmTimer);
+        if (this._cardWarmTimer) clearTimeout(this._cardWarmTimer);
         this._cardWarmTimer = setTimeout(() => {
           this._cardWarmTimer = null;
           this.warmCards();
@@ -5182,8 +4761,7 @@ var require_noval_notes_core = __commonJS({
       }
       /** 面板打开时用的数据：没预热过就现读一次，绝不给一个空列表 */
       async suggestCardsAsync(query) {
-        if (!this._cardCache || !this._cardCache.length)
-          await this.warmCards();
+        if (!this._cardCache || !this._cardCache.length) await this.warmCards();
         return this.suggestCards(query);
       }
       /**
@@ -5209,16 +4787,13 @@ var require_noval_notes_core = __commonJS({
       currentNoteTags() {
         try {
           const file = this.currentNoteFile();
-          if (!file)
-            return [];
+          if (!file) return [];
           const cache = this.app.metadataCache.getFileCache(file);
-          if (!cache)
-            return [];
+          if (!cache) return [];
           const out = [];
           for (const t of cache.tags || []) {
             const v = String(t && t.tag || "").replace(/^#/, "").toLowerCase();
-            if (v)
-              out.push(v);
+            if (v) out.push(v);
           }
           return out;
         } catch (e) {
@@ -5229,8 +4804,7 @@ var require_noval_notes_core = __commonJS({
       cardAgeDays(card) {
         try {
           const d = moment(String(card && card.date || ""), "YYYY-MM-DD", true);
-          if (!d || typeof d.isValid !== "function" || !d.isValid())
-            return null;
+          if (!d || typeof d.isValid !== "function" || !d.isValid()) return null;
           return moment().startOf("day").diff(d.clone().startOf("day"), "days");
         } catch (e) {
           return null;
@@ -5242,8 +4816,7 @@ var require_noval_notes_core = __commonJS({
        */
       suggestCards(query) {
         const cards = this._cardCache || [];
-        if (!cards.length)
-          return [];
+        if (!cards.length) return [];
         const raw = String(query || "").trim();
         const conds = qmParseQuery(raw);
         const words = conds.filter((c) => c.kind === "text").map((c) => c.value);
@@ -5253,13 +4826,11 @@ var require_noval_notes_core = __commonJS({
           const strict = qmCardMatches(c, conds);
           let sim = 0;
           if (!strict) {
-            if (!raw)
-              continue;
+            if (!raw) continue;
             sim = qmBigramScore(raw, c.bodyLower || "");
             const low = raw.toLowerCase();
             const tagHit = (c.tags || []).some((t) => String(t).toLowerCase().indexOf(low) !== -1);
-            if (sim < 0.28 && !tagHit)
-              continue;
+            if (sim < 0.28 && !tagHit) continue;
           }
           rows.push({
             card: c,
@@ -5275,20 +4846,16 @@ var require_noval_notes_core = __commonJS({
         let score = 0;
         const body = String(card.bodyLower || "");
         for (const w of words) {
-          if (w && body.indexOf(w) !== -1)
-            score += 3;
+          if (w && body.indexOf(w) !== -1) score += 3;
         }
-        if (raw.length >= 4)
-          score += qmBigramScore(raw, body) * 5;
+        if (raw.length >= 4) score += qmBigramScore(raw, body) * 5;
         score += Math.min(2, this.refCount(card));
         const tags = card.tags || [];
         for (const t of tags) {
-          if (noteTags.indexOf(String(t).toLowerCase()) !== -1)
-            score += 2;
+          if (noteTags.indexOf(String(t).toLowerCase()) !== -1) score += 2;
         }
         const age = this.cardAgeDays(card);
-        if (age !== null && age <= 30)
-          score += 1;
+        if (age !== null && age <= 30) score += 1;
         return score;
       }
       /** 候选行：时间 + 引用点 + 标签 + 首行（命中词高亮），不显示「相似度」 */
@@ -5297,8 +4864,7 @@ var require_noval_notes_core = __commonJS({
         el.addClass("qm-picker-row");
         const head = el.createDiv({ cls: "qm-suggest-head" });
         head.createSpan({ cls: "qm-suggest-when", text: String(item.card.date).slice(5) + " " + item.card.time });
-        if (item.card.id && this.refCount(item.card))
-          head.createSpan({ cls: "qm-suggest-ref" });
+        if (item.card.id && this.refCount(item.card)) head.createSpan({ cls: "qm-suggest-ref" });
         const tags = item.card.tags || [];
         if (tags.length) {
           head.createSpan({ cls: "qm-suggest-tags", text: tags.slice(0, 3).map((t) => "#" + t).join(" ") });
@@ -5312,8 +4878,7 @@ var require_noval_notes_core = __commonJS({
        * 没有块 ID 的旧卡片退化成纯文本，别造一个跳不过去的链接。
        */
       cardRefText(card, plain) {
-        if (plain)
-          return qmPasteText(card.body);
+        if (plain) return qmPasteText(card.body);
         if (card.id) {
           const bang = this.settings.blockRefEmbed ? "!" : "";
           return bang + "[[" + this.linkTarget(card) + "#^" + card.id + "]]";
@@ -5349,16 +4914,13 @@ var require_noval_notes_core = __commonJS({
           files = [];
         }
         const same = files.filter((f) => f && f.name === name);
-        if (same.length > 1)
-          return String(card.filePath || "").replace(/\.md$/, "");
+        if (same.length > 1) return String(card.filePath || "").replace(/\.md$/, "");
         return String(card && card.fileBase || "");
       }
       async ensureId(card) {
         const file = this.app.vault.getAbstractFileByPath(card.filePath);
-        if (!(file instanceof TFile))
-          return "";
-        if (card.id && card.idOnLastLine)
-          return card.id;
+        if (!(file instanceof TFile)) return "";
+        if (card.id && card.idOnLastLine) return card.id;
         let result = "";
         const res = await this.mutateCardFile(card, (lines, hit) => {
           const onEnd = lines[hit.lineEnd].match(/[ \t]\^([A-Za-z0-9-]+)[ \t]*$/);
@@ -5369,10 +4931,8 @@ var require_noval_notes_core = __commonJS({
           let oldId = "";
           for (let j = hit.lineIndex; j < hit.lineEnd; j++) {
             const m = lines[j].match(/[ \t]\^([A-Za-z0-9-]+)[ \t]*$/);
-            if (!m)
-              continue;
-            if (!oldId)
-              oldId = m[1];
+            if (!m) continue;
+            if (!oldId) oldId = m[1];
             lines[j] = lines[j].replace(/[ \t]\^[A-Za-z0-9-]+[ \t]*$/, "");
           }
           const id = oldId || card.id || this.uniqueIdIn(lines.join("\n"));
@@ -5403,10 +4963,8 @@ var require_noval_notes_core = __commonJS({
           const body = qmComposeBody(bodyLines.join("\n"), sections.appends);
           return qmReplaceBlock(lines, hit, body, id);
         });
-        if (res.ok)
-          new Notice2("\u5DF2\u66F4\u65B0");
-        else
-          new Notice2("\u6CA1\u6709\u4FEE\u6539\uFF1A" + res.reason);
+        if (res.ok) new Notice2("\u5DF2\u66F4\u65B0");
+        else new Notice2("\u6CA1\u6709\u4FEE\u6539\uFF1A" + res.reason);
         return !!res.ok;
       }
       /* ---------------- 追加 ---------------- */
@@ -5425,10 +4983,8 @@ var require_noval_notes_core = __commonJS({
           const body = qmComposeBody(sections.original, sections.appends);
           return qmReplaceBlock(lines, hit, body, id);
         });
-        if (res.ok)
-          new Notice2("\u5DF2\u8FFD\u52A0");
-        else
-          new Notice2("\u6CA1\u6709\u8FFD\u52A0\uFF1A" + res.reason);
+        if (res.ok) new Notice2("\u5DF2\u8FFD\u52A0");
+        else new Notice2("\u6CA1\u6709\u8FFD\u52A0\uFF1A" + res.reason);
         return !!res.ok;
       }
       /** 改第 index 条追加，其它节不动 */
@@ -5450,10 +5006,8 @@ var require_noval_notes_core = __commonJS({
           const body = qmComposeBody(sections.original, sections.appends);
           return qmReplaceBlock(lines, hit, body, id);
         });
-        if (res.ok)
-          new Notice2("\u5DF2\u66F4\u65B0\u8FFD\u52A0");
-        else
-          new Notice2(missing ? "\u8FD9\u6761\u8FFD\u52A0\u5DF2\u7ECF\u4E0D\u5B58\u5728\u4E86\uFF0C\u8BF7\u5237\u65B0" : "\u6CA1\u6709\u4FEE\u6539\uFF1A" + res.reason);
+        if (res.ok) new Notice2("\u5DF2\u66F4\u65B0\u8FFD\u52A0");
+        else new Notice2(missing ? "\u8FD9\u6761\u8FFD\u52A0\u5DF2\u7ECF\u4E0D\u5B58\u5728\u4E86\uFF0C\u8BF7\u5237\u65B0" : "\u6CA1\u6709\u4FEE\u6539\uFF1A" + res.reason);
         return !!res.ok;
       }
       /** 删第 index 条追加，原始内容与其它追加不动 */
@@ -5470,10 +5024,8 @@ var require_noval_notes_core = __commonJS({
           const body = qmComposeBody(sections.original, sections.appends);
           return qmReplaceBlock(lines, hit, body, id);
         });
-        if (res.ok)
-          new Notice2("\u5DF2\u5220\u9664\u8FD9\u6761\u8FFD\u52A0");
-        else
-          new Notice2(missing ? "\u8FD9\u6761\u8FFD\u52A0\u5DF2\u7ECF\u4E0D\u5B58\u5728\u4E86\uFF0C\u8BF7\u5237\u65B0" : "\u6CA1\u6709\u5220\u9664\uFF1A" + res.reason);
+        if (res.ok) new Notice2("\u5DF2\u5220\u9664\u8FD9\u6761\u8FFD\u52A0");
+        else new Notice2(missing ? "\u8FD9\u6761\u8FFD\u52A0\u5DF2\u7ECF\u4E0D\u5B58\u5728\u4E86\uFF0C\u8BF7\u5237\u65B0" : "\u6CA1\u6709\u5220\u9664\uFF1A" + res.reason);
         return !!res.ok;
       }
       /* ---------------- 删 ---------------- */
@@ -5495,8 +5047,7 @@ var require_noval_notes_core = __commonJS({
           lines: removed,
           filePath: card.filePath
         });
-        if (opts && opts.quiet)
-          return;
+        if (opts && opts.quiet) return;
         const n = new Notice2("\u5DF2\u5220\u9664 \xB7 \u70B9\u6B64\u64A4\u9500", 9e3);
         try {
           if (n && n.noticeEl) {
@@ -5525,8 +5076,7 @@ var require_noval_notes_core = __commonJS({
             failed.push(c);
             continue;
           }
-          if (!byFile.has(p))
-            byFile.set(p, []);
+          if (!byFile.has(p)) byFile.set(p, []);
           byFile.get(p).push(c);
         }
         const writes = [];
@@ -5553,8 +5103,7 @@ var require_noval_notes_core = __commonJS({
                 used.add(hit.lineIndex);
                 ranges.push(hit);
               }
-              if (!ranges.length)
-                return data;
+              if (!ranges.length) return data;
               const lines = text.replace(/\r\n?/g, "\n").split("\n");
               ranges.sort((a, b) => b.lineIndex - a.lineIndex);
               for (const hit of ranges) {
@@ -5583,14 +5132,10 @@ var require_noval_notes_core = __commonJS({
           }
           saved.push(...removed);
         }
-        if (saved.length)
-          await this.pushTrashMany(saved);
-        if (writes.length === 1)
-          this.notifyViews({ path: writes[0].path, content: writes[0].content });
-        else if (writes.length > 1)
-          this.notifyViews();
-        else
-          this.notifyViews({ light: true });
+        if (saved.length) await this.pushTrashMany(saved);
+        if (writes.length === 1) this.notifyViews({ path: writes[0].path, content: writes[0].content });
+        else if (writes.length > 1) this.notifyViews();
+        else this.notifyViews({ light: true });
         return { deleted: saved.length, failed: failed.length };
       }
       /* ---------------- 回收站 ---------------- */
@@ -5606,15 +5151,13 @@ var require_noval_notes_core = __commonJS({
           deletedAt: Date.now()
         };
         this.settings.trash.unshift(entry);
-        if (this.settings.trash.length > 50)
-          this.settings.trash.length = 50;
+        if (this.settings.trash.length > 50) this.settings.trash.length = 50;
         await this.saveSettings(false);
         return entry;
       }
       /** 批量入回收站：一次写完，避免 N 次读写配置与刷新视图 */
       async pushTrashMany(items) {
-        if (!items || !items.length)
-          return;
+        if (!items || !items.length) return;
         const now = Date.now();
         for (let i = 0; i < items.length; i++) {
           const it = items[i] || {};
@@ -5628,14 +5171,12 @@ var require_noval_notes_core = __commonJS({
             deletedAt: now
           });
         }
-        if (this.settings.trash.length > 50)
-          this.settings.trash.length = 50;
+        if (this.settings.trash.length > 50) this.settings.trash.length = 50;
         await this.saveData(this.settings);
       }
       async dropTrash(uid) {
         const i = this.settings.trash.findIndex((t) => t.uid === uid);
-        if (i === -1)
-          return;
+        if (i === -1) return;
         this.settings.trash.splice(i, 1);
         await this.saveSettings(false);
       }
@@ -5675,15 +5216,13 @@ var require_noval_notes_core = __commonJS({
           if (needId) {
             let nid = genId();
             let guardN = 0;
-            while (ids.has(nid) && guardN++ < 50)
-              nid = genId();
+            while (ids.has(nid) && guardN++ < 50) nid = genId();
             const bare = String(lines[last] || "").replace(/[ \t]\^[A-Za-z0-9-]+[ \t]*$/, "");
             lines[last] = bare.replace(/[ \t]+$/, "") + " ^" + nid;
           }
           done = true;
           const out = qmInsertRestoredCard(content, entry.date, entry.time, lines);
-          if (out !== data)
-            written = out;
+          if (out !== data) written = out;
           return out;
         });
         if (!done) {
@@ -16653,8 +16192,7 @@ var require_noval_gallery = __commonJS({
         const mw = dom.offsetWidth;
         const vw = window.innerWidth;
         let left = rect.left;
-        if (left + mw > vw - 4)
-          left = Math.max(4, rect.right - mw);
+        if (left + mw > vw - 4) left = Math.max(4, rect.right - mw);
         dom.style.left = Math.round(left) + "px";
         dom.style.top = Math.round(rect.bottom) + "px";
       }
@@ -16673,23 +16211,18 @@ var require_noval_gallery = __commonJS({
     }
     function toneOf(node2) {
       const color = node2.color;
-      if (!color)
-        return "";
+      if (!color) return "";
       return color;
     }
     async function blockText(app, node2) {
-      if (node2.type !== "card")
-        return "";
+      if (node2.type !== "card") return "";
       const card = node2;
-      if (!card.file || !card.blockId)
-        return "";
+      if (!card.file || !card.blockId) return "";
       const file = app.vault.getAbstractFileByPath(card.file);
-      if (!(file instanceof TFile))
-        return "";
+      if (!(file instanceof TFile)) return "";
       const key = `${file.path}@${file.stat.mtime}`;
       const cached = blockCache.get(key);
-      if (cached !== void 0)
-        return cached;
+      if (cached !== void 0) return cached;
       let excerpt = "";
       try {
         const content = await app.vault.cachedRead(file);
@@ -16700,8 +16233,7 @@ var require_noval_gallery = __commonJS({
           const parts = [lines[at].replace(marker, "")];
           for (let i = at - 1; i >= 0 && parts.length < 4; i--) {
             const line = lines[i];
-            if (!line.trim() || /^#{1,6}\s/.test(line) || /^(---|\*\*\*)/.test(line))
-              break;
+            if (!line.trim() || /^#{1,6}\s/.test(line) || /^(---|\*\*\*)/.test(line)) break;
             parts.unshift(line);
           }
           excerpt = cut(parts.join(" "), 140);
@@ -16709,28 +16241,22 @@ var require_noval_gallery = __commonJS({
       } catch {
         excerpt = "";
       }
-      if (blockCache.size > 300)
-        blockCache.clear();
+      if (blockCache.size > 300) blockCache.clear();
       blockCache.set(key, excerpt);
       return excerpt;
     }
     function labelOf(node2, cardText) {
-      if (node2.type === "text")
-        return cut(node2.text ?? "");
-      if (node2.type === "file")
-        return cut(baseName(node2.file ?? ""), 40);
-      if (node2.type === "card")
-        return cardText || cut(baseName(node2.file ?? ""), 40);
-      if (node2.type === "group")
-        return cut(node2.label ?? "", 28);
+      if (node2.type === "text") return cut(node2.text ?? "");
+      if (node2.type === "file") return cut(baseName(node2.file ?? ""), 40);
+      if (node2.type === "card") return cardText || cut(baseName(node2.file ?? ""), 40);
+      if (node2.type === "group") return cut(node2.label ?? "", 28);
       return "";
     }
     function layout(data, labels) {
       const nodes = (data.nodes ?? []).filter(
         (node2) => node2.type !== "group" && Number.isFinite(node2.x) && Number.isFinite(node2.y) && node2.width > 0
       );
-      if (!nodes.length)
-        return { nodes: [], edges: [] };
+      if (!nodes.length) return { nodes: [], edges: [] };
       const minX = Math.min(...nodes.map((n) => n.x));
       const minY = Math.min(...nodes.map((n) => n.y));
       const maxX = Math.max(...nodes.map((n) => n.x + n.width));
@@ -16761,20 +16287,17 @@ var require_noval_gallery = __commonJS({
       const mini = built.map((entry) => entry.box).sort((a, b) => a.w * a.h - b.w * b.h);
       const edges = [];
       for (const edge of data.edges ?? []) {
-        if (!kept.has(edge.from) || !kept.has(edge.to))
-          continue;
+        if (!kept.has(edge.from) || !kept.has(edge.to)) continue;
         const from = center.get(edge.from);
         const to = center.get(edge.to);
-        if (!from || !to)
-          continue;
+        if (!from || !to) continue;
         edges.push({
           x1: from.x + from.w / 2,
           y1: from.y + from.h / 2,
           x2: to.x + to.w / 2,
           y2: to.y + to.h / 2
         });
-        if (edges.length >= 24)
-          break;
+        if (edges.length >= 24) break;
       }
       return { nodes: mini, edges };
     }
@@ -16786,10 +16309,8 @@ var require_noval_gallery = __commonJS({
       return `${day} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     }
     function isBoardPath(path, folder) {
-      if (!path.toLowerCase().endsWith(`.${BOARD_EXTENSION}`))
-        return false;
-      if (!folder)
-        return true;
+      if (!path.toLowerCase().endsWith(`.${BOARD_EXTENSION}`)) return false;
+      if (!folder) return true;
       const prefix = folder.replace(/^\/+|\/+$/g, "");
       return !prefix || path.startsWith(`${prefix}/`);
     }
@@ -16887,12 +16408,9 @@ var require_noval_gallery = __commonJS({
       el.style.height = `${box.h}%`;
     }
     function applyTone(el, tone) {
-      if (!tone)
-        return;
-      if (tone.startsWith("#"))
-        el.style.setProperty("--tn", tone);
-      else
-        el.setAttribute("data-tone", tone);
+      if (!tone) return;
+      if (tone.startsWith("#")) el.style.setProperty("--tn", tone);
+      else el.setAttribute("data-tone", tone);
     }
     function node(tag, className) {
       const el = document.createElement(tag);
@@ -16916,8 +16434,7 @@ var require_noval_gallery = __commonJS({
       }
       onOpen() {
         const el = this.contentEl;
-        while (el.firstChild)
-          el.removeChild(el.firstChild);
+        while (el.firstChild) el.removeChild(el.firstChild);
         el.classList.add("noval-delete-modal");
         const heading = document.createElement("h2");
         heading.textContent = this.names.length === 1 ? "\u5220\u9664\u8FD9\u5757\u753B\u5E03\uFF1F" : `\u5220\u9664\u8FD9 ${this.names.length} \u5757\u753B\u5E03\uFF1F`;
@@ -16944,8 +16461,7 @@ var require_noval_gallery = __commonJS({
       }
       onClose() {
         const el = this.contentEl;
-        while (el.firstChild)
-          el.removeChild(el.firstChild);
+        while (el.firstChild) el.removeChild(el.firstChild);
       }
     };
     var NovalGalleryPanel2 = class {
@@ -16965,8 +16481,7 @@ var require_noval_gallery = __commonJS({
         this.workspaceRefs = [];
       }
       async mount(containerEl) {
-        if (this.root)
-          this.destroy();
+        if (this.root) this.destroy();
         this.root = document.createElement("div");
         containerEl.appendChild(this.root);
         try {
@@ -16987,17 +16502,14 @@ var require_noval_gallery = __commonJS({
           window.clearTimeout(this.reloadTimer);
           this.reloadTimer = null;
         }
-        for (const ref of this.vaultRefs)
-          this.app.vault.offref(ref);
-        for (const ref of this.workspaceRefs)
-          this.app.workspace.offref(ref);
+        for (const ref of this.vaultRefs) this.app.vault.offref(ref);
+        for (const ref of this.workspaceRefs) this.app.workspace.offref(ref);
         this.vaultRefs = [];
         this.workspaceRefs = [];
         this.watching = false;
         this.signature = "";
         if (this.root) {
-          if (this.root.parentNode)
-            this.root.parentNode.removeChild(this.root);
+          if (this.root.parentNode) this.root.parentNode.removeChild(this.root);
           this.root = null;
         }
       }
@@ -17007,52 +16519,44 @@ var require_noval_gallery = __commonJS({
       }
       /** 墙是文件夹的实时镜像：保存、增删、改名、切回前台都会重绘。 */
       watchSources() {
-        if (this.watching)
-          return;
+        if (this.watching) return;
         this.watching = true;
         const inFolder = (path) => isBoardPath(path, this.noval.novalFolder);
         this.vaultRefs.push(
           this.app.vault.on("modify", (file) => {
-            if (inFolder(file.path))
-              this.schedule(220);
+            if (inFolder(file.path)) this.schedule(220);
           })
         );
         this.vaultRefs.push(
           this.app.vault.on("create", (file) => {
-            if (inFolder(file.path))
-              this.schedule(60);
+            if (inFolder(file.path)) this.schedule(60);
           })
         );
         this.vaultRefs.push(
           this.app.vault.on("delete", (file) => {
-            if (inFolder(file.path))
-              this.schedule(60);
+            if (inFolder(file.path)) this.schedule(60);
           })
         );
         this.vaultRefs.push(
           this.app.vault.on("rename", (file, oldPath) => {
-            if (inFolder(file.path) || inFolder(oldPath))
-              this.schedule(60);
+            if (inFolder(file.path) || inFolder(oldPath)) this.schedule(60);
           })
         );
         this.workspaceRefs.push(
           this.app.workspace.on("active-leaf-change", (leaf) => {
-            if (leaf === this.app.workspace.activeLeaf)
-              this.schedule(0);
+            if (leaf === this.app.workspace.activeLeaf) this.schedule(0);
           })
         );
       }
       schedule(delay) {
-        if (this.reloadTimer !== null)
-          window.clearTimeout(this.reloadTimer);
+        if (this.reloadTimer !== null) window.clearTimeout(this.reloadTimer);
         this.reloadTimer = window.setTimeout(() => {
           this.reloadTimer = null;
           void this.loadItems();
         }, delay);
       }
       clearRoot(el) {
-        while (el.firstChild)
-          el.removeChild(el.firstChild);
+        while (el.firstChild) el.removeChild(el.firstChild);
       }
       reportError(stage, error) {
         const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
@@ -17079,21 +16583,17 @@ var require_noval_gallery = __commonJS({
           new Notice2("\u8BFB\u53D6\u753B\u5E03\u5217\u8868\u5931\u8D25");
         }
         items = [...items].sort((a, b) => {
-          if (this.sortMode === "name")
-            return a.title.localeCompare(b.title, "zh-CN");
-          if (this.sortMode === "modified")
-            return b.mtime - a.mtime;
+          if (this.sortMode === "name") return a.title.localeCompare(b.title, "zh-CN");
+          if (this.sortMode === "modified") return b.mtime - a.mtime;
           return b.created - a.created;
         });
         this.items = items;
-        if (listSignature(items, this.sortMode) === this.signature)
-          return;
+        if (listSignature(items, this.sortMode) === this.signature) return;
         this.renderWall();
       }
       renderWall() {
         const root = this.root;
-        if (!root)
-          return;
+        if (!root) return;
         const scrolled = root.querySelector(".vw-scroll");
         const scroll = scrolled ? scrolled.scrollTop : 0;
         this.clearRoot(root);
@@ -17114,12 +16614,10 @@ var require_noval_gallery = __commonJS({
       /** 纯输入只换结果区，输入框保持焦点与光标。 */
       updateResults() {
         const root = this.root;
-        if (!root)
-          return;
+        if (!root) return;
         const results = root.querySelector(".vw-results");
         const count = root.querySelector(".vw-count");
-        if (!results)
-          return;
+        if (!results) return;
         this.clearRoot(results);
         results.appendChild(this.buildResults());
         const visible = this.visibleItems();
@@ -17129,8 +16627,7 @@ var require_noval_gallery = __commonJS({
       }
       visibleItems() {
         const q = this.query.trim().toLocaleLowerCase();
-        if (!q)
-          return this.items;
+        if (!q) return this.items;
         return this.items.filter(
           (item) => [item.title, ...item.cover.nodes.map((box) => box.text)].some((text) => text.toLocaleLowerCase().includes(q))
         );
@@ -17141,8 +16638,7 @@ var require_noval_gallery = __commonJS({
           return this.buildEmpty(this.query.trim().length > 0);
         }
         const grid = node("div", "vw-grid");
-        for (const item of visible)
-          grid.appendChild(this.buildCard(item));
+        for (const item of visible) grid.appendChild(this.buildCard(item));
         return grid;
       }
       buildEmpty(searching) {
@@ -17164,8 +16660,7 @@ var require_noval_gallery = __commonJS({
             this.query = "";
             this.renderWall();
             const input = this.root ? this.root.querySelector(".vw-search-input") : null;
-            if (input)
-              input.focus();
+            if (input) input.focus();
           });
         } else {
           const plus = node("span", "vw-ico");
@@ -17203,16 +16698,14 @@ var require_noval_gallery = __commonJS({
           info.textContent = `\u5DF2\u9009 ${this.selected.size} \u5757`;
           actions.appendChild(info);
           actions.appendChild(simpleButton("\u5168\u9009", "vw-ghost", () => {
-            for (const item of this.visibleItems())
-              this.selected.add(item.file.path);
+            for (const item of this.visibleItems()) this.selected.add(item.file.path);
             this.syncSelectionUI();
           }));
           const remove = simpleButton("\u5220\u9664\u6240\u9009", "vw-primary vw-danger", () => {
             const chosen = this.items.filter((item) => this.selected.has(item.file.path));
             this.confirmDelete(chosen, true);
           });
-          if (!this.selected.size)
-            remove.disabled = true;
+          if (!this.selected.size) remove.disabled = true;
           actions.appendChild(remove);
           actions.appendChild(simpleButton("\u9000\u51FA\u591A\u9009", "vw-ghost", () => this.setMulti(false)));
           head.appendChild(actions);
@@ -17276,16 +16769,14 @@ var require_noval_gallery = __commonJS({
         anchorMenuBelow2(menu, event.currentTarget ?? event.target);
       }
       setSort(value) {
-        if (this.sortMode === value)
-          return;
+        if (this.sortMode === value) return;
         this.sortMode = value;
         void this.loadItems();
       }
       buildCard(item) {
         const card = node("div", "vw-card");
         card.setAttribute("data-path", item.file.path);
-        if (this.multi && this.selected.has(item.file.path))
-          card.classList.add("is-selected");
+        if (this.multi && this.selected.has(item.file.path)) card.classList.add("is-selected");
         card.appendChild(this.buildCover(item));
         if (this.multi) {
           const check = node("span", "vw-check");
@@ -17315,10 +16806,8 @@ var require_noval_gallery = __commonJS({
         body.appendChild(meta);
         card.appendChild(body);
         card.addEventListener("click", () => {
-          if (this.multi)
-            this.toggleSelected(item.file.path);
-          else
-            this.openBoard(item);
+          if (this.multi) this.toggleSelected(item.file.path);
+          else this.openBoard(item);
         });
         return card;
       }
@@ -17333,8 +16822,7 @@ var require_noval_gallery = __commonJS({
           cover.appendChild(ghost);
           return cover;
         }
-        if (edges.length)
-          cover.appendChild(edgeLayer(edges));
+        if (edges.length) cover.appendChild(edgeLayer(edges));
         for (const box of nodes) {
           const chip = node("span", "vw-chip");
           applyBox(chip, box);
@@ -17354,36 +16842,29 @@ var require_noval_gallery = __commonJS({
       }
       setMulti(on) {
         this.multi = on;
-        if (!on)
-          this.selected.clear();
+        if (!on) this.selected.clear();
         this.renderWall();
       }
       toggleSelected(path) {
-        if (this.selected.has(path))
-          this.selected.delete(path);
-        else
-          this.selected.add(path);
+        if (this.selected.has(path)) this.selected.delete(path);
+        else this.selected.add(path);
         this.syncSelectionUI();
       }
       /** 选中只改相关属性，整墙重建会让卡片闪烁并吞掉下一次点击。 */
       syncSelectionUI() {
         const root = this.root;
-        if (!root)
-          return;
+        if (!root) return;
         for (const card of Array.from(root.querySelectorAll("[data-path]"))) {
           const path = card.getAttribute("data-path") ?? "";
           card.classList.toggle("is-selected", this.selected.has(path));
         }
         const count = root.querySelector(".vw-multi-count");
-        if (count)
-          count.textContent = `\u5DF2\u9009 ${this.selected.size} \u5757`;
+        if (count) count.textContent = `\u5DF2\u9009 ${this.selected.size} \u5757`;
         const remove = root.querySelector(".vw-danger");
-        if (remove)
-          remove.disabled = this.selected.size === 0;
+        if (remove) remove.disabled = this.selected.size === 0;
       }
       confirmDelete(items, exitMulti = false) {
-        if (!items.length)
-          return;
+        if (!items.length) return;
         new DeleteBoardsModal(this.app, items.map((item) => item.title), () => {
           void this.deleteBoards(items.map((item) => item.file), exitMulti);
         }).open();
@@ -17403,8 +16884,7 @@ var require_noval_gallery = __commonJS({
             }
           }
         }
-        for (const file of files)
-          this.selected.delete(file.path);
+        for (const file of files) this.selected.delete(file.path);
         if (exitMulti && removed > 0) {
           this.multi = false;
           this.selected.clear();
@@ -17438,13 +16918,11 @@ var require_noval_notes = __commonJS({
       back: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>'
     };
     function setIconHtml(parent, name) {
-      if (parent && ICONS[name])
-        parent.innerHTML = ICONS[name];
+      if (parent && ICONS[name]) parent.innerHTML = ICONS[name];
     }
     function daysAgo(date) {
       const parts = String(date || "").split("-").map(Number);
-      if (parts.length !== 3 || !parts[0])
-        return 0;
+      if (parts.length !== 3 || !parts[0]) return 0;
       const target = new Date(parts[0], parts[1] - 1, parts[2]);
       const now = /* @__PURE__ */ new Date();
       now.setHours(0, 0, 0, 0);
@@ -17489,8 +16967,7 @@ var require_noval_notes = __commonJS({
       }
       /* ---------------- 生命周期 ---------------- */
       mount(containerEl) {
-        if (this._outside)
-          document.removeEventListener("mousedown", this._outside);
+        if (this._outside) document.removeEventListener("mousedown", this._outside);
         this._outside = null;
         this.closeMenu();
         this.closePop();
@@ -17504,27 +16981,22 @@ var require_noval_notes = __commonJS({
         this._outside = (ev) => {
           const inPop = this.pop && this.pop.contains(ev.target);
           const onOwner = this.popOwner && this.popOwner.contains(ev.target);
-          if (this.pop && !inPop && !onOwner)
-            this.closePop();
-          if (this.cardMenu && !this.cardMenu.contains(ev.target))
-            this.closeCardMenu();
+          if (this.pop && !inPop && !onOwner) this.closePop();
+          if (this.cardMenu && !this.cardMenu.contains(ev.target)) this.closeCardMenu();
           const inMenu = this.menuEl && this.menuEl.contains(ev.target);
           const onMenuAnchor = this.menuAnchor && this.menuAnchor.contains(ev.target);
-          if (this.menuEl && !inMenu && !onMenuAnchor)
-            this.closeMenu();
+          if (this.menuEl && !inMenu && !onMenuAnchor) this.closeMenu();
         };
         document.addEventListener("mousedown", this._outside);
         this.load();
       }
       destroy() {
-        if (this._outside)
-          document.removeEventListener("mousedown", this._outside);
+        if (this._outside) document.removeEventListener("mousedown", this._outside);
         this._outside = null;
         this.closeMenu();
         this.closePop();
         this.closeCardMenu();
-        if (this.container)
-          this.container.empty();
+        if (this.container) this.container.empty();
         this.container = null;
         this.listWrap = null;
         this.subEl = null;
@@ -17552,8 +17024,7 @@ var require_noval_notes = __commonJS({
           this.query = search.value;
           clear.classList.toggle("is-visible", !!search.value);
           this.renderList();
-          if (this.pop)
-            this.renderFilterPanel();
+          if (this.pop) this.renderFilterPanel();
         });
         clear.onclick = () => {
           search.value = "";
@@ -17629,15 +17100,13 @@ var require_noval_notes = __commonJS({
       }
       /* ---------------- 数据 ---------------- */
       async load() {
-        if (!this.container)
-          return;
+        if (!this.container) return;
         if (this._loading) {
           this._pending = true;
           return;
         }
         if (!this.noval || typeof this.noval.readAllCards !== "function") {
-          if (this.subEl)
-            this.subEl.setText("Noval \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u67E5\u770B\u63A7\u5236\u53F0\u65E5\u5FD7\u3002");
+          if (this.subEl) this.subEl.setText("Noval \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u67E5\u770B\u63A7\u5236\u53F0\u65E5\u5FD7\u3002");
           return;
         }
         this._loading = true;
@@ -17649,8 +17118,7 @@ var require_noval_notes = __commonJS({
           cards = [];
         }
         this._loading = false;
-        if (!this.container)
-          return;
+        if (!this.container) return;
         this.cards = Array.isArray(cards) ? cards : [];
         this.renderList();
         this.applyPendingFocus();
@@ -17668,23 +17136,18 @@ var require_noval_notes = __commonJS({
       }
       /** 首页点速记时调用：切到卡片笔记后定位到这一条。 */
       focusCard(card) {
-        if (!card)
-          return;
+        if (!card) return;
         this.pendingFocus = card;
-        if (this.container && !this._loading && this.cards.length)
-          this.applyPendingFocus();
+        if (this.container && !this._loading && this.cards.length) this.applyPendingFocus();
       }
       applyPendingFocus() {
         const card = this.pendingFocus;
-        if (!card || !this.listWrap || this._loading)
-          return;
+        if (!card || !this.listWrap || this._loading) return;
         let changed = false;
         if (this.query) {
           this.query = "";
-          if (this.search)
-            this.search.value = "";
-          if (this.clearBtn)
-            this.clearBtn.classList.remove("is-visible");
+          if (this.search) this.search.value = "";
+          if (this.clearBtn) this.clearBtn.classList.remove("is-visible");
           changed = true;
         }
         if (this.refFilter || this.tags && this.tags.length || this.untagged) {
@@ -17697,21 +17160,16 @@ var require_noval_notes = __commonJS({
           this.collapsed.delete(card.date);
           changed = true;
         }
-        if (changed)
-          this.renderList();
+        if (changed) this.renderList();
         this.pendingFocus = null;
         window.setTimeout(() => {
-          if (!this.listWrap)
-            return;
+          if (!this.listWrap) return;
           const nodes = this.listWrap.querySelectorAll(".qm-card");
           let target = null;
           for (const node of nodes) {
-            if (node.getAttribute("data-qm-date") !== (card.date || ""))
-              continue;
-            if (node.getAttribute("data-qm-time") !== (card.time || ""))
-              continue;
-            if (card.id && node.getAttribute("data-qm-id") !== card.id)
-              continue;
+            if (node.getAttribute("data-qm-date") !== (card.date || "")) continue;
+            if (node.getAttribute("data-qm-time") !== (card.time || "")) continue;
+            if (card.id && node.getAttribute("data-qm-id") !== card.id) continue;
             target = node;
             break;
           }
@@ -17738,14 +17196,11 @@ var require_noval_notes = __commonJS({
         return this.cards.filter((card) => {
           if (ref) {
             const n = this.refCount(card);
-            if (ref === "has" && n === 0)
-              return false;
-            if (ref === "none" && n > 0)
-              return false;
+            if (ref === "has" && n === 0) return false;
+            if (ref === "none" && n > 0) return false;
           }
           const tags = (card.tags || []).map((t) => String(t).replace(/^#/, ""));
-          if (this.untagged && tags.length)
-            return false;
+          if (this.untagged && tags.length) return false;
           if (this.tags.length) {
             const hit = tags.some((t) => {
               const low = t.toLowerCase();
@@ -17754,14 +17209,11 @@ var require_noval_notes = __commonJS({
                 return low === key || low.indexOf(key + "/") === 0;
               });
             });
-            if (!hit)
-              return false;
+            if (!hit) return false;
           }
-          if (!raw)
-            return true;
+          if (!raw) return true;
           const lowerTags = tags.map((t) => t.toLowerCase());
-          if (tagQuery)
-            return lowerTags.some((t) => t.includes(tagQuery));
+          if (tagQuery) return lowerTags.some((t) => t.includes(tagQuery));
           return String(card.bodyLower || "").includes(raw) || lowerTags.some((t) => t.includes(raw)) || String(card.date || "").includes(raw);
         });
       }
@@ -17771,15 +17223,12 @@ var require_noval_notes = __commonJS({
       }
       /** 引用筛选实际生效值：索引没建好时按「全部」 */
       effectiveRefFilter() {
-        if (!this.refFilter)
-          return "";
-        if (!this.noval || typeof this.noval.refsReady !== "function")
-          return "";
+        if (!this.refFilter) return "";
+        if (!this.noval || typeof this.noval.refsReady !== "function") return "";
         return this.noval.refsReady() ? this.refFilter : "";
       }
       refCount(card) {
-        if (!this.noval || typeof this.noval.refCount !== "function")
-          return 0;
+        if (!this.noval || typeof this.noval.refCount !== "function") return 0;
         try {
           return this.noval.refCount(card) || 0;
         } catch (e) {
@@ -17787,12 +17236,10 @@ var require_noval_notes = __commonJS({
         }
       }
       renderFilterBtnState() {
-        if (!this.filterBtn)
-          return;
+        if (!this.filterBtn) return;
         const n = this.activeFilterCount();
         this.filterBtn.classList.toggle("is-active", n > 0);
-        if (this.filterDot)
-          this.filterDot.classList.toggle("is-hidden", !n);
+        if (this.filterDot) this.filterDot.classList.toggle("is-hidden", !n);
       }
       isTagSelected(keyLower) {
         return this.tags.some((t) => String(t).toLowerCase() === keyLower);
@@ -17802,22 +17249,19 @@ var require_noval_notes = __commonJS({
         for (let i = parts.length - 1; i >= 1; i--) {
           const p = parts.slice(0, i).join("/");
           const hit = this.tags.find((t) => String(t).toLowerCase() === p);
-          if (hit)
-            return hit;
+          if (hit) return hit;
         }
         return "";
       }
       hasSelectedBelow(node) {
         for (const ch of node.children || []) {
-          if (this.isTagSelected(ch.key) || this.hasSelectedBelow(ch))
-            return true;
+          if (this.isTagSelected(ch.key) || this.hasSelectedBelow(ch)) return true;
         }
         return false;
       }
       toggleTagFilter(path) {
         const key = String(path).toLowerCase();
-        if (!key)
-          return;
+        if (!key) return;
         const anc = this.selectedAncestorPath(key);
         if (anc) {
           new Notice2("\u5DF2\u5305\u542B\u5728 #" + anc + " \u91CC");
@@ -17825,13 +17269,11 @@ var require_noval_notes = __commonJS({
         }
         const cur = this.tags.slice();
         const at = cur.findIndex((t) => String(t).toLowerCase() === key);
-        if (at >= 0)
-          cur.splice(at, 1);
+        if (at >= 0) cur.splice(at, 1);
         else {
           const rest = cur.filter((t) => String(t).toLowerCase().indexOf(key + "/") !== 0);
           cur.length = 0;
-          for (const t of rest)
-            cur.push(t);
+          for (const t of rest) cur.push(t);
           cur.push(path);
           this.expanded[key] = true;
         }
@@ -17842,10 +17284,8 @@ var require_noval_notes = __commonJS({
       /** 正文里点标签：只用这一个标签筛选，换掉原来的多选条件（与 Noval 侧栏一致） */
       setFilterTags(list) {
         this.tags = (list || []).filter(Boolean);
-        if (this.tags.length)
-          this.untagged = false;
-        if (this.selectMode)
-          this.selected.clear();
+        if (this.tags.length) this.untagged = false;
+        if (this.selectMode) this.selected.clear();
         this.afterFilterChange();
       }
       setRefFilter(v) {
@@ -17857,10 +17297,8 @@ var require_noval_notes = __commonJS({
         this.tags = [];
         this.untagged = false;
         this.query = "";
-        if (this.search)
-          this.search.value = "";
-        if (this.clearBtn)
-          this.clearBtn.classList.remove("is-visible");
+        if (this.search) this.search.value = "";
+        if (this.clearBtn) this.clearBtn.classList.remove("is-visible");
         this.afterFilterChange();
       }
       /** 筛选变化后统一刷新列表、按钮状态与已打开的面板 */
@@ -17886,8 +17324,7 @@ var require_noval_notes = __commonJS({
           const seen = /* @__PURE__ */ new Set();
           for (const raw of tags) {
             const path = String(raw).replace(/^#/, "");
-            if (!path)
-              continue;
+            if (!path) continue;
             const parts = path.split("/");
             let level = root;
             let acc = "";
@@ -17927,10 +17364,8 @@ var require_noval_notes = __commonJS({
             sub: "",
             clear: () => {
               this.query = "";
-              if (this.search)
-                this.search.value = "";
-              if (this.clearBtn)
-                this.clearBtn.classList.remove("is-visible");
+              if (this.search) this.search.value = "";
+              if (this.clearBtn) this.clearBtn.classList.remove("is-visible");
               this.afterFilterChange();
             }
           });
@@ -17977,8 +17412,7 @@ var require_noval_notes = __commonJS({
       }
       renderChips() {
         const el = this.chipsEl;
-        if (!el)
-          return;
+        if (!el) return;
         el.empty();
         const parts = this.chipParts();
         if (!parts.length) {
@@ -17992,8 +17426,7 @@ var require_noval_notes = __commonJS({
         for (const p of shown) {
           const chip = el.createSpan({ cls: "qm-chip" });
           chip.createSpan({ text: p.text });
-          if (p.sub)
-            chip.createEl("em", { text: p.sub });
+          if (p.sub) chip.createEl("em", { text: p.sub });
           const x = chip.createEl("button", { text: "\xD7" });
           x.setAttribute("type", "button");
           x.setAttribute("aria-label", "\u6E05\u9664");
@@ -18008,8 +17441,7 @@ var require_noval_notes = __commonJS({
           more.setAttribute("title", "\u8FD8\u6709 " + rest + " \u4E2A\u6761\u4EF6");
           more.onclick = (e) => {
             e.stopPropagation();
-            if (!this.pop)
-              this.openFilterPanel();
+            if (!this.pop) this.openFilterPanel();
           };
         }
         this.positionFilterPop();
@@ -18017,8 +17449,7 @@ var require_noval_notes = __commonJS({
       /** 筛选浮层跟着工具行与 chips 一起下移 */
       positionFilterPop() {
         const pop = this.pop;
-        if (!pop || this.popOwner !== this.filterBtn)
-          return;
+        if (!pop || this.popOwner !== this.filterBtn) return;
         let top = (this.toolrow.offsetTop || 0) + (this.toolrow.offsetHeight || 30) + 6;
         if (this.chipsEl && this.chipsEl.classList.contains("show")) {
           top += (this.chipsEl.offsetHeight || 0) + 7;
@@ -18027,8 +17458,7 @@ var require_noval_notes = __commonJS({
       }
       /* ---------------- 渲染 ---------------- */
       renderList() {
-        if (!this.listWrap)
-          return;
+        if (!this.listWrap) return;
         this.closeCardMenu();
         this.closeMenu();
         const cards = this.filteredCards();
@@ -18064,16 +17494,12 @@ var require_noval_notes = __commonJS({
           day.createSpan({ cls: "qm-day-text", text: date });
           day.createSpan({ cls: "qm-day-count", text: String(group.length) });
           day.onclick = () => {
-            if (this.collapsed.has(date))
-              this.collapsed.delete(date);
-            else
-              this.collapsed.add(date);
+            if (this.collapsed.has(date)) this.collapsed.delete(date);
+            else this.collapsed.add(date);
             this.renderList();
           };
-          if (collapsed)
-            continue;
-          for (const card of group)
-            this.renderCard(list, card);
+          if (collapsed) continue;
+          for (const card of group) this.renderCard(list, card);
         }
       }
       renderCard(list, card) {
@@ -18085,11 +17511,9 @@ var require_noval_notes = __commonJS({
         el.setAttribute("data-qm-date", card.date || "");
         el.setAttribute("data-qm-time", card.time || "");
         el.setAttribute("data-qm-id", card.id || "");
-        if (this.selectMode)
-          el.addClass("is-selectable");
+        if (this.selectMode) el.addClass("is-selectable");
         const head = el.createDiv({ cls: "qm-card-head" });
-        if (this.selectMode)
-          head.createSpan({ cls: "qm-tick", text: "\u2713" });
+        if (this.selectMode) head.createSpan({ cls: "qm-tick", text: "\u2713" });
         head.createSpan({ cls: "qm-time", text: card.time || "" });
         const refDot = head.createSpan({ cls: "qm-ref" });
         this.paintRefDot(refDot, card);
@@ -18101,10 +17525,8 @@ var require_noval_notes = __commonJS({
           badge.setAttribute("role", "button");
           badge.onclick = (ev) => {
             ev.stopPropagation();
-            if (this.appendOpen.has(key))
-              this.appendOpen.delete(key);
-            else
-              this.appendOpen.add(key);
+            if (this.appendOpen.has(key)) this.appendOpen.delete(key);
+            else this.appendOpen.add(key);
             this.renderList();
           };
         }
@@ -18131,18 +17553,15 @@ var require_noval_notes = __commonJS({
           this.renderAppendComposer(el, card, key);
         }
         el.onclick = () => {
-          if (this.selectMode)
-            this.toggleSelected(card, el);
+          if (this.selectMode) this.toggleSelected(card, el);
         };
         el.addEventListener("dblclick", (e) => {
-          if (this.selectMode)
-            return;
+          if (this.selectMode) return;
           const t = e.target;
           if (t && typeof t.closest === "function" && t.closest("a, .qm-tag, .qm-more, .qm-ref, .qm-append-badge, button, textarea")) {
             return;
           }
-          if (e.preventDefault)
-            e.preventDefault();
+          if (e.preventDefault) e.preventDefault();
           this.beginEdit(card);
         });
       }
@@ -18224,8 +17643,7 @@ var require_noval_notes = __commonJS({
               ev.stopPropagation();
               const text = this.appendEditing && this.appendEditing.key === key ? this.appendEditing.text : ta.value;
               const ok = await this.noval.updateAppend(card, index, text);
-              if (!ok)
-                return;
+              if (!ok) return;
               this.appendEditing = null;
               await this.load();
             };
@@ -18258,8 +17676,7 @@ var require_noval_notes = __commonJS({
       confirmDeleteAppend(card, index) {
         new NovalBundle2.ConfirmModal(this.app, "\u5220\u9664\u8FD9\u6761\u8FFD\u52A0\uFF1F", async () => {
           const ok = await this.noval.deleteAppend(card, index);
-          if (!ok)
-            return;
+          if (!ok) return;
           this.appendEditing = null;
           await this.load();
         }).open();
@@ -18304,8 +17721,7 @@ var require_noval_notes = __commonJS({
             return;
           }
           const ok = await this.noval.appendToCard(card, text);
-          if (!ok)
-            return;
+          if (!ok) return;
           this.appendDrafting = null;
           this.appendOpen.add(key);
           await this.load();
@@ -18322,8 +17738,7 @@ var require_noval_notes = __commonJS({
       }
       /** 引用小红点：数字与提示文案都与 Noval 的 paintRefDot 一致 */
       paintRefDot(el, card) {
-        if (!el)
-          return;
+        if (!el) return;
         const info = this.noval.refSummary ? this.noval.refSummary(card) : null;
         const n = info ? info.notes : 0;
         if (!n) {
@@ -18337,12 +17752,9 @@ var require_noval_notes = __commonJS({
           "\u88AB " + n + " \u7BC7\u7B14\u8BB0\u5F15\u7528" + (places > n ? " \xB7 \u5171 " + places + " \u5904" : "")
         ];
         const names = info.names || [];
-        for (const nm of names.slice(0, 8))
-          lines.push("\xB7 " + nm);
-        if (names.length > 8)
-          lines.push("\xB7 \u2026\u8FD8\u6709 " + (names.length - 8) + " \u7BC7");
-        if (info.ambiguous)
-          lines.push("\uFF08\u6709\u540C\u540D\u6587\u4EF6\uFF0C\u94FE\u63A5\u53EF\u80FD\u6307\u9519\uFF0C\u6CE8\u610F\uFF09");
+        for (const nm of names.slice(0, 8)) lines.push("\xB7 " + nm);
+        if (names.length > 8) lines.push("\xB7 \u2026\u8FD8\u6709 " + (names.length - 8) + " \u7BC7");
+        if (info.ambiguous) lines.push("\uFF08\u6709\u540C\u540D\u6587\u4EF6\uFF0C\u94FE\u63A5\u53EF\u80FD\u6307\u9519\uFF0C\u6CE8\u610F\uFF09");
         el.setAttribute("title", lines.join("\n"));
       }
       renderCardBody(bodyEl, card, textOverride) {
@@ -18378,10 +17790,8 @@ var require_noval_notes = __commonJS({
         owner.classList.add("is-pop-open");
       }
       closePop() {
-        if (this.pop)
-          this.pop.remove();
-        if (this.popOwner)
-          this.popOwner.classList.remove("is-pop-open");
+        if (this.pop) this.pop.remove();
+        if (this.popOwner) this.popOwner.classList.remove("is-pop-open");
         this.pop = null;
         this.popOwner = null;
         this.treeEl = null;
@@ -18406,10 +17816,8 @@ var require_noval_notes = __commonJS({
       }
       renderFilterPanel(keepTop) {
         const el = this.pop;
-        if (!el)
-          return;
-        if (keepTop == null)
-          keepTop = this.treeEl ? this.treeEl.scrollTop || 0 : 0;
+        if (!el) return;
+        if (keepTop == null) keepTop = this.treeEl ? this.treeEl.scrollTop || 0 : 0;
         el.empty();
         el.createDiv({ cls: "qm-pop-title", text: "\u7B5B\u9009" });
         el.createDiv({ cls: "qm-pop-label", text: "\u5F15\u7528\u60C5\u51B5" });
@@ -18446,12 +17854,10 @@ var require_noval_notes = __commonJS({
         un.createSpan({ cls: "qm-tmark", text: "\u2713" });
         un.onclick = () => {
           this.untagged = !this.untagged;
-          if (this.untagged)
-            this.tags = [];
+          if (this.untagged) this.tags = [];
           this.afterFilterChange();
         };
-        for (const node of forest.tree)
-          this.renderTagNode(tree, node, 0);
+        for (const node of forest.tree) this.renderTagNode(tree, node, 0);
         const foot = el.createDiv({ cls: "qm-pop-foot" });
         const clear = foot.createEl("button", { cls: "qm-link-btn", text: "\u6E05\u9664\u7B5B\u9009" });
         clear.setAttribute("type", "button");
@@ -18465,8 +17871,7 @@ var require_noval_notes = __commonJS({
           text: n ? "\u5DF2\u751F\u6548 " + n + " \u9879" : "\u6CA1\u6709\u751F\u6548\u7684\u7B5B\u9009"
         });
         this.updateTreeMore();
-        if (keepTop && tree.scrollTop !== keepTop)
-          tree.scrollTop = keepTop;
+        if (keepTop && tree.scrollTop !== keepTop) tree.scrollTop = keepTop;
       }
       renderTagNode(parent, node, depth) {
         const key = node.key;
@@ -18485,12 +17890,9 @@ var require_noval_notes = __commonJS({
         });
         caret.onclick = (e) => {
           e.stopPropagation();
-          if (!kids)
-            return;
-          if (this.expanded[key])
-            delete this.expanded[key];
-          else
-            this.expanded[key] = true;
+          if (!kids) return;
+          if (this.expanded[key]) delete this.expanded[key];
+          else this.expanded[key] = true;
           this.renderFilterPanel();
         };
         row.createSpan({ cls: "qm-tname", text: (depth ? "" : "#") + node.label });
@@ -18505,19 +17907,16 @@ var require_noval_notes = __commonJS({
         };
         if (kids && open) {
           const box = parent.createDiv({ cls: "qm-tchildren" });
-          for (const ch of node.children)
-            this.renderTagNode(box, ch, depth + 1);
+          for (const ch of node.children) this.renderTagNode(box, ch, depth + 1);
         }
       }
       /** 侧栏不高时收一点标签窗口，保证底部按钮可见 */
       fitPopHeight() {
         const pop = this.pop;
         const tree = this.treeEl;
-        if (!pop || !tree || !this.container)
-          return;
+        if (!pop || !tree || !this.container) return;
         tree.style.height = "";
-        if (!this.container.clientHeight)
-          return;
+        if (!this.container.clientHeight) return;
         const avail = this.container.clientHeight - pop.offsetTop - 10;
         const need = pop.offsetHeight;
         if (need > avail) {
@@ -18526,12 +17925,10 @@ var require_noval_notes = __commonJS({
       }
       updateTreeMore() {
         const tree = this.treeEl;
-        if (!tree)
-          return;
+        if (!tree) return;
         const wrap = tree.parentNode;
         const rest = (tree.scrollHeight || 0) - (tree.scrollTop || 0) - (tree.clientHeight || 0);
-        if (wrap && wrap.classList)
-          wrap.classList.toggle("more", rest > 0.5);
+        if (wrap && wrap.classList) wrap.classList.toggle("more", rest > 0.5);
       }
       openMoreMenu() {
         const hit = this.filteredCards().length;
@@ -18590,17 +17987,14 @@ var require_noval_notes = __commonJS({
             cls: "qm-menu-item" + (it.disabled ? " is-disabled" : "") + (it.danger ? " is-danger" : "")
           });
           const ico = row.createSpan({ cls: "qm-menu-ico" });
-          if (it.icon)
-            setIcon2(ico, it.icon);
+          if (it.icon) setIcon2(ico, it.icon);
           row.createSpan({ cls: "qm-menu-label", text: it.title });
           if (!it.disabled) {
             row.onclick = (e) => {
-              if (e && e.stopPropagation)
-                e.stopPropagation();
+              if (e && e.stopPropagation) e.stopPropagation();
               const fn = it.onClick;
               this.closeMenu();
-              if (fn)
-                fn();
+              if (fn) fn();
             };
           }
         }
@@ -18618,8 +18012,7 @@ var require_noval_notes = __commonJS({
         this.menuAnchor = anchor;
         anchor.classList.add("is-pop-open");
         this._menuKey = (ev) => {
-          if (ev.key === "Escape")
-            this.closeMenu();
+          if (ev.key === "Escape") this.closeMenu();
         };
         document.addEventListener("keydown", this._menuKey, true);
       }
@@ -18649,15 +18042,11 @@ var require_noval_notes = __commonJS({
       toggleSelected(card, box) {
         const key = this.cardKey(card);
         const on = !this.selected.has(key);
-        if (on)
-          this.selected.add(key);
-        else
-          this.selected.delete(key);
-        if (box)
-          box.classList.toggle("is-picked", on);
+        if (on) this.selected.add(key);
+        else this.selected.delete(key);
+        if (box) box.classList.toggle("is-picked", on);
         const n = this.selected.size;
-        if (this._selInfoEl)
-          this._selInfoEl.setText("\u5DF2\u9009 " + n + " \u6761");
+        if (this._selInfoEl) this._selInfoEl.setText("\u5DF2\u9009 " + n + " \u6761");
         if (this._selDelEl) {
           this._selDelEl.setText(n ? "\u5220\u9664\u6240\u9009 " + n : "\u5220\u9664\u6240\u9009");
           this._selDelEl.disabled = !n;
@@ -18665,27 +18054,23 @@ var require_noval_notes = __commonJS({
       }
       renderSelectBar() {
         const el = this.selBarEl;
-        if (!el)
-          return;
+        if (!el) return;
         el.empty();
         if (!this.selectMode) {
           el.removeClass("show");
-          if (this.listWrap)
-            this.listWrap.removeClass("has-selbar");
+          if (this.listWrap) this.listWrap.removeClass("has-selbar");
           this._selInfoEl = null;
           this._selDelEl = null;
           return;
         }
         el.addClass("show");
-        if (this.listWrap)
-          this.listWrap.addClass("has-selbar");
+        if (this.listWrap) this.listWrap.addClass("has-selbar");
         const n = this.selected.size;
         this._selInfoEl = el.createSpan({ cls: "qm-selbar-info", text: "\u5DF2\u9009 " + n + " \u6761" });
         const acts = el.createDiv({ cls: "qm-selbar-acts" });
         const cancel = acts.createEl("button", { text: "\u53D6\u6D88" });
         cancel.onclick = (e) => {
-          if (e && e.stopPropagation)
-            e.stopPropagation();
+          if (e && e.stopPropagation) e.stopPropagation();
           this.toggleSelectMode(false);
         };
         const del = acts.createEl("button", {
@@ -18694,18 +18079,15 @@ var require_noval_notes = __commonJS({
         });
         del.disabled = !n;
         del.onclick = (e) => {
-          if (e && e.stopPropagation)
-            e.stopPropagation();
-          if (!this.selected.size)
-            return;
+          if (e && e.stopPropagation) e.stopPropagation();
+          if (!this.selected.size) return;
           this.deleteSelected();
         };
         this._selDelEl = del;
       }
       deleteSelected() {
         const picked = this.cards.filter((c) => this.selected.has(this.cardKey(c)));
-        if (!picked.length)
-          return;
+        if (!picked.length) return;
         new NovalBundle2.ConfirmModal(
           this.app,
           "\u5220\u9664\u9009\u4E2D\u7684 " + picked.length + " \u6761\u5361\u7247\uFF1F",
@@ -18727,15 +18109,13 @@ var require_noval_notes = __commonJS({
       }
       /* ---------------- 回看（复刻 Noval 的覆盖视图） ---------------- */
       openReview() {
-        if (!this.reviewEl)
-          return;
+        if (!this.reviewEl) return;
         this.pickReview();
         this.reviewEl.addClass("show");
         this.renderReview();
       }
       closeReview() {
-        if (!this.reviewEl)
-          return;
+        if (!this.reviewEl) return;
         this.reviewEl.removeClass("show");
         this.reviewEl.empty();
       }
@@ -18751,8 +18131,7 @@ var require_noval_notes = __commonJS({
       }
       renderReview() {
         const el = this.reviewEl;
-        if (!el)
-          return;
+        if (!el) return;
         el.empty();
         const head = el.createDiv({ cls: "qm-review-head" });
         const back = head.createEl("button", { cls: "qm-review-back" });
@@ -18787,10 +18166,8 @@ var require_noval_notes = __commonJS({
             });
             badge.onclick = (ev) => {
               ev.stopPropagation();
-              if (this.appendOpen.has(key))
-                this.appendOpen.delete(key);
-              else
-                this.appendOpen.add(key);
+              if (this.appendOpen.has(key)) this.appendOpen.delete(key);
+              else this.appendOpen.add(key);
               this.renderReview();
             };
           }
@@ -18807,8 +18184,7 @@ var require_noval_notes = __commonJS({
             if (t && typeof t.closest === "function" && t.closest("a, .qm-tag, .qm-more, .qm-rv-more, .qm-append-badge, button, textarea")) {
               return;
             }
-            if (e.preventDefault)
-              e.preventDefault();
+            if (e.preventDefault) e.preventDefault();
             this.beginEdit(card);
           });
           if (this.editingKey === key) {
@@ -18827,8 +18203,7 @@ var require_noval_notes = __commonJS({
       }
       /** 回看里存的是一批旧对象：卡片被改 / 删后换成本轮的新对象，找不到就移除 */
       syncReviewCards() {
-        if (!Array.isArray(this.reviewCards))
-          return;
+        if (!Array.isArray(this.reviewCards)) return;
         const used = /* @__PURE__ */ new Set();
         const next = [];
         for (const old of this.reviewCards) {
@@ -18839,8 +18214,7 @@ var require_noval_notes = __commonJS({
               (c) => !used.has(this.cardKey(c)) && c.filePath === old.filePath && c.date === old.date && c.time === old.time
             );
           }
-          if (!hit)
-            continue;
+          if (!hit) continue;
           used.add(this.cardKey(hit));
           next.push(hit);
         }
@@ -18930,8 +18304,7 @@ var require_noval_notes = __commonJS({
           return;
         }
         const key = this.cardKey(card);
-        if (this.editingKey === key)
-          return;
+        if (this.editingKey === key) return;
         this.editingKey = key;
         this.editingDraft = {
           key,
@@ -18947,8 +18320,7 @@ var require_noval_notes = __commonJS({
       /** 列表与回看共用一次刷新：回看打开时两个都要重画 */
       renderAll() {
         this.renderList();
-        if (this.reviewEl && this.reviewEl.hasClass("show"))
-          this.renderReview();
+        if (this.reviewEl && this.reviewEl.hasClass("show")) this.renderReview();
       }
       /** 在月份文件里定位到这张卡所在的那一行 */
       async locateCard(card) {
@@ -19000,15 +18372,13 @@ var require_noval_notes = __commonJS({
         ).open();
       }
       closeCardMenu() {
-        if (this.cardMenu)
-          this.cardMenu.remove();
+        if (this.cardMenu) this.cardMenu.remove();
         this.cardMenu = null;
       }
       /* ---------------- 动作 ---------------- */
       async capture() {
         const text = this.input ? this.input.value.trim() : "";
-        if (!text)
-          return;
+        if (!text) return;
         if (!this.noval || typeof this.noval.appendCard !== "function") {
           new Notice2("Noval \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u6682\u65F6\u4E0D\u80FD\u8BB0\u5F55");
           return;
@@ -19034,8 +18404,7 @@ var require_noval_notes = __commonJS({
         this.load();
       }
       openCard(card, newLeaf) {
-        if (!card || !card.filePath)
-          return;
+        if (!card || !card.filePath) return;
         const ref = card.id ? card.filePath + "#^" + card.id : card.filePath;
         try {
           this.app.workspace.openLinkText(ref, "", "tab");
@@ -19073,12 +18442,9 @@ var NovalBoardBundle = require_noval_board_core();
 var { NovalGalleryPanel } = require_noval_gallery();
 var { NovalNotesPanel } = require_noval_notes();
 function resolvePluginClass(bundle, fallbackName) {
-  if (typeof bundle === "function")
-    return bundle;
-  if (bundle && typeof bundle.default === "function")
-    return bundle.default;
-  if (bundle && typeof bundle[fallbackName] === "function")
-    return bundle[fallbackName];
+  if (typeof bundle === "function") return bundle;
+  if (bundle && typeof bundle.default === "function") return bundle.default;
+  if (bundle && typeof bundle[fallbackName] === "function") return bundle[fallbackName];
   return null;
 }
 var NOTES_ID = "noval-notes";
@@ -19254,13 +18620,10 @@ var EXCLUDED_FILE_NAMES = /* @__PURE__ */ new Set([
 ]);
 function isIgnoredPath(filePath) {
   const parts = String(filePath || "").split("/");
-  if (!parts.length)
-    return false;
-  if (parts.some((part) => part.startsWith(".")))
-    return true;
+  if (!parts.length) return false;
+  if (parts.some((part) => part.startsWith("."))) return true;
   const dirs = parts.slice(0, -1).map((p) => p.toLowerCase());
-  if (dirs.some((d) => EXCLUDED_DIR_NAMES.has(d)))
-    return true;
+  if (dirs.some((d) => EXCLUDED_DIR_NAMES.has(d))) return true;
   const base = parts[parts.length - 1];
   const name = base.replace(/\.[^.]+$/, "").toLowerCase();
   return EXCLUDED_FILE_NAMES.has(name);
@@ -19270,9 +18633,44 @@ function sanitizeFolderName(value) {
 }
 function isToolFolder(path) {
   const dir = String(path || "").replace(/^\/+|\/+$/g, "").toLowerCase();
-  if (!dir)
-    return false;
+  if (!dir) return false;
   return dir.split("/").some((part) => EXCLUDED_DIR_NAMES.has(part));
+}
+function moduleFolderOf(mod) {
+  const raw = String(mod && (mod.folder || mod.name || mod.id || mod.module) || "").trim();
+  return raw.replace(/^\/+|\/+$/g, "").replace(/[\\:*?"<>|]/g, "_");
+}
+var FILE_TREE_COLLATOR = new Intl.Collator(void 0, {
+  usage: "sort",
+  sensitivity: "base",
+  numeric: true
+});
+function compareVaultNodes(a, b) {
+  return FILE_TREE_COLLATOR.compare(String(a && a.name || ""), String(b && b.name || ""));
+}
+function vaultNodeRank(app, dir, cache) {
+  const store = cache || /* @__PURE__ */ new Map();
+  const path = String(dir || "").replace(/^\/+|\/+$/g, "");
+  if (!path) return [];
+  const key = path.toLowerCase();
+  if (store.has(key)) return store.get(key);
+  store.set(key, null);
+  const vault = app && app.vault;
+  if (!vault) return null;
+  const node = vault.getAbstractFileByPath(path);
+  if (!node) return null;
+  const parentPath = path.split("/").slice(0, -1).join("/");
+  const root = typeof vault.getRoot === "function" ? vault.getRoot() : null;
+  const parent = parentPath ? vault.getAbstractFileByPath(parentPath) : root;
+  if (!parent || !Array.isArray(parent.children)) return null;
+  const parentRank = parentPath ? vaultNodeRank(app, parentPath, store) : [];
+  if (!parentRank) return null;
+  const siblings = parent.children.filter((child) => Array.isArray(child.children)).sort(compareVaultNodes);
+  const index = siblings.indexOf(node);
+  if (index < 0) return null;
+  const rank = parentRank.concat(index);
+  store.set(key, rank);
+  return rank;
 }
 var DEFAULT_MODULES = [
   {
@@ -19366,21 +18764,16 @@ function getTags(fm) {
 }
 function formatTime(ts) {
   const diff = (Date.now() - ts) / 1e3;
-  if (diff < 60)
-    return "\u521A\u521A";
-  if (diff < 3600)
-    return Math.floor(diff / 60) + " \u5206\u949F\u524D";
-  if (diff < 86400)
-    return Math.floor(diff / 3600) + " \u5C0F\u65F6\u524D";
-  if (diff < 86400 * 7)
-    return Math.floor(diff / 86400) + " \u5929\u524D";
+  if (diff < 60) return "\u521A\u521A";
+  if (diff < 3600) return Math.floor(diff / 60) + " \u5206\u949F\u524D";
+  if (diff < 86400) return Math.floor(diff / 3600) + " \u5C0F\u65F6\u524D";
+  if (diff < 86400 * 7) return Math.floor(diff / 86400) + " \u5929\u524D";
   const d = new Date(ts);
   return d.getMonth() + 1 + "-" + d.getDate();
 }
 function hmRgba(hex, alpha) {
   const value = String(hex || "").replace("#", "");
-  if (value.length !== 6)
-    return "rgba(255,255,255," + alpha + ")";
+  if (value.length !== 6) return "rgba(255,255,255," + alpha + ")";
   const n = parseInt(value, 16);
   return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + alpha + ")";
 }
@@ -19451,16 +18844,11 @@ var THUMB_KIND_LABELS = {
 };
 function fileKind(file) {
   const ext = String(file && file.extension || "").toLowerCase();
-  if (ext === "md")
-    return "note";
-  if (THUMB_IMAGE_EXT.has(ext))
-    return "image";
-  if (THUMB_VIDEO_EXT.has(ext))
-    return "video";
-  if (THUMB_AUDIO_EXT.has(ext))
-    return "audio";
-  if (THUMB_DOC_EXT.has(ext))
-    return "doc";
+  if (ext === "md") return "note";
+  if (THUMB_IMAGE_EXT.has(ext)) return "image";
+  if (THUMB_VIDEO_EXT.has(ext)) return "video";
+  if (THUMB_AUDIO_EXT.has(ext)) return "audio";
+  if (THUMB_DOC_EXT.has(ext)) return "doc";
   return "other";
 }
 function stripNoteBody(raw) {
@@ -19489,8 +18877,7 @@ function findNoteMedia(app, body, sourcePath) {
   let m;
   while (m = re.exec(body)) {
     let link = String(m[1] || m[2] || "").trim();
-    if (!link)
-      continue;
+    if (!link) continue;
     if (m[2]) {
       try {
         link = decodeURI(link);
@@ -19503,11 +18890,9 @@ function findNoteMedia(app, body, sourcePath) {
     } catch (e) {
       target = null;
     }
-    if (!target)
-      continue;
+    if (!target) continue;
     const kind = fileKind(target);
-    if (kind === "image" || kind === "video")
-      return { file: target, kind };
+    if (kind === "image" || kind === "video") return { file: target, kind };
   }
   return null;
 }
@@ -19518,8 +18903,7 @@ function paintMediaThumb(app, thumb, file, kind) {
   } catch (e) {
     src = "";
   }
-  if (!src)
-    return false;
+  if (!src) return false;
   thumb.addClass("cl-md-thumb-media");
   if (kind === "image") {
     const img = thumb.createEl("img", { cls: "cl-md-media" });
@@ -19553,12 +18937,10 @@ function paintMediaThumb(app, thumb, file, kind) {
 }
 function paintNoteThumb(app, thumb, file) {
   app.vault.cachedRead(file).then((raw) => {
-    if (!thumb.isConnected)
-      return;
+    if (!thumb.isConnected) return;
     const body = stripNoteBody(raw);
     const media = findNoteMedia(app, body, file.path);
-    if (media && paintMediaThumb(app, thumb, media.file, media.kind))
-      return;
+    if (media && paintMediaThumb(app, thumb, media.file, media.kind)) return;
     const snippet = noteSnippet(body);
     if (!snippet) {
       setIcon(thumb, "file-text");
@@ -19567,8 +18949,7 @@ function paintNoteThumb(app, thumb, file) {
     thumb.addClass("cl-md-thumb-note");
     thumb.createDiv({ cls: "cl-md-snippet", text: snippet });
   }).catch(() => {
-    if (thumb.isConnected)
-      setIcon(thumb, "file-text");
+    if (thumb.isConnected) setIcon(thumb, "file-text");
   });
 }
 var WB_TOOLTIP_SCOPE = [
@@ -19593,10 +18974,8 @@ function wbInTooltipScope(el) {
   }
 }
 function wbNormalizeTitle(el) {
-  if (!el || el.nodeType !== 1 || !el.hasAttribute || !el.hasAttribute("title"))
-    return;
-  if (!wbInTooltipScope(el))
-    return;
+  if (!el || el.nodeType !== 1 || !el.hasAttribute || !el.hasAttribute("title")) return;
+  if (!wbInTooltipScope(el)) return;
   const t = el.getAttribute("title") || "";
   if (!el.hasAttribute("aria-label")) {
     el.setAttribute("aria-label", t);
@@ -19607,12 +18986,10 @@ function wbNormalizeTitle(el) {
   el.removeAttribute("title");
 }
 function wbNormalizeTree(root) {
-  if (!root || root.nodeType !== 1)
-    return;
+  if (!root || root.nodeType !== 1) return;
   wbNormalizeTitle(root);
   const list = root.querySelectorAll("[title]");
-  for (let i = 0; i < list.length; i++)
-    wbNormalizeTitle(list[i]);
+  for (let i = 0; i < list.length; i++) wbNormalizeTitle(list[i]);
 }
 function anchorMenuBelow(menu, anchor) {
   if (!anchor || typeof anchor.getBoundingClientRect !== "function") {
@@ -19626,8 +19003,7 @@ function anchorMenuBelow(menu, anchor) {
     const mw = dom.offsetWidth;
     const vw = window.innerWidth;
     let left = rect.left;
-    if (left + mw > vw - 4)
-      left = Math.max(4, rect.right - mw);
+    if (left + mw > vw - 4) left = Math.max(4, rect.right - mw);
     dom.style.left = Math.round(left) + "px";
     dom.style.top = Math.round(rect.bottom) + "px";
   }
@@ -19664,10 +19040,8 @@ async function ensureVaultFolder(app, path) {
   for (const part of parts) {
     cur = cur ? cur + "/" + part : part;
     const found = app.vault.getAbstractFileByPath(cur);
-    if (!found)
-      await app.vault.createFolder(cur);
-    else if (!Array.isArray(found.children))
-      throw new Error("\u300C" + cur + "\u300D\u5DF2\u88AB\u540C\u540D\u6587\u4EF6\u5360\u7528");
+    if (!found) await app.vault.createFolder(cur);
+    else if (!Array.isArray(found.children)) throw new Error("\u300C" + cur + "\u300D\u5DF2\u88AB\u540C\u540D\u6587\u4EF6\u5360\u7528");
   }
   return cur;
 }
@@ -19743,8 +19117,7 @@ var ModuleEditorModal = class extends Modal {
           current: String(folder || "").trim(),
           onPick: (path) => {
             folder = path;
-            if (folderInput)
-              folderInput.setValue(path);
+            if (folderInput) folderInput.setValue(path);
           }
         }).open();
       });
@@ -19786,8 +19159,7 @@ var ModuleEditorModal = class extends Modal {
         folder: folderValue || sanitizeFolderName(finalName)
       });
       this.close();
-      if (this.options.onSave)
-        this.options.onSave(next);
+      if (this.options.onSave) this.options.onSave(next);
     };
   }
   onClose() {
@@ -19817,8 +19189,7 @@ var DeleteFilesModal = class extends Modal {
     const remove = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664" });
     remove.onclick = () => {
       this.close();
-      if (this.onConfirm)
-        this.onConfirm();
+      if (this.onConfirm) this.onConfirm();
     };
   }
   onClose() {
@@ -19834,18 +19205,15 @@ var DissolveModuleModal = class extends Modal {
   finish(value) {
     const callback = this.onConfirm;
     this.onConfirm = null;
-    if (callback)
-      callback(value);
+    if (callback) callback(value);
   }
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("cl-modaleditor");
     contentEl.createEl("h2", { text: "\u5220\u9664\u6A21\u5757\u300C" + (this.info.name || "") + "\u300D\uFF1F" });
     const parts = [];
-    if (this.info.fileCount)
-      parts.push(this.info.fileCount + " \u4E2A\u6587\u4EF6");
-    if (this.info.folderCount)
-      parts.push(this.info.folderCount + " \u4E2A\u5B50\u6587\u4EF6\u5939");
+    if (this.info.fileCount) parts.push(this.info.fileCount + " \u4E2A\u6587\u4EF6");
+    if (this.info.folderCount) parts.push(this.info.folderCount + " \u4E2A\u5B50\u6587\u4EF6\u5939");
     contentEl.createDiv({
       cls: "cl-modal-hint",
       text: parts.length ? "\u4F1A\u628A " + parts.join("\u3001") + " \u4E0A\u79FB\u5230\u300C" + (this.info.parentLabel || "\u4E0A\u4E00\u7EA7") + "\u300D\uFF0C\u7136\u540E\u5220\u9664\u7A7A\u7684\u6A21\u5757\u6587\u4EF6\u5939\u3002\u4E0D\u4F1A\u5220\u9664\u4EFB\u4F55\u7B14\u8BB0\u5185\u5BB9\u3002" : "\u8FD9\u4E2A\u6A21\u5757\u6587\u4EF6\u5939\u662F\u7A7A\u7684\uFF0C\u4F1A\u76F4\u63A5\u79FB\u9664\u6A21\u5757\u5E76\u5220\u9664\u7A7A\u6587\u4EF6\u5939\u3002"
@@ -19910,8 +19278,7 @@ var RenameModuleModal = class extends Modal {
   submit(value) {
     const callback = this.onSubmit;
     this.onSubmit = null;
-    if (callback)
-      callback(String(value || "").trim());
+    if (callback) callback(String(value || "").trim());
     this.close();
   }
   onClose() {
@@ -19927,16 +19294,13 @@ var FolderPickerModal = class extends Modal {
     const out = [];
     const walk = (folder) => {
       for (const child of folder.children || []) {
-        if (!Array.isArray(child.children))
-          continue;
-        if (!isIgnoredPath(child.path + "/"))
-          out.push(child.path);
+        if (!Array.isArray(child.children)) continue;
+        if (!isIgnoredPath(child.path + "/")) out.push(child.path);
         walk(child);
       }
     };
     const root = this.app.vault.getRoot();
-    if (root)
-      walk(root);
+    if (root) walk(root);
     return out.sort((a, b) => a.localeCompare(b, "zh"));
   }
   // 逐级建目录，父级不存在时一并补上；创建后文件树会自动出现
@@ -19969,15 +19333,13 @@ var FolderPickerModal = class extends Modal {
       empty.toggle(rows.length === 0);
       rows.forEach((path) => {
         const row = listEl.createDiv({ cls: "cl-pickitem" });
-        if (path === this.options.current)
-          row.addClass("is-active");
+        if (path === this.options.current) row.addClass("is-active");
         const icon = row.createDiv({ cls: "cl-pickicon" });
         setIcon(icon, "folder");
         row.createDiv({ cls: "cl-pickname", text: path });
         row.onclick = () => {
           this.close();
-          if (this.options.onPick)
-            this.options.onPick(path);
+          if (this.options.onPick) this.options.onPick(path);
         };
       });
     };
@@ -20002,8 +19364,7 @@ var FolderPickerModal = class extends Modal {
     const showForm = (on) => {
       form.classList.toggle("is-hidden", !on);
       pickWrap.classList.toggle("is-hidden", on);
-      if (on)
-        nameInput.focus();
+      if (on) nameInput.focus();
     };
     backBtn.onclick = () => showForm(false);
     okBtn.onclick = async () => {
@@ -20030,12 +19391,10 @@ var FolderPickerModal = class extends Modal {
         }
       }
       this.close();
-      if (this.options.onPick)
-        this.options.onPick(value);
+      if (this.options.onPick) this.options.onPick(value);
     };
     nameInput.addEventListener("keydown", (evt) => {
-      if (evt.key === "Enter")
-        okBtn.click();
+      if (evt.key === "Enter") okBtn.click();
     });
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
     const create = foot.createEl("button", {
@@ -20077,16 +19436,14 @@ var ModulePickerModal = class extends Modal {
       item.createDiv({ cls: "cl-pickname", text: mod.name });
       item.onclick = () => {
         this.close();
-        if (this.onPick)
-          this.onPick(mod);
+        if (this.onPick) this.onPick(mod);
       };
     });
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
     const create = foot.createEl("button", { cls: "cl-btn", text: "\u65B0\u5EFA\u6A21\u5757\u2026" });
     create.onclick = () => {
       this.close();
-      if (this.onCreate)
-        this.onCreate();
+      if (this.onCreate) this.onCreate();
     };
     const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
@@ -20115,16 +19472,14 @@ var ModuleManagerModal = class extends Modal {
     const create = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u65B0\u5EFA\u6A21\u5757" });
     create.onclick = () => {
       this.close();
-      if (this.options.onCreate)
-        this.options.onCreate();
+      if (this.options.onCreate) this.options.onCreate();
     };
     const close = foot.createEl("button", { cls: "cl-btn", text: "\u5173\u95ED" });
     close.onclick = () => this.close();
   }
   renderList() {
     const list = this.listEl;
-    if (!list)
-      return;
+    if (!list) return;
     list.empty();
     const roots = this.options.getRootModules ? this.options.getRootModules() : [];
     if (!roots.length) {
@@ -20142,10 +19497,8 @@ var ModuleManagerModal = class extends Modal {
       if (children.length) {
         setIcon(toggle, isOpen ? "chevron-down" : "chevron-right");
         toggle.onclick = () => {
-          if (isOpen)
-            this.expanded.delete(key);
-          else
-            this.expanded.add(key);
+          if (isOpen) this.expanded.delete(key);
+          else this.expanded.add(key);
           this.renderList();
         };
       } else {
@@ -20160,23 +19513,19 @@ var ModuleManagerModal = class extends Modal {
       const main = row.createDiv({ cls: "cl-modrow-main" });
       main.createDiv({ cls: "cl-modrow-name", text: mod.name });
       const folder = this.options.getFolder ? this.options.getFolder(mod) : mod.folder || "";
-      if (folder)
-        main.createDiv({ cls: "cl-modrow-path", text: folder });
+      if (folder) main.createDiv({ cls: "cl-modrow-path", text: folder });
       const edit = row.createEl("button", { cls: "cl-btn", text: "\u7F16\u8F91" });
       edit.onclick = () => {
         this.close();
-        if (this.options.onEdit)
-          this.options.onEdit(mod);
+        if (this.options.onEdit) this.options.onEdit(mod);
       };
       const del = row.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664" });
       del.onclick = async () => {
-        if (!this.options.onDissolve)
-          return;
+        if (!this.options.onDissolve) return;
         await this.options.onDissolve(mod);
         this.renderList();
       };
-      if (children.length && isOpen)
-        children.forEach((child) => draw(child, depth + 1));
+      if (children.length && isOpen) children.forEach((child) => draw(child, depth + 1));
     };
     roots.forEach((mod) => draw(mod, 0));
   }
@@ -20212,12 +19561,10 @@ var NamePromptModal = class extends Modal {
         return;
       }
       this.close();
-      if (this.options.onSubmit)
-        this.options.onSubmit(value);
+      if (this.options.onSubmit) this.options.onSubmit(value);
     };
     input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter")
-        ok.click();
+      if (event.key === "Enter") ok.click();
     });
     window.setTimeout(() => input.focus(), 0);
   }
@@ -20258,18 +19605,14 @@ var AddFilesModal = class extends Modal {
         box.checked = this.selected.has(file.path);
         box.onclick = (event) => {
           event.stopPropagation();
-          if (box.checked)
-            this.selected.add(file.path);
-          else
-            this.selected.delete(file.path);
+          if (box.checked) this.selected.add(file.path);
+          else this.selected.delete(file.path);
         };
         row.createDiv({ cls: "cl-pickname", text: file.path });
         row.onclick = () => {
           box.checked = !box.checked;
-          if (box.checked)
-            this.selected.add(file.path);
-          else
-            this.selected.delete(file.path);
+          if (box.checked) this.selected.add(file.path);
+          else this.selected.delete(file.path);
         };
       });
     };
@@ -20286,8 +19629,7 @@ var AddFilesModal = class extends Modal {
         return;
       }
       this.close();
-      if (this.onConfirm)
-        this.onConfirm(chosen);
+      if (this.onConfirm) this.onConfirm(chosen);
     };
   }
   onClose() {
@@ -20325,8 +19667,7 @@ var NovalView = class extends ItemView {
     this.watchWidth();
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf) => {
-        if (leaf === this.leaf && this._needsRefresh)
-          this.refresh();
+        if (leaf === this.leaf && this._needsRefresh) this.refresh();
       })
     );
   }
@@ -20343,25 +19684,21 @@ var NovalView = class extends ItemView {
   /* 侧栏一展开，视图宽度就变，但窗口宽度不变，所以断点必须量视图自身。
      ResizeObserver 盯着视图容器，实时把宽度换算成三档类名和一个留白变量。 */
   watchWidth() {
-    if (this._ro)
-      this._ro.disconnect();
-    if (typeof ResizeObserver !== "function")
-      return;
+    if (this._ro) this._ro.disconnect();
+    if (typeof ResizeObserver !== "function") return;
     this._ro = new ResizeObserver(() => this.applyLayout());
     this._ro.observe(this.containerEl);
   }
   applyLayout() {
     const app = this.appEl;
-    if (!app)
-      return;
+    if (!app) return;
     let w = 0;
     try {
       w = this.containerEl.clientWidth || 0;
     } catch (e) {
       w = 0;
     }
-    if (w < 40)
-      return;
+    if (w < 40) return;
     app.classList.toggle("is-compact", w < 1120);
     app.classList.toggle("is-mini", w < 940);
     app.classList.toggle("is-nav-collapsed", !!this.navCollapsed);
@@ -20370,8 +19707,7 @@ var NovalView = class extends ItemView {
   }
   getModules() {
     const list = this.plugin.settings.modules;
-    if (Array.isArray(list))
-      return list;
+    if (Array.isArray(list)) return list;
     return DEFAULT_MODULES;
   }
   contentFiles() {
@@ -20409,8 +19745,7 @@ var NovalView = class extends ItemView {
   }
   // 模块没有单独设置文件夹时，用模块名建一个同名目录。
   moduleTargetFolder(mod) {
-    const raw = String(mod && (mod.folder || mod.name || mod.id || mod.module) || "").trim();
-    return raw.replace(/^\/+|\/+$/g, "").replace(/[\\:*?"<>|]/g, "_");
+    return moduleFolderOf(mod);
   }
   // 目标同名时加 -1 / -2，避免覆盖模块目录里已有的文件。
   uniqueFilePath(dir, file) {
@@ -20435,21 +19770,17 @@ var NovalView = class extends ItemView {
   /* 读取文件夹下的直接子文件。folder 不存在时返回空数组，不报错。 */
   folderFiles(dir, includeChildren) {
     const target = String(dir || "").replace(/^\/+|\/+$/g, "");
-    if (!target)
-      return [];
+    if (!target) return [];
     const node = this.app.vault.getAbstractFileByPath(target);
-    if (!node || !Array.isArray(node.children))
-      return [];
+    if (!node || !Array.isArray(node.children)) return [];
     const out = [];
     const walk = (folder) => {
       (folder.children || []).forEach((child) => {
         if (Array.isArray(child.children)) {
-          if (includeChildren)
-            walk(child);
+          if (includeChildren) walk(child);
           return;
         }
-        if (!isIgnoredPath(child.path))
-          out.push(child);
+        if (!isIgnoredPath(child.path)) out.push(child);
       });
     };
     walk(node);
@@ -20461,8 +19792,7 @@ var NovalView = class extends ItemView {
    * 模块页只统计笔记，附件一律不参与计数、也不在模块页展示。 */
   isHiddenModuleFolder(path) {
     const dir = String(path || "").replace(/^\/+|\/+$/g, "").toLowerCase();
-    if (!dir)
-      return false;
+    if (!dir) return false;
     return (this.plugin.settings.hiddenModuleFolders || []).some(
       (item) => String(item || "").replace(/^\/+|\/+$/g, "").toLowerCase() === dir
     );
@@ -20471,14 +19801,10 @@ var NovalView = class extends ItemView {
   // 附件、媒体文件夹同样是模块，按文件树正常显示
   isModuleFolderIgnored(path) {
     const dir = String(path || "").replace(/^\/+|\/+$/g, "");
-    if (!dir)
-      return true;
-    if (dir === CARD_FOLDER)
-      return true;
-    if (this.isCanvasModuleFolder(dir))
-      return true;
-    if (isToolFolder(dir))
-      return true;
+    if (!dir) return true;
+    if (dir === CARD_FOLDER) return true;
+    if (this.isCanvasModuleFolder(dir)) return true;
+    if (isToolFolder(dir)) return true;
     return this.isHiddenModuleFolder(dir);
   }
   /* 画布文件夹归白板工作区使用，不再作为模块出现在导航里。
@@ -20491,19 +19817,14 @@ var NovalView = class extends ItemView {
    * 没有配置时生成一个临时模块（id = dir:路径），文件树里的文件夹也能直接进入。 */
   moduleForFolder(path) {
     const dir = String(path || "").replace(/^\/+|\/+$/g, "");
-    if (!dir)
-      return null;
-    if (this.isCanvasModuleFolder(dir))
-      return null;
+    if (!dir) return null;
+    if (this.isCanvasModuleFolder(dir)) return null;
     const configured = this.getModules().find(
       (mod) => this.moduleTargetFolder(mod).toLowerCase() === dir.toLowerCase()
     );
-    if (configured)
-      return configured;
-    if (this.isModuleFolderIgnored(dir))
-      return null;
-    if (!this.app.vault.getAbstractFileByPath(dir))
-      return null;
+    if (configured) return configured;
+    if (this.isModuleFolderIgnored(dir)) return null;
+    if (!this.app.vault.getAbstractFileByPath(dir)) return null;
     const name = dir.split("/").pop();
     return {
       id: "dir:" + dir,
@@ -20517,34 +19838,28 @@ var NovalView = class extends ItemView {
   // 文件属于哪个模块：从文件所在文件夹逐级往上找，命中的最近一层就是归属
   // （包含没写进配置的隐式子文件夹，保证深层笔记也能在首页/归入逻辑里定位）
   moduleForFile(file) {
-    if (!file)
-      return null;
+    if (!file) return null;
     let dir = String(file.path || "").split("/").slice(0, -1).join("/");
     while (dir) {
       const mod = this.moduleForFolder(dir);
-      if (mod)
-        return mod;
+      if (mod) return mod;
       dir = dir.split("/").slice(0, -1).join("/");
     }
     return null;
   }
   moduleById(id) {
     const direct = this.getModules().find((mod) => moduleIdOf(mod) === id);
-    if (direct)
-      return direct;
+    if (direct) return direct;
     const value = String(id || "");
-    if (value.startsWith("dir:"))
-      return this.moduleForFolder(value.slice(4));
+    if (value.startsWith("dir:")) return this.moduleForFolder(value.slice(4));
     return null;
   }
   submodulesOf(mod) {
     const dir = this.moduleTargetFolder(mod);
-    if (!dir)
-      return [];
+    if (!dir) return [];
     const node = this.app.vault.getAbstractFileByPath(dir);
-    if (!node || !Array.isArray(node.children))
-      return [];
-    return node.children.filter((child) => Array.isArray(child.children)).filter((child) => !this.isModuleFolderIgnored(child.path)).map((child) => this.moduleForFolder(child.path)).filter(Boolean).sort((a, b) => String(a.name).localeCompare(String(b.name), "zh"));
+    if (!node || !Array.isArray(node.children)) return [];
+    return node.children.filter((child) => Array.isArray(child.children)).filter((child) => !this.isModuleFolderIgnored(child.path)).sort(compareVaultNodes).map((child) => this.moduleForFolder(child.path)).filter(Boolean);
   }
   moduleNoteFiles(mod) {
     return this.moduleFiles(mod).filter(
@@ -20555,8 +19870,7 @@ var NovalView = class extends ItemView {
   moduleTreeNoteFiles(mod, visited) {
     const seenIds = visited || /* @__PURE__ */ new Set();
     const id = moduleIdOf(mod);
-    if (!id || seenIds.has(id))
-      return [];
+    if (!id || seenIds.has(id)) return [];
     seenIds.add(id);
     const out = this.moduleNoteFiles(mod).slice();
     this.submodulesOf(mod).forEach((child) => {
@@ -20571,30 +19885,23 @@ var NovalView = class extends ItemView {
     const dirs = mods.map((mod) => this.moduleTargetFolder(mod)).filter(Boolean);
     return mods.filter((mod) => {
       const dir = this.moduleTargetFolder(mod);
-      if (dir && this.isCanvasModuleFolder(dir))
-        return false;
-      if (!dir)
-        return true;
+      if (dir && this.isCanvasModuleFolder(dir)) return false;
+      if (!dir) return true;
       return !dirs.some((other) => other && other !== dir && dir.startsWith(other + "/"));
     });
   }
   // 从根模块到当前文件夹的链路，用于面包屑和导航展开
   modulePath(mod) {
     const dir = this.moduleTargetFolder(mod);
-    if (!dir)
-      return [mod];
+    if (!dir) return [mod];
     let root = null;
     this.rootModules().forEach((candidate) => {
       const cdir = this.moduleTargetFolder(candidate);
-      if (!cdir)
-        return;
-      if (dir !== cdir && !dir.startsWith(cdir + "/"))
-        return;
-      if (!root || cdir.length > this.moduleTargetFolder(root).length)
-        root = candidate;
+      if (!cdir) return;
+      if (dir !== cdir && !dir.startsWith(cdir + "/")) return;
+      if (!root || cdir.length > this.moduleTargetFolder(root).length) root = candidate;
     });
-    if (!root)
-      return [mod];
+    if (!root) return [mod];
     const rootDir = this.moduleTargetFolder(root);
     const chain = [root];
     if (dir !== rootDir) {
@@ -20602,12 +19909,10 @@ var NovalView = class extends ItemView {
       dir.slice(rootDir.length + 1).split("/").filter(Boolean).forEach((seg) => {
         acc += "/" + seg;
         const node = this.moduleForFolder(acc);
-        if (node)
-          chain.push(node);
+        if (node) chain.push(node);
       });
       const last = chain[chain.length - 1];
-      if (last && last.id !== mod.id)
-        chain.push(mod);
+      if (last && last.id !== mod.id) chain.push(mod);
     } else if (root.id !== mod.id) {
       chain[0] = mod;
     }
@@ -20621,8 +19926,7 @@ var NovalView = class extends ItemView {
       placeholder: "\u4F8B\u5982\uFF1A\u5BA2\u6237",
       onSubmit: async (raw) => {
         const name = sanitizeFolderName(raw);
-        if (!name)
-          return;
+        if (!name) return;
         const dir = parentDir ? parentDir + "/" + name : name;
         const existing = this.getModules().find(
           (mod) => this.moduleTargetFolder(mod) === dir
@@ -20666,15 +19970,11 @@ var NovalView = class extends ItemView {
   // 这类复合后缀不会再混进来。
   vaultAttachments() {
     return this.app.vault.getFiles().filter((file) => {
-      if (file.extension === "md")
-        return false;
-      if (["noval", "volis", "canvas"].includes(file.extension.toLowerCase()))
-        return false;
+      if (file.extension === "md") return false;
+      if (["noval", "volis", "canvas"].includes(file.extension.toLowerCase())) return false;
       const lower = file.path.toLowerCase();
-      if (lower.includes(".volis.") || lower.includes(".noval."))
-        return false;
-      if (!ATTACHMENT_EXTENSIONS.has(file.extension.toLowerCase()))
-        return false;
+      if (lower.includes(".volis.") || lower.includes(".noval.")) return false;
+      if (!ATTACHMENT_EXTENSIONS.has(file.extension.toLowerCase())) return false;
       return !isIgnoredPath(file.path);
     });
   }
@@ -20692,18 +19992,13 @@ var NovalView = class extends ItemView {
     return this.app.vault.getFiles().filter((file) => String(file.path).indexOf("/") === -1);
   }
   isInboxFile(file) {
-    if (!file)
-      return false;
+    if (!file) return false;
     const ext = String(file.extension || "").toLowerCase();
-    if (["noval", "volis", "canvas"].includes(ext))
-      return false;
+    if (["noval", "volis", "canvas"].includes(ext)) return false;
     const lower = file.path.toLowerCase();
-    if (lower.includes(".volis.") || lower.includes(".noval."))
-      return false;
-    if (isIgnoredPath(file.path))
-      return false;
-    if (file.path.startsWith(CARD_FOLDER + "/"))
-      return false;
+    if (lower.includes(".volis.") || lower.includes(".noval.")) return false;
+    if (isIgnoredPath(file.path)) return false;
+    if (file.path.startsWith(CARD_FOLDER + "/")) return false;
     return true;
   }
   inboxFiles() {
@@ -20721,8 +20016,7 @@ var NovalView = class extends ItemView {
     });
     const pending = md.filter((file) => {
       const explicit = this.explicitModule(getFm(this.app, file));
-      if (!explicit.length)
-        return true;
+      if (!explicit.length) return true;
       return !explicit.some((v) => known.has(v));
     });
     const assigned = this.ownershipMap();
@@ -20743,18 +20037,15 @@ var NovalView = class extends ItemView {
     for (const file of this.vaultFiles()) {
       const values = this.explicitModule(getFm(this.app, file));
       values.forEach((value) => {
-        if (known.has(value) || ignored.has(value))
-          return;
-        if (!groups.has(value))
-          groups.set(value, []);
+        if (known.has(value) || ignored.has(value)) return;
+        if (!groups.has(value)) groups.set(value, []);
         groups.get(value).push(file);
       });
     }
     return groups;
   }
   openFile(file) {
-    if (!file)
-      return;
+    if (!file) return;
     this.app.workspace.getLeaf("tab").openFile(file);
   }
   /* 删除模块只删配置，不动磁盘文件。
@@ -20768,8 +20059,7 @@ var NovalView = class extends ItemView {
       hidden.add(folder);
       this.plugin.settings.hiddenModuleFolders = Array.from(hidden);
     }
-    if (this.active === target.id)
-      this.active = "home";
+    if (this.active === target.id) this.active = "home";
     this._ownership = null;
     await this.plugin.saveSettings();
   }
@@ -20792,8 +20082,7 @@ var NovalView = class extends ItemView {
    * 直接文件与子文件夹整体上移，再移除模块配置并清掉空文件夹。不删除任何内容。 */
   async dissolveModule(target) {
     const folder = this.moduleTargetFolder(target);
-    if (!folder)
-      return;
+    if (!folder) return;
     const node = this.app.vault.getAbstractFileByPath(folder);
     const parentPath = folder.indexOf("/") === -1 ? "" : folder.slice(0, folder.lastIndexOf("/"));
     const parentLabel = parentPath ? parentPath.split("/").pop() : "\u5E93\u6839\u76EE\u5F55";
@@ -20818,8 +20107,7 @@ var NovalView = class extends ItemView {
         resolve
       ).open();
     });
-    if (!confirmed)
-      return;
+    if (!confirmed) return;
     let movedFiles = 0;
     let movedFolders = 0;
     try {
@@ -20858,15 +20146,13 @@ var NovalView = class extends ItemView {
       const nextAuto = String(mod.id || "").startsWith("dir:");
       if (prevAuto && !nextAuto) {
         const index = deduped.indexOf(prev);
-        if (index >= 0)
-          deduped[index] = mod;
+        if (index >= 0) deduped[index] = mod;
         byFolder.set(key, mod);
       }
     });
     this.plugin.settings.modules = deduped;
     this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => String(path).toLowerCase() !== folder.toLowerCase());
-    if (this.active === target.id)
-      this.active = "home";
+    if (this.active === target.id) this.active = "home";
     this._ownership = null;
     try {
       const left = this.app.vault.getAbstractFileByPath(folder);
@@ -20887,8 +20173,7 @@ var NovalView = class extends ItemView {
   }
   /* 模块右键菜单：和文件树一样，就地重命名或删除，操作同步到文件夹。 */
   showModuleMenu(mod, event) {
-    if (!mod)
-      return;
+    if (!mod) return;
     const menu = new Menu();
     menu.addItem(
       (item) => item.setTitle("\u91CD\u547D\u540D\u2026").setIcon("pencil").onClick(() => this.renameModule(mod))
@@ -20905,8 +20190,7 @@ var NovalView = class extends ItemView {
     menu.showAtMouseEvent(event);
   }
   renameModule(mod) {
-    if (!mod)
-      return;
+    if (!mod) return;
     const oldFolder = this.moduleTargetFolder(mod);
     new RenameModuleModal(this.app, mod.name || oldFolder.split("/").pop(), async (value) => {
       const name = sanitizeFolderName(value);
@@ -20923,8 +20207,7 @@ var NovalView = class extends ItemView {
         this.render();
         return;
       }
-      if (newFolder === oldFolder && name === mod.name)
-        return;
+      if (newFolder === oldFolder && name === mod.name) return;
       if (newFolder.toLowerCase() !== oldFolder.toLowerCase()) {
         if (this.app.vault.getAbstractFileByPath(newFolder)) {
           new Notice("\u5DF2\u5B58\u5728\u540C\u540D\u6587\u4EF6\u5939\uFF1A" + newFolder);
@@ -20946,10 +20229,8 @@ var NovalView = class extends ItemView {
       const oldId = "dir:" + oldFolder;
       const newId = "dir:" + newFolder;
       const remapId = (id) => {
-        if (id === oldId)
-          return newId;
-        if (id.indexOf(oldId + "/") === 0)
-          return newId + id.slice(oldId.length);
+        if (id === oldId) return newId;
+        if (id.indexOf(oldId + "/") === 0) return newId + id.slice(oldId.length);
         return id;
       };
       this.active = remapId(this.active);
@@ -20985,20 +20266,16 @@ var NovalView = class extends ItemView {
         if (idx < 0) {
           idx = list.findIndex((m) => this.moduleTargetFolder(m) === folder);
         }
-        if (idx >= 0)
-          list[idx] = next;
-        else
-          list.push(next);
+        if (idx >= 0) list[idx] = next;
+        else list.push(next);
         this.plugin.settings.modules = list;
         this._ownership = null;
         await this.plugin.saveSettings();
         new Notice("\u5DF2\u4FDD\u5B58\u6A21\u5757\u300C" + next.name + "\u300D");
         const pending = this._pendingAssign;
         this._pendingAssign = null;
-        if (pending && pending.length)
-          this.assignToModule(pending, next);
-        else if (!mod)
-          this.go(next.id);
+        if (pending && pending.length) this.assignToModule(pending, next);
+        else if (!mod) this.go(next.id);
       },
       onDelete: mod ? async (target) => {
         await this.removeModuleConfig(target);
@@ -21020,8 +20297,7 @@ var NovalView = class extends ItemView {
     }).open();
   }
   openModulePicker(files) {
-    if (!files || !files.length)
-      return;
+    if (!files || !files.length) return;
     new ModulePickerModal(
       this.app,
       this.getModules(),
@@ -21039,19 +20315,16 @@ var NovalView = class extends ItemView {
       let done = false;
       let ref = null;
       const finish = () => {
-        if (done)
-          return;
+        if (done) return;
         done = true;
         try {
-          if (ref)
-            cache.offref(ref);
+          if (ref) cache.offref(ref);
         } catch (e) {
         }
         resolve();
       };
       ref = cache.on("changed", (changed) => {
-        if (changed && changed.path === file.path)
-          finish();
+        if (changed && changed.path === file.path) finish();
       });
       setTimeout(finish, timeout);
     });
@@ -21061,14 +20334,12 @@ var NovalView = class extends ItemView {
    *   - 笔记顺手写 module 字段（只是元数据，模块归属仍以文件夹为准）；
    *   - 素材在归属表里留一条记录，兼容后续切回 unassigned 收件箱策略。 */
   async assignToModule(files, mod) {
-    if (!files || !files.length)
-      return;
+    if (!files || !files.length) return;
     const rawId = moduleIdOf(mod);
     const value = String(rawId).startsWith("dir:") ? mod.name : rawId;
     const dir = this.moduleTargetFolder(mod);
     try {
-      if (dir)
-        await ensureVaultFolder(this.app, dir);
+      if (dir) await ensureVaultFolder(this.app, dir);
     } catch (e) {
       new Notice("\u65E0\u6CD5\u521B\u5EFA\u6A21\u5757\u6587\u4EF6\u5939\u300C" + dir + "\u300D\uFF1A" + (e.message || e));
       return;
@@ -21102,8 +20373,7 @@ var NovalView = class extends ItemView {
         done += 1;
       } catch (e) {
         failed += 1;
-        if (!firstError)
-          firstError = e && e.message || String(e);
+        if (!firstError) firstError = e && e.message || String(e);
       }
     }
     await this.plugin.saveSettings();
@@ -21116,23 +20386,18 @@ var NovalView = class extends ItemView {
   }
   // 按标签 / 文件夹名 / 文件名给未归类笔记猜一个模块，只做建议，不自动改文件
   suggestModuleFor(file) {
-    if (file.extension !== "md")
-      return null;
+    if (file.extension !== "md") return null;
     const fm = getFm(this.app, file);
     const tags = getTags(fm).map((t) => t.toLowerCase());
     const segs = file.parent ? file.parent.path.split("/").map((s) => s.toLowerCase()) : [];
     const base = file.basename.toLowerCase();
     for (const mod of this.getModules()) {
       const names = [mod.name, mod.id, mod.module].filter(Boolean).map((s) => String(s).toLowerCase());
-      if (tags.some((t) => names.some((n) => t === n || t.startsWith(n + "/"))))
-        return mod;
-      if (segs.some((s) => names.some((n) => s === n)))
-        return mod;
+      if (tags.some((t) => names.some((n) => t === n || t.startsWith(n + "/")))) return mod;
+      if (segs.some((s) => names.some((n) => s === n))) return mod;
       const keywords = (mod.keywords || []).map((k) => String(k).toLowerCase()).filter(Boolean);
-      if (tags.some((t) => keywords.some((k) => t === k || t.startsWith(k + "/"))))
-        return mod;
-      if (keywords.some((k) => k.length >= 2 && base.includes(k)))
-        return mod;
+      if (tags.some((t) => keywords.some((k) => t === k || t.startsWith(k + "/")))) return mod;
+      if (keywords.some((k) => k.length >= 2 && base.includes(k))) return mod;
     }
     return null;
   }
@@ -21140,14 +20405,11 @@ var NovalView = class extends ItemView {
   async applyAllSuggestions(files) {
     const groups = /* @__PURE__ */ new Map();
     for (const file of files) {
-      if (file.extension !== "md")
-        continue;
+      if (file.extension !== "md") continue;
       const mod = this.suggestModuleFor(file);
-      if (!mod)
-        continue;
+      if (!mod) continue;
       const key = moduleIdOf(mod);
-      if (!groups.has(key))
-        groups.set(key, { mod, files: [] });
+      if (!groups.has(key)) groups.set(key, { mod, files: [] });
       groups.get(key).files.push(file);
     }
     if (!groups.size) {
@@ -21160,8 +20422,7 @@ var NovalView = class extends ItemView {
   }
   // 删除收集箱条目：笔记和附件都移入系统回收站，可随时恢复
   deleteFiles(files, onDone) {
-    if (!files || !files.length)
-      return;
+    if (!files || !files.length) return;
     new DeleteFilesModal(this.app, files, async () => {
       let done = 0;
       for (const file of files) {
@@ -21172,8 +20433,7 @@ var NovalView = class extends ItemView {
             await this.app.vault.trash(file, true);
           }
           done += 1;
-          if (this._inboxSel)
-            this._inboxSel.delete(file.path);
+          if (this._inboxSel) this._inboxSel.delete(file.path);
           if (this.plugin.settings.inboxAssigned) {
             delete this.plugin.settings.inboxAssigned[file.path];
           }
@@ -21183,16 +20443,13 @@ var NovalView = class extends ItemView {
       await this.plugin.saveSettings();
       this._ownership = null;
       new Notice("\u5DF2\u5220\u9664 " + done + " \u4E2A\u6587\u4EF6\uFF0C\u53EF\u5728\u56DE\u6536\u7AD9\u6062\u590D");
-      if (typeof onDone === "function")
-        onDone(done);
-      else
-        this.render();
+      if (typeof onDone === "function") onDone(done);
+      else this.render();
     }).open();
   }
   ignoreModuleValue(value) {
     const list = (this.plugin.settings.ignoredModuleValues || []).slice();
-    if (!list.includes(value))
-      list.push(value);
+    if (!list.includes(value)) list.push(value);
     this.plugin.settings.ignoredModuleValues = list;
     this.plugin.saveSettings();
   }
@@ -21205,8 +20462,7 @@ var NovalView = class extends ItemView {
   }
   openNoval() {
     const ok = this.runCommand(NOTES_ID + ":open-cards");
-    if (ok)
-      return;
+    if (ok) return;
     const leaf = this.app.workspace.getRightLeaf(false);
     if (leaf) {
       leaf.setViewState({ type: "qm-cards-view", active: true });
@@ -21240,13 +20496,11 @@ var NovalView = class extends ItemView {
   setNavCollapsed(on) {
     this.navCollapsed = !!on;
     this.plugin.settings.navCollapsed = this.navCollapsed;
-    if (this.plugin.persistSettings)
-      this.plugin.persistSettings();
+    if (this.plugin.persistSettings) this.plugin.persistSettings();
     this.applyLayout();
   }
   refresh() {
-    if (!this.containerEl)
-      return;
+    if (!this.containerEl) return;
     const shown = typeof this.containerEl.isShown === "function" ? this.containerEl.isShown() : this.containerEl.offsetParent !== null;
     if (!shown) {
       this._needsRefresh = true;
@@ -21265,10 +20519,8 @@ var NovalView = class extends ItemView {
     this.render();
   }
   go(id) {
-    if (this.active === "canvas" && id !== "canvas")
-      this.destroyGallery();
-    if (this.active === "notes" && id !== "notes")
-      this.destroyNotes();
+    if (this.active === "canvas" && id !== "canvas") this.destroyGallery();
+    if (this.active === "notes" && id !== "notes") this.destroyNotes();
     const mod = this.moduleById(id);
     const builtin = ["home", "inbox", "canvas", "notes"].includes(id);
     if (!mod && !builtin) {
@@ -21282,12 +20534,10 @@ var NovalView = class extends ItemView {
     this.render();
   }
   destroyGallery() {
-    if (this.gallery)
-      this.gallery.destroy();
+    if (this.gallery) this.gallery.destroy();
   }
   destroyNotes() {
-    if (this.notes)
-      this.notes.destroy();
+    if (this.notes) this.notes.destroy();
   }
   getBoardFiles() {
     return this.app.vault.getFiles().filter((f) => f.extension === BOARD_EXT).sort((a, b) => b.stat.mtime - a.stat.mtime);
@@ -21298,21 +20548,17 @@ var NovalView = class extends ItemView {
   // 卡片总数只有读文件才知道，导航先渲染，数字到了再补进徽标。
   fillCardCount(item) {
     const noval = this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID] || this.app.plugins.plugins && this.app.plugins.plugins[LEGACY.notesId];
-    if (!noval || typeof noval.readAllCards !== "function")
-      return;
+    if (!noval || typeof noval.readAllCards !== "function") return;
     noval.readAllCards().then((cards) => {
       const total = Array.isArray(cards) ? cards.length : 0;
       this._cardCount = total;
-      if (!item.isConnected)
-        return;
+      if (!item.isConnected) return;
       let badge = item.querySelector(".cl-navcount");
       if (!total) {
-        if (badge)
-          badge.remove();
+        if (badge) badge.remove();
         return;
       }
-      if (!badge)
-        badge = item.createDiv({ cls: "cl-navcount" });
+      if (!badge) badge = item.createDiv({ cls: "cl-navcount" });
       badge.setText(String(total));
     }).catch(() => {
     });
@@ -21329,8 +20575,7 @@ var NovalView = class extends ItemView {
         continue;
       }
       const start = line.match(/^-\s+(\d{2}:\d{2})\s+(.*)$/);
-      if (!start)
-        continue;
+      if (!start) continue;
       let body = start[2];
       let j = i + 1;
       while (j < lines.length && !/^-\s+\d{2}:\d{2}\s+/.test(lines[j]) && !/^##\s+/.test(lines[j])) {
@@ -21377,18 +20622,15 @@ var NovalView = class extends ItemView {
     return cards.slice(0, limit || 6);
   }
   openCard(card) {
-    if (!card)
-      return;
+    if (!card) return;
     const sub = card.id ? "#^" + card.id : "";
     this.app.workspace.openLinkText(card.file.path + sub, "", true);
   }
   /** 首页速记卡片：切到卡片笔记页，并定位到具体这一条。 */
   openCardInNotes(card) {
-    if (!card)
-      return;
+    if (!card) return;
     this.go("notes");
-    if (this.notes)
-      this.notes.focusCard(card);
+    if (this.notes) this.notes.focusCard(card);
   }
   async readBoard(file) {
     try {
@@ -21410,10 +20652,8 @@ var NovalView = class extends ItemView {
   render() {
     this._mdFiles = this.app.vault.getMarkdownFiles();
     this._contentFiles = this._mdFiles.filter(isContentFile);
-    if (this.active !== "canvas")
-      this.destroyGallery();
-    if (this.active !== "notes")
-      this.destroyNotes();
+    if (this.active !== "canvas") this.destroyGallery();
+    if (this.active !== "notes") this.destroyNotes();
     this.contentEl.empty();
     this.contentEl.addClass("cl-content");
     const root = this.contentEl.createDiv({ cls: "cl-app" });
@@ -21435,10 +20675,8 @@ var NovalView = class extends ItemView {
       this.renderHome(scroll);
     } else {
       const mod = this.moduleById(this.active);
-      if (mod)
-        this.renderModule(scroll, mod);
-      else
-        this.renderHome(scroll);
+      if (mod) this.renderModule(scroll, mod);
+      else this.renderHome(scroll);
     }
     this.applyLayout();
   }
@@ -21468,28 +20706,24 @@ var NovalView = class extends ItemView {
         cls: "cl-navitem" + (active ? " is-active" : "") + (depth > 0 ? " is-sub" : "")
       });
       item.setAttribute("aria-label", label);
-      if (depth > 0)
-        item.style.paddingLeft = 9 + depth * 14 + "px";
+      if (depth > 0) item.style.paddingLeft = 9 + depth * 14 + "px";
       if (chevron) {
         const chev = item.createDiv({ cls: "cl-navchev" + (hasChildren ? "" : " is-blank") });
         if (hasChildren) {
           setIcon(chev, expanded ? "chevron-down" : "chevron-right");
           chev.onclick = (event) => {
             event.stopPropagation();
-            if (onToggle)
-              onToggle();
+            if (onToggle) onToggle();
           };
         }
       }
       const iconEl = item.createDiv({
         cls: "cl-navicon" + (tile ? " cl-navtile " + tile : "")
       });
-      if (color)
-        iconEl.style.setProperty("--tint", color);
+      if (color) iconEl.style.setProperty("--tint", color);
       setIcon(iconEl, icon);
       item.createDiv({ cls: "cl-navlabel", text: label });
-      if (count > 0)
-        item.createDiv({ cls: "cl-navcount", text: String(count) });
+      if (count > 0) item.createDiv({ cls: "cl-navcount", text: String(count) });
       item.onclick = onClick;
       if (onContextMenu) {
         item.oncontextmenu = (event) => {
@@ -21546,25 +20780,20 @@ var NovalView = class extends ItemView {
         expanded,
         onContextMenu: (event) => this.showModuleMenu(mod, event),
         onToggle: () => {
-          if (expanded)
-            this._navExpanded.delete(key);
-          else
-            this._navExpanded.add(key);
+          if (expanded) this._navExpanded.delete(key);
+          else this._navExpanded.add(key);
           this.render();
         },
         // 与文件树一致：有子模块时，点击模块名本身就展开/折叠；没有子模块则只做导航
         onClick: () => {
           if (children.length) {
-            if (expanded)
-              this._navExpanded.delete(key);
-            else
-              this._navExpanded.add(key);
+            if (expanded) this._navExpanded.delete(key);
+            else this._navExpanded.add(key);
           }
           this.go(key);
         }
       });
-      if (expanded)
-        children.forEach((child) => drawModule(child, depth + 1));
+      if (expanded) children.forEach((child) => drawModule(child, depth + 1));
     };
     roots.forEach((mod) => drawModule(mod, 0));
     const workspace = group("WORKSPACE");
@@ -21624,8 +20853,7 @@ var NovalView = class extends ItemView {
     cmd.createSpan({ text: "\u5FEB\u901F\u8BB0\u4E00\u6761" });
     cmd.createDiv({ cls: "cl-hm-kbd", text: "\u21B5" });
     cmd.onclick = () => {
-      if (captureInput)
-        captureInput.focus();
+      if (captureInput) captureInput.focus();
     };
     const gear = top.createDiv({ cls: "cl-hm-iconbtn" });
     gear.setAttribute("aria-label", "\u8BBE\u7F6E");
@@ -21675,8 +20903,7 @@ var NovalView = class extends ItemView {
         if (ok) {
           captureInput.value = "";
           window.setTimeout(() => {
-            if (this.active === "home")
-              this.refresh();
+            if (this.active === "home") this.refresh();
           }, 320);
         }
       } else {
@@ -21709,10 +20936,8 @@ var NovalView = class extends ItemView {
       d.setHours(0, 0, 0, 0);
       const key = d.getTime();
       buckets.set(key, (buckets.get(key) || 0) + 1);
-      if (key >= recentFrom)
-        recentCount += 1;
-      else if (key >= prevFrom)
-        prevCount += 1;
+      if (key >= recentFrom) recentCount += 1;
+      else if (key >= prevFrom) prevCount += 1;
     }
     const trend = prevCount ? Math.round((recentCount - prevCount) / prevCount * 100) : null;
     const weekNum = weekCard.createDiv({ cls: "cl-hm-weeknum" });
@@ -21735,18 +20960,15 @@ var NovalView = class extends ItemView {
         const count = buckets.get(time) || 0;
         let level = 0;
         for (let k = 1; k < levels.length; k++) {
-          if (count >= levels[k])
-            level = k;
+          if (count >= levels[k]) level = k;
         }
-        if (level)
-          cell.addClass("l" + level);
+        if (level) cell.addClass("l" + level);
       }
     }
     const heatFoot = weekCard.createDiv({ cls: "cl-hm-heatfoot" });
     heatFoot.createSpan({ text: "\u5C11" });
     const legend = heatFoot.createDiv({ cls: "cl-hm-legend" });
-    for (let i = 0; i < 5; i++)
-      legend.createEl("i", { cls: "l" + i });
+    for (let i = 0; i < 5; i++) legend.createEl("i", { cls: "l" + i });
     heatFoot.createSpan({ text: "\u591A" });
     const inboxCard = grid.createDiv({ cls: "cl-hm-card cl-hm-inbox cl-hm-s3" });
     const inboxHead = inboxCard.createDiv({ cls: "cl-hm-head" });
@@ -21788,10 +21010,8 @@ var NovalView = class extends ItemView {
       inboxLink.onclick = () => {
         const list = inbox.slice();
         const suggestions = list.filter((f) => this.suggestModuleFor(f));
-        if (suggestions.length)
-          this.applyAllSuggestions(suggestions);
-        else
-          this.go("inbox");
+        if (suggestions.length) this.applyAllSuggestions(suggestions);
+        else this.go("inbox");
       };
     } else {
       inboxLink.createSpan({ text: "\u6253\u5F00\u6536\u96C6\u7BB1 \u2192" });
@@ -21953,8 +21173,7 @@ var NovalView = class extends ItemView {
   async fillHomeBoards(items) {
     for (const item of items) {
       const data = await this.readBoard(item.file);
-      if (!item.metaEl.isConnected)
-        return;
+      if (!item.metaEl.isConnected) return;
       item.badge.setText(data.nodes + " \u8282\u70B9");
       item.metaEl.setText(
         (data.edges ? data.edges + " \u6761\u8FDE\u7EBF \xB7 " : "") + formatTime(item.file.stat.mtime)
@@ -21963,8 +21182,7 @@ var NovalView = class extends ItemView {
   }
   async fillHomeCards(container) {
     const cards = await this.getRecentCards(2);
-    if (!container.isConnected || this.active !== "home")
-      return;
+    if (!container.isConnected || this.active !== "home") return;
     container.empty();
     if (!cards.length) {
       container.createDiv({
@@ -21977,8 +21195,7 @@ var NovalView = class extends ItemView {
       const row = container.createDiv({ cls: "cl-hm-note" });
       const meta = row.createDiv({ cls: "cl-hm-notedate" });
       meta.createSpan({ text: card.date ? card.date.slice(5) : "" });
-      if (card.time)
-        meta.createSpan({ text: " " + card.time });
+      if (card.time) meta.createSpan({ text: " " + card.time });
       row.createDiv({ cls: "cl-hm-notetext", text: card.text });
       if (card.tags && card.tags.length) {
         row.createDiv({ cls: "cl-hm-notetag", text: "#" + card.tags[0] });
@@ -21993,8 +21210,7 @@ var NovalView = class extends ItemView {
     head.createDiv({ cls: "cl-spacer" });
     if (actionText) {
       const action = head.createDiv({ cls: "cl-panel-action", text: actionText });
-      if (onAction)
-        action.onclick = onAction;
+      if (onAction) action.onclick = onAction;
     }
     return panel;
   }
@@ -22016,15 +21232,12 @@ var NovalView = class extends ItemView {
         const m = line.match(/^\s*[-*]\s*\[ \]\s+(.+)/);
         if (m) {
           tasks.push({ text: m[1].trim(), file });
-          if (tasks.length >= 6)
-            break;
+          if (tasks.length >= 6) break;
         }
       }
-      if (tasks.length >= 6)
-        break;
+      if (tasks.length >= 6) break;
     }
-    if (!container.isConnected || this.active !== "home")
-      return;
+    if (!container.isConnected || this.active !== "home") return;
     container.empty();
     if (!tasks.length) {
       container.createDiv({ cls: "cl-empty", text: "\u6CA1\u6709\u672A\u5B8C\u6210\u4EFB\u52A1\uFF0C\u6536\u4EF6\u7BB1\u662F\u7A7A\u7684\u3002" });
@@ -22039,8 +21252,7 @@ var NovalView = class extends ItemView {
   }
   async fillCards(container) {
     const cards = await this.getRecentCards(6);
-    if (!container.isConnected || this.active !== "home")
-      return;
+    if (!container.isConnected || this.active !== "home") return;
     container.empty();
     if (!cards.length) {
       container.createDiv({
@@ -22083,25 +21295,21 @@ var NovalView = class extends ItemView {
       const sub = info.createDiv({ cls: "cl-board-sub", text: "\u8BFB\u53D6\u4E2D\u2026" });
       row.onclick = () => this.openFile(file);
       this.readBoard(file).then((data) => {
-        if (sub.isConnected)
-          sub.setText(data.summary);
+        if (sub.isConnected) sub.setText(data.summary);
       });
     }
   }
   renderInbox(el) {
     const files = this.inboxFiles();
-    if (!this._inboxSel)
-      this._inboxSel = /* @__PURE__ */ new Set();
+    if (!this._inboxSel) this._inboxSel = /* @__PURE__ */ new Set();
     const alive = new Set(files.map((f) => f.path));
     Array.from(this._inboxSel).forEach((p) => {
-      if (!alive.has(p))
-        this._inboxSel.delete(p);
+      if (!alive.has(p)) this._inboxSel.delete(p);
     });
     const suggestions = /* @__PURE__ */ new Map();
     files.forEach((f) => {
       const mod = this.suggestModuleFor(f);
-      if (mod)
-        suggestions.set(f.path, mod);
+      if (mod) suggestions.set(f.path, mod);
     });
     el.addClass("cl-inbox-scroll");
     const page = el.createDiv({ cls: "cl-inbox-page" });
@@ -22162,8 +21370,7 @@ var NovalView = class extends ItemView {
       };
       segButtons.set(key, btn);
     });
-    if (!this._inboxFilter)
-      this._inboxFilter = "all";
+    if (!this._inboxFilter) this._inboxFilter = "all";
     segButtons.get(this._inboxFilter).classList.add("is-active");
     const viewSeg = controls.createDiv({ cls: "cl-inbox-viewseg" });
     const viewButtons = /* @__PURE__ */ new Map();
@@ -22179,8 +21386,7 @@ var NovalView = class extends ItemView {
       };
       viewButtons.set(key, btn);
     });
-    if (!this._inboxView)
-      this._inboxView = "list";
+    if (!this._inboxView) this._inboxView = "list";
     const syncView = () => {
       const mode = this._inboxView || "list";
       viewButtons.forEach((btn, key) => btn.classList.toggle("is-active", key === mode));
@@ -22235,16 +21441,14 @@ var NovalView = class extends ItemView {
     const selectedFiles = () => files.filter((f) => this._inboxSel.has(f.path));
     bulkAssign.onclick = () => {
       const chosen = selectedFiles();
-      if (chosen.length)
-        this.openModulePicker(chosen);
+      if (chosen.length) this.openModulePicker(chosen);
     };
     bulkDelete.onclick = () => this.deleteFiles(selectedFiles());
     query.oninput = () => {
       this._inboxQuery = query.value;
       paint();
     };
-    if (!files.length)
-      bulk.remove();
+    if (!files.length) bulk.remove();
     const typeInfo = (file) => {
       const key = fileKind(file);
       const ext = String(file.extension || "").toLowerCase();
@@ -22256,27 +21460,22 @@ var NovalView = class extends ItemView {
         doc: "file-text",
         other: "file"
       }[key] || "file";
-      if (["zip", "rar", "7z", "tar", "gz"].includes(ext))
-        icon = "archive";
+      if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) icon = "archive";
       return { key, icon };
     };
     const groupFor = (ts) => {
       const now = /* @__PURE__ */ new Date();
       const date = new Date(ts);
-      if (date.toDateString() === now.toDateString())
-        return "\u4ECA\u5929";
-      if (now.getTime() - ts < 7 * 864e5)
-        return "\u672C\u5468";
+      if (date.toDateString() === now.toDateString()) return "\u4ECA\u5929";
+      if (now.getTime() - ts < 7 * 864e5) return "\u672C\u5468";
       return "\u66F4\u65E9";
     };
     let current = [];
     const matches = (file) => {
       const kind = this._inboxFilter || "all";
-      if (kind !== "all" && typeInfo(file).key !== kind)
-        return false;
+      if (kind !== "all" && typeInfo(file).key !== kind) return false;
       const q = String(this._inboxQuery || "").trim().toLowerCase();
-      if (!q)
-        return true;
+      if (!q) return true;
       return file.basename.toLowerCase().includes(q) || file.path.toLowerCase().includes(q);
     };
     const updateBulk = () => {
@@ -22309,10 +21508,8 @@ var NovalView = class extends ItemView {
         box.checked = selected;
         box.onclick = (evt) => {
           evt.stopPropagation();
-          if (box.checked)
-            this._inboxSel.add(file.path);
-          else
-            this._inboxSel.delete(file.path);
+          if (box.checked) this._inboxSel.add(file.path);
+          else this._inboxSel.delete(file.path);
           tile.classList.toggle("is-selected", box.checked);
           updateBulk();
         };
@@ -22370,8 +21567,7 @@ var NovalView = class extends ItemView {
       current.sort(
         (a, b) => sortBy === "name" ? a.basename.localeCompare(b.basename, "zh") : b.stat.mtime - a.stat.mtime
       );
-      while (list.firstChild)
-        list.removeChild(list.firstChild);
+      while (list.firstChild) list.removeChild(list.firstChild);
       const gridMode = (this._inboxView || "list") === "grid";
       list.classList.toggle("is-grid", gridMode);
       if (!files.length) {
@@ -22411,12 +21607,10 @@ var NovalView = class extends ItemView {
       const buckets = [["\u4ECA\u5929", []], ["\u672C\u5468", []], ["\u66F4\u65E9", []]];
       current.forEach((file) => {
         const bucket = buckets.find((b) => b[0] === groupFor(file.stat.mtime));
-        if (bucket)
-          bucket[1].push(file);
+        if (bucket) bucket[1].push(file);
       });
       buckets.forEach(([label, items]) => {
-        if (!items.length)
-          return;
+        if (!items.length) return;
         const group = list.createDiv({ cls: "cl-inbox-group" });
         const groupHead = group.createDiv({ cls: "cl-inbox-group-head" });
         groupHead.createSpan({ cls: "cl-inbox-group-name", text: label });
@@ -22434,10 +21628,8 @@ var NovalView = class extends ItemView {
           box.checked = selected;
           box.onclick = (evt) => {
             evt.stopPropagation();
-            if (box.checked)
-              this._inboxSel.add(file.path);
-            else
-              this._inboxSel.delete(file.path);
+            if (box.checked) this._inboxSel.add(file.path);
+            else this._inboxSel.delete(file.path);
             card.classList.toggle("is-selected", box.checked);
             updateBulk();
           };
@@ -22538,16 +21730,13 @@ var NovalView = class extends ItemView {
     const pad2 = (n) => String(n).padStart(2, "0");
     const fmtDate = (ts) => {
       const d = new Date(ts);
-      if (ts >= todayTs)
-        return pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+      if (ts >= todayTs) return pad2(d.getHours()) + ":" + pad2(d.getMinutes());
       return d.getMonth() + 1 + "-" + pad2(d.getDate());
     };
     const fmtSize = (bytes) => {
       const n = Number(bytes || 0);
-      if (!n)
-        return "\u2014";
-      if (n < 1024)
-        return n + " B";
+      if (!n) return "\u2014";
+      if (n < 1024) return n + " B";
       const units = ["KB", "MB", "GB", "TB"];
       let value = n / 1024;
       let i = 0;
@@ -22568,10 +21757,8 @@ var NovalView = class extends ItemView {
     }
     const selected = this._mdSel;
     const toggleSelect = (path) => {
-      if (selected.has(path))
-        selected.delete(path);
-      else
-        selected.add(path);
+      if (selected.has(path)) selected.delete(path);
+      else selected.add(path);
       draw();
     };
     el.empty();
@@ -22644,8 +21831,7 @@ var NovalView = class extends ItemView {
       menu.addItem(
         (item) => item.setTitle(this._mdMulti ? "\u9000\u51FA\u591A\u9009" : "\u591A\u9009\u5220\u9664").setIcon("list-checks").setChecked(this._mdMulti).onClick(() => {
           this._mdMulti = !this._mdMulti;
-          if (!this._mdMulti)
-            this._mdSel.clear();
+          if (!this._mdMulti) this._mdSel.clear();
           draw();
         })
       );
@@ -22685,8 +21871,7 @@ var NovalView = class extends ItemView {
       searching = !searching;
       searchWrap.classList.toggle("is-on", searching);
       searchBtn.classList.toggle("is-on", searching);
-      if (searching)
-        queryInput.focus();
+      if (searching) queryInput.focus();
     };
     const subSec = page.createDiv({ cls: "cl-mdv-sec" });
     subSec.createEl("h3", { text: "\u5B50\u6A21\u5757" });
@@ -22761,8 +21946,7 @@ var NovalView = class extends ItemView {
     const selDelete = selBar.createEl("button", { cls: "cl-md-btn cl-md-btn-danger", text: "\u5220\u9664\u6240\u9009" });
     selDelete.onclick = () => {
       const chosen = allNotes.filter((file) => this._mdSel.has(file.path));
-      if (!chosen.length)
-        return;
+      if (!chosen.length) return;
       this.deleteFiles(chosen, () => {
         this._mdMulti = false;
         this._mdSel.clear();
@@ -22773,8 +21957,7 @@ var NovalView = class extends ItemView {
       const groups = /* @__PURE__ */ new Map([["\u4ECA\u5929", []], ["\u672C\u5468", []], ["\u66F4\u65E9", []]]);
       items.forEach((file) => groups.get(groupOf(file.stat.mtime)).push(file));
       groups.forEach((list, name) => {
-        if (!list.length)
-          return;
+        if (!list.length) return;
         body.createDiv({ cls: "cl-mdv-glabel", text: name });
         list.forEach((file) => {
           const picked = this._mdSel.has(file.path);
@@ -22812,10 +21995,8 @@ var NovalView = class extends ItemView {
             };
           }
           row.onclick = () => {
-            if (this._mdMulti)
-              toggleSelect(file.path);
-            else
-              this.openFile(file);
+            if (this._mdMulti) toggleSelect(file.path);
+            else this.openFile(file);
           };
         });
       });
@@ -22856,10 +22037,8 @@ var NovalView = class extends ItemView {
           };
         }
         tile.onclick = () => {
-          if (this._mdMulti)
-            toggleSelect(file.path);
-          else
-            this.openFile(file);
+          if (this._mdMulti) toggleSelect(file.path);
+          else this.openFile(file);
         };
       });
     };
@@ -22891,10 +22070,8 @@ var NovalView = class extends ItemView {
         body.createDiv({ cls: "cl-mdv-nomatch", text: "\u6CA1\u6709\u5339\u914D\u7684\u7B14\u8BB0" });
         return;
       }
-      if (mode === "grid")
-        renderGrid(items);
-      else
-        renderList(items);
+      if (mode === "grid") renderGrid(items);
+      else renderList(items);
     };
     listBtn.onclick = () => {
       mode = "list";
@@ -22968,8 +22145,7 @@ var NovalView = class extends ItemView {
       });
       return;
     }
-    if (!this.gallery)
-      this.gallery = new NovalGalleryPanel(this.app, novalBoard);
+    if (!this.gallery) this.gallery = new NovalGalleryPanel(this.app, novalBoard);
     this.gallery.mount(el);
   }
   renderNotes(el) {
@@ -22984,8 +22160,7 @@ var NovalView = class extends ItemView {
       });
       return;
     }
-    if (!this.notes)
-      this.notes = new NovalNotesPanel(this.app, noval, this);
+    if (!this.notes) this.notes = new NovalNotesPanel(this.app, noval, this);
     this.notes.mount(el);
   }
 };
@@ -23003,8 +22178,7 @@ var NovalSettingTab = class extends PluginSettingTab {
         this.plugin.settings.workspaceName = value.trim() || "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0";
         await this.plugin.persistSettings();
         this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach((leaf) => {
-          if (leaf.view && leaf.view.render)
-            leaf.view.render();
+          if (leaf.view && leaf.view.render) leaf.view.render();
         });
       })
     );
@@ -23059,8 +22233,7 @@ var NovalSettingTab = class extends PluginSettingTab {
     let boardFolderTimer = null;
     new Setting(containerEl).setName("\u753B\u5E03\u6587\u4EF6\u5939").setDesc("\u65B0\u5EFA\u753B\u5E03\u65F6\u4FDD\u5B58\u5230\u8FD9\u4E2A\u6587\u4EF6\u5939\uFF0C\u9ED8\u8BA4\u300C\u753B\u5E03\u300D\u3002\u4FEE\u6539\u540E\u8BE5\u6587\u4EF6\u5939\u4E0D\u4F1A\u4F5C\u4E3A\u6A21\u5757\u51FA\u73B0\u3002").addText(
       (text) => text.setPlaceholder("\u753B\u5E03").setValue(board.settings.noval && board.settings.noval.boardFolder || "").onChange((value) => {
-        if (boardFolderTimer)
-          window.clearTimeout(boardFolderTimer);
+        if (boardFolderTimer) window.clearTimeout(boardFolderTimer);
         boardFolderTimer = window.setTimeout(async () => {
           board.settings.noval = board.settings.noval || {};
           board.settings.noval.boardFolder = value.trim();
@@ -23107,8 +22280,7 @@ module.exports = class NovalPlugin extends Plugin {
       this.settings.modules = this.settings.modules.map((mod) => {
         const base = DEFAULT_MODULES.find((d) => d.id === mod.id);
         const merged = Object.assign({}, base || {}, mod);
-        if (!merged.folder)
-          merged.folder = sanitizeFolderName(merged.name);
+        if (!merged.folder) merged.folder = sanitizeFolderName(merged.name);
         return merged;
       });
       const kept = this.settings.modules.filter(
@@ -23121,10 +22293,8 @@ module.exports = class NovalPlugin extends Plugin {
       const seenFolders = /* @__PURE__ */ new Set();
       const deduped = this.settings.modules.filter((mod) => {
         const key = String(mod.folder || "").replace(/^\/+|\/+$/g, "").toLowerCase();
-        if (!key)
-          return true;
-        if (seenFolders.has(key))
-          return false;
+        if (!key) return true;
+        if (seenFolders.has(key)) return false;
         seenFolders.add(key);
         return true;
       });
@@ -23133,18 +22303,15 @@ module.exports = class NovalPlugin extends Plugin {
         settingsDirty = true;
       }
     }
-    if (this.syncModulesFromVault())
-      settingsDirty = true;
+    if (this.syncModulesFromVault()) settingsDirty = true;
     if (firstRun && !this.settings.modules.length) {
       this.settings.modules = DEFAULT_MODULES;
       settingsDirty = true;
     }
-    if (settingsDirty)
-      await this.persistSettings();
+    if (settingsDirty) await this.persistSettings();
     this.requestRefresh = debounce(() => this.refreshAll(), 700, true);
     this.registerView(VIEW_TYPE, (leaf) => new NovalView(leaf, this));
-    if (PLUGIN_ICON_SVG)
-      addIcon(PLUGIN_ICON_ID, PLUGIN_ICON_SVG);
+    if (PLUGIN_ICON_SVG) addIcon(PLUGIN_ICON_ID, PLUGIN_ICON_SVG);
     this.addRibbonIcon(PLUGIN_ICON_ID, "\u6253\u5F00 Noval", () => this.activateView());
     this.addCommand({
       id: "open-noval",
@@ -23182,8 +22349,7 @@ module.exports = class NovalPlugin extends Plugin {
       callback: async () => {
         await this.activateView();
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
-        if (leaf && leaf.view && leaf.view.go)
-          leaf.view.go("notes");
+        if (leaf && leaf.view && leaf.view.go) leaf.view.go("notes");
       }
     });
     this.addCommand({
@@ -23191,8 +22357,7 @@ module.exports = class NovalPlugin extends Plugin {
       name: "\u5FEB\u901F\u8BB0\u4E00\u6761\uFF08Noval\uFF09",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
-        if (leaf && leaf.view && leaf.view.quickCapture)
-          leaf.view.quickCapture();
+        if (leaf && leaf.view && leaf.view.quickCapture) leaf.view.quickCapture();
       }
     });
     this.addCommand({
@@ -23201,14 +22366,12 @@ module.exports = class NovalPlugin extends Plugin {
       callback: async () => {
         await this.activateView();
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
-        if (leaf && leaf.view && leaf.view.go)
-          leaf.view.go("canvas");
+        if (leaf && leaf.view && leaf.view.go) leaf.view.go("canvas");
       }
     });
     this.addSettingTab(new NovalSettingTab(this.app, this));
     await this.loadBundledPlugins();
-    if (this.syncModulesFromVault())
-      await this.persistSettings();
+    if (this.syncModulesFromVault()) await this.persistSettings();
     this._ttObserver = new MutationObserver((mutations) => {
       for (let i = 0; i < mutations.length; i++) {
         const m = mutations[i];
@@ -23218,8 +22381,7 @@ module.exports = class NovalPlugin extends Plugin {
           const nodes = m.addedNodes;
           for (let j = 0; j < nodes.length; j++) {
             const n = nodes[j];
-            if (n && n.nodeType === 1)
-              wbNormalizeTree(n);
+            if (n && n.nodeType === 1) wbNormalizeTree(n);
           }
         }
       }
@@ -23253,8 +22415,7 @@ module.exports = class NovalPlugin extends Plugin {
           if (hidden.includes(path)) {
             this.settings.hiddenModuleFolders = hidden.filter((item) => item !== path);
           }
-          if (this.syncModulesFromVault())
-            this.persistSettings();
+          if (this.syncModulesFromVault()) this.persistSettings();
         }
       })
     );
@@ -23279,8 +22440,7 @@ module.exports = class NovalPlugin extends Plugin {
       this.app.workspace.on("active-leaf-change", (leaf) => {
         const type = leaf && leaf.view ? leaf.view.getViewType() : null;
         if (type === VIEW_TYPE) {
-          if (leaf.view.focus)
-            document.body.classList.add("noval-focus");
+          if (leaf.view.focus) document.body.classList.add("noval-focus");
         } else {
           document.body.classList.remove("noval-focus");
         }
@@ -23290,31 +22450,26 @@ module.exports = class NovalPlugin extends Plugin {
   // 素材归属表跟着文件改名 / 删除走，避免记录指向不存在的旧路径。
   remapOwnership(oldPath, newPath) {
     const map = this.settings && this.settings.inboxAssigned;
-    if (!map || !oldPath || !newPath || oldPath === newPath)
-      return;
-    if (!(oldPath in map))
-      return;
+    if (!map || !oldPath || !newPath || oldPath === newPath) return;
+    if (!(oldPath in map)) return;
     map[newPath] = map[oldPath];
     delete map[oldPath];
     this.saveSettings();
   }
   dropOwnership(path) {
     const map = this.settings && this.settings.inboxAssigned;
-    if (!map || !path || !(path in map))
-      return;
+    if (!map || !path || !(path in map)) return;
     delete map[path];
     this.saveSettings();
   }
   // 模块的保存文件夹被整体改名 / 移动时，同步更新配置里的路径。
   remapModuleFolder(oldPath, newPath) {
     const modules = this.settings && this.settings.modules || [];
-    if (!oldPath || !newPath || oldPath === newPath)
-      return;
+    if (!oldPath || !newPath || oldPath === newPath) return;
     let changed = false;
     for (const mod of modules) {
       const folder = String(mod.folder || "");
-      if (!folder)
-        continue;
+      if (!folder) continue;
       if (folder === oldPath) {
         mod.folder = newPath;
         changed = true;
@@ -23326,18 +22481,15 @@ module.exports = class NovalPlugin extends Plugin {
     const hidden = this.settings && this.settings.hiddenModuleFolders || [];
     const nextHidden = hidden.map((path) => {
       const value = String(path || "");
-      if (value === oldPath)
-        return newPath;
-      if (value.indexOf(oldPath + "/") === 0)
-        return newPath + value.slice(oldPath.length);
+      if (value === oldPath) return newPath;
+      if (value.indexOf(oldPath + "/") === 0) return newPath + value.slice(oldPath.length);
       return value;
     });
     if (nextHidden.join("\n") !== hidden.join("\n")) {
       this.settings.hiddenModuleFolders = nextHidden;
       changed = true;
     }
-    if (changed)
-      this.saveSettings();
+    if (changed) this.saveSettings();
   }
   onunload() {
     document.body.classList.remove("noval-focus");
@@ -23400,28 +22552,23 @@ module.exports = class NovalPlugin extends Plugin {
       this.app.workspace.revealLeaf(leaves[0]);
       return;
     }
-    if (!this.settings.novalSidebarOpen)
-      return;
+    if (!this.settings.novalSidebarOpen) return;
     this.openNovalSidebar();
   }
   syncNovalSidebarState() {
-    if (!this._novalLayoutReady)
-      return;
+    if (!this._novalLayoutReady) return;
     const open = this.app.workspace.getLeavesOfType(QM_VIEW_TYPE).length > 0;
-    if (open === !!this.settings.novalSidebarOpen)
-      return;
+    if (open === !!this.settings.novalSidebarOpen) return;
     this.settings.novalSidebarOpen = open;
     this.persistSettings();
   }
   openNovalSidebar() {
     try {
-      if (this.app.commands.executeCommandById(NOTES_ID + ":open-cards"))
-        return;
+      if (this.app.commands.executeCommandById(NOTES_ID + ":open-cards")) return;
     } catch (error) {
     }
     const leaf = this.app.workspace.getRightLeaf(false);
-    if (!leaf)
-      return;
+    if (!leaf) return;
     leaf.setViewState({ type: QM_VIEW_TYPE, active: true });
     this.app.workspace.revealLeaf(leaf);
   }
@@ -23430,8 +22577,7 @@ module.exports = class NovalPlugin extends Plugin {
   async migrateBoardExtension() {
     const oldExt = LEGACY.boardExt.map((ext) => "." + ext);
     const legacy = this.app.vault.getFiles().filter((file) => oldExt.includes("." + file.extension.toLowerCase()));
-    if (!legacy.length)
-      return;
+    if (!legacy.length) return;
     let moved = 0;
     let skipped = 0;
     for (const file of legacy) {
@@ -23459,8 +22605,7 @@ module.exports = class NovalPlugin extends Plugin {
     if (!this.hostData) {
       const raw = await this.loadData() || {};
       this.hostData = raw;
-      if (this.migrateLegacyKeys(raw))
-        await this.writeHostData();
+      if (this.migrateLegacyKeys(raw)) await this.writeHostData();
     }
     return this.hostData;
   }
@@ -23468,10 +22613,8 @@ module.exports = class NovalPlugin extends Plugin {
   migrateLegacyKeys(data) {
     let changed = false;
     const move = (from, to) => {
-      if (from === to || data[from] === void 0)
-        return;
-      if (data[to] === void 0)
-        data[to] = data[from];
+      if (from === to || data[from] === void 0) return;
+      if (data[to] === void 0) data[to] = data[from];
       delete data[from];
       changed = true;
     };
@@ -23504,8 +22647,7 @@ module.exports = class NovalPlugin extends Plugin {
       [NOTES_ID, LEGACY.notesId],
       [BOARD_ID, LEGACY.boardId]
     ]) {
-      if (data[id])
-        continue;
+      if (data[id]) continue;
       for (const dir of [id, legacyId]) {
         try {
           const raw = await this.app.vault.adapter.read(
@@ -23521,13 +22663,11 @@ module.exports = class NovalPlugin extends Plugin {
         }
       }
     }
-    if (dirty)
-      await this.writeHostData();
+    if (dirty) await this.writeHostData();
   }
   isStandaloneEnabled(id) {
     try {
-      if (id === this.manifest.id)
-        return false;
+      if (id === this.manifest.id) return false;
       const plugins = this.app.plugins && this.app.plugins.plugins;
       return !!(plugins && plugins[id] && plugins[id] !== this);
     } catch (error) {
@@ -23594,14 +22734,41 @@ module.exports = class NovalPlugin extends Plugin {
     const folder = String(board && board.novalFolder || "\u753B\u5E03").replace(/^\/+|\/+$/g, "");
     return folder || "\u753B\u5E03";
   }
+  /* 按文件树顺序重排模块配置：
+   *   - 同一层级按文件夹在文件树里的先后排，子模块紧跟父模块；
+   *   - 文件树里找不到的模块排在同级最后，保持原有相对顺序。 */
+  orderModulesByFileTree(list) {
+    const mods = Array.isArray(list) ? list.slice() : [];
+    if (mods.length < 2) return mods;
+    const cache = /* @__PURE__ */ new Map();
+    const entries = mods.map((mod, index) => {
+      const dir = moduleFolderOf(mod);
+      return { mod, index, rank: dir ? vaultNodeRank(this.app, dir, cache) : null };
+    });
+    entries.sort((a, b) => {
+      if (a.rank && b.rank) {
+        const len = Math.max(a.rank.length, b.rank.length);
+        for (let i = 0; i < len; i += 1) {
+          if (a.rank[i] === void 0) return -1;
+          if (b.rank[i] === void 0) return 1;
+          if (a.rank[i] !== b.rank[i]) return a.rank[i] - b.rank[i];
+        }
+        return a.index - b.index;
+      }
+      if (a.rank) return -1;
+      if (b.rank) return 1;
+      return a.index - b.index;
+    });
+    return entries.map((entry) => entry.mod);
+  }
   /* 启动同步：把库根目录下已有的文件夹同步成模块入口。
    * 只跳过工具/AI/构建目录（vault-scripts、node_modules、.claude …）和画布目录；
    * 附件、媒体文件等普通文件夹同样同步。子文件夹由模块页按文件树自动生成，
-   * 用户手动删除的模块记录在 hiddenModuleFolders 里，不会被重新加回。 */
+   * 用户手动删除的模块记录在 hiddenModuleFolders 里，不会被重新加回。
+   * 同步出来的模块顺序与文件树一致。 */
   syncModulesFromVault() {
     const root = this.app.vault.getRoot && this.app.vault.getRoot();
-    if (!root || !Array.isArray(root.children))
-      return false;
+    if (!root || !Array.isArray(root.children)) return false;
     const normalize = (value) => String(value || "").replace(/^\/+|\/+$/g, "");
     const keyOf = (value) => normalize(value).toLowerCase();
     const canvasKey = keyOf(this.canvasFolderPath());
@@ -23616,16 +22783,13 @@ module.exports = class NovalPlugin extends Plugin {
     );
     root.children.filter((child) => child && Array.isArray(child.children)).filter((child) => {
       const path = String(child.path || "");
-      if (!path || path.split("/").some((part) => part.startsWith(".")))
-        return false;
-      if (keyOf(path) === canvasKey)
-        return false;
+      if (!path || path.split("/").some((part) => part.startsWith("."))) return false;
+      if (keyOf(path) === canvasKey) return false;
       return !isToolFolder(path);
-    }).sort((a, b) => String(a.name).localeCompare(String(b.name), "zh")).forEach((folder) => {
+    }).forEach((folder) => {
       const path = normalize(folder.path);
       const key = keyOf(path);
-      if (!path || configured.has(key) || hidden.has(key))
-        return;
+      if (!path || configured.has(key) || hidden.has(key)) return;
       this.settings.modules.push({
         id: "dir:" + path,
         name: folder.name,
@@ -23635,6 +22799,11 @@ module.exports = class NovalPlugin extends Plugin {
       configured.add(key);
       changed = true;
     });
+    const ordered = this.orderModulesByFileTree(this.settings.modules);
+    if (ordered.some((mod, index) => mod !== this.settings.modules[index])) {
+      this.settings.modules = ordered;
+      changed = true;
+    }
     return changed;
   }
   /* 文件树里的文件夹被删掉后，清掉对应的自动模块；
@@ -23643,11 +22812,9 @@ module.exports = class NovalPlugin extends Plugin {
     const before = (this.settings.modules || []).length;
     this.settings.modules = (this.settings.modules || []).filter((mod) => {
       const id = String(mod.id || "");
-      if (!id.startsWith("dir:"))
-        return true;
+      if (!id.startsWith("dir:")) return true;
       const folder = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
-      if (!folder)
-        return true;
+      if (!folder) return true;
       return Boolean(this.app.vault.getAbstractFileByPath(folder));
     });
     return this.settings.modules.length !== before;
@@ -23671,8 +22838,7 @@ module.exports = class NovalPlugin extends Plugin {
   }
   refreshAll() {
     this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach((leaf) => {
-      if (leaf.view && leaf.view.refresh)
-        leaf.view.refresh();
+      if (leaf.view && leaf.view.refresh) leaf.view.refresh();
     });
   }
   async activateView(forceFocus) {
