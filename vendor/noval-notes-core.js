@@ -126,12 +126,12 @@ function qmIcon(parent, name) {
 
 
 /* ------------------------------------------------------------------ */
-/* 侧栏 / 标签页图标：沿用 Collis 的画布标志                           */
+/* 侧栏 / 标签页图标：沿用 Noval 的画布标志                           */
 /* ------------------------------------------------------------------ */
 
-const ICON_ID = 'collis-mark';
+const ICON_ID = 'noval-mark';
 
-// 沿用 Collis 标志：虚线圆角画布 + 一条连线 + 右上角一个点。
+// 沿用 Noval 标志：虚线圆角画布 + 一条连线 + 右上角一个点。
 // 注意：addIcon 的第二个参数是 <svg> 的**内部内容**，外壳由 Obsidian 自己
 // 包（固定 viewBox="0 0 100 100"），所以这里用 scale(100/24) 把 24 网格放大。
 const ICON_MARK = (() => {
@@ -2168,7 +2168,7 @@ class CardsView extends ItemView {
   }
 
   getDisplayText() {
-    return 'Collis';
+    return 'Noval';
   }
 
   getIcon() {
@@ -4500,7 +4500,7 @@ class QuickMemoSettingTab extends PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl('h3', { text: 'Collis 设置' });
+    containerEl.createEl('h3', { text: 'Noval 设置' });
 
     new Setting(containerEl)
       .setName('卡片文件夹')
@@ -4792,7 +4792,7 @@ class QuickMemoPlugin extends Plugin {
     // 图标必须先注册，addRibbonIcon 才认得这个名字
     addIcon(ICON_ID, ICON_MARK);
 
-    this.addRibbonIcon(ICON_ID, 'Collis', async () => {
+    this.addRibbonIcon(ICON_ID, 'Noval', async () => {
       await this.activateView();
     });
 
@@ -5345,7 +5345,7 @@ class QuickMemoPlugin extends Plugin {
     }
 
     new Notice(
-      'Collis：有 ' + total + ' 条时间条目没有块 ID（^xxxx），不会显示成卡片。' +
+      'Noval：有 ' + total + ' 条时间条目没有块 ID（^xxxx），不会显示成卡片。' +
         '如果是以前的卡片，在行尾补一个 ^id 就能纳入；也可以在设置里关掉「严格识别卡片」。',
       15000
     );
@@ -6582,7 +6582,7 @@ module.exports.qmOrphanFingerprint = qmOrphanFingerprint;
 module.exports.qmSuggestOrphanTime = qmSuggestOrphanTime;
 module.exports.qmRebuildOrphanLines = qmRebuildOrphanLines;
 
-// Collis 本地补充：把弹窗类暴露出来，供内嵌的卡片笔记页复用
+// Noval 本地补充：把弹窗类暴露出来，供内嵌的卡片笔记页复用
 module.exports.TrashModal = TrashModal;
 module.exports.OrphanModal = OrphanModal;
 module.exports.ConfirmModal = ConfirmModal;

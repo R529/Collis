@@ -1,4 +1,4 @@
-.collis-badge {
+.noval-badge {
   position: absolute;
   right: 8px;
   bottom: 6px;
@@ -16,23 +16,23 @@
   transition: opacity 120ms ease;
 }
 
-.canvas-node:hover .collis-badge {
+.canvas-node:hover .noval-badge {
   opacity: 0.95;
   color: var(--text-muted);
 }
 
-.collis-badge.is-stale {
+.noval-badge.is-stale {
   color: var(--text-error);
   opacity: 0.9;
 }
 
-.collis-editor-modal .collis-editor-meta {
+.noval-editor-modal .noval-editor-meta {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   margin-bottom: 8px;
 }
 
-.collis-editor-modal textarea.collis-editor-input {
+.noval-editor-modal textarea.noval-editor-input {
   width: 100%;
   min-height: 180px;
   resize: vertical;
@@ -41,14 +41,14 @@
   line-height: var(--line-height-normal);
 }
 
-.collis-editor-modal .collis-editor-footer {
+.noval-editor-modal .noval-editor-footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 12px;
 }
 
-.collis-preview {
+.noval-preview {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   max-height: 240px;
@@ -60,7 +60,7 @@
   white-space: pre-wrap;
 }
 
-.collis-inline {
+.noval-inline {
   position: absolute;
   inset: 0;
   z-index: 40;
@@ -73,9 +73,9 @@
   box-shadow: none;
 }
 
-.collis-inline-input,
-.collis-inline-input:focus,
-.collis-inline-input:focus-visible {  flex: 1;
+.noval-inline-input,
+.noval-inline-input:focus,
+.noval-inline-input:focus-visible {  flex: 1;
   width: 100%;
   height: 100%;
   margin: 0;
@@ -97,45 +97,45 @@
 
 /* Keep the selected look while editing: the canvas swaps the node into an
    editing state whose border is thinner and paler than the selected one. */
-.canvas-node.collis-editing .canvas-node-container {
+.canvas-node.noval-editing .canvas-node-container {
   border-width: 2px !important;
   border-color: var(--interactive-accent) !important;
 }
 
-.canvas-node.collis-editing {
+.canvas-node.noval-editing {
   --canvas-node-border-width: 2px;
   --canvas-node-border-color: var(--interactive-accent);
 }
 /* ── Card board view ─────────────────────────────────── */
 
-.collis-board-host {
+.noval-board-host {
   padding: 0 !important;
   overflow: hidden;
 }
 
-.collis-board {
-  --collis-bg: var(--collis-board-bg, #f7f6f2);
-  --collis-dot: var(--collis-board-dot, #d9d5cc);
+.noval-board {
+  --noval-bg: var(--noval-board-bg, #f7f6f2);
+  --noval-dot: var(--noval-board-dot, #d9d5cc);
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: var(--collis-bg);
-  background-image: radial-gradient(circle, var(--collis-dot) 1px, transparent 1px);
+  background-color: var(--noval-bg);
+  background-image: radial-gradient(circle, var(--noval-dot) 1px, transparent 1px);
   background-size: 24px 24px;
   cursor: default;
   touch-action: none;
 }
 
-.collis-board.is-panning {
+.noval-board.is-panning {
   cursor: grabbing;
 }
 
-.collis-board.is-dragging-node {
+.noval-board.is-dragging-node {
   cursor: grabbing;
 }
 
-.collis-board.is-drop-target::after {
+.noval-board.is-drop-target::after {
   content: "";
   position: absolute;
   inset: 8px;
@@ -144,11 +144,11 @@
   pointer-events: none;
 }
 
-.collis-world.is-loading {
+.noval-world.is-loading {
   visibility: hidden;
 }
 
-.collis-world {
+.noval-world {
   position: absolute;
   top: 0;
   left: 0;
@@ -156,7 +156,7 @@
   will-change: transform;
 }
 
-.collis-bnode {
+.noval-bnode {
   position: absolute;
   top: 0;
   left: 0;
@@ -177,63 +177,63 @@
   user-select: none;
 }
 
-.collis-bnode:hover {
+.noval-bnode:hover {
   border-color: var(--background-modifier-border-hover);
 }
 
-.collis-bnode.is-selected {
+.noval-bnode.is-selected {
   border-color: var(--interactive-accent);
   /* border-box keeps the node size fixed when the border thickens. */
   border-width: 2.5px;
   box-shadow: 0 0 0 1px var(--interactive-accent), 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-.collis-bnode.is-file {
+.noval-bnode.is-file {
   display: block;
   padding: 0;
   overflow: hidden;
   border-radius: 8px;
 }
 
-.collis-bnode-body {
+.noval-bnode-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
 }
 
-.collis-bnode-body::-webkit-scrollbar {
+.noval-bnode-body::-webkit-scrollbar {
   width: 8px;
 }
 
-.collis-bnode-body::-webkit-scrollbar-track {
+.noval-bnode-body::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.collis-bnode-body::-webkit-scrollbar-thumb {
+.noval-bnode-body::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 8px;
   background-clip: padding-box;
   background-color: var(--background-modifier-border-hover);
 }
 
-.collis-bnode-body::-webkit-scrollbar-thumb:hover {
+.noval-bnode-body::-webkit-scrollbar-thumb:hover {
   background-color: var(--text-faint);
 }
 
-.collis-bnode-body .markdown-rendered {
+.noval-bnode-body .markdown-rendered {
   background: transparent;
   padding: 0;
 }
 
-.collis-bnode-body p:first-child {
+.noval-bnode-body p:first-child {
   margin-top: 0;
 }
 
-.collis-bnode-body p:last-child {
+.noval-bnode-body p:last-child {
   margin-bottom: 0;
 }
 
-.collis-bnode-meta {
+.noval-bnode-meta {
   flex: 0 0 auto;
   margin: 2px 0 -5px;
   color: var(--text-faint);
@@ -242,13 +242,13 @@
   letter-spacing: 0.02em;
 }
 
-.collis-bnode-placeholder {
+.noval-bnode-placeholder {
   color: var(--text-faint);
   font-size: 12px;
   padding: 4px 0;
 }
 
-.collis-bnode-media {
+.noval-bnode-media {
   display: block;
   width: 100%;
   height: 100%;
@@ -257,7 +257,7 @@
   pointer-events: none;
 }
 
-.collis-bnode.is-doc {
+.noval-bnode.is-doc {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -265,19 +265,19 @@
   min-height: 90px;
 }
 
-.collis-bnode-doc-icon {
+.noval-bnode-doc-icon {
   color: var(--text-faint);
   font-size: 10px;
   letter-spacing: 0.08em;
 }
 
-.collis-bnode-doc-name {
+.noval-bnode-doc-name {
   font-size: 13px;
   color: var(--text-normal);
   word-break: break-all;
 }
 
-.collis-board-toolbar {
+.noval-board-toolbar {
   position: absolute;
   top: 8px;
   right: 8px;
@@ -292,7 +292,7 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
 
-.collis-board-btn {
+.noval-board-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -307,33 +307,33 @@
   cursor: pointer;
 }
 
-.collis-board-btn:hover {
+.noval-board-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.collis-board-btn:disabled {
+.noval-board-btn:disabled {
   opacity: 0.3;
   cursor: default;
 }
 
-.collis-board-btn:disabled:hover {
+.noval-board-btn:disabled:hover {
   background: var(--background-primary);
   color: var(--text-muted);
 }
 
-.collis-board-btn svg {
+.noval-board-btn svg {
   width: 16px;
   height: 16px;
 }
 
-.collis-board-sep {
+.noval-board-sep {
   height: 1px;
   margin: 2px 5px;
   background: var(--background-modifier-border);
 }
 
-.collis-board-zoom {
+.noval-board-zoom {
   position: absolute;
   right: 14px;
   bottom: 12px;
@@ -343,7 +343,7 @@
   pointer-events: none;
 }
 
-.collis-board-hint {
+.noval-board-hint {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -355,13 +355,13 @@
   user-select: none;
 }
 
-.collis-board-hint.is-hidden {
+.noval-board-hint.is-hidden {
   display: none;
 }
 
 /* ── Board extras ────────────────────────────────────── */
 
-.collis-select-box {
+.noval-select-box {
   position: absolute;
   z-index: 4;
   border: 1px solid var(--interactive-accent);
@@ -370,15 +370,15 @@
   pointer-events: none;
 }
 
-.collis-board.is-space {
+.noval-board.is-space {
   cursor: grab;
 }
 
-.collis-board.is-space.is-panning {
+.noval-board.is-space.is-panning {
   cursor: grabbing;
 }
 
-.collis-board-hint {
+.noval-board-hint {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -394,53 +394,53 @@
   box-shadow: 0 2px 14px rgba(0, 0, 0, 0.06);
 }
 
-.collis-hint-title {
+.noval-hint-title {
   margin-bottom: 6px;
   color: var(--text-normal);
   font-size: 14px;
   font-weight: 500;
 }
 
-.collis-hint-sub {
+.noval-hint-sub {
   color: var(--text-muted);
   font-size: 12px;
 }
 
-.collis-bnode.is-file.is-doc-text {
+.noval-bnode.is-file.is-doc-text {
   padding: 14px 16px;
   overflow: hidden;
   background: var(--background-primary);
 }
 
-.collis-media-modal {
+.noval-media-modal {
   width: min(90vw, 1100px);
   height: min(85vh, 820px);
 }
 
-.collis-media-modal .modal-content {
+.noval-media-modal .modal-content {
   display: flex;
   align-items: center;
   justify-content: center;
   height: calc(100% - 46px);
 }
 
-.collis-media-image,
-.collis-media-video,
-.collis-media-pdf {
+.noval-media-image,
+.noval-media-video,
+.noval-media-pdf {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
   border: none;
 }
 
-.collis-media-pdf {
+.noval-media-pdf {
   width: 100%;
   height: 100%;
 }
 
 /* ── Selection frame & media extras ──────────────────── */
 
-.collis-selection-frame {
+.noval-selection-frame {
   position: absolute;
   top: 0;
   left: 0;
@@ -450,8 +450,8 @@
   pointer-events: none;
 }
 
-.collis-selection-frame::before,
-.collis-selection-frame::after {
+.noval-selection-frame::before,
+.noval-selection-frame::after {
   content: "";
   position: absolute;
   width: 9px;
@@ -461,26 +461,26 @@
   background: var(--background-primary);
 }
 
-.collis-selection-frame::before {
+.noval-selection-frame::before {
   left: -6px;
   top: -6px;
 }
 
-.collis-selection-frame::after {
+.noval-selection-frame::after {
   right: -6px;
   bottom: -6px;
 }
 
-.collis-selection-frame.is-hidden {
+.noval-selection-frame.is-hidden {
   display: none;
 }
 
-.collis-bnode.is-doc-text {
+.noval-bnode.is-doc-text {
   display: flex;
   flex-direction: column;
 }
 
-.collis-bnode-doc-head {
+.noval-bnode-doc-head {
   flex: 0 0 auto;
   margin-bottom: 6px;
   color: var(--inline-title-color, var(--text-normal));
@@ -490,7 +490,7 @@
   line-height: 1.25;
 }
 
-.collis-bnode-doc-body {
+.noval-bnode-doc-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
@@ -498,25 +498,25 @@
   line-height: var(--line-height-normal, 1.6);
 }
 
-.collis-bnode-doc-body h1 {
+.noval-bnode-doc-body h1 {
   margin: 0.3em 0 0.4em;
   font-size: 1.45em;
   line-height: 1.25;
 }
 
-.collis-bnode-doc-body h2 {
+.noval-bnode-doc-body h2 {
   margin: 0.3em 0 0.4em;
   font-size: 1.3em;
   line-height: 1.25;
 }
 
-.collis-bnode-doc-body h3 {
+.noval-bnode-doc-body h3 {
   margin: 0.3em 0 0.4em;
   font-size: 1.15em;
   line-height: 1.3;
 }
 
-.collis-bnode-play {
+.noval-bnode-play {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -532,7 +532,7 @@
   pointer-events: auto;
 }
 
-.collis-bnode-play::before {
+.noval-bnode-play::before {
   content: "";
   margin-left: 4px;
   border-left: 13px solid #fff;
@@ -541,29 +541,29 @@
 }
 
 
-.collis-bnode.is-playing {
+.noval-bnode.is-playing {
   cursor: default;
 }
 
-.collis-bnode.is-playing .collis-bnode-media {
+.noval-bnode.is-playing .noval-bnode-media {
   pointer-events: auto;
 }
 
-.collis-bnode-play.is-hidden {
+.noval-bnode-play.is-hidden {
   display: none;
 }
 
-.collis-inline-host {
+.noval-inline-host {
   position: relative;
 }
 
-.collis-md-editor {
+.noval-md-editor {
   flex-direction: column;
   gap: 6px;
   padding: 8px 10px;
 }
 
-.collis-md-title {
+.noval-md-title {
   flex: 0 0 auto;
   width: 100%;
   margin: 0 !important;
@@ -574,7 +574,7 @@
   outline: none !important;
 }
 
-.collis-md-title.inline-title {
+.noval-md-title.inline-title {
   color: var(--inline-title-color, var(--h1-color, var(--text-normal)));
   font-family: var(--inline-title-font, var(--font-text));
   font-size: var(--inline-title-size, var(--h1-size, 1.8em));
@@ -582,7 +582,7 @@
   line-height: var(--inline-title-line-height, 1.2);
 }
 
-.collis-md-body {
+.noval-md-body {
   flex: 1 1 auto;
   min-height: 0;
   padding: 0 !important;
@@ -591,17 +591,17 @@
   line-height: var(--line-height-normal) !important;
 }
 
-.collis-bnode-media {
+.noval-bnode-media {
   transition: opacity 140ms ease;
 }
 
-.collis-bnode-media.is-loading {
+.noval-bnode-media.is-loading {
   opacity: 0;
 }
 
 /* ── Node toolbar ────────────────────────────────────── */
 
-.collis-node-toolbar {
+.noval-node-toolbar {
   position: absolute;
   z-index: 10;
   display: flex;
@@ -613,11 +613,11 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 
-.collis-node-toolbar.is-hidden {
+.noval-node-toolbar.is-hidden {
   display: none;
 }
 
-.collis-tool-btn {
+.noval-tool-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -632,56 +632,56 @@
   cursor: pointer;
 }
 
-.collis-tool-btn:hover {
+.noval-tool-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.collis-tool-btn.is-danger:hover {
+.noval-tool-btn.is-danger:hover {
   background: rgba(214, 78, 78, 0.12);
   color: var(--text-error);
 }
 
-.collis-tool-btn svg {
+.noval-tool-btn svg {
   width: 16px;
   height: 16px;
 }
 
-.collis-tool-btn:disabled {
+.noval-tool-btn:disabled {
   opacity: 0.35;
   cursor: default;
 }
 
-.collis-tool-btn:disabled:hover {
+.noval-tool-btn:disabled:hover {
   background: transparent;
   color: var(--text-muted);
 }
 
 /* The header bar of a board tab uses the same paper colour as the canvas,
    without touching any of its borders or controls. */
-.collis-board-leaf {
-  --collis-board-bg: #f7f6f2;
-  --collis-board-dot: #d9d5cc;
+.noval-board-leaf {
+  --noval-board-bg: #f7f6f2;
+  --noval-board-dot: #d9d5cc;
 }
 
-.theme-dark .collis-board-leaf {
+.theme-dark .noval-board-leaf {
   /* Same source as the canvas, otherwise the header shows a seam. */
-  --collis-board-bg: var(--background-secondary, #232628);
-  --collis-board-dot: var(--background-modifier-border, #3c4046);
+  --noval-board-bg: var(--background-secondary, #232628);
+  --noval-board-dot: var(--background-modifier-border, #3c4046);
 }
 
-.collis-board-leaf,
-.collis-board-leaf .view-header,
-.collis-board-leaf .view-header-title-container,
-.collis-board-leaf .view-header-nav-buttons,
-.collis-board-leaf .view-content {
-  background-color: var(--collis-board-bg) !important;
+.noval-board-leaf,
+.noval-board-leaf .view-header,
+.noval-board-leaf .view-header-title-container,
+.noval-board-leaf .view-header-nav-buttons,
+.noval-board-leaf .view-content {
+  background-color: var(--noval-board-bg) !important;
 }
 
 
 /* ── Resize handle ───────────────────────────────────── */
 
-.collis-resize-handle {
+.noval-resize-handle {
   position: absolute;
   z-index: 3;
   opacity: 0;
@@ -689,87 +689,87 @@
   transition: opacity 120ms ease;
 }
 
-.collis-bnode.is-selected .collis-resize-handle {
+.noval-bnode.is-selected .noval-resize-handle {
   opacity: 1;
   pointer-events: auto;
 }
 
 /* corners: visible dots */
-.collis-resize-handle[data-dir="nw"],
-.collis-resize-handle[data-dir="ne"],
-.collis-resize-handle[data-dir="sw"],
-.collis-resize-handle[data-dir="se"] {
+.noval-resize-handle[data-dir="nw"],
+.noval-resize-handle[data-dir="ne"],
+.noval-resize-handle[data-dir="sw"],
+.noval-resize-handle[data-dir="se"] {
   width: 12px;
   height: 12px;
   border: none;
   background: transparent;
 }
 
-.collis-resize-handle[data-dir="nw"] {
+.noval-resize-handle[data-dir="nw"] {
   left: 1px;
   top: 1px;
   cursor: nwse-resize;
 }
 
-.collis-resize-handle[data-dir="ne"] {
+.noval-resize-handle[data-dir="ne"] {
   right: 1px;
   top: 1px;
   cursor: nesw-resize;
 }
 
-.collis-resize-handle[data-dir="sw"] {
+.noval-resize-handle[data-dir="sw"] {
   left: 1px;
   bottom: 1px;
   cursor: nesw-resize;
 }
 
-.collis-resize-handle[data-dir="se"] {
+.noval-resize-handle[data-dir="se"] {
   right: 1px;
   bottom: 1px;
   cursor: nwse-resize;
 }
 
 /* edges: invisible hit strips */
-.collis-resize-handle[data-dir="n"],
-.collis-resize-handle[data-dir="s"] {
+.noval-resize-handle[data-dir="n"],
+.noval-resize-handle[data-dir="s"] {
   left: 12px;
   right: 12px;
   height: 7px;
   cursor: ns-resize;
 }
 
-.collis-resize-handle[data-dir="n"] {
+.noval-resize-handle[data-dir="n"] {
   top: 0;
 }
 
-.collis-resize-handle[data-dir="s"] {
+.noval-resize-handle[data-dir="s"] {
   bottom: 0;
 }
 
-.collis-resize-handle[data-dir="w"],
-.collis-resize-handle[data-dir="e"] {
+.noval-resize-handle[data-dir="w"],
+.noval-resize-handle[data-dir="e"] {
   top: 12px;
   bottom: 12px;
   width: 7px;
   cursor: ew-resize;
 }
 
-.collis-resize-handle[data-dir="w"] {
+.noval-resize-handle[data-dir="w"] {
   left: 0;
 }
 
-.collis-resize-handle[data-dir="e"] {
+.noval-resize-handle[data-dir="e"] {
   right: 0;
 }
 
-.collis-board.is-resizing,
-.collis-board.is-resizing .collis-bnode {
+.noval-board.is-resizing,
+.noval-board.is-resizing .noval-bnode {
   cursor: default;
 }
 
 /* ── Connections ─────────────────────────────────────── */
 
-.collis-edges {
+.noval-edges {
   position: absolute;
   top: 0;
   left: 0;
@@ -779,7 +779,7 @@
   pointer-events: none;
 }
 
-.collis-edge-hit {
+.noval-edge-hit {
   fill: none;
   stroke: transparent;
   stroke-width: 18px;
@@ -787,23 +787,23 @@
   cursor: pointer;
 }
 
-.collis-edge {
+.noval-edge {
   fill: none;
   stroke: var(--text-faint);
   stroke-width: 2.6px;
   pointer-events: none;
 }
 
-.collis-edge-group:hover .collis-edge {
+.noval-edge-group:hover .noval-edge {
   stroke: var(--text-muted);
 }
 
-.collis-edge-group.is-selected .collis-edge {
+.noval-edge-group.is-selected .noval-edge {
   stroke: var(--interactive-accent);
   stroke-width: 3.6px;
 }
 
-.collis-edge.is-preview {
+.noval-edge.is-preview {
   stroke: var(--interactive-accent);
   stroke-dasharray: 5 4;
   pointer-events: none;
@@ -813,7 +813,7 @@
    border, so the stroke reads as interrupted behind the text instead of cutting
    through it, and the chip reads as a chip on the canvas in either theme. Size
    and radius are set as attributes from the text metrics in BoardView.ts. */
-.collis-edge-label-bg {
+.noval-edge-label-bg {
   fill: var(--background-primary);
   stroke: var(--background-modifier-border);
   stroke-width: 1px;
@@ -825,7 +825,7 @@
 
 /* Font comes from BoardView.ts (inline `font`), because the chip width is
    measured from that exact spec; only paint lives here. */
-.collis-edge-label {
+.noval-edge-label {
   fill: var(--text-muted);
   pointer-events: all;
   cursor: pointer;
@@ -833,23 +833,23 @@
   transition: fill 120ms ease;
 }
 
-.collis-edge-label.is-relation {
+.noval-edge-label.is-relation {
   fill: var(--text-faint);
 }
 
-.collis-edge-group:hover .collis-edge-label-bg,
-.collis-edge-group.is-selected .collis-edge-label-bg {
+.noval-edge-group:hover .noval-edge-label-bg,
+.noval-edge-group.is-selected .noval-edge-label-bg {
   stroke: var(--interactive-accent);
 }
 
-.collis-edge-group:hover .collis-edge-label,
-.collis-edge-group.is-selected .collis-edge-label {
+.noval-edge-group:hover .noval-edge-label,
+.noval-edge-group.is-selected .noval-edge-label {
   fill: var(--text-normal);
 }
 
 /* Inline label input, anchored in world space on the line itself. BoardView
    owns the transform (it cancels the board zoom so the field stays readable). */
-.collis-edge-label-editor {
+.noval-edge-label-editor {
   position: absolute;
   z-index: 45;
   display: flex;
@@ -858,7 +858,7 @@
   transform: translate(-50%, -50%);
 }
 
-.collis-edge-relation-select {
+.noval-edge-relation-select {
   box-sizing: border-box;
   width: 220px;
   height: 32px;
@@ -872,11 +872,11 @@
   outline: none;
 }
 
-.collis-edge-relation-select:focus {
+.noval-edge-relation-select:focus {
   border-color: var(--interactive-accent);
 }
 
-.collis-edge-label-input {
+.noval-edge-label-input {
   box-sizing: border-box;
   width: 220px;
   height: 36px;
@@ -892,11 +892,11 @@
   outline: none;
 }
 
-.collis-edge-label-input::placeholder {
+.noval-edge-label-input::placeholder {
   color: var(--text-faint);
 }
 
-.collis-port {
+.noval-port {
   position: absolute;
   z-index: 5;
   width: 13px;
@@ -910,37 +910,37 @@
   transition: opacity 100ms ease;
 }
 
-.collis-port.is-top {
+.noval-port.is-top {
   left: 50%;
   top: 0;
 }
 
-.collis-port.is-bottom {
+.noval-port.is-bottom {
   left: 50%;
   top: 100%;
 }
 
-.collis-port.is-left {
+.noval-port.is-left {
   left: 0;
   top: 50%;
 }
 
-.collis-port.is-right {
+.noval-port.is-right {
   left: 100%;
   top: 50%;
 }
 
-.collis-bnode:hover .collis-port,
-.collis-bnode.is-link-target .collis-port {
+.noval-bnode:hover .noval-port,
+.noval-bnode.is-link-target .noval-port {
   opacity: 1;
 }
 
-.collis-board.is-linking {
+.noval-board.is-linking {
   cursor: crosshair;
 }
 
 /* Larger grab area around each connection dot, invisibly. */
-.collis-port::before {
+.noval-port::before {
   content: "";
   position: absolute;
   inset: -11px;
@@ -949,7 +949,7 @@
 
 /* ── Insert panel ────────────────────────────────────── */
 
-.collis-insert-panel {
+.noval-insert-panel {
   position: absolute;
   z-index: 30;
   display: flex;
@@ -963,7 +963,7 @@
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
 }
 
-.collis-insert-head {
+.noval-insert-head {
   display: flex;
   align-items: center;
   flex: 0 0 auto;
@@ -972,19 +972,19 @@
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.collis-insert-head-icon {
+.noval-insert-head-icon {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   color: var(--text-faint);
 }
 
-.collis-insert-head-icon svg {
+.noval-insert-head-icon svg {
   width: 15px;
   height: 15px;
 }
 
-.collis-insert-input {
+.noval-insert-input {
   flex: 1 1 auto;
   width: 100%;
   height: 22px;
@@ -998,23 +998,23 @@
   outline: none !important;
 }
 
-.collis-insert-input:focus {
+.noval-insert-input:focus {
   border: none !important;
   box-shadow: none !important;
   outline: none !important;
 }
 
-.collis-insert-input::placeholder {
+.noval-insert-input::placeholder {
   color: var(--text-faint);
 }
 
-.collis-insert-list {
+.noval-insert-list {
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 5px;
 }
 
-.collis-insert-item {
+.noval-insert-item {
   display: flex;
   align-items: flex-start;
   gap: 9px;
@@ -1023,16 +1023,16 @@
   cursor: pointer;
 }
 
-.collis-insert-item:hover {
+.noval-insert-item:hover {
   background: var(--background-modifier-hover);
 }
 
-.collis-insert-item.is-active {
+.noval-insert-item.is-active {
   background: var(--background-modifier-hover);
   box-shadow: inset 2px 0 0 var(--interactive-accent);
 }
 
-.collis-insert-item-icon {
+.noval-insert-item-icon {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -1042,21 +1042,21 @@
   color: var(--text-faint);
 }
 
-.collis-insert-item.is-active .collis-insert-item-icon {
+.noval-insert-item.is-active .noval-insert-item-icon {
   color: var(--interactive-accent);
 }
 
-.collis-insert-item-icon svg {
+.noval-insert-item-icon svg {
   width: 14px;
   height: 14px;
 }
 
-.collis-insert-item-body {
+.noval-insert-item-body {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.collis-insert-title {
+.noval-insert-title {
   overflow: hidden;
   color: var(--text-normal);
   font-size: 13px;
@@ -1065,7 +1065,7 @@
   white-space: nowrap;
 }
 
-.collis-insert-sub {
+.noval-insert-sub {
   margin-top: 1px;
   overflow: hidden;
   color: var(--text-faint);
@@ -1075,7 +1075,7 @@
   white-space: nowrap;
 }
 
-.collis-insert-foot {
+.noval-insert-foot {
   flex: 0 0 auto;
   padding: 6px 12px 8px;
   border-top: 1px solid var(--background-modifier-border);
@@ -1086,7 +1086,7 @@
 
 /* ── Colour swatches ─────────────────────────────────── */
 
-.collis-color-pop {
+.noval-color-pop {
   position: absolute;
   z-index: 15;
   display: flex;
@@ -1099,7 +1099,7 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
 }
 
-.collis-swatch {
+.noval-swatch {
   width: 20px;
   height: 20px;
   padding: 0;
@@ -1109,39 +1109,39 @@
   cursor: pointer;
 }
 
-.collis-swatch[data-color="red"] {
+.noval-swatch[data-color="red"] {
   background: #d9534f;
 }
 
-.collis-swatch[data-color="orange"] {
+.noval-swatch[data-color="orange"] {
   background: #e08a2e;
 }
 
-.collis-swatch[data-color="yellow"] {
+.noval-swatch[data-color="yellow"] {
   background: #c9a227;
 }
 
-.collis-swatch[data-color="green"] {
+.noval-swatch[data-color="green"] {
   background: #639922;
 }
 
-.collis-swatch[data-color="teal"] {
+.noval-swatch[data-color="teal"] {
   background: #1d9e75;
 }
 
-.collis-swatch[data-color="blue"] {
+.noval-swatch[data-color="blue"] {
   background: #378add;
 }
 
-.collis-swatch[data-color="purple"] {
+.noval-swatch[data-color="purple"] {
   background: #7f77dd;
 }
 
-.collis-swatch:hover {
+.noval-swatch:hover {
   transform: scale(1.12);
 }
 
-.collis-swatch.is-clear {
+.noval-swatch.is-clear {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1149,12 +1149,12 @@
   color: var(--text-faint);
 }
 
-.collis-swatch.is-clear svg {
+.noval-swatch.is-clear svg {
   width: 12px;
   height: 12px;
 }
 
-.collis-swatch.is-custom {
+.noval-swatch.is-custom {
   position: relative;
   display: flex;
   align-items: center;
@@ -1175,11 +1175,11 @@
   cursor: pointer;
 }
 
-.collis-swatch.is-custom:hover {
+.noval-swatch.is-custom:hover {
   transform: scale(1.12);
 }
 
-.collis-swatch.is-custom input[type="color"] {
+.noval-swatch.is-custom input[type="color"] {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1193,7 +1193,7 @@
 
 /* ── Edge toolbar ────────────────────────────────────── */
 
-.collis-edge-toolbar {
+.noval-edge-toolbar {
   position: absolute;
   z-index: 12;
   display: flex;
@@ -1206,11 +1206,11 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
-.collis-edge-toolbar.is-hidden {
+.noval-edge-toolbar.is-hidden {
   display: none;
 }
 
-.collis-edge-dot {
+.noval-edge-dot {
   position: relative;
   width: 18px;
   height: 18px;
@@ -1221,11 +1221,11 @@
   cursor: pointer;
 }
 
-.collis-edge-dot:hover {
+.noval-edge-dot:hover {
   transform: scale(1.12);
 }
 
-.collis-edge-dot.is-custom {
+.noval-edge-dot.is-custom {
   overflow: hidden;
   border-color: var(--background-modifier-border);
   background: conic-gradient(
@@ -1241,7 +1241,7 @@
   );
 }
 
-.collis-edge-dot.is-custom input[type="color"] {
+.noval-edge-dot.is-custom input[type="color"] {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1252,21 +1252,21 @@
   cursor: pointer;
 }
 
-.collis-edge-sep {
+.noval-edge-sep {
   width: 1px;
   height: 18px;
   margin: 0 2px;
   background: var(--background-modifier-border);
 }
 
-.collis-rename-input {
+.noval-rename-input {
   width: 100%;
   margin-bottom: 12px;
 }
 
 /* ── Groups ──────────────────────────────────────────── */
 
-.collis-bnode.is-group {
+.noval-bnode.is-group {
   z-index: 0;
   padding: 0;
   background: rgba(120, 130, 140, 0.05);
@@ -1275,15 +1275,15 @@
   box-shadow: none;
 }
 
-.collis-bnode.is-group:hover {
+.noval-bnode.is-group:hover {
   border-color: var(--text-faint);
 }
 
-.collis-bnode.is-group.is-selected {
+.noval-bnode.is-group.is-selected {
   border-color: var(--interactive-accent);
 }
 
-.collis-group-label {
+.noval-group-label {
   position: absolute;
   top: -21px;
   left: 10px;
@@ -1294,7 +1294,7 @@
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 8px;
-  background: var(--collis-board-bg, var(--background-primary));
+  background: var(--noval-board-bg, var(--background-primary));
   box-shadow: none;
   color: var(--group-tint, var(--text-muted));
   font-size: 16px;
@@ -1304,33 +1304,33 @@
   cursor: text;
 }
 
-.collis-group-label:hover {
+.noval-group-label:hover {
   border-color: var(--background-modifier-border);
 }
 
-.collis-group-label:focus {
+.noval-group-label:focus {
   border-color: var(--interactive-accent);
   background: var(--background-primary);
   color: var(--text-normal);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.collis-bnode.is-dimmed {
+.noval-bnode.is-dimmed {
   opacity: 0.25;
   transition: opacity 220ms ease;
 }
 
-.collis-board.is-focusing .collis-edges {
+.noval-board.is-focusing .noval-edges {
   opacity: 0.2;
   transition: opacity 220ms ease;
 }
 
-.collis-bnode.is-flash {
+.noval-bnode.is-flash {
   z-index: 4;
-  animation: collis-flash 700ms ease-in-out 2;
+  animation: noval-flash 700ms ease-in-out 2;
 }
 
-@keyframes collis-flash {
+@keyframes noval-flash {
   0%,
   100% {
     box-shadow: 0 0 0 3px var(--interactive-accent);
@@ -1342,7 +1342,7 @@
   }
 }
 
-.collis-insert-empty {
+.noval-insert-empty {
   padding: 18px 12px;
   color: var(--text-faint);
   font-size: 12px;
@@ -1351,7 +1351,7 @@
 
 /* ── Align palette ───────────────────────────────────── */
 
-.collis-align-pop {
+.noval-align-pop {
   position: absolute;
   z-index: 15;
   display: grid;
@@ -1364,7 +1364,7 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
 }
 
-.collis-guide {
+.noval-guide {
   stroke: var(--interactive-accent);
   stroke-width: 1.8px;
   stroke-dasharray: 5 4;
@@ -1376,7 +1376,7 @@
 
 /* ── Minimap ─────────────────────────────────────────── */
 
-.collis-minimap {
+.noval-minimap {
   position: absolute;
   left: 10px;
   bottom: 10px;
@@ -1392,42 +1392,42 @@
   cursor: pointer;
 }
 
-.collis-minimap.is-hidden {
+.noval-minimap.is-hidden {
   display: none;
 }
 
-.collis-minimap-svg {
+.noval-minimap-svg {
   display: block;
   width: 100%;
   height: 100%;
   border-radius: 6px;
 }
 
-.collis-mini-node {
+.noval-mini-node {
   fill: var(--background-modifier-border);
   stroke: none;
 }
 
-.collis-mini-node.is-card {
+.noval-mini-node.is-card {
   fill: #b9b4a8;
 }
 
-.collis-mini-node.is-text {
+.noval-mini-node.is-text {
   fill: #c9c4b8;
 }
 
-.collis-mini-node.is-file {
+.noval-mini-node.is-file {
   fill: #a8a49a;
 }
 
-.collis-mini-node.is-group {
+.noval-mini-node.is-group {
   fill: transparent;
   stroke: var(--background-modifier-border-hover);
   stroke-width: 2;
   stroke-dasharray: 6 4;
 }
 
-.collis-mini-view {
+.noval-mini-view {
   fill: var(--interactive-accent);
   fill-opacity: 0.12;
   stroke: var(--interactive-accent);
@@ -1436,7 +1436,7 @@
 
 /* ── AI panel ────────────────────────────────────────── */
 
-.collis-ai-panel {
+.noval-ai-panel {
   position: absolute;
   z-index: 60;
   display: flex;
@@ -1450,14 +1450,14 @@
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
 }
 
-.collis-ai-panel.is-expanded {
+.noval-ai-panel.is-expanded {
   left: 10% !important;
   top: 7% !important;
   width: 80%;
   height: 86%;
 }
 
-.collis-ai-head {
+.noval-ai-head {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -1467,24 +1467,24 @@
   background: var(--background-secondary);
 }
 
-.collis-ai-head-icon {
+.noval-ai-head-icon {
   display: flex;
   align-items: center;
   color: var(--interactive-accent);
 }
 
-.collis-ai-head-icon svg {
+.noval-ai-head-icon svg {
   width: 15px;
   height: 15px;
 }
 
-.collis-ai-head-title {
+.noval-ai-head-title {
   color: var(--text-normal);
   font-size: 13px;
   font-weight: 600;
 }
 
-.collis-ai-head-model {
+.noval-ai-head-model {
   overflow: hidden;
   max-width: 130px;
   padding: 1px 7px;
@@ -1496,11 +1496,11 @@
   white-space: nowrap;
 }
 
-.collis-ai-head-spacer {
+.noval-ai-head-spacer {
   flex: 1 1 auto;
 }
 
-.collis-ai-chip {
+.noval-ai-chip {
   padding: 3px 9px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
@@ -1511,12 +1511,12 @@
   cursor: pointer;
 }
 
-.collis-ai-chip:hover {
+.noval-ai-chip:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.collis-ai-head-btn {
+.noval-ai-head-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1531,37 +1531,37 @@
   cursor: pointer;
 }
 
-.collis-ai-head-btn:hover {
+.noval-ai-head-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.collis-ai-head-btn svg {
+.noval-ai-head-btn svg {
   width: 14px;
   height: 14px;
 }
 
-.collis-ai-stream {
+.noval-ai-stream {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: 14px 14px 6px;
 }
 
-.collis-ai-msg {
+.noval-ai-msg {
   display: flex;
   margin-bottom: 12px;
 }
 
-.collis-ai-msg.is-user {
+.noval-ai-msg.is-user {
   justify-content: flex-end;
 }
 
-.collis-ai-msg.is-ai {
+.noval-ai-msg.is-ai {
   justify-content: flex-start;
 }
 
-.collis-ai-bubble {
+.noval-ai-bubble {
   max-width: 90%;
   padding: 9px 12px;
   border-radius: 10px;
@@ -1571,76 +1571,76 @@
   overflow-wrap: anywhere;
 }
 
-.is-user .collis-ai-bubble {
+.is-user .noval-ai-bubble {
   border-bottom-right-radius: 3px;
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.is-ai .collis-ai-bubble {
+.is-ai .noval-ai-bubble {
   border: 1px solid var(--background-modifier-border);
   border-bottom-left-radius: 3px;
   background: var(--background-secondary);
   color: var(--text-normal);
 }
 
-.collis-ai-bubble.is-md {
+.noval-ai-bubble.is-md {
   white-space: normal;
 }
 
-.collis-ai-bubble.is-md p {
+.noval-ai-bubble.is-md p {
   margin: 0 0 0.5em;
 }
 
-.collis-ai-bubble.is-md p:last-child {
+.noval-ai-bubble.is-md p:last-child {
   margin-bottom: 0;
 }
 
-.collis-ai-bubble.is-md h1,
-.collis-ai-bubble.is-md h2,
-.collis-ai-bubble.is-md h3 {
+.noval-ai-bubble.is-md h1,
+.noval-ai-bubble.is-md h2,
+.noval-ai-bubble.is-md h3 {
   margin: 0.5em 0 0.35em;
   color: var(--text-normal);
   font-size: 1.05em;
   font-weight: 600;
 }
 
-.collis-ai-bubble.is-md ul,
-.collis-ai-bubble.is-md ol {
+.noval-ai-bubble.is-md ul,
+.noval-ai-bubble.is-md ol {
   margin: 0.3em 0;
   padding-left: 1.3em;
 }
 
-.collis-ai-bubble.is-error {
+.noval-ai-bubble.is-error {
   border-color: var(--background-modifier-error);
   background: var(--background-modifier-error);
   color: var(--text-error);
 }
 
-.collis-ai-bubble.is-pending {
+.noval-ai-bubble.is-pending {
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 12px 14px;
 }
 
-.collis-ai-dot {
+.noval-ai-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: var(--text-faint);
-  animation: collis-ai-blink 1.2s ease-in-out infinite;
+  animation: noval-ai-blink 1.2s ease-in-out infinite;
 }
 
-.collis-ai-dot:nth-child(2) {
+.noval-ai-dot:nth-child(2) {
   animation-delay: 0.2s;
 }
 
-.collis-ai-dot:nth-child(3) {
+.noval-ai-dot:nth-child(3) {
   animation-delay: 0.4s;
 }
 
-@keyframes collis-ai-blink {
+@keyframes noval-ai-blink {
   0%,
   60%,
   100% {
@@ -1651,14 +1651,14 @@
   }
 }
 
-.collis-ai-empty-hint {
+.noval-ai-empty-hint {
   padding: 8px 4px;
   color: var(--text-faint);
   font-size: 12px;
   line-height: 1.6;
 }
 
-.collis-ai-compose {
+.noval-ai-compose {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -1667,7 +1667,7 @@
   border-top: 1px solid var(--background-modifier-border);
 }
 
-.collis-ai-input {
+.noval-ai-input {
   flex: 1 1 auto;
   height: 34px;
   padding: 0 12px;
@@ -1680,11 +1680,11 @@
   outline: none !important;
 }
 
-.collis-ai-input:focus {
+.noval-ai-input:focus {
   border-color: var(--interactive-accent) !important;
 }
 
-.collis-ai-send {
+.noval-ai-send {
   flex: 0 0 auto;
   height: 34px;
   padding: 0 16px;
@@ -1697,16 +1697,16 @@
   cursor: pointer;
 }
 
-.collis-ai-send:hover {
+.noval-ai-send:hover {
   background: var(--interactive-accent-hover);
 }
 
-.collis-ai-send:disabled {
+.noval-ai-send:disabled {
   opacity: 0.45;
   cursor: default;
 }
 
-.collis-ai-actions {
+.noval-ai-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -1714,7 +1714,7 @@
   padding: 0 14px 12px;
 }
 
-.collis-ai-btn {
+.noval-ai-btn {
   padding: 5px 12px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 7px;
@@ -1725,36 +1725,36 @@
   cursor: pointer;
 }
 
-.collis-ai-btn:hover {
+.noval-ai-btn:hover {
   background: var(--background-modifier-hover);
 }
 
-.collis-ai-btn.is-primary {
+.noval-ai-btn.is-primary {
   border-color: transparent;
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.collis-ai-btn.is-primary:hover {
+.noval-ai-btn.is-primary:hover {
   background: var(--interactive-accent-hover);
 }
 
-.collis-ai-btn:disabled {
+.noval-ai-btn:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-.collis-ai-btn.is-hidden {
+.noval-ai-btn.is-hidden {
   display: none;
 }
 
 /* ── AI config cards ─────────────────────────────────── */
 
-.collis-ai-cards {
+.noval-ai-cards {
   margin: 10px 0 6px;
 }
 
-.collis-ai-card {
+.noval-ai-card {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1766,12 +1766,12 @@
   transition: border-color 140ms ease;
 }
 
-.collis-ai-card.is-active {
+.noval-ai-card.is-active {
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 1px var(--interactive-accent);
 }
 
-.collis-ai-avatar {
+.noval-ai-avatar {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -1785,17 +1785,17 @@
   font-weight: 600;
 }
 
-.collis-ai-card.is-active .collis-ai-avatar {
+.noval-ai-card.is-active .noval-ai-avatar {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.collis-ai-card-main {
+.noval-ai-card-main {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.collis-ai-card-name {
+.noval-ai-card-name {
   overflow: hidden;
   color: var(--text-normal);
   font-size: 13.5px;
@@ -1804,7 +1804,7 @@
   white-space: nowrap;
 }
 
-.collis-ai-card-url {
+.noval-ai-card-url {
   overflow: hidden;
   margin-top: 2px;
   color: var(--text-accent);
@@ -1813,14 +1813,14 @@
   white-space: nowrap;
 }
 
-.collis-ai-card-actions {
+.noval-ai-card-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 4px;
 }
 
-.collis-ai-use {
+.noval-ai-use {
   padding: 4px 12px;
   border: none;
   border-radius: 6px;
@@ -1831,11 +1831,11 @@
   cursor: pointer;
 }
 
-.collis-ai-use:hover {
+.noval-ai-use:hover {
   background: var(--interactive-accent-hover);
 }
 
-.collis-ai-icon {
+.noval-ai-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1850,51 +1850,51 @@
   cursor: pointer;
 }
 
-.collis-ai-icon:hover {
+.noval-ai-icon:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.collis-ai-icon.is-danger:hover {
+.noval-ai-icon.is-danger:hover {
   background: var(--background-modifier-error);
   color: var(--text-on-accent);
 }
 
-.collis-ai-icon svg {
+.noval-ai-icon svg {
   width: 15px;
   height: 15px;
 }
 
-.collis-ai-empty {
+.noval-ai-empty {
   padding: 14px 2px;
   color: var(--text-faint);
   font-size: 12px;
   line-height: 1.6;
 }
 
-.collis-ai-modal .setting-item {
+.noval-ai-modal .setting-item {
   border-top: none;
 }
 
 /* Picking one answer among several */
-.collis-ai-msg.is-ai {
+.noval-ai-msg.is-ai {
   cursor: pointer;
 }
 
-.collis-ai-msg.is-ai .collis-ai-bubble {
+.noval-ai-msg.is-ai .noval-ai-bubble {
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
-.collis-ai-msg.is-ai:hover .collis-ai-bubble {
+.noval-ai-msg.is-ai:hover .noval-ai-bubble {
   border-color: var(--background-modifier-border-hover);
 }
 
-.collis-ai-msg.is-picked .collis-ai-bubble {
+.noval-ai-msg.is-picked .noval-ai-bubble {
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 1px var(--interactive-accent);
 }
 
-.collis-confirm-text {
+.noval-confirm-text {
   margin: 0 0 4px;
   color: var(--text-muted);
   font-size: 13px;
@@ -1902,12 +1902,12 @@
 }
 
 /* Pending dots and error rows are not pickable answers */
-.collis-ai-msg.is-status {
+.noval-ai-msg.is-status {
   justify-content: flex-start;
 }
 
 /* Round send / stop button */
-.collis-ai-send {
+.noval-ai-send {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -1924,40 +1924,40 @@
   transition: background 140ms ease, transform 120ms ease;
 }
 
-.collis-ai-send:hover {
+.noval-ai-send:hover {
   background: var(--interactive-accent-hover);
 }
 
-.collis-ai-send svg {
+.noval-ai-send svg {
   width: 16px;
   height: 16px;
   stroke-width: 2.2;
 }
 
-.collis-ai-send.is-stop svg {
+.noval-ai-send.is-stop svg {
   width: 12px;
   height: 12px;
   fill: currentColor;
   stroke-width: 0;
 }
 
-.collis-ai-thinking {
+.noval-ai-thinking {
   color: var(--text-muted);
   font-size: 12.5px;
 }
 
-.collis-ai-head {
+.noval-ai-head {
   cursor: grab;
   user-select: none;
 }
 
-.collis-ai-panel.is-dragging .collis-ai-head {
+.noval-ai-panel.is-dragging .noval-ai-head {
   cursor: grabbing;
 }
 
 /* ── Conversation history pop ────────────────────────── */
 
-.collis-ai-history {
+.noval-ai-history {
   position: absolute;
   z-index: 70;
   width: 300px;
@@ -1970,13 +1970,13 @@
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
 }
 
-.collis-ai-history-head {
+.noval-ai-history-head {
   display: flex;
   align-items: center;
   padding: 6px 8px 8px;
 }
 
-.collis-ai-history-heading {
+.noval-ai-history-heading {
   flex: 1 1 auto;
   color: var(--text-muted);
   font-size: 11px;
@@ -1985,7 +1985,7 @@
   text-transform: uppercase;
 }
 
-.collis-ai-history-clear {
+.noval-ai-history-clear {
   padding: 2px 8px;
   border: none;
   border-radius: 5px;
@@ -1996,12 +1996,12 @@
   cursor: pointer;
 }
 
-.collis-ai-history-clear:hover {
+.noval-ai-history-clear:hover {
   background: var(--background-modifier-error);
   color: var(--text-on-accent);
 }
 
-.collis-ai-history-item {
+.noval-ai-history-item {
   position: relative;
   display: flex;
   align-items: center;
@@ -2011,35 +2011,35 @@
   cursor: pointer;
 }
 
-.collis-ai-history-item:hover {
+.noval-ai-history-item:hover {
   background: var(--background-modifier-hover);
 }
 
-.collis-ai-history-item.is-current {
+.noval-ai-history-item.is-current {
   box-shadow: inset 2px 0 0 var(--interactive-accent);
 }
 
-.collis-ai-history-icon {
+.noval-ai-history-icon {
   display: flex;
   flex: 0 0 auto;
   color: var(--text-faint);
 }
 
-.collis-ai-history-icon svg {
+.noval-ai-history-icon svg {
   width: 15px;
   height: 15px;
 }
 
-.collis-ai-history-item.is-current .collis-ai-history-icon {
+.noval-ai-history-item.is-current .noval-ai-history-icon {
   color: var(--interactive-accent);
 }
 
-.collis-ai-history-body {
+.noval-ai-history-body {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.collis-ai-history-name {
+.noval-ai-history-name {
   overflow: hidden;
   color: var(--text-normal);
   font-size: 12.5px;
@@ -2048,13 +2048,13 @@
   white-space: nowrap;
 }
 
-.collis-ai-history-time {
+.noval-ai-history-time {
   margin-top: 1px;
   color: var(--text-faint);
   font-size: 11px;
 }
 
-.collis-ai-history-del {
+.noval-ai-history-del {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -2071,21 +2071,21 @@
   cursor: pointer;
 }
 
-.collis-ai-history-item:hover .collis-ai-history-del {
+.noval-ai-history-item:hover .noval-ai-history-del {
   opacity: 1;
 }
 
-.collis-ai-history-del:hover {
+.noval-ai-history-del:hover {
   background: var(--background-modifier-error);
   color: var(--text-on-accent);
 }
 
-.collis-ai-history-del svg {
+.noval-ai-history-del svg {
   width: 13px;
   height: 13px;
 }
 
-.collis-ai-history-empty {
+.noval-ai-history-empty {
   padding: 14px 8px 16px;
   color: var(--text-faint);
   font-size: 12px;
@@ -2094,32 +2094,32 @@
 
 /* Dark theme: solid surfaces one step above the canvas, so the grid never
    shows through and the toolbar reads as a raised panel rather than a hole. */
-.theme-dark .collis-board-toolbar {
+.theme-dark .noval-board-toolbar {
   border-color: rgba(255, 255, 255, 0.12);
   background: #2f3634;
   box-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
 }
 
-.theme-dark .collis-board-btn {
+.theme-dark .noval-board-btn {
   border-color: transparent;
   background: #3d4644;
   box-shadow: none;
   color: var(--text-muted);
 }
 
-.theme-dark .collis-board-btn:hover {
+.theme-dark .noval-board-btn:hover {
   background: #4a5451;
   color: var(--text-normal);
 }
 
-.theme-dark .collis-board-btn:disabled {
+.theme-dark .noval-board-btn:disabled {
   background: #343b39;
   color: var(--text-faint);
 }
 
 /* ── Type badge on the node border ───────────────────── */
 
-.collis-type-badge {
+.noval-type-badge {
   position: absolute;
   top: -9px;
   right: 10px;
@@ -2135,7 +2135,7 @@
   pointer-events: none;
 }
 
-.collis-type-badge svg {
+.noval-type-badge svg {
   width: 13px;
   height: 13px;
   stroke: #ffffff;
@@ -2145,94 +2145,94 @@
 
 /* These two types clip their content to keep rounded image corners, which would
    slice a badge sitting across the border. They keep it just inside instead. */
-.collis-bnode.is-file .collis-type-badge,
-.collis-bnode.is-doc-text .collis-type-badge {
+.noval-bnode.is-file .noval-type-badge,
+.noval-bnode.is-doc-text .noval-type-badge {
   top: 2px;
   right: 4px;
 }
 
-.collis-type-badge[data-kind="card"] {
+.noval-type-badge[data-kind="card"] {
   background: #c9a227;
 }
 
-.collis-type-badge[data-kind="note"] {
+.noval-type-badge[data-kind="note"] {
   background: #378add;
 }
 
-.collis-type-badge[data-kind="text"] {
+.noval-type-badge[data-kind="text"] {
   background: #8a8880;
 }
 
-.collis-type-badge[data-kind="image"] {
+.noval-type-badge[data-kind="image"] {
   background: #1d9e75;
 }
 
-.collis-type-badge[data-kind="video"] {
+.noval-type-badge[data-kind="video"] {
   background: #d9534f;
 }
 
-.collis-type-badge[data-kind="file"] {
+.noval-type-badge[data-kind="file"] {
   background: #8a8880;
 }
 
-.theme-dark .collis-type-badge {
+.theme-dark .noval-type-badge {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
 
-.theme-dark .collis-type-badge[data-kind="card"] {
+.theme-dark .noval-type-badge[data-kind="card"] {
   background: #b8912a;
 }
 
-.theme-dark .collis-type-badge[data-kind="note"] {
+.theme-dark .noval-type-badge[data-kind="note"] {
   background: #2f76bf;
 }
 
-.theme-dark .collis-type-badge[data-kind="text"] {
+.theme-dark .noval-type-badge[data-kind="text"] {
   background: #6f6e68;
 }
 
-.theme-dark .collis-type-badge[data-kind="image"] {
+.theme-dark .noval-type-badge[data-kind="image"] {
   background: #1a8c68;
 }
 
-.theme-dark .collis-type-badge[data-kind="video"] {
+.theme-dark .noval-type-badge[data-kind="video"] {
   background: #bf4a46;
 }
 
 /* ── Sticky notes ────────────────────────────────────── */
 
-.collis-bnode.is-sticky {
+.noval-bnode.is-sticky {
   background: #fdf3cf;
   border-color: #e3cf8d;
 }
 
-.theme-dark .collis-bnode.is-sticky {
+.theme-dark .noval-bnode.is-sticky {
   background: #4a4127;
   border-color: #796b3d;
 }
 
-.collis-bnode.is-sticky.is-selected {
+.noval-bnode.is-sticky.is-selected {
   border-color: var(--interactive-accent);
 }
 
-.collis-type-badge[data-kind="sticky"] {
+.noval-type-badge[data-kind="sticky"] {
   background: #c9a227;
 }
 
-.theme-dark .collis-type-badge[data-kind="sticky"] {
+.theme-dark .noval-type-badge[data-kind="sticky"] {
   background: #b8912a;
 }
 
-.collis-insert-head {
+.noval-insert-head {
   cursor: grab;
   user-select: none;
 }
 
-.collis-insert-panel.is-dragging .collis-insert-head {
+.noval-insert-panel.is-dragging .noval-insert-head {
   cursor: grabbing;
 }
 
-.collis-ai-hint {
+.noval-ai-hint {
   margin: 6px 0 12px;
   padding: 8px 10px;
   border-left: 2px solid var(--interactive-accent);
@@ -2243,34 +2243,34 @@
   line-height: 1.6;
 }
 
-.collis-ai-advanced {
+.noval-ai-advanced {
   margin: 8px 0 16px;
 }
 
-.collis-ai-advanced > summary {
+.noval-ai-advanced > summary {
   cursor: pointer;
   color: var(--text-muted);
   font-size: 12px;
 }
 
 /* Settings page: clear section breaks and quieter model metadata. */
-.collis-settings h3 {
+.noval-settings h3 {
   margin-top: 4px;
 }
 
-.collis-settings-divider {
+.noval-settings-divider {
   height: 1px;
   margin: 22px 0 18px;
   border-radius: 1px;
   background: var(--background-modifier-border);
 }
 
-.collis-ai-hint {
+.noval-ai-hint {
   margin: 4px 0 14px;
   padding: 7px 10px;
 }
 
-.collis-ai-card-meta {
+.noval-ai-card-meta {
   overflow: hidden;
   margin-top: 3px;
   color: var(--text-muted);
@@ -2279,30 +2279,30 @@
   white-space: nowrap;
 }
 
-.collis-ai-card-url {
+.noval-ai-card-url {
   color: var(--text-faint);
   font-size: 11px;
 }
 
 /* ── Conversation: chat-like, no boxes around the assistant ───── */
 
-.collis-ai-panel {
+.noval-ai-panel {
   overflow: hidden;
 }
 
-.collis-ai-stream {
+.noval-ai-stream {
   padding: 20px 28px 116px;
 }
 
-.collis-ai-msg {
+.noval-ai-msg {
   margin-bottom: 18px;
 }
 
-.collis-ai-msg.is-user {
+.noval-ai-msg.is-user {
   justify-content: flex-end;
 }
 
-.collis-ai-msg.is-user .collis-ai-bubble {
+.noval-ai-msg.is-user .noval-ai-bubble {
   max-width: 72%;
   padding: 9px 13px;
   border: none;
@@ -2315,46 +2315,46 @@
   overflow-wrap: anywhere;
 }
 
-.collis-ai-msg.is-ai {
+.noval-ai-msg.is-ai {
   display: block;
   cursor: default;
 }
 
-.collis-ai-msg.is-ai:hover {
+.noval-ai-msg.is-ai:hover {
   cursor: default;
 }
 
-.collis-ai-reply {
+.noval-ai-reply {
   font-size: 13.5px;
   line-height: 1.75;
   color: var(--text-normal);
   overflow-wrap: anywhere;
 }
 
-.collis-ai-reply p {
+.noval-ai-reply p {
   margin: 0 0 0.7em;
 }
 
-.collis-ai-reply p:last-child {
+.noval-ai-reply p:last-child {
   margin-bottom: 0;
 }
 
-.collis-ai-reply h1,
-.collis-ai-reply h2,
-.collis-ai-reply h3 {
+.noval-ai-reply h1,
+.noval-ai-reply h2,
+.noval-ai-reply h3 {
   margin: 0.8em 0 0.4em;
   font-size: 1.05em;
   font-weight: 500;
 }
 
-.collis-ai-reply ul,
-.collis-ai-reply ol {
+.noval-ai-reply ul,
+.noval-ai-reply ol {
   margin: 0.4em 0;
   padding-left: 1.35em;
 }
 
 /* Selected answer: a faint tint that stays inside the text column. */
-.collis-ai-msg.is-ai.is-picked .collis-ai-reply {
+.noval-ai-msg.is-ai.is-picked .noval-ai-reply {
   background: var(--background-modifier-hover);
   box-shadow: inset 0 0 0 1px var(--background-modifier-border);
   border-radius: 6px;
@@ -2362,14 +2362,14 @@
   margin: -5px 0 0;
 }
 
-.collis-ai-reply-bar {
+.noval-ai-reply-bar {
   display: flex;
   gap: 10px;
   margin-top: 8px;
   min-height: 20px;
 }
 
-.collis-ai-reply-icon {
+.noval-ai-reply-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2384,29 +2384,29 @@
   cursor: pointer;
 }
 
-.collis-ai-reply-icon:hover {
+.noval-ai-reply-icon:hover {
   background: var(--background-secondary);
   color: var(--text-normal);
 }
 
-.collis-ai-reply-icon.is-done {
+.noval-ai-reply-icon.is-done {
   color: var(--interactive-accent);
 }
 
-.collis-ai-reply-icon svg {
+.noval-ai-reply-icon svg {
   width: 14px;
   height: 14px;
   stroke-width: 1.8;
 }
 
 
-.collis-ai-context {
+.noval-ai-context {
   margin-bottom: 8px;
   font-size: 11.5px;
   color: var(--text-muted);
 }
 
-.collis-ai-context > summary {
+.noval-ai-context > summary {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2417,42 +2417,42 @@
   color: var(--text-muted);
 }
 
-.collis-ai-context > summary::-webkit-details-marker {
+.noval-ai-context > summary::-webkit-details-marker {
   display: none;
 }
 
-.collis-ai-context > summary::before {
+.noval-ai-context > summary::before {
   content: "▸";
   font-size: 10px;
   color: var(--text-faint);
 }
 
-.collis-ai-context[open] > summary::before {
+.noval-ai-context[open] > summary::before {
   content: "▾";
 }
 
-.collis-ai-context-count {
+.noval-ai-context-count {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
 
-.collis-ai-context-body {
+.noval-ai-context-body {
   margin: 4px 0 2px 14px;
   line-height: 1.7;
 }
 
-.collis-ai-context-row {
+.noval-ai-context-row {
   display: flex;
   gap: 8px;
   align-items: baseline;
 }
 
-.collis-ai-context-tag {
+.noval-ai-context-tag {
   min-width: 26px;
   color: var(--text-faint);
 }
 
-.collis-ai-context-name {
+.noval-ai-context-name {
   flex: 0 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2460,64 +2460,64 @@
   color: var(--text-muted);
 }
 
-.collis-ai-context-size {
+.noval-ai-context-size {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
 
-.collis-ai-context-flag,
-.collis-ai-context-note {
+.noval-ai-context-flag,
+.noval-ai-context-note {
   color: var(--text-warning);
 }
 
-.collis-ai-pending {
+.noval-ai-pending {
   padding: 2px 0;
 }
 
-.collis-ai-msg.is-error .collis-ai-error {
+.noval-ai-msg.is-error .noval-ai-error {
   padding: 2px 0;
   color: var(--text-muted);
   font-size: 12.5px;
 }
 
-.collis-ai-error-title {
+.noval-ai-error-title {
   color: var(--text-normal);
   font-size: 13px;
   font-weight: 500;
 }
 
-.collis-ai-error-summary {
+.noval-ai-error-summary {
   margin-top: 4px;
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.collis-ai-error-detail {
+.noval-ai-error-detail {
   margin-top: 6px;
   font-size: 11.5px;
 }
 
-.collis-ai-error-detail > summary {
+.noval-ai-error-detail > summary {
   list-style: none;
   cursor: pointer;
   width: fit-content;
   color: var(--text-faint);
 }
 
-.collis-ai-error-detail > summary::-webkit-details-marker {
+.noval-ai-error-detail > summary::-webkit-details-marker {
   display: none;
 }
 
-.collis-ai-error-detail > summary::before {
+.noval-ai-error-detail > summary::before {
   content: "▸ ";
 }
 
-.collis-ai-error-detail[open] > summary::before {
+.noval-ai-error-detail[open] > summary::before {
   content: "▾ ";
 }
 
-.collis-ai-error-detail pre {
+.noval-ai-error-detail pre {
   margin: 6px 0 0;
   padding: 0 0 0 12px;
   border-left: none;
@@ -2528,14 +2528,14 @@
   overflow-wrap: anywhere;
 }
 
-.collis-ai-error-hint {
+.noval-ai-error-hint {
   display: block;
   margin-top: 6px;
   color: var(--text-muted);
 }
 
 /* Floating composer, no dividing rule. */
-.collis-ai-dock {
+.noval-ai-dock {
   position: absolute;
   left: 0;
   right: 0;
@@ -2544,13 +2544,13 @@
   background: linear-gradient(to top, var(--background-primary) 72%, transparent);
 }
 
-.collis-ai-dock .collis-ai-compose {
+.noval-ai-dock .noval-ai-compose {
   padding: 0;
   border-top: none;
   gap: 8px;
 }
 
-.collis-ai-dock .collis-ai-input {
+.noval-ai-dock .noval-ai-input {
   height: 46px;
   padding: 0 16px;
   border: none !important;
@@ -2559,36 +2559,36 @@
   font-size: 13px;
 }
 
-.collis-ai-dock .collis-ai-input:focus {
+.noval-ai-dock .noval-ai-input:focus {
   border: none !important;
   box-shadow: none !important;
 }
 
-.collis-ai-dock .collis-ai-send {
+.noval-ai-dock .noval-ai-send {
   width: 36px;
   height: 36px;
   border-radius: 50%;
 }
 
-.collis-ai-dock .collis-ai-actions {
+.noval-ai-dock .noval-ai-actions {
   padding: 10px 2px 0;
 }
 
 /* Keep the original button look; only lift it above the floating dock. */
-.collis-ai-dock .collis-ai-btn {
+.noval-ai-dock .noval-ai-btn {
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
   color: var(--text-normal);
 }
 
-.collis-ai-dock .collis-ai-btn.is-primary {
+.noval-ai-dock .noval-ai-btn.is-primary {
   border-color: transparent;
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
 /* Temporary node numbers, top-left, mirrored from the type badge. */
-.collis-ai-node-number {
+.noval-ai-node-number {
   position: absolute;
   top: -9px;
   left: 10px;
@@ -2614,24 +2614,24 @@
 /* Clickable N1 references inside an answer.
    A translucent tint reads as a chip on either theme; the dark value only
    lifts a little so it stays quiet next to running text. */
-.collis-ai-reply {
-  --collis-nref-bg: rgba(0, 0, 0, 0.045);
-  --collis-nref-bg-hover: rgba(0, 0, 0, 0.09);
+.noval-ai-reply {
+  --noval-nref-bg: rgba(0, 0, 0, 0.045);
+  --noval-nref-bg-hover: rgba(0, 0, 0, 0.09);
 }
 
-.theme-dark .collis-ai-reply {
-  --collis-nref-bg: rgba(255, 255, 255, 0.065);
-  --collis-nref-bg-hover: rgba(255, 255, 255, 0.12);
+.theme-dark .noval-ai-reply {
+  --noval-nref-bg: rgba(255, 255, 255, 0.065);
+  --noval-nref-bg-hover: rgba(255, 255, 255, 0.12);
 }
 
 /* The app's own button defaults outrank a plain class selector, so the
    background is forced here — everything else stays inherited. */
-.collis-ai-reply .collis-ai-nref {
+.noval-ai-reply .noval-ai-nref {
   display: inline;
   padding: 0 3px;
   border: none;
   border-radius: 4px;
-  background: var(--collis-nref-bg) !important;
+  background: var(--noval-nref-bg) !important;
   box-shadow: none;
   color: inherit;
   font: inherit;
@@ -2640,34 +2640,34 @@
   transition: background-color 0.12s ease;
 }
 
-.collis-ai-reply .collis-ai-nref:hover {
-  background: var(--collis-nref-bg-hover) !important;
+.noval-ai-reply .noval-ai-nref:hover {
+  background: var(--noval-nref-bg-hover) !important;
   text-decoration: underline;
 }
 
 /* ── Board doctor ──────────────────────────────────────── */
 
 /* Width is also set inline on .modal-el so it beats the theme's own rule. */
-.collis-doctor-modal {
+.noval-doctor-modal {
   width: 620px;
   max-width: 92vw;
   max-height: 74vh;
   overflow: hidden;
 }
 
-.collis-doctor-content {
+.noval-doctor-content {
   display: flex;
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
 }
 
-.collis-doctor-drag {
+.noval-doctor-drag {
   cursor: move;
   user-select: none;
 }
 
-.collis-doctor-summary {
+.noval-doctor-summary {
   flex: none;
   margin: 4px 0 10px;
   color: var(--text-muted);
@@ -2675,7 +2675,7 @@
 }
 
 /* Only the findings scroll; summary and footer stay in view. */
-.collis-doctor-scroll {
+.noval-doctor-scroll {
   flex: 1 1 auto;
   min-height: 0;
   max-height: 46vh;
@@ -2684,18 +2684,18 @@
   padding-right: 6px;
 }
 
-.collis-doctor-empty {
+.noval-doctor-empty {
   padding: 28px 0 12px;
   color: var(--text-faint);
   font-size: 13px;
   text-align: center;
 }
 
-.collis-doctor-group {
+.noval-doctor-group {
   margin-top: 14px;
 }
 
-.collis-doctor-group-head {
+.noval-doctor-group-head {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -2706,20 +2706,20 @@
   font-weight: 600;
 }
 
-.collis-doctor-group-note {
+.noval-doctor-group-note {
   color: var(--text-faint);
   font-size: 11px;
   font-weight: 400;
 }
 
-.collis-doctor-count {
+.noval-doctor-count {
   margin-left: auto;
   color: var(--text-faint);
   font-size: 11px;
   font-weight: 400;
 }
 
-.collis-doctor-row {
+.noval-doctor-row {
   display: flex;
   gap: 10px;
   align-items: flex-start;
@@ -2729,11 +2729,11 @@
   border-bottom: 1px solid var(--background-modifier-hover);
 }
 
-.collis-doctor-row:last-child {
+.noval-doctor-row:last-child {
   border-bottom: none;
 }
 
-.collis-doctor-dot {
+.noval-doctor-dot {
   flex: none;
   width: 8px;
   height: 8px;
@@ -2742,22 +2742,22 @@
   background: var(--text-faint);
 }
 
-.collis-doctor-dot.is-error { background: var(--text-error); }
-.collis-doctor-dot.is-warning { background: var(--text-warning); }
-.collis-doctor-dot.is-hint { background: var(--interactive-accent); }
+.noval-doctor-dot.is-error { background: var(--text-error); }
+.noval-doctor-dot.is-warning { background: var(--text-warning); }
+.noval-doctor-dot.is-hint { background: var(--interactive-accent); }
 
-.collis-doctor-body {
+.noval-doctor-body {
   flex: 1 1 auto;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.collis-doctor-title {
+.noval-doctor-title {
   color: var(--text-normal);
   font-size: 13px;
 }
 
-.collis-doctor-detail {
+.noval-doctor-detail {
   margin-top: 3px;
   color: var(--text-muted);
   font-size: 12px;
@@ -2765,23 +2765,23 @@
   overflow-wrap: anywhere;
 }
 
-.collis-doctor-actions {
+.noval-doctor-actions {
   display: flex;
   flex: 0 0 auto;
   gap: 6px;
   white-space: nowrap;
 }
 
-.collis-doctor-btn {
+.noval-doctor-btn {
   padding: 3px 9px;
   font-size: 12px;
 }
 
-.collis-doctor-btn.is-danger {
+.noval-doctor-btn.is-danger {
   color: var(--text-error);
 }
 
-.collis-doctor-foot {
+.noval-doctor-foot {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--text-faint);
@@ -2789,7 +2789,7 @@
   line-height: 1.5;
 }
 
-.collis-doctor-footer {
+.noval-doctor-footer {
   display: flex;
   flex: none;
   align-items: center;
@@ -2800,28 +2800,28 @@
 
 /* ── In-board shortcut help ────────────────────────────── */
 
-.collis-help-modal {
+.noval-help-modal {
   width: 580px;
   max-width: 92vw;
   max-height: 76vh;
   overflow: hidden;
 }
 
-.collis-help-content {
+.noval-help-content {
   display: flex;
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
 }
 
-.collis-help-scope {
+.noval-help-scope {
   flex: none;
   margin: 2px 0 10px;
   color: var(--text-muted);
   font-size: 12px;
 }
 
-.collis-help-scroll {
+.noval-help-scroll {
   flex: 1 1 auto;
   min-height: 0;
   max-height: 54vh;
@@ -2830,11 +2830,11 @@
   padding-right: 6px;
 }
 
-.collis-help-group {
+.noval-help-group {
   margin-top: 12px;
 }
 
-.collis-help-group-title {
+.noval-help-group-title {
   padding-bottom: 5px;
   border-bottom: 1px solid var(--background-modifier-border);
   color: var(--text-normal);
@@ -2842,7 +2842,7 @@
   font-weight: 600;
 }
 
-.collis-help-row {
+.noval-help-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2852,14 +2852,14 @@
   border-bottom: 1px solid var(--background-modifier-hover);
 }
 
-.collis-help-label {
+.noval-help-label {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--text-normal);
   font-size: 13px;
 }
 
-.collis-help-keys {
+.noval-help-keys {
   display: flex;
   flex: 0 0 auto;
   justify-content: flex-end;
@@ -2867,7 +2867,7 @@
   gap: 5px;
 }
 
-.collis-help-key {
+.noval-help-key {
   padding: 2px 8px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 10px;
@@ -2878,7 +2878,7 @@
   white-space: nowrap;
 }
 
-.collis-help-foot {
+.noval-help-foot {
   flex: none;
   margin-top: 12px;
   color: var(--text-faint);
@@ -2888,7 +2888,7 @@
 
 /* ── Outline panel ───────────────────────────────────── */
 
-.collis-outline-panel {
+.noval-outline-panel {
   position: absolute;
   z-index: 58;
   display: flex;
@@ -2903,7 +2903,7 @@
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.16);
 }
 
-.collis-outline-head {
+.noval-outline-head {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -2915,28 +2915,28 @@
   user-select: none;
 }
 
-.collis-outline-panel.is-dragging .collis-outline-head {
+.noval-outline-panel.is-dragging .noval-outline-head {
   cursor: grabbing;
 }
 
-.collis-outline-head-icon {
+.noval-outline-head-icon {
   display: flex;
   align-items: center;
   color: var(--interactive-accent);
 }
 
-.collis-outline-head-icon svg {
+.noval-outline-head-icon svg {
   width: 15px;
   height: 15px;
 }
 
-.collis-outline-head-title {
+.noval-outline-head-title {
   color: var(--text-normal);
   font-size: 13px;
   font-weight: 600;
 }
 
-.collis-outline-head-meta {
+.noval-outline-head-meta {
   overflow: hidden;
   color: var(--text-faint);
   font-size: 11px;
@@ -2944,11 +2944,11 @@
   text-overflow: ellipsis;
 }
 
-.collis-outline-head-spacer {
+.noval-outline-head-spacer {
   flex: 1 1 auto;
 }
 
-.collis-outline-head .collis-outline-head-btn {
+.noval-outline-head .noval-outline-head-btn {
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -2965,32 +2965,32 @@
   cursor: pointer;
 }
 
-.collis-outline-head .collis-outline-head-btn:hover {
+.noval-outline-head .noval-outline-head-btn:hover {
   background: var(--background-modifier-hover);
   background-color: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.collis-outline-head-btn svg {
+.noval-outline-head-btn svg {
   width: 14px;
   height: 14px;
 }
 
-.collis-outline-body {
+.noval-outline-body {
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 4px 0 8px;
 }
 
-.collis-outline-body > .collis-outline-row {
+.noval-outline-body > .noval-outline-row {
   margin-top: 6px;
 }
 
-.collis-outline-body > .collis-outline-row:first-child {
+.noval-outline-body > .noval-outline-row:first-child {
   margin-top: 0;
 }
 
-.collis-outline-row {
+.noval-outline-row {
   display: flex;
   align-items: flex-start;
   gap: 3px;
@@ -2998,21 +2998,21 @@
   cursor: pointer;
 }
 
-.collis-outline-children {
+.noval-outline-children {
   margin: 2px 0 0 15px;
   padding-left: 4px;
   border-left: 1px solid var(--background-modifier-border);
 }
 
-.collis-outline-row:hover {
+.noval-outline-row:hover {
   background: var(--background-modifier-hover);
 }
 
-.collis-outline-row.is-active {
+.noval-outline-row.is-active {
   background: var(--background-modifier-active-hover, var(--background-modifier-hover));
 }
 
-.collis-outline-toggle {
+.noval-outline-toggle {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -3029,33 +3029,33 @@
   cursor: pointer;
 }
 
-.collis-outline-toggle:hover {
+.noval-outline-toggle:hover {
   color: var(--text-normal);
   background: transparent;
 }
 
-.collis-outline-toggle svg {
+.noval-outline-toggle svg {
   width: 13px;
   height: 13px;
 }
 
-.collis-outline-toggle.is-empty {
+.noval-outline-toggle.is-empty {
   visibility: hidden;
 }
 
-.collis-outline-main {
+.noval-outline-main {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.collis-outline-title-row {
+.noval-outline-title-row {
   display: flex;
   align-items: center;
   gap: 5px;
   min-width: 0;
 }
 
-.collis-outline-title {
+.noval-outline-title {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -3066,16 +3066,16 @@
   text-overflow: ellipsis;
 }
 
-.collis-outline-row.is-root .collis-outline-title {
+.noval-outline-row.is-root .noval-outline-title {
   font-weight: 600;
 }
 
-.collis-outline-row.is-group .collis-outline-title {
+.noval-outline-row.is-group .noval-outline-title {
   color: var(--text-muted);
   font-weight: 600;
 }
 
-.collis-outline-relation {
+.noval-outline-relation {
   flex: 0 0 auto;
   padding: 0 5px;
   border-radius: 999px;
@@ -3083,24 +3083,24 @@
   line-height: 16px;
 }
 
-.collis-outline-relation.is-derives {
+.noval-outline-relation.is-derives {
   background: rgba(59, 130, 246, 0.14);
   color: #3b82f6;
 }
 
-.collis-outline-relation.is-causes {
+.noval-outline-relation.is-causes {
   background: rgba(249, 115, 22, 0.14);
   color: #f97316;
 }
 
-.collis-outline-badges {
+.noval-outline-badges {
   display: flex;
   flex: 0 0 auto;
   gap: 4px;
   margin-left: auto;
 }
 
-.collis-outline-badge {
+.noval-outline-badge {
   flex: 0 0 auto;
   padding: 0 5px;
   border-radius: 999px;
@@ -3109,22 +3109,22 @@
   white-space: nowrap;
 }
 
-.collis-outline-badge.is-supports {
+.noval-outline-badge.is-supports {
   background: rgba(34, 197, 94, 0.14);
   color: #22c55e;
 }
 
-.collis-outline-badge.is-refutes {
+.noval-outline-badge.is-refutes {
   background: rgba(239, 68, 68, 0.14);
   color: #ef4444;
 }
 
-.collis-outline-badge.is-source {
+.noval-outline-badge.is-source {
   background: rgba(168, 85, 247, 0.14);
   color: #a855f7;
 }
 
-.collis-outline-snippet {
+.noval-outline-snippet {
   margin-top: 1px;
   overflow: hidden;
   color: var(--text-faint);
@@ -3134,7 +3134,7 @@
   text-overflow: ellipsis;
 }
 
-.collis-outline-empty {
+.noval-outline-empty {
   padding: 22px 18px;
   color: var(--text-muted);
   font-size: 12px;
@@ -3142,7 +3142,7 @@
   text-align: center;
 }
 
-.collis-outline-note {
+.noval-outline-note {
   margin: 8px 10px 2px;
   padding: 7px 9px;
   border-radius: 8px;
@@ -3154,34 +3154,34 @@
 
 /* ── Markdown export ───────────────────────────────────── */
 
-.collis-export-modal {
+.noval-export-modal {
   width: 680px;
   max-width: 94vw;
   max-height: 84vh;
   overflow: hidden;
 }
 
-.collis-export-content {
+.noval-export-content {
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-width: 0;
 }
 
-.collis-export-sub {
+.noval-export-sub {
   flex: none;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
 }
 
-.collis-export-tabs {
+.noval-export-tabs {
   display: flex;
   flex: none;
   gap: 6px;
 }
 
-.collis-export-tab {
+.noval-export-tab {
   padding: 4px 12px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 999px;
@@ -3192,13 +3192,13 @@
   cursor: pointer;
 }
 
-.collis-export-tab.is-active {
+.noval-export-tab.is-active {
   border-color: var(--interactive-accent);
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.collis-export-preview {
+.noval-export-preview {
   flex: 1 1 auto;
   width: 100%;
   height: 46vh;
@@ -3215,7 +3215,7 @@
   resize: none;
 }
 
-.collis-export-footer {
+.noval-export-footer {
   display: flex;
   flex: none;
   align-items: center;
@@ -3223,7 +3223,7 @@
   gap: 12px;
 }
 
-.collis-export-foot {
+.noval-export-foot {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--text-faint);
@@ -3231,18 +3231,18 @@
   line-height: 1.5;
 }
 
-.collis-export-actions {
+.noval-export-actions {
   display: flex;
   flex: 0 0 auto;
   gap: 8px;
 }
 
-.collis-export-btn {
+.noval-export-btn {
   padding: 5px 14px;
   font-size: 12.5px;
 }
 
-.collis-export-drag {
+.noval-export-drag {
   cursor: move;
   user-select: none;
 }
@@ -3253,17 +3253,17 @@
    above the bottom of the pane. */
 .workspace-leaf:has(.cl-root),
 .workspace-leaf:has(.cl-root) .workspace-leaf-content { position: relative; }
-/* Only trim Obsidian's header when the gallery is its own leaf. Inside Collis
-   the wall lives under .collis-view; trimming that view's header makes the
-   whole collis jump upward as soon as 白板 is opened. */
-.workspace-leaf:has(.cl-root):not(:has(.collis-view)) .view-header {
+/* Only trim Obsidian's header when the gallery is its own leaf. Inside Noval
+   the wall lives under .noval-view; trimming that view's header makes the
+   whole noval jump upward as soon as 白板 is opened. */
+.workspace-leaf:has(.cl-root):not(:has(.noval-view)) .view-header {
   box-sizing: border-box;
   height: 24px;
   min-height: 24px;
   padding: 0 8px;
 }
-.workspace-leaf:has(.cl-root):not(:has(.collis-view)) .view-header .view-header-nav-buttons,
-.workspace-leaf:has(.cl-root):not(:has(.collis-view)) .view-header .view-actions { height: 24px; }
+.workspace-leaf:has(.cl-root):not(:has(.noval-view)) .view-header .view-header-nav-buttons,
+.workspace-leaf:has(.cl-root):not(:has(.noval-view)) .view-header .view-actions { height: 24px; }
 
 .cl-root {
   --vw-line: var(--background-modifier-border, var(--background-modifier-hover));
@@ -3694,14 +3694,14 @@
 }
 
 /* ---------- Confirmation modal ---------- */
-.collis-delete-modal .vw-modal-actions {
+.noval-delete-modal .vw-modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 22px;
 }
-.collis-delete-modal button { font: inherit; }
-.collis-rename-actions {
+.noval-delete-modal button { font: inherit; }
+.noval-rename-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;

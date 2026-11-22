@@ -1,4 +1,4 @@
-// 本地验证：用假的 obsidian 模块执行 Collis 各子模块构建产物与打包后的 dist/main.js，
+// 本地验证：用假的 obsidian 模块执行 Noval 各子模块构建产物与打包后的 dist/main.js，
 // 确认插件类能取到、单文件 bundle 能在模块层正常执行（不启动 Obsidian，不接触 vault）。
 const fs = require("fs");
 const path = require("path");
@@ -34,8 +34,8 @@ function loadVendor(file) {
 
 const root = path.join(__dirname, "..");
 const cases = [
-  ["collis", path.join(root, "vendor/collis-core.js")],
-  ["collis-board", path.join(root, "vendor/collis-board-core.js")]
+  ["noval-notes", path.join(root, "vendor/noval-notes-core.js")],
+  ["noval-board", path.join(root, "vendor/noval-board-core.js")]
 ];
 
 for (const [id, file] of cases) {
@@ -55,8 +55,8 @@ Module._load = function (request) {
   return originalLoad.apply(this, arguments);
 };
 try {
-  const CollisPlugin = require(path.join(root, "dist/main.js"));
-  console.log("dist/main.js OK:", typeof CollisPlugin, CollisPlugin && CollisPlugin.name);
+  const NovalPlugin = require(path.join(root, "dist/main.js"));
+  console.log("dist/main.js OK:", typeof NovalPlugin, NovalPlugin && NovalPlugin.name);
 } finally {
   Module._load = originalLoad;
 }

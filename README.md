@@ -1,9 +1,9 @@
-# Collis
+# Noval
 
 > 一个插件，三样东西：**工作台模块视图**、**速记卡片**、**画布集**。启用这一个就够了。
 
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7c6df2)](https://obsidian.md)
-[![Version](https://img.shields.io/badge/version-0.5.20-blue)](https://github.com/R529/Collis/releases)
+[![Version](https://img.shields.io/badge/version-0.6.0-blue)](https://github.com/R529/Noval/releases)
 [![Desktop only](https://img.shields.io/badge/platform-desktop-lightgrey)](#)
 
 ## 它能做什么
@@ -32,39 +32,39 @@
 - 画布卡片节点支持行内编辑、分组、带标签的语义连线（支持 / 反驳 / 导致 …）。
 - 选中节点即可向 AI 提问，答案写回笔记（需自备模型服务商的 API Key，仅存本机）。
 - 画布健康检查、Markdown 导出、撤销 / 重做（`Ctrl/Cmd + Z` / `Y`）。
-- 画布存为 `.collis` 文件，与 Obsidian 原生 Canvas 共存。
+- 画布存为 `.noval` 文件，与 Obsidian 原生 Canvas 共存。
 
 ## 安装
 
 ### 从社区插件市场（上架后）
-设置 → 第三方插件 → 浏览 → 搜索 **Collis** → 安装并启用。
+设置 → 第三方插件 → 浏览 → 搜索 **Noval** → 安装并启用。
 
 ### 手动安装
-1. 到 [Releases](https://github.com/R529/Collis/releases) 下载最新版的 `main.js`、`manifest.json`、`styles.css`。
-2. 在你的库目录下创建文件夹 `.obsidian/plugins/collis/`，把三个文件放进去。
-3. 设置 → 第三方插件 → 刷新 → 启用 **Collis**。
+1. 到 [Releases](https://github.com/R529/Noval/releases) 下载最新版的 `main.js`、`manifest.json`、`styles.css`。
+2. 在你的库目录下创建文件夹 `.obsidian/plugins/noval/`，把三个文件放进去。
+3. 设置 → 第三方插件 → 刷新 → 启用 **Noval**。
 
 ### 用 BRAT 安装
 1. 安装 [BRAT](https://github.com/TfTHacker/obsidian42-brat)。
-2. BRAT → Add Beta plugin → 填入 `R529/Collis` → Add Plugin。
+2. BRAT → Add Beta plugin → 填入 `R529/Noval` → Add Plugin。
 
 ## 命令与快捷键
 
 | 命令 | 默认快捷键 | 说明 |
 | --- | --- | --- |
-| 打开 Collis | — | 打开工作台视图（左侧栏有图标） |
-| 打开 Collis（专注模式） | — | 隐藏侧栏，沉浸浏览 |
-| 切换 Collis 专注模式 | — | 开 / 关专注模式 |
-| 切换 Collis 侧栏 | — | 折叠 / 展开左侧模块导航 |
+| 打开 Noval | — | 打开工作台视图（左侧栏有图标） |
+| 打开 Noval（专注模式） | — | 隐藏侧栏，沉浸浏览 |
+| 切换 Noval 专注模式 | — | 开 / 关专注模式 |
+| 切换 Noval 侧栏 | — | 折叠 / 展开左侧模块导航 |
 | 打开卡片笔记 | — | 工作台 → 速记卡片页 |
-| 快速记一条（Collis） | — | 工作台内唤起速记 |
-| 打开 Collis 画布集 | — | 工作台 → 画布集页 |
+| 快速记一条（Noval） | — | 工作台内唤起速记 |
+| 打开 Noval 画布集 | — | 工作台 → 画布集页 |
 | 快速记一条 | `Ctrl/Cmd + J` | 任意位置弹速记窗 |
 | 把选中的内容存为卡片 | `Ctrl/Cmd + Shift + C` | 编辑器选区存卡 |
 | 插入卡片（引用或全文） | `Ctrl/Cmd + Shift + K` | 在笔记里插入已有卡片 |
 | 打开卡片视图 | — | 打开速记卡片侧栏视图 |
 
-> 所有快捷键都可在 设置 → 快捷键 里搜索 `Collis` 自行修改。
+> 所有快捷键都可在 设置 → 快捷键 里搜索 `Noval` 自行修改。
 
 ## 本地构建与开发
 
@@ -80,12 +80,12 @@ node build/build.js
 node build/verify.js
 ```
 
-把 `dist/` 里的三个文件拷到 `.obsidian/plugins/collis/` 即可在 Obsidian 里加载测试。
+把 `dist/` 里的三个文件拷到 `.obsidian/plugins/noval/` 即可在 Obsidian 里加载测试。
 
 ### 目录结构
 
 ```
-Collis/
+Noval/
 ├── dist/                # 构建产物（发布到 Release 的三个文件在这里）
 │   ├── main.js
 │   ├── manifest.json
@@ -93,11 +93,11 @@ Collis/
 │   └── versions.json
 ├── src/                 # 工作台宿主源码
 │   ├── main.js
-│   ├── collis-gallery.js
-│   └── collis-notes.js
+│   ├── noval-gallery.js
+│   └── noval-notes.js
 ├── vendor/              # 内置的速记卡片 / 画布集模块（打包时并入）
-│   ├── collis-core.js
-│   └── collis-board-core.js
+│   ├── noval-notes-core.js
+│   └── noval-board-core.js
 ├── build/               # 构建与验证脚本、分段样式
 └── manifest.json (in dist)
 ```

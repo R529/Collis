@@ -1,10 +1,10 @@
 /** 画布集面板：BoardGalleryView 的可嵌入 CommonJS 版本。
- *  只保留渲染与数据逻辑，去掉 ItemView / leaf 生命周期，供 Collis 内嵌显示。 */
+ *  只保留渲染与数据逻辑，去掉 ItemView / leaf 生命周期，供 Noval 内嵌显示。 */
 
 const { Menu, Modal, Notice, setIcon, TFile } = require("obsidian");
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-const BOARD_EXTENSION = "collis";
+const BOARD_EXTENSION = "noval";
 
 const PAD = 7;
 const MAX_NODES = 14;
@@ -235,8 +235,8 @@ function listSignature(items, sort) {
   ].join("|");
 }
 
-/** Collis 标记，与 ribbon 图标同一几何形状。 */
-function collisMark() {
+/** Noval 标记，与 ribbon 图标同一几何形状。 */
+function novalMark() {
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("fill", "none");
@@ -325,7 +325,7 @@ class DeleteBoardsModal extends Modal {
   onOpen() {
     const el = this.contentEl;
     while (el.firstChild) el.removeChild(el.firstChild);
-    el.classList.add("collis-delete-modal");
+    el.classList.add("noval-delete-modal");
     const heading = document.createElement("h2");
     heading.textContent = this.names.length === 1 ? "删除这块画布？" : `删除这 ${this.names.length} 块画布？`;
     const detail = document.createElement("p");
@@ -358,10 +358,10 @@ class DeleteBoardsModal extends Modal {
   }
 }
 
-class CollisGalleryPanel {
-  constructor(app, collisPlugin) {
+class NovalGalleryPanel {
+  constructor(app, novalPlugin) {
     this.app = app;
-    this.collis = collisPlugin;
+    this.noval = novalPlugin;
     this.root = null;
     this.items = [];
     this.sortMode = "created";
@@ -424,7 +424,7 @@ class CollisGalleryPanel {
   watchSources() {
     if (this.watching) return;
     this.watching = true;
-    const inFolder = (path) => isBoardPath(path, this.collis.collisFolder);
+    const inFolder = (path) => isBoardPath(path, this.noval.novalFolder);
 
     this.vaultRefs.push(
       this.app.vault.on("modify", (file) => {
@@ -468,7 +468,7 @@ class CollisGalleryPanel {
 
   reportError(stage, error) {
     const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-    console.error(`[collis] 画布集${stage}失败`, error);
+    console.error(`[noval] 画布集${stage}失败`, error);
     if (this.root) {
       this.clearRoot(this.root);
       const box = document.createElement("div");
@@ -487,7 +487,7 @@ class CollisGalleryPanel {
   async loadItems() {
     let items = [];
     try {
-      items = await listBoardItems(this.app, this.collis.collisFolder);
+      items = await listBoardItems(this.app, this.noval.novalFolder);
     } catch {
       new Notice("读取画布列表失败");
     }
@@ -565,7 +565,7 @@ class CollisGalleryPanel {
     const empty = node("div", "vw-empty");
     const art = node("div", "vw-empty-art");
     // 与 ribbon 图标、空白封面同一标记，空状态也属于这个插件。
-    art.appendChild(collisMark());
+    art.appendChild(novalMark());
     const title = node("div", "vw-empty-title");
     title.textContent = searching ? "没有匹配的画布" : "还没有画布";
     const hint = document.createElement("p");
@@ -774,7 +774,7 @@ class CollisGalleryPanel {
     if (!nodes.length) {
       cover.classList.add("is-blank");
       const ghost = node("span", "vw-cover-ghost");
-      ghost.appendChild(collisMark());
+      ghost.appendChild(novalMark());
       cover.appendChild(ghost);
       return cover;
     }
@@ -797,7 +797,7 @@ class CollisGalleryPanel {
   }
 
   openBoard(item) {
-    void this.collis.openBoardFile(item.file.path);
+    void this.noval.openBoardFile(item.file.path);
   }
 
   setMulti(on) {
@@ -860,7 +860,7 @@ class CollisGalleryPanel {
 
   async createBoard() {
     try {
-      await this.collis.createGalleryBoard();
+      await this.noval.createGalleryBoard();
       await this.loadItems();
     } catch (error) {
       new Notice(error instanceof Error ? error.message : "新建画布失败");
@@ -868,4 +868,4 @@ class CollisGalleryPanel {
   }
 }
 
-module.exports = { CollisGalleryPanel };
+module.exports = { NovalGalleryPanel };

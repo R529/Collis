@@ -11,13 +11,13 @@ const {
   addIcon
 } = require("obsidian");
 
-// 内置子插件：Collis（速记卡片）与 Collis（画布工作台）。
-// 代码在打包时并入本插件，设置统一存进 collis/data.json 的 collis / collis-board 键，
+// 内置子插件：Noval（速记卡片）与 Noval（画布工作台）。
+// 代码在打包时并入本插件，设置统一存进 noval/data.json 的 noval-notes / noval-board 键，
 // 不再依赖单独的插件文件夹。
-const CollisBundle = require("../vendor/collis-core.js");
-const CollisBoardBundle = require("../vendor/collis-board-core.js");
-const { CollisGalleryPanel } = require("./collis-gallery.js");
-const { CollisNotesPanel } = require("./collis-notes.js");
+const NovalBundle = require("../vendor/noval-notes-core.js");
+const NovalBoardBundle = require("../vendor/noval-board-core.js");
+const { NovalGalleryPanel } = require("./noval-gallery.js");
+const { NovalNotesPanel } = require("./noval-notes.js");
 
 function resolvePluginClass(bundle, fallbackName) {
   if (typeof bundle === "function") return bundle;
@@ -26,14 +26,21 @@ function resolvePluginClass(bundle, fallbackName) {
   return null;
 }
 
+/* 内置子模块的 id：既是 childPlugins 的键，也是 data.json 里的设置键。
+ * 故意用 noval-notes / noval-board，而不是裸 noval——宿主 id 就是 noval，
+ * 子模块再叫 noval 会撞名，isStandaloneEnabled 会把宿主自己当成“已启用的独立插件”
+ * 从而跳过整个卡片模块的加载（上一个大版本踩过这个坑）。 */
+const NOTES_ID = "noval-notes";
+const BOARD_ID = "noval-board";
+
 const BUNDLED_PLUGINS = [
   {
-    id: "collis",
+    id: NOTES_ID,
     className: "QuickMemoPlugin",
-    bundle: CollisBundle,
+    bundle: NovalBundle,
     manifest: {
-      id: "collis",
-      name: "Collis",
+      id: NOTES_ID,
+      name: "Noval",
       version: "2.0.5",
       minAppVersion: "1.4.0",
       description: "在知识库里速记：不建文件、不起标题，按月存进本地 Markdown。",
@@ -42,12 +49,12 @@ const BUNDLED_PLUGINS = [
     }
   },
   {
-    id: "collis-board",
-    className: "CollisBoardPlugin",
-    bundle: CollisBoardBundle,
+    id: BOARD_ID,
+    className: "NovalBoardPlugin",
+    bundle: NovalBoardBundle,
     manifest: {
-      id: "collis-board",
-      name: "Collis",
+      id: BOARD_ID,
+      name: "Noval",
       version: "0.6.2",
       minAppVersion: "1.13.0",
       description: "Canvas 思考工作台：画布集、语义连线、大纲、Markdown 导出与 AI。",
@@ -57,15 +64,30 @@ const BUNDLED_PLUGINS = [
   }
 ];
 
-const VIEW_TYPE = "collis-view";
-// 卡片笔记右侧栏视图，由内置 Collis 注册；主插件需要用它判断/恢复侧栏
+const VIEW_TYPE = "noval-view";
+// 卡片笔记右侧栏视图，由内置 Noval 注册；主插件需要用它判断/恢复侧栏
 const QM_VIEW_TYPE = "qm-cards-view";
-// 插件图标沿用 Collis 画布标志；图形从内置 Collis 模块里取，保证
+// 插件图标沿用 Noval 画布标志；图形从内置 Noval 模块里取，保证
 // 侧栏卡片视图、ribbon、标签页三处是同一枚图标。
-const PLUGIN_ICON_ID = (CollisBundle && CollisBundle.ICON_ID) || "collis-mark";
-const PLUGIN_ICON_SVG = (CollisBundle && CollisBundle.ICON_MARK) || "";
+const PLUGIN_ICON_ID = (NovalBundle && NovalBundle.ICON_ID) || "noval-mark";
+const PLUGIN_ICON_SVG = (NovalBundle && NovalBundle.ICON_MARK) || "";
 const CARD_FOLDER = "00-Inbox/速记";
-const BOARD_EXT = "collis";
+const BOARD_EXT = "noval";
+
+/* ================= 旧版本兼容（只读，升级完成后可整块删除） =================
+ * 0.6.0 起插件由 Collis 更名为 Noval。下面这些旧标识只用于把已有数据搬过来：
+ * 数据键、插件目录名、白板后缀、旧标签页类型。它们不会出现在界面、文档或新数据里，
+ * 只在本文件这一处引用，方便将来确认所有人都升级后一次性删除。 */
+const LEGACY = {
+  // 旧版 data.json 里的设置键，也是旧独立插件的目录名
+  notesId: "collis",
+  boardId: "collis-board",
+  sidebarKey: "collisSidebarOpen",
+  // 旧白板后缀：volis 是合并前的，collis 是更名前的
+  boardExt: ["collis", "volis"],
+  // 旧标签页类型：升级后先把残留标签页关掉，避免留下打不开的空标签
+  viewTypes: ["collis-view", "collis-board", "collis-gallery"]
+};
 
 /* 收集箱收录的附件类型白名单。
  * 以前是“非 md 全收”，结果白板的 .volis.json / .volis.bak 这类复合后缀
@@ -232,7 +254,7 @@ const DEFAULT_SETTINGS = {
   workspaceName: "个人工作台",
   navCollapsed: false,
   // 上次退出时卡片笔记右侧栏是否开着，用于重启后恢复
-  collisSidebarOpen: false,
+  novalSidebarOpen: false,
   // 用户点过“忽略”的未知 module 值，避免同一提示反复出现
   ignoredModuleValues: [],
   // 收件箱策略：root = 只收库根目录里散落的文件；unassigned / all 作为后续扩展接口
@@ -473,25 +495,25 @@ function paintNoteThumb(app, thumb, file) {
  *   - 浏览器 / Electron 的原生白色提示框读取 title 属性生成。
  *   - Obsidian 核心不会移除 title，所以一个元素同时有 aria-label 和 title
  *     时，悬停就会同时冒出黑、白两个提示框。
- * Collis 的功能按钮（回看 / 筛选 / 更多 / 卡片右上角 ··· / 侧栏
- * Collis 视图等）恰好同时写了这两个属性。这里把本插件视图内所有 title
+ * Noval 的功能按钮（回看 / 筛选 / 更多 / 卡片右上角 ··· / 侧栏
+ * Noval 视图等）恰好同时写了这两个属性。这里把本插件视图内所有 title
  * 统一转成 aria-label：已有 aria-label 的只删 title（保留黑色提示文案），
  * 只有 title 的把文案搬到 aria-label 再删 title。作用域严格限定在本插件
  * 的视图容器内，不碰 Obsidian 核心和其他插件。
  */
 const WB_TOOLTIP_SCOPE = [
-  ".collis-view",
+  ".noval-view",
   ".qm-view",
   ".qm-root",
-  ".collis-board-leaf",
-  ".collis-board-host",
-  ".collis-board",
+  ".noval-board-leaf",
+  ".noval-board-host",
+  ".noval-board",
   ".cl-root",
   ".vw-frame",
-  ".collis-doctor-content",
-  ".collis-export-content",
-  ".collis-ai-modal",
-  ".collis-settings"
+  ".noval-doctor-content",
+  ".noval-export-content",
+  ".noval-ai-modal",
+  ".noval-settings"
 ].join(",");
 
 function wbInTooltipScope(el) {
@@ -1290,7 +1312,7 @@ class AddFilesModal extends Modal {
   }
 }
 
-class CollisView extends ItemView {
+class NovalView extends ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -1313,7 +1335,7 @@ class CollisView extends ItemView {
   }
 
   getDisplayText() {
-    return "Collis";
+    return "Noval";
   }
 
   getIcon() {
@@ -1321,7 +1343,7 @@ class CollisView extends ItemView {
   }
 
   async onOpen() {
-    this.containerEl.addClass("collis-view");
+    this.containerEl.addClass("noval-view");
     this.contentEl.addClass("cl-content");
     this.render();
     this.watchWidth();
@@ -1339,7 +1361,7 @@ class CollisView extends ItemView {
       this._ro.disconnect();
       this._ro = null;
     }
-    document.body.classList.remove("collis-focus");
+    document.body.classList.remove("noval-focus");
     this.focus = false;
     this.destroyGallery();
     this.destroyNotes();
@@ -1387,7 +1409,7 @@ class CollisView extends ItemView {
 
   /* 收件箱 / 模块归属用的全量清单：
    * 整个 vault 的 Markdown 都算，只排除卡片笔记的月度聚合文件。
-   * 白板是 .collis，不在 getMarkdownFiles() 里，天然被排除。
+   * 白板是 .noval，不在 getMarkdownFiles() 里，天然被排除。
    * 不再按顶层文件夹白名单过滤，避免文件在文件树里一挪位置就“消失”。 */
   vaultFiles() {
     return this.app.vault
@@ -1686,15 +1708,15 @@ class CollisView extends ItemView {
   }
 
   // 收件箱也收录附件：图片 / 视频 / PDF / 音频等，排除白板和隐藏目录。
-  // 只收白名单里的扩展名，白板的历史备份（xxx.volis.json、xxx.collis.bak）
+  // 只收白名单里的扩展名，白板的历史备份（xxx.volis.json、xxx.noval.bak）
   // 这类复合后缀不会再混进来。
   vaultAttachments() {
     return this.app.vault.getFiles().filter((file) => {
       if (file.extension === "md") return false;
       // 新旧白板与 Obsidian 原生 canvas 都属于画布，不当作附件素材
-      if (["collis", "volis", "canvas"].includes(file.extension.toLowerCase())) return false;
+      if (["noval", "volis", "canvas"].includes(file.extension.toLowerCase())) return false;
       const lower = file.path.toLowerCase();
-      if (lower.includes(".volis.") || lower.includes(".collis.")) return false;
+      if (lower.includes(".volis.") || lower.includes(".noval.")) return false;
       if (!ATTACHMENT_EXTENSIONS.has(file.extension.toLowerCase())) return false;
       return !isIgnoredPath(file.path);
     });
@@ -1718,9 +1740,9 @@ class CollisView extends ItemView {
   isInboxFile(file) {
     if (!file) return false;
     const ext = String(file.extension || "").toLowerCase();
-    if (["collis", "volis", "canvas"].includes(ext)) return false;
+    if (["noval", "volis", "canvas"].includes(ext)) return false;
     const lower = file.path.toLowerCase();
-    if (lower.includes(".volis.") || lower.includes(".collis.")) return false;
+    if (lower.includes(".volis.") || lower.includes(".noval.")) return false;
     if (isIgnoredPath(file.path)) return false;
     if (file.path.startsWith(CARD_FOLDER + "/")) return false;
     return true;
@@ -2262,26 +2284,26 @@ class CollisView extends ItemView {
     }
   }
 
-  openCollis() {
-    const ok = this.runCommand("collis:open-cards");
+  openNoval() {
+    const ok = this.runCommand(NOTES_ID + ":open-cards");
     if (ok) return;
     const leaf = this.app.workspace.getRightLeaf(false);
     if (leaf) {
       leaf.setViewState({ type: "qm-cards-view", active: true });
       this.app.workspace.revealLeaf(leaf);
     } else {
-      new Notice("没有找到 Collis 视图");
+      new Notice("没有找到 Noval 视图");
     }
   }
 
   quickCapture() {
-    if (!this.runCommand("collis:quick-capture")) {
-      new Notice("未找到 Collis 的快速记录命令");
+    if (!this.runCommand(NOTES_ID + ":quick-capture")) {
+      new Notice("未找到 Noval 的快速记录命令");
     }
   }
 
   // 画布集现在就是「白板」页本身，所有入口都切到这一页，不再开新标签。
-  openCollisGallery() {
+  openNovalGallery() {
     this.go("canvas");
   }
 
@@ -2290,13 +2312,13 @@ class CollisView extends ItemView {
       this.app.setting.open();
       this.app.setting.openTabById(this.plugin.manifest.id);
     } catch (e) {
-      new Notice("请手动打开设置 → Collis");
+      new Notice("请手动打开设置 → Noval");
     }
   }
 
   setFocus(on) {
     this.focus = on;
-    document.body.classList.toggle("collis-focus", on);
+    document.body.classList.toggle("noval-focus", on);
     this.render();
   }
 
@@ -2321,7 +2343,7 @@ class CollisView extends ItemView {
     this._needsRefresh = false;
     // 文件增删改后归属会变，旧缓存必须清掉，否则新笔记会被旧归属表挡在外面
     this._ownership = null;
-    // 白板页是 Collis 画布集本体的实时镜像；卡片笔记页直接刷新面板，
+    // 白板页是 Noval 画布集本体的实时镜像；卡片笔记页直接刷新面板，
     // 都不重建整页，避免滚动位置和输入内容丢失。
     if (this.active === "canvas" && this.gallery) {
       this.gallery.refresh();
@@ -2379,11 +2401,11 @@ class CollisView extends ItemView {
 
   // 卡片总数只有读文件才知道，导航先渲染，数字到了再补进徽标。
   fillCardCount(item) {
-    const collis =
-      (this.plugin.childPlugins && this.plugin.childPlugins.collis) ||
-      (this.app.plugins.plugins && this.app.plugins.plugins.collis);
-    if (!collis || typeof collis.readAllCards !== "function") return;
-    collis
+    const noval =
+      (this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID]) ||
+      (this.app.plugins.plugins && this.app.plugins.plugins[LEGACY.notesId]);
+    if (!noval || typeof noval.readAllCards !== "function") return;
+    noval
       .readAllCards()
       .then((cards) => {
         const total = Array.isArray(cards) ? cards.length : 0;
@@ -2525,7 +2547,7 @@ class CollisView extends ItemView {
 
     // 侧栏收起后从主区域左上角浮出，用来恢复导航
     const restore = main.createDiv({ cls: "cl-navrestore" });
-    restore.setAttribute("aria-label", "展开 Collis 侧栏");
+    restore.setAttribute("aria-label", "展开 Noval 侧栏");
     setIcon(restore, "chevrons-right");
     restore.onclick = () => this.setNavCollapsed(false);
 
@@ -2556,12 +2578,12 @@ class CollisView extends ItemView {
     brandText.createDiv({ cls: "cl-brand-name", text: brandName });
     brandText.createDiv({
       cls: "cl-brand-sub",
-      text: brandName === "个人工作台" ? "Collis Workspace" : "个人工作台"
+      text: brandName === "个人工作台" ? "Noval Workspace" : "个人工作台"
     });
 
     // 收起按钮固定在品牌行右侧：导航的开关放在导航的起始位置
     const collapseBtn = brand.createDiv({ cls: "cl-navtoggle" });
-    collapseBtn.setAttribute("aria-label", "收起 Collis 侧栏");
+    collapseBtn.setAttribute("aria-label", "收起 Noval 侧栏");
     setIcon(collapseBtn, "chevrons-left");
     collapseBtn.onclick = () => this.setNavCollapsed(true);
 
@@ -2807,9 +2829,9 @@ class CollisView extends ItemView {
         captureInput.focus();
         return;
       }
-      const collis = this.plugin.childPlugins && this.plugin.childPlugins.collis;
-      if (collis && typeof collis.appendCard === "function") {
-        const ok = await collis.appendCard(text);
+      const noval = this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID];
+      if (noval && typeof noval.appendCard === "function") {
+        const ok = await noval.appendCard(text);
         if (ok) {
           captureInput.value = "";
           window.setTimeout(() => {
@@ -2958,7 +2980,7 @@ class CollisView extends ItemView {
     }
 
     for (const file of recentFiles) {
-      const isBoard = file.extension === "collis";
+      const isBoard = file.extension === "noval";
       const mod = isBoard ? null : this.moduleForFile(file);
       const color = isBoard ? "#9b8cff" : (mod && mod.color) || "#3f7fd1";
       const fm = isBoard ? {} : getFm(this.app, file);
@@ -3039,7 +3061,7 @@ class CollisView extends ItemView {
     boardHead.createDiv({ cls: "cl-hm-title", text: "最近白板" });
     boardHead.createDiv({ cls: "cl-hm-sub", text: boards.length + " 块" });
     const boardMore = boardHead.createDiv({ cls: "cl-hm-more", text: "画布集 ›" });
-    boardMore.onclick = () => this.openCollisGallery();
+    boardMore.onclick = () => this.openNovalGallery();
 
     const boardGrid = boardCard.createDiv({ cls: "cl-hm-boards" });
     const boardEls = [];
@@ -3069,7 +3091,7 @@ class CollisView extends ItemView {
     noteMore.onclick = () => this.go("notes");
     const noteWrap = noteCard.createDiv({ cls: "cl-hm-notes" });
 
-    page.createDiv({ cls: "cl-hm-foot", text: "数据实时读取 · Collis v" + this.plugin.manifest.version });
+    page.createDiv({ cls: "cl-hm-foot", text: "数据实时读取 · Noval v" + this.plugin.manifest.version });
 
     this.fillHomeBoards(boardEls);
     this.fillHomeCards(noteWrap);
@@ -3229,7 +3251,7 @@ class CollisView extends ItemView {
     if (!cards.length) {
       container.createDiv({
         cls: "cl-empty",
-        text: "还没有速记卡片。用 Collis 记一条，它会出现在这里。"
+        text: "还没有速记卡片。用 Noval 记一条，它会出现在这里。"
       });
       return;
     }
@@ -3257,7 +3279,7 @@ class CollisView extends ItemView {
     if (!boards.length) {
       container.createDiv({
         cls: "cl-empty",
-        text: "还没有 .collis 白板。去画布集新建一张。"
+        text: "还没有 .noval 白板。去画布集新建一张。"
       });
       return;
     }
@@ -4235,45 +4257,45 @@ class CollisView extends ItemView {
 
   renderCanvas(el) {
     el.addClass("cl-scroll-canvas");
-    const collisBoard =
-      this.plugin.childPlugins && this.plugin.childPlugins["collis-board"];
+    const novalBoard =
+      this.plugin.childPlugins && this.plugin.childPlugins[BOARD_ID];
 
-    if (!collisBoard) {
+    if (!novalBoard) {
       const head = el.createDiv({ cls: "cl-pagehead" });
       head.createEl("h1", { text: "白板" });
       head.createDiv({
         cls: "cl-sub",
-        text: "Collis 画布集没有加载成功，请打开控制台查看 [collis] 日志。"
+        text: "Noval 画布集没有加载成功，请打开控制台查看 [noval] 日志。"
       });
       return;
     }
 
-    if (!this.gallery) this.gallery = new CollisGalleryPanel(this.app, collisBoard);
+    if (!this.gallery) this.gallery = new NovalGalleryPanel(this.app, novalBoard);
     this.gallery.mount(el);
   }
 
   renderNotes(el) {
     el.addClass("cl-scroll-notes");
-    const collis =
-      (this.plugin.childPlugins && this.plugin.childPlugins.collis) ||
-      (this.app.plugins.plugins && this.app.plugins.plugins.collis);
+    const noval =
+      (this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID]) ||
+      (this.app.plugins.plugins && this.app.plugins.plugins[LEGACY.notesId]);
 
-    if (!collis) {
+    if (!noval) {
       const head = el.createDiv({ cls: "cl-pagehead" });
       head.createEl("h1", { text: "卡片笔记" });
       head.createDiv({
         cls: "cl-sub",
-        text: "Collis 没有加载成功，请打开控制台查看 [collis] 日志。"
+        text: "Noval 没有加载成功，请打开控制台查看 [noval] 日志。"
       });
       return;
     }
 
-    if (!this.notes) this.notes = new CollisNotesPanel(this.app, collis, this);
+    if (!this.notes) this.notes = new NovalNotesPanel(this.app, noval, this);
     this.notes.mount(el);
   }
 }
 
-class CollisSettingTab extends PluginSettingTab {
+class NovalSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -4305,7 +4327,7 @@ class CollisSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("打开时进入专注模式")
-      .setDesc("隐藏左侧栏、标签栏和状态栏，保留右侧栏，方便同时使用 Collis 和其他面板。")
+      .setDesc("隐藏左侧栏、标签栏和状态栏，保留右侧栏，方便同时使用 Noval 和其他面板。")
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.focusOnOpen).onChange(async (value) => {
           this.plugin.settings.focusOnOpen = value;
@@ -4331,7 +4353,7 @@ class CollisSettingTab extends PluginSettingTab {
           if (leaf && leaf.view && leaf.view.openModuleManager) {
             leaf.view.openModuleManager();
           } else {
-            new Notice("请先打开 Collis 工作台，再管理模块。");
+            new Notice("请先打开 Noval 工作台，再管理模块。");
           }
         })
       );
@@ -4378,7 +4400,7 @@ class CollisSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("画布").setHeading();
 
     const board =
-      this.plugin.childPlugins && this.plugin.childPlugins["collis-board"];
+      this.plugin.childPlugins && this.plugin.childPlugins[BOARD_ID];
     if (!board) {
       containerEl.createEl("p", {
         cls: "cl-settings-hint",
@@ -4394,12 +4416,12 @@ class CollisSettingTab extends PluginSettingTab {
       .addText((text) =>
         text
           .setPlaceholder("画布")
-          .setValue((board.settings.collis && board.settings.collis.boardFolder) || "")
+          .setValue((board.settings.noval && board.settings.noval.boardFolder) || "")
           .onChange((value) => {
             if (boardFolderTimer) window.clearTimeout(boardFolderTimer);
             boardFolderTimer = window.setTimeout(async () => {
-              board.settings.collis = board.settings.collis || {};
-              board.settings.collis.boardFolder = value.trim();
+              board.settings.noval = board.settings.noval || {};
+              board.settings.noval.boardFolder = value.trim();
               await board.saveSettings();
               if (this.plugin.syncModulesFromVault()) {
                 await this.plugin.persistSettings();
@@ -4446,7 +4468,7 @@ class CollisSettingTab extends PluginSettingTab {
   }
 }
 
-module.exports = class CollisPlugin extends Plugin {
+module.exports = class NovalPlugin extends Plugin {
   async onload() {
     const saved = await this.readHostData();
     // 全新安装：从文件树同步模块，不预置占位模块
@@ -4497,28 +4519,28 @@ module.exports = class CollisPlugin extends Plugin {
 
     this.requestRefresh = debounce(() => this.refreshAll(), 700, true);
 
-    this.registerView(VIEW_TYPE, (leaf) => new CollisView(leaf, this));
+    this.registerView(VIEW_TYPE, (leaf) => new NovalView(leaf, this));
 
     // 先注册图标，addRibbonIcon 和视图标签页才认得这个名字
     if (PLUGIN_ICON_SVG) addIcon(PLUGIN_ICON_ID, PLUGIN_ICON_SVG);
 
-    this.addRibbonIcon(PLUGIN_ICON_ID, "打开 Collis", () => this.activateView());
+    this.addRibbonIcon(PLUGIN_ICON_ID, "打开 Noval", () => this.activateView());
 
     this.addCommand({
-      id: "open-collis",
-      name: "打开 Collis",
+      id: "open-noval",
+      name: "打开 Noval",
       callback: () => this.activateView()
     });
 
     this.addCommand({
-      id: "open-collis-focus",
-      name: "打开 Collis（专注模式）",
+      id: "open-noval-focus",
+      name: "打开 Noval（专注模式）",
       callback: () => this.activateView(true)
     });
 
     this.addCommand({
-      id: "toggle-collis-focus",
-      name: "切换 Collis 专注模式",
+      id: "toggle-noval-focus",
+      name: "切换 Noval 专注模式",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (leaf && leaf.view && leaf.view.setFocus) {
@@ -4528,8 +4550,8 @@ module.exports = class CollisPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "toggle-collis-nav",
-      name: "切换 Collis 侧栏",
+      id: "toggle-noval-nav",
+      name: "切换 Noval 侧栏",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (leaf && leaf.view && leaf.view.setNavCollapsed) {
@@ -4539,7 +4561,7 @@ module.exports = class CollisPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "open-collis-notes",
+      id: "open-noval-notes",
       name: "打开卡片笔记",
       callback: async () => {
         await this.activateView();
@@ -4550,7 +4572,7 @@ module.exports = class CollisPlugin extends Plugin {
 
     this.addCommand({
       id: "quick-capture",
-      name: "快速记一条（Collis）",
+      name: "快速记一条（Noval）",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (leaf && leaf.view && leaf.view.quickCapture) leaf.view.quickCapture();
@@ -4559,7 +4581,7 @@ module.exports = class CollisPlugin extends Plugin {
 
     this.addCommand({
       id: "open-canvas-gallery",
-      name: "打开 Collis 画布集",
+      name: "打开 Noval 画布集",
       callback: async () => {
         await this.activateView();
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
@@ -4567,7 +4589,7 @@ module.exports = class CollisPlugin extends Plugin {
       }
     });
 
-    this.addSettingTab(new CollisSettingTab(this.app, this));
+    this.addSettingTab(new NovalSettingTab(this.app, this));
 
     await this.loadBundledPlugins();
 
@@ -4608,14 +4630,14 @@ module.exports = class CollisPlugin extends Plugin {
     // 卡片笔记的 qm-cards-view 是正式侧栏，不在这里处理。
     this.app.workspace.onLayoutReady(() => this.closeLegacyViews());
 
-    // 白板后缀由 .volis 统一迁到 .collis，只需在布局就绪后跑一次。
+    // 白板后缀由 .volis 统一迁到 .noval，只需在布局就绪后跑一次。
     this.app.workspace.onLayoutReady(() => this.migrateBoardExtension());
 
     // 卡片笔记右侧栏：跟随上次退出时的状态恢复。用户主动关掉后不会再自己弹出来。
     this.registerEvent(
-      this.app.workspace.on("layout-change", () => this.syncCollisSidebarState())
+      this.app.workspace.on("layout-change", () => this.syncNovalSidebarState())
     );
-    this.app.workspace.onLayoutReady(() => this.restoreCollisSidebar());
+    this.app.workspace.onLayoutReady(() => this.restoreNovalSidebar());
 
     this.registerEvent(this.app.vault.on("modify", () => this.requestRefresh()));
     this.registerEvent(
@@ -4656,9 +4678,9 @@ module.exports = class CollisPlugin extends Plugin {
       this.app.workspace.on("active-leaf-change", (leaf) => {
         const type = leaf && leaf.view ? leaf.view.getViewType() : null;
         if (type === VIEW_TYPE) {
-          if (leaf.view.focus) document.body.classList.add("collis-focus");
+          if (leaf.view.focus) document.body.classList.add("noval-focus");
         } else {
-          document.body.classList.remove("collis-focus");
+          document.body.classList.remove("noval-focus");
         }
       })
     );
@@ -4713,20 +4735,22 @@ module.exports = class CollisPlugin extends Plugin {
   }
 
   onunload() {
-    document.body.classList.remove("collis-focus");
+    document.body.classList.remove("noval-focus");
     this.unloadBundledPlugins();
   }
 
   // 清理旧版插件残留的独立视图，避免启动后右侧栏还挂着旧画布视图。
-  // 注意：qm-cards-view 现在是内置 Collis 的正式右侧栏，不能再当旧视图清掉，
+  // 注意：qm-cards-view 现在是内置 Noval 的正式右侧栏，不能再当旧视图清掉，
   // 否则每次启动都会把上次开着的卡片笔记关掉。
   closeLegacyViews() {
-    const types = ["volis-board", "volis-workbench"];
+    // 更名前的标签页类型：这里只关掉，不迁移状态——视图注册已经换成新类型，
+    // 留着旧标签就是一个打不开的空页；关掉后用户从 ribbon 或命令重新打开即可。
+    const types = LEGACY.viewTypes.concat(["volis-board", "volis-workbench"]);
     for (const type of types) {
       try {
         this.app.workspace.detachLeavesOfType(type);
       } catch (error) {
-        console.error("[collis] 清理旧视图失败: " + type, error);
+        console.error("[noval] 清理旧视图失败: " + type, error);
       }
     }
   }
@@ -4734,33 +4758,33 @@ module.exports = class CollisPlugin extends Plugin {
   /* 卡片笔记右侧栏的启动恢复。
    * Obsidian 本身会保存工作区布局，但自定义视图注册较晚时可能被丢掉，
    * 所以这里再用一个布尔标记兜底：上次开着就恢复，上次关了就不动。 */
-  restoreCollisSidebar() {
-    this._collisLayoutReady = true;
+  restoreNovalSidebar() {
+    this._novalLayoutReady = true;
     const leaves = this.app.workspace.getLeavesOfType(QM_VIEW_TYPE);
     if (leaves.length) {
       // 已经由 Obsidian 恢复，只需确保右侧栏是展开状态
-      if (!this.settings.collisSidebarOpen) {
-        this.settings.collisSidebarOpen = true;
+      if (!this.settings.novalSidebarOpen) {
+        this.settings.novalSidebarOpen = true;
         this.persistSettings();
       }
       this.app.workspace.revealLeaf(leaves[0]);
       return;
     }
-    if (!this.settings.collisSidebarOpen) return;
-    this.openCollisSidebar();
+    if (!this.settings.novalSidebarOpen) return;
+    this.openNovalSidebar();
   }
 
-  syncCollisSidebarState() {
-    if (!this._collisLayoutReady) return;
+  syncNovalSidebarState() {
+    if (!this._novalLayoutReady) return;
     const open = this.app.workspace.getLeavesOfType(QM_VIEW_TYPE).length > 0;
-    if (open === !!this.settings.collisSidebarOpen) return;
-    this.settings.collisSidebarOpen = open;
+    if (open === !!this.settings.novalSidebarOpen) return;
+    this.settings.novalSidebarOpen = open;
     this.persistSettings();
   }
 
-  openCollisSidebar() {
+  openNovalSidebar() {
     try {
-      if (this.app.commands.executeCommandById("collis:open-cards")) return;
+      if (this.app.commands.executeCommandById(NOTES_ID + ":open-cards")) return;
     } catch (error) {
       // 命令不存在时走下面的兜底
     }
@@ -4770,17 +4794,19 @@ module.exports = class CollisPlugin extends Plugin {
     this.app.workspace.revealLeaf(leaf);
   }
 
-  /* 一次性迁移：插件更名为 Collis 后，白板后缀从 .volis 改成 .collis。
+  /* 一次性迁移：插件更名为 Noval 后，白板后缀从 .volis 改成 .noval。
    * 只改扩展名，不碰文件内容；目标同名文件已存在时跳过，避免覆盖。 */
   async migrateBoardExtension() {
+    // .volis 是合并前、.collis 是更名前，两种旧后缀统一换成 .noval。
+    const oldExt = LEGACY.boardExt.map((ext) => "." + ext);
     const legacy = this.app.vault
       .getFiles()
-      .filter((file) => file.extension.toLowerCase() === "volis");
+      .filter((file) => oldExt.includes("." + file.extension.toLowerCase()));
     if (!legacy.length) return;
     let moved = 0;
     let skipped = 0;
     for (const file of legacy) {
-      const next = file.path.replace(/\.volis$/i, ".collis");
+      const next = file.path.slice(0, file.path.length - file.extension.length) + BOARD_EXT;
       if (this.app.vault.getAbstractFileByPath(next)) {
         skipped += 1;
         continue;
@@ -4790,20 +4816,40 @@ module.exports = class CollisPlugin extends Plugin {
         moved += 1;
       } catch (error) {
         skipped += 1;
-        console.error("[collis] 白板后缀迁移失败: " + file.path, error);
+        console.error("[noval] 白板后缀迁移失败: " + file.path, error);
       }
     }
     if (moved) {
-      new Notice("已把 " + moved + " 张白板的扩展名更新为 .collis");
+      new Notice("已把 " + moved + " 张白板的扩展名更新为 .noval");
     }
     if (skipped) {
-      console.warn("[collis] 有 " + skipped + " 张白板未能迁移，请检查同名文件");
+      console.warn("[noval] 有 " + skipped + " 张白板未能迁移，请检查同名文件");
     }
   }
 
   async readHostData() {
-    if (!this.hostData) this.hostData = (await this.loadData()) || {};
+    if (!this.hostData) {
+      const raw = (await this.loadData()) || {};
+      this.hostData = raw;
+      // 更名前后的设置键都在这一个入口搬完，读写只有一处，不会漏。
+      if (this.migrateLegacyKeys(raw)) await this.writeHostData();
+    }
     return this.hostData;
+  }
+
+  // 把旧键原样搬到新键（不复制内容，只换键名），旧键删掉。
+  migrateLegacyKeys(data) {
+    let changed = false;
+    const move = (from, to) => {
+      if (from === to || data[from] === undefined) return;
+      if (data[to] === undefined) data[to] = data[from];
+      delete data[from];
+      changed = true;
+    };
+    move(LEGACY.notesId, NOTES_ID);
+    move(LEGACY.boardId, BOARD_ID);
+    move(LEGACY.sidebarKey, "novalSidebarOpen");
+    return changed;
   }
 
   async writeHostData() {
@@ -4819,47 +4865,36 @@ module.exports = class CollisPlugin extends Plugin {
   }
 
   // 旧版独立插件的设置分别在各自文件夹的 data.json。
-  // 第一次启动时搬进 collis/data.json，搬完后那两个文件夹可以随时删掉。
+  // 第一次启动时搬进 noval/data.json，搬完后那些文件夹可以随时删掉。
   async migrateLegacySettings() {
     const data = await this.readHostData();
     let dirty = false;
-    // 旧目录名是工具链临时起的，正式版改为 collis；把旧设置搬过来，已存在的键不覆盖。
-    try {
-      const legacyRaw = await this.app.vault.adapter.read(
-        this.app.vault.configDir + "/plugins/workbench/data.json"
-      );
-      const legacy = JSON.parse(legacyRaw);
-      if (legacy && typeof legacy === "object") {
-        for (const [key, value] of Object.entries(legacy)) {
-          if (!(key in data)) {
-            data[key] = value;
-            dirty = true;
-          }
-        }
-      }
-    } catch (error) {
-      // 没有旧目录数据就跳过
-    }
-    // 画布子插件内部 id 从 volis 更名为 collis-board：搬运旧设置，避免丢配置。
-    if (!data["collis-board"] && data.volis) {
-      data["collis-board"] = data.volis;
+    // 画布子插件早期叫 volis：把旧键搬过来，避免丢 AI 配置。
+    if (!data[BOARD_ID] && data.volis) {
+      data[BOARD_ID] = data.volis;
       delete data.volis;
       dirty = true;
     }
-    for (const spec of BUNDLED_PLUGINS) {
-      // 宿主现在也叫 collis，不能把自己当成旧独立插件的配置读进来。
-      if (spec.id === this.manifest.id) continue;
-      if (data[spec.id]) continue;
-      const path = this.app.vault.configDir + "/plugins/" + spec.id + "/data.json";
-      try {
-        const raw = await this.app.vault.adapter.read(path);
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object") {
-          data[spec.id] = parsed;
-          dirty = true;
+    // 只有宿主里还没有这份设置时，才去旧目录捞一次。
+    for (const [id, legacyId] of [
+      [NOTES_ID, LEGACY.notesId],
+      [BOARD_ID, LEGACY.boardId]
+    ]) {
+      if (data[id]) continue;
+      for (const dir of [id, legacyId]) {
+        try {
+          const raw = await this.app.vault.adapter.read(
+            this.app.vault.configDir + "/plugins/" + dir + "/data.json"
+          );
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            data[id] = parsed;
+            dirty = true;
+            break;
+          }
+        } catch (error) {
+          // 没有旧数据就交给子插件使用自己的默认值
         }
-      } catch (error) {
-        // 没有旧数据就交给子插件使用自己的默认值
       }
     }
     if (dirty) await this.writeHostData();
@@ -4867,8 +4902,8 @@ module.exports = class CollisPlugin extends Plugin {
 
   isStandaloneEnabled(id) {
     try {
-      // 宿主 id 已改成 collis，和内置速记卡片子模块同名；必须排除自身，
-      // 否则会被误判为“旧独立插件已启用”，整个卡片模块就不加载了。
+      // 内置子模块的 id 与宿主 id 已经错开（noval / noval-notes / noval-board），
+      // 这里保留排除自身的判断：万一以后再把 id 改成一样，也不会自己把自己当独立插件跳过。
       if (id === this.manifest.id) return false;
       const plugins = this.app.plugins && this.app.plugins.plugins;
       return !!(plugins && plugins[id] && plugins[id] !== this);
@@ -4877,7 +4912,7 @@ module.exports = class CollisPlugin extends Plugin {
     }
   }
 
-  // 子插件的读写重定向到 collis 的 data.json，键名分别是 collis / collis-board。
+  // 子插件的读写重定向到 noval 的 data.json，键名分别是 noval / noval-board。
   attachChildSettings(child, id) {
     child.loadData = async () => {
       const data = await this.readHostData();
@@ -4892,7 +4927,7 @@ module.exports = class CollisPlugin extends Plugin {
 
   async loadBundledPlugin(spec) {
     if (this.isStandaloneEnabled(spec.id)) {
-      console.log("[collis] 独立插件已启用，跳过内置 " + spec.id);
+      console.log("[noval] 独立插件已启用，跳过内置 " + spec.id);
       return;
     }
     try {
@@ -4901,12 +4936,12 @@ module.exports = class CollisPlugin extends Plugin {
         throw new Error("未找到可用的插件类");
       }
       const manifest = Object.assign({}, spec.manifest);
-      manifest.dir = this.manifest.dir || this.app.vault.configDir + "/plugins/collis";
+      manifest.dir = this.manifest.dir || this.app.vault.configDir + "/plugins/noval";
       const child = new PluginClass(this.app, manifest);
       this.attachChildSettings(child, spec.id);
       // 内置子插件只作为功能模块存在，不再单独出现在界面上：
       // 不挂 ribbon 图标、状态栏；设置页不单独注册，但保留实例，
-      // 由 Collis 设置页复用画布组件原有的 AI 配置界面。
+      // 由 Noval 设置页复用画布组件原有的 AI 配置界面。
       const noElement = () => document.createElement("div");
       child.addRibbonIcon = noElement;
       child.addStatusBarItem = noElement;
@@ -4920,10 +4955,10 @@ module.exports = class CollisPlugin extends Plugin {
       await child.onload();
       this.childPlugins = this.childPlugins || {};
       this.childPlugins[spec.id] = child;
-      console.log("[collis] 已加载内置插件 " + manifest.id);
+      console.log("[noval] 已加载内置插件 " + manifest.id);
     } catch (error) {
-      console.error("[collis] 内置插件启动失败: " + spec.id, error);
-      new Notice("Collis：内置 " + spec.id + " 启动失败，请查看控制台");
+      console.error("[noval] 内置插件启动失败: " + spec.id, error);
+      new Notice("Noval：内置 " + spec.id + " 启动失败，请查看控制台");
     }
   }
 
@@ -4934,15 +4969,15 @@ module.exports = class CollisPlugin extends Plugin {
       try {
         child.unload();
       } catch (error) {
-        console.error("[collis] 内置插件卸载失败", error);
+        console.error("[noval] 内置插件卸载失败", error);
       }
     }
   }
 
   /* 画布文件夹路径：跟随画布子插件的设置，未加载时按默认「画布」。 */
   canvasFolderPath() {
-    const board = this.childPlugins && this.childPlugins["collis-board"];
-    const folder = String((board && board.collisFolder) || "画布").replace(/^\/+|\/+$/g, "");
+    const board = this.childPlugins && this.childPlugins[BOARD_ID];
+    const folder = String((board && board.novalFolder) || "画布").replace(/^\/+|\/+$/g, "");
     return folder || "画布";
   }
 
@@ -5012,7 +5047,7 @@ module.exports = class CollisPlugin extends Plugin {
     data.focusOnOpen = this.settings.focusOnOpen;
     data.workspaceName = this.settings.workspaceName;
     data.navCollapsed = !!this.settings.navCollapsed;
-    data.collisSidebarOpen = !!this.settings.collisSidebarOpen;
+    data.novalSidebarOpen = !!this.settings.novalSidebarOpen;
     data.ignoredModuleValues = this.settings.ignoredModuleValues || [];
     data.inboxAssigned = this.settings.inboxAssigned || {};
     data.inboxPolicy = this.settings.inboxPolicy || "root";

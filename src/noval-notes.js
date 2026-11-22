@@ -1,14 +1,14 @@
-/** 卡片笔记面板：把 Collis 侧栏的卡片视图复刻进工作台主区域。
+/** 卡片笔记面板：把 Noval 侧栏的卡片视图复刻进工作台主区域。
  *
- *  数据读写直接交给内置的 Collis 插件实例（readAllCards / appendCard），
+ *  数据读写直接交给内置的 Noval 插件实例（readAllCards / appendCard），
  *  所以卡片格式、月份文件、块 ID 都与右侧栏完全一致。
  *  面板本身只负责排版和交互，不碰存储层。
  */
 
 const { Notice, setIcon, TFile } = require("obsidian");
-const CollisBundle = require("../vendor/collis-core.js");
+const NovalBundle = require("../vendor/noval-notes-core.js");
 
-/** 与 Collis 原版完全一致的图标（qmIcon 里那份 SVG） */
+/** 与 Noval 原版完全一致的图标（qmIcon 里那份 SVG） */
 const ICONS = {
   search:
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>',
@@ -37,10 +37,10 @@ function daysAgo(date) {
 
 const TAG_RE = /#([^\s#\[\]()]+)/g;
 
-class CollisNotesPanel {
-  constructor(app, collis, hostView) {
+class NovalNotesPanel {
+  constructor(app, noval, hostView) {
     this.app = app;
-    this.collis = collis;
+    this.noval = noval;
     this.hostView = hostView || null;
 
     this.container = null;
@@ -49,7 +49,7 @@ class CollisNotesPanel {
     this.pop = null;
     this.popOwner = null;
     this.cardMenu = null;
-    // 「更多」菜单 / 多选：与 Collis 同一套状态
+    // 「更多」菜单 / 多选：与 Noval 同一套状态
     this.menuEl = null;
     this.menuAnchor = null;
     this._menuKey = null;
@@ -58,7 +58,7 @@ class CollisNotesPanel {
     this.selBarEl = null;
     this._selInfoEl = null;
     this._selDelEl = null;
-    // 行内编辑：与 Collis 同一套 key / 草稿
+    // 行内编辑：与 Noval 同一套 key / 草稿
     this.editingKey = null;
     this.editingDraft = null;
     // 追加区：哪些卡片展开着、正在写哪条、正在改哪条
@@ -68,7 +68,7 @@ class CollisNotesPanel {
 
     this.cards = [];
     this.query = "";
-    // 筛选状态与 Collis 完全一致：引用情况 / 多选标签 / 无标签
+    // 筛选状态与 Noval 完全一致：引用情况 / 多选标签 / 无标签
     this.refFilter = "";
     this.tags = [];
     this.untagged = false;
@@ -95,7 +95,7 @@ class CollisNotesPanel {
     this.container = containerEl;
     this.container.empty();
     this.container.addClass("cl-notes-panel");
-    // 借用 Collis 的按钮 / 卡片样式作用域（.qm-view 前缀规则）。
+    // 借用 Noval 的按钮 / 卡片样式作用域（.qm-view 前缀规则）。
     this.container.addClass("qm-view");
 
     this.buildHead();
@@ -165,7 +165,7 @@ class CollisNotesPanel {
       this.renderList();
     };
 
-    // 三个按钮完全按 Collis 原版：类名、图标、aria / title 都一致
+    // 三个按钮完全按 Noval 原版：类名、图标、aria / title 都一致
     const reviewBtn = this.iconButton(actions, "review", "回看", "回看（翻几张旧卡片）");
     reviewBtn.onclick = (ev) => {
       ev.stopPropagation();
@@ -191,7 +191,7 @@ class CollisNotesPanel {
   buildBody() {
     const body = this.container.createDiv({ cls: "cl-notes-body" });
 
-    // 生效条件 chips：紧贴搜索行下方，和 Collis 一致
+    // 生效条件 chips：紧贴搜索行下方，和 Noval 一致
     this.chipsEl = body.createDiv({ cls: "qm-chips" });
 
     // 记录输入块
@@ -236,10 +236,10 @@ class CollisNotesPanel {
     // 卡片列表
     this.listWrap = body.createDiv({ cls: "cl-notes-listwrap" });
 
-    // 多选浮条：与 Collis 同一个 .qm-selbar
+    // 多选浮条：与 Noval 同一个 .qm-selbar
     this.selBarEl = body.createDiv({ cls: "qm-selbar" });
 
-    // 回看：和 Collis 一样是覆盖在内容区上的视图
+    // 回看：和 Noval 一样是覆盖在内容区上的视图
     this.reviewEl = body.createDiv({ cls: "qm-review" });
   }
 
@@ -260,17 +260,17 @@ class CollisNotesPanel {
       this._pending = true;
       return;
     }
-    if (!this.collis || typeof this.collis.readAllCards !== "function") {
-      if (this.subEl) this.subEl.setText("Collis 没有加载成功，请查看控制台日志。");
+    if (!this.noval || typeof this.noval.readAllCards !== "function") {
+      if (this.subEl) this.subEl.setText("Noval 没有加载成功，请查看控制台日志。");
       return;
     }
 
     this._loading = true;
     let cards = [];
     try {
-      cards = await this.collis.readAllCards();
+      cards = await this.noval.readAllCards();
     } catch (e) {
-      console.error("[collis] 读取卡片失败", e);
+      console.error("[noval] 读取卡片失败", e);
       cards = [];
     }
     this._loading = false;
@@ -399,7 +399,7 @@ class CollisNotesPanel {
     });
   }
 
-  /** 生效条件数：搜索词也算一条，和 Collis 一致 */
+  /** 生效条件数：搜索词也算一条，和 Noval 一致 */
   activeFilterCount() {
     return (
       (String(this.query || "").trim() ? 1 : 0) +
@@ -412,14 +412,14 @@ class CollisNotesPanel {
   /** 引用筛选实际生效值：索引没建好时按「全部」 */
   effectiveRefFilter() {
     if (!this.refFilter) return "";
-    if (!this.collis || typeof this.collis.refsReady !== "function") return "";
-    return this.collis.refsReady() ? this.refFilter : "";
+    if (!this.noval || typeof this.noval.refsReady !== "function") return "";
+    return this.noval.refsReady() ? this.refFilter : "";
   }
 
   refCount(card) {
-    if (!this.collis || typeof this.collis.refCount !== "function") return 0;
+    if (!this.noval || typeof this.noval.refCount !== "function") return 0;
     try {
-      return this.collis.refCount(card) || 0;
+      return this.noval.refCount(card) || 0;
     } catch (e) {
       return 0;
     }
@@ -476,7 +476,7 @@ class CollisNotesPanel {
     this.afterFilterChange();
   }
 
-  /** 正文里点标签：只用这一个标签筛选，换掉原来的多选条件（与 Collis 侧栏一致） */
+  /** 正文里点标签：只用这一个标签筛选，换掉原来的多选条件（与 Noval 侧栏一致） */
   setFilterTags(list) {
     this.tags = (list || []).filter(Boolean);
     if (this.tags.length) this.untagged = false;
@@ -568,7 +568,7 @@ class CollisNotesPanel {
   chipParts() {
     const parts = [];
 
-    // 搜索也算一条生效条件，和 Collis 一样
+    // 搜索也算一条生效条件，和 Noval 一样
     const kw = String(this.query || "").trim();
     if (kw) {
       parts.push({
@@ -690,7 +690,7 @@ class CollisNotesPanel {
     this.closeMenu();
 
     const cards = this.filteredCards();
-    // 有生效条件时按钮常亮并带小圆点，和 Collis 一致
+    // 有生效条件时按钮常亮并带小圆点，和 Noval 一致
     this.renderFilterBtnState();
     this.renderChips();
     this.renderSelectBar();
@@ -747,7 +747,7 @@ class CollisNotesPanel {
     const picked = this.selectMode && this.selected.has(key);
     const editing = this.editingKey === key;
     // 正文按标记行拆成「原始内容 + 各条追加」，追加默认收起
-    const sections = CollisBundle.qmCardSections(card.body);
+    const sections = NovalBundle.qmCardSections(card.body);
     const el = list.createDiv({ cls: "qm-card" + (picked ? " is-picked" : "") });
     // 定位用的坐标：日期 + 时间 + 块 ID，不依赖 file 字段的类型差异
     el.setAttribute("data-qm-date", card.date || "");
@@ -756,10 +756,10 @@ class CollisNotesPanel {
     if (this.selectMode) el.addClass("is-selectable");
 
     const head = el.createDiv({ cls: "qm-card-head" });
-    // 勾号和 Collis 一样放在时间里侧，靠 .is-picked 控制显隐
+    // 勾号和 Noval 一样放在时间里侧，靠 .is-picked 控制显隐
     if (this.selectMode) head.createSpan({ cls: "qm-tick", text: "\u2713" });
     head.createSpan({ cls: "qm-time", text: card.time || "" });
-    // 时间后面的引用小红点：和 Collis 的 mountRefDot 一致
+    // 时间后面的引用小红点：和 Noval 的 mountRefDot 一致
     const refDot = head.createSpan({ cls: "qm-ref" });
     this.paintRefDot(refDot, card);
 
@@ -809,7 +809,7 @@ class CollisNotesPanel {
       if (this.selectMode) this.toggleSelected(card, el);
     };
 
-    // 与 Collis bindCardEdit 一致：链接、标签、「···」、引用点保持原生语义
+    // 与 Noval bindCardEdit 一致：链接、标签、「···」、引用点保持原生语义
     el.addEventListener("dblclick", (e) => {
       if (this.selectMode) return;
       const t = e.target;
@@ -856,7 +856,7 @@ class CollisNotesPanel {
         new Notice("内容不能为空");
         return;
       }
-      const ok = await this.collis.updateCard(card, text);
+      const ok = await this.noval.updateCard(card, text);
       if (!ok) {
         new Notice("保存失败，卡片位置可能已变化");
         return;
@@ -917,7 +917,7 @@ class CollisNotesPanel {
           const text = this.appendEditing && this.appendEditing.key === key
             ? this.appendEditing.text
             : ta.value;
-          const ok = await this.collis.updateAppend(card, index, text);
+          const ok = await this.noval.updateAppend(card, index, text);
           if (!ok) return;
           this.appendEditing = null;
           await this.load();
@@ -953,8 +953,8 @@ class CollisNotesPanel {
   }
 
   confirmDeleteAppend(card, index) {
-    new CollisBundle.ConfirmModal(this.app, "删除这条追加？", async () => {
-      const ok = await this.collis.deleteAppend(card, index);
+    new NovalBundle.ConfirmModal(this.app, "删除这条追加？", async () => {
+      const ok = await this.noval.deleteAppend(card, index);
       if (!ok) return;
       this.appendEditing = null;
       await this.load();
@@ -1007,7 +1007,7 @@ class CollisNotesPanel {
         new Notice("写点什么再追加吧");
         return;
       }
-      const ok = await this.collis.appendToCard(card, text);
+      const ok = await this.noval.appendToCard(card, text);
       if (!ok) return;
       this.appendDrafting = null;
       this.appendOpen.add(key);
@@ -1025,10 +1025,10 @@ class CollisNotesPanel {
     });
   }
 
-  /** 引用小红点：数字与提示文案都与 Collis 的 paintRefDot 一致 */
+  /** 引用小红点：数字与提示文案都与 Noval 的 paintRefDot 一致 */
   paintRefDot(el, card) {
     if (!el) return;
-    const info = this.collis.refSummary ? this.collis.refSummary(card) : null;
+    const info = this.noval.refSummary ? this.noval.refSummary(card) : null;
     const n = info ? info.notes : 0;
     if (!n) {
       el.addClass("is-hidden");
@@ -1051,7 +1051,7 @@ class CollisNotesPanel {
   renderCardBody(bodyEl, card, textOverride) {
     const text = textOverride != null
       ? String(textOverride)
-      : CollisBundle.qmCardSections(String(card.body || "")).original;
+      : NovalBundle.qmCardSections(String(card.body || "")).original;
     TAG_RE.lastIndex = 0;
     let last = 0;
     let match;
@@ -1066,7 +1066,7 @@ class CollisNotesPanel {
       if (!this.selectMode) {
         tag.onclick = (ev) => {
           ev.stopPropagation();
-          // 与侧栏 Collis 一致：正文点标签 = 只用这一个标签筛选（换掉原条件）
+          // 与侧栏 Noval 一致：正文点标签 = 只用这一个标签筛选（换掉原条件）
           this.setFilterTags([tagValue]);
         };
       }
@@ -1097,7 +1097,7 @@ class CollisNotesPanel {
     this.renderFilterBtnState();
   }
 
-  /* ---------------- 筛选浮层（与 Collis 同一套 DOM / 逻辑） ---------------- */
+  /* ---------------- 筛选浮层（与 Noval 同一套 DOM / 逻辑） ---------------- */
 
   openFilterPanel() {
     if (this.pop && this.popOwner === this.filterBtn) {
@@ -1157,7 +1157,7 @@ class CollisNotesPanel {
 
     const forest = this.tagForest();
 
-    // 「无标签」单独一行，和 Collis 一致
+    // 「无标签」单独一行，和 Noval 一致
     const un = tree.createDiv({
       cls: "qm-tnode qm-tnode-untagged" + (this.untagged ? " is-on" : "")
     });
@@ -1263,14 +1263,14 @@ class CollisNotesPanel {
   }
 
   openMoreMenu() {
-    // 与 Collis 的 openMoreMenu 同一份条目：计数行、多选、最近删除、本月文件、孤儿卡片
+    // 与 Noval 的 openMoreMenu 同一份条目：计数行、多选、最近删除、本月文件、孤儿卡片
     const hit = this.filteredCards().length;
     const total = this.cards.length;
-    const cap = (this.collis.settings && this.collis.settings.maxCards) || 0;
+    const cap = (this.noval.settings && this.noval.settings.maxCards) || 0;
     const capNote = cap > 0 && hit > cap ? " \u00b7 显示最近 " + cap : "";
     const countLine =
       (hit === total ? "共 " + total + " 条卡片" : "共 " + total + " 条 \u00b7 命中 " + hit + " 条") + capNote;
-    const n = ((this.collis.settings && this.collis.settings.trash) || []).length;
+    const n = ((this.noval.settings && this.noval.settings.trash) || []).length;
 
     const items = [
       { title: countLine, icon: "arrow-right", disabled: true },
@@ -1283,17 +1283,17 @@ class CollisNotesPanel {
       {
         title: n ? "最近删除 " + n : "最近删除",
         icon: "trash-2",
-        onClick: () => new CollisBundle.TrashModal(this.app, this.collis).open()
+        onClick: () => new NovalBundle.TrashModal(this.app, this.noval).open()
       },
       {
         title: "打开本月文件",
         icon: "file-text",
-        onClick: () => this.collis.openCurrentMonthFile()
+        onClick: () => this.noval.openCurrentMonthFile()
       },
       {
         title: "检查孤儿卡片",
         icon: "search-check",
-        onClick: () => new CollisBundle.OrphanModal(this.app, this.collis).open()
+        onClick: () => new NovalBundle.OrphanModal(this.app, this.noval).open()
       },
       { separator: true },
       {
@@ -1306,7 +1306,7 @@ class CollisNotesPanel {
     return this.showMenu(items, this.moreBtn);
   }
 
-  /* ---------------- 「更多」菜单（复刻 Collis 的 showMenu） ---------------- */
+  /* ---------------- 「更多」菜单（复刻 Noval 的 showMenu） ---------------- */
 
   showMenu(items, anchor) {
     // 再点一次同一个按钮就是收起
@@ -1380,7 +1380,7 @@ class CollisNotesPanel {
     }
   }
 
-  /* ---------------- 多选（与 Collis 同一套交互） ---------------- */
+  /* ---------------- 多选（与 Noval 同一套交互） ---------------- */
 
   cardKey(card) {
     return (
@@ -1456,11 +1456,11 @@ class CollisNotesPanel {
   deleteSelected() {
     const picked = this.cards.filter((c) => this.selected.has(this.cardKey(c)));
     if (!picked.length) return;
-    new CollisBundle.ConfirmModal(
+    new NovalBundle.ConfirmModal(
       this.app,
       "删除选中的 " + picked.length + " 条卡片？",
       async () => {
-        const res = await this.collis.deleteCards(picked);
+        const res = await this.noval.deleteCards(picked);
         this.selectMode = false;
         this.selected.clear();
         await this.load();
@@ -1476,7 +1476,7 @@ class CollisNotesPanel {
     ).open();
   }
 
-  /* ---------------- 回看（复刻 Collis 的覆盖视图） ---------------- */
+  /* ---------------- 回看（复刻 Noval 的覆盖视图） ---------------- */
 
   openReview() {
     if (!this.reviewEl) return;
@@ -1532,7 +1532,7 @@ class CollisNotesPanel {
     const list = el.createDiv({ cls: "qm-review-list" });
     for (const card of this.reviewCards) {
       const key = this.cardKey(card);
-      const sections = CollisBundle.qmCardSections(card.body);
+      const sections = NovalBundle.qmCardSections(card.body);
       const box = list.createDiv({ cls: "qm-rv-card" });
 
       const rhead = box.createDiv({ cls: "qm-rv-head" });
@@ -1621,7 +1621,7 @@ class CollisNotesPanel {
   }
 
   openCardMenu(cardEl, card, anchorBtn) {
-    const info = this.collis.refSummary ? this.collis.refSummary(card) : null;
+    const info = this.noval.refSummary ? this.noval.refSummary(card) : null;
     const n = info ? info.notes : 0;
     const anchor = anchorBtn || cardEl.querySelector(".qm-more");
 
@@ -1630,7 +1630,7 @@ class CollisNotesPanel {
         title: "复制全文",
         icon: "copy",
         onClick: async () => {
-          await this.collis.copy(CollisBundle.qmPasteText(card.body));
+          await this.noval.copy(NovalBundle.qmPasteText(card.body));
           new Notice("已复制卡片全文");
         }
       },
@@ -1640,7 +1640,7 @@ class CollisNotesPanel {
       { separator: true }
     ];
 
-    if (this.collis.refsReady && !this.collis.refsReady()) {
+    if (this.noval.refsReady && !this.noval.refsReady()) {
       // 索引还没建好时说清楚，别让人误以为「没被引用过」
       items.push({ title: "引用统计准备中…", icon: "corner-down-right", disabled: true });
     } else if (n) {
@@ -1648,7 +1648,7 @@ class CollisNotesPanel {
         title: "被 " + n + " 篇笔记引用…",
         icon: "corner-down-right",
         onClick: () =>
-          new CollisBundle.RefListModal(this.app, info, (r) => this.openRef(r.path, r.line)).open()
+          new NovalBundle.RefListModal(this.app, info, (r) => this.openRef(r.path, r.line)).open()
       });
     } else {
       items.push({
@@ -1674,17 +1674,17 @@ class CollisNotesPanel {
     return this.showMenu(items, anchor);
   }
 
-  /** 复制块链接：跟随「嵌入」开关，与 Collis 一致 */
+  /** 复制块链接：跟随「嵌入」开关，与 Noval 一致 */
   async copyRef(card) {
     const hadId = !!card.id && card.idOnLastLine;
-    const id = await this.collis.ensureId(card);
+    const id = await this.noval.ensureId(card);
     if (!id) {
       new Notice("没找到这张卡片，请改用「复制全文」");
       return;
     }
-    const bang = this.collis.settings.blockRefEmbed ? "!" : "";
-    const ref = bang + "[[" + this.collis.linkTarget(card) + "#^" + id + "]]";
-    await this.collis.copy(ref);
+    const bang = this.noval.settings.blockRefEmbed ? "!" : "";
+    const ref = bang + "[[" + this.noval.linkTarget(card) + "#^" + id + "]]";
+    await this.noval.copy(ref);
     new Notice(
       (hadId ? "已复制：" : "已为这条卡片补上块 ID，已复制：") + ref,
       7000
@@ -1718,7 +1718,7 @@ class CollisNotesPanel {
     this.editingKey = key;
     this.editingDraft = {
       key,
-      text: CollisBundle.qmCardSections(String(card.body || "")).original
+      text: NovalBundle.qmCardSections(String(card.body || "")).original
     };
     this.renderAll();
   }
@@ -1746,8 +1746,8 @@ class CollisNotesPanel {
     let hit = null;
     try {
       const text = String((await this.app.vault.read(file)) || "").replace(/\r\n?/g, "\n");
-      hit = CollisBundle.qmLocateCard(text, card, {
-        strict: this.collis.settings.strictCardId !== false
+      hit = NovalBundle.qmLocateCard(text, card, {
+        strict: this.noval.settings.strictCardId !== false
       });
     } catch (e) {
       hit = null;
@@ -1775,16 +1775,16 @@ class CollisNotesPanel {
   }
 
   confirmDelete(card) {
-    const info = this.collis.refSummary ? this.collis.refSummary(card) : null;
+    const info = this.noval.refSummary ? this.noval.refSummary(card) : null;
     const n = info ? info.notes : 0;
     const detail = n
       ? "这张卡还被 " + n + " 篇笔记引用，删除后这些引用会失效。"
       : "";
-    new CollisBundle.ConfirmModal(
+    new NovalBundle.ConfirmModal(
       this.app,
       "删除这条卡片？",
       async () => {
-        await this.collis.deleteCard(card);
+        await this.noval.deleteCard(card);
         await this.load();
       },
       detail
@@ -1801,8 +1801,8 @@ class CollisNotesPanel {
   async capture() {
     const text = this.input ? this.input.value.trim() : "";
     if (!text) return;
-    if (!this.collis || typeof this.collis.appendCard !== "function") {
-      new Notice("Collis 没有加载成功，暂时不能记录");
+    if (!this.noval || typeof this.noval.appendCard !== "function") {
+      new Notice("Noval 没有加载成功，暂时不能记录");
       return;
     }
 
@@ -1810,9 +1810,9 @@ class CollisNotesPanel {
     this.saveBtn.classList.add("is-disabled");
     let ok = false;
     try {
-      ok = await this.collis.appendCard(text);
+      ok = await this.noval.appendCard(text);
     } catch (e) {
-      console.error("[collis] 写入卡片失败", e);
+      console.error("[noval] 写入卡片失败", e);
     }
     if (ok) {
       this.input.value = "";
@@ -1839,12 +1839,12 @@ class CollisNotesPanel {
   }
 
   openSidebar() {
-    if (this.hostView && this.hostView.openCollis) {
-      this.hostView.openCollis();
+    if (this.hostView && this.hostView.openNoval) {
+      this.hostView.openNoval();
       return;
     }
-    this.app.commands.executeCommandById("collis:open-cards");
+    this.app.commands.executeCommandById("noval:open-cards");
   }
 }
 
-module.exports = { CollisNotesPanel };
+module.exports = { NovalNotesPanel };

@@ -3,9 +3,9 @@ var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 
-// vendor/collis-core.js
-var require_collis_core = __commonJS({
-  "vendor/collis-core.js"(exports2, module2) {
+// vendor/noval-notes-core.js
+var require_noval_notes_core = __commonJS({
+  "vendor/noval-notes-core.js"(exports2, module2) {
     "use strict";
     var {
       Plugin: Plugin2,
@@ -91,7 +91,7 @@ var require_collis_core = __commonJS({
         return;
       parent.innerHTML = QM_ICONS[name];
     }
-    var ICON_ID = "collis-mark";
+    var ICON_ID = "noval-mark";
     var ICON_MARK = /* @__PURE__ */ (() => {
       return '<g transform="scale(4.1667)" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="19" height="17" rx="5" stroke-dasharray="3 2.6"/><path d="M6 15.5C8.2 10.5 11 10.2 11.8 12.4C12.6 14.6 15.4 14.8 17.6 10.2"/><circle cx="18.6" cy="6.6" r="1.5" fill="currentColor" stroke="none"/></g>';
     })();
@@ -1777,7 +1777,7 @@ var require_collis_core = __commonJS({
         return VIEW_TYPE_QM;
       }
       getDisplayText() {
-        return "Collis";
+        return "Noval";
       }
       getIcon() {
         return ICON_ID;
@@ -3837,7 +3837,7 @@ var require_collis_core = __commonJS({
       display() {
         const { containerEl } = this;
         containerEl.empty();
-        containerEl.createEl("h3", { text: "Collis \u8BBE\u7F6E" });
+        containerEl.createEl("h3", { text: "Noval \u8BBE\u7F6E" });
         new Setting2(containerEl).setName("\u5361\u7247\u6587\u4EF6\u5939").setDesc(
           "\u5361\u7247\u6309\u6708\u5B58\u6210 YYYY-MM.md\u3002\u6587\u4EF6\u5939\u4E0D\u5B58\u5728\u4F1A\u81EA\u52A8\u521B\u5EFA\uFF1B\u5207\u6362\u65F6\u4F1A\u5148\u68C0\u67E5\u76EE\u6807\u6587\u4EF6\u5939\u91CC\u5DF2\u6709\u7684\u5E74\u6708\u6587\u4EF6\uFF0C\u53D1\u73B0\u4E0D\u50CF\u5361\u7247\u6587\u4EF6\uFF08\u6BD4\u5982\u65E5\u8BB0\u3001\u526A\u85CF\uFF09\u5C31\u62D2\u7EDD\u5207\u6362\uFF0C\u907F\u514D\u8BEF\u6539\u522B\u7684\u7B14\u8BB0\u3002"
         ).addText((t) => {
@@ -4073,7 +4073,7 @@ var require_collis_core = __commonJS({
         }
         this.registerView(VIEW_TYPE_QM, (leaf) => new CardsView(leaf, this));
         addIcon2(ICON_ID, ICON_MARK);
-        this.addRibbonIcon(ICON_ID, "Collis", async () => {
+        this.addRibbonIcon(ICON_ID, "Noval", async () => {
           await this.activateView();
         });
         this.addCommand({
@@ -4582,7 +4582,7 @@ var require_collis_core = __commonJS({
         } catch (e) {
         }
         new Notice2(
-          "Collis\uFF1A\u6709 " + total + " \u6761\u65F6\u95F4\u6761\u76EE\u6CA1\u6709\u5757 ID\uFF08^xxxx\uFF09\uFF0C\u4E0D\u4F1A\u663E\u793A\u6210\u5361\u7247\u3002\u5982\u679C\u662F\u4EE5\u524D\u7684\u5361\u7247\uFF0C\u5728\u884C\u5C3E\u8865\u4E00\u4E2A ^id \u5C31\u80FD\u7EB3\u5165\uFF1B\u4E5F\u53EF\u4EE5\u5728\u8BBE\u7F6E\u91CC\u5173\u6389\u300C\u4E25\u683C\u8BC6\u522B\u5361\u7247\u300D\u3002",
+          "Noval\uFF1A\u6709 " + total + " \u6761\u65F6\u95F4\u6761\u76EE\u6CA1\u6709\u5757 ID\uFF08^xxxx\uFF09\uFF0C\u4E0D\u4F1A\u663E\u793A\u6210\u5361\u7247\u3002\u5982\u679C\u662F\u4EE5\u524D\u7684\u5361\u7247\uFF0C\u5728\u884C\u5C3E\u8865\u4E00\u4E2A ^id \u5C31\u80FD\u7EB3\u5165\uFF1B\u4E5F\u53EF\u4EE5\u5728\u8BBE\u7F6E\u91CC\u5173\u6389\u300C\u4E25\u683C\u8BC6\u522B\u5361\u7247\u300D\u3002",
           15e3
         );
       }
@@ -5757,9 +5757,9 @@ var require_collis_core = __commonJS({
   }
 });
 
-// vendor/collis-board-core.js
-var require_collis_board_core = __commonJS({
-  "vendor/collis-board-core.js"(exports2, module2) {
+// vendor/noval-board-core.js
+var require_noval_board_core = __commonJS({
+  "vendor/noval-board-core.js"(exports2, module2) {
     var __defProp = Object.defineProperty;
     var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
     var __getOwnPropNames2 = Object.getOwnPropertyNames;
@@ -5779,7 +5779,7 @@ var require_collis_board_core = __commonJS({
     var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
     var main_exports = {};
     __export(main_exports, {
-      default: () => CollisBoardPlugin
+      default: () => NovalBoardPlugin
     });
     module2.exports = __toCommonJS(main_exports);
     var import_obsidian21 = require("obsidian");
@@ -6044,13 +6044,13 @@ var require_collis_board_core = __commonJS({
         policy: { ...DEFAULT_CONTEXT_POLICY }
       },
       conversations: [],
-      collis: { ...DEFAULT_GALLERY_SETTINGS }
+      noval: { ...DEFAULT_GALLERY_SETTINGS }
     };
     function activeProfile(ai) {
       var _a, _b;
       return (_b = (_a = ai.profiles.find((profile) => profile.id === ai.activeId)) != null ? _a : ai.profiles[0]) != null ? _b : null;
     }
-    function normalizeCollisSettings(raw) {
+    function normalizeNovalSettings(raw) {
       const value = raw != null ? raw : {};
       const folder = typeof value.boardFolder === "string" ? value.boardFolder.trim() : "";
       return {
@@ -6143,7 +6143,7 @@ var require_collis_board_core = __commonJS({
     }
     var import_obsidian3 = require("obsidian");
     var import_obsidian2 = require("obsidian");
-    var BOARD_EXTENSION = "collis";
+    var BOARD_EXTENSION = "noval";
     function blankBoardData() {
       return { version: 1, nodes: [], edges: [] };
     }
@@ -6363,7 +6363,7 @@ var require_collis_board_core = __commonJS({
         ...items.map((item) => `${item.file.path}:${item.mtime}:${item.nodes}:${item.edges}`)
       ].join("|");
     }
-    var VIEW_TYPE_GALLERY = "collis-gallery";
+    var VIEW_TYPE_GALLERY = "noval-gallery";
     var SVG_NS = "http://www.w3.org/2000/svg";
     var BoardGalleryView = class extends import_obsidian3.ItemView {
       constructor(leaf, plugin) {
@@ -6420,7 +6420,7 @@ var require_collis_board_core = __commonJS({
         if (this.watching)
           return;
         this.watching = true;
-        const inFolder = (path) => isBoardPath(path, this.plugin.collisFolder);
+        const inFolder = (path) => isBoardPath(path, this.plugin.novalFolder);
         this.registerEvent(
           this.app.vault.on("modify", (file) => {
             if (inFolder(file.path))
@@ -6478,7 +6478,7 @@ var require_collis_board_core = __commonJS({
       }
       reportError(stage, error) {
         const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-        console.error(`[collis] \u753B\u5E03\u96C6${stage}\u5931\u8D25`, error);
+        console.error(`[noval] \u753B\u5E03\u96C6${stage}\u5931\u8D25`, error);
         const root = this.rootEl();
         if (root) {
           this.clearRoot(root);
@@ -6497,7 +6497,7 @@ var require_collis_board_core = __commonJS({
       async loadItems() {
         let items = [];
         try {
-          items = await listBoardItems(this.app, this.plugin.collisFolder);
+          items = await listBoardItems(this.app, this.plugin.novalFolder);
         } catch (e) {
           new import_obsidian3.Notice("\u8BFB\u53D6\u753B\u5E03\u5217\u8868\u5931\u8D25");
         }
@@ -6571,7 +6571,7 @@ var require_collis_board_core = __commonJS({
       buildEmpty(searching) {
         const empty = node("div", "vw-empty");
         const art = node("div", "vw-empty-art");
-        art.appendChild(collisMark());
+        art.appendChild(novalMark());
         const title = node("div", "vw-empty-title");
         title.textContent = searching ? "\u6CA1\u6709\u5339\u914D\u7684\u753B\u5E03" : "\u8FD8\u6CA1\u6709\u753B\u5E03";
         const hint = document.createElement("p");
@@ -6767,7 +6767,7 @@ var require_collis_board_core = __commonJS({
         if (!nodes.length) {
           cover.classList.add("is-blank");
           const ghost = node("span", "vw-cover-ghost");
-          ghost.appendChild(collisMark());
+          ghost.appendChild(novalMark());
           cover.appendChild(ghost);
           return cover;
         }
@@ -6861,7 +6861,7 @@ var require_collis_board_core = __commonJS({
         }
       }
     };
-    function collisMark() {
+    function novalMark() {
       const svg = document.createElementNS(SVG_NS, "svg");
       svg.setAttribute("viewBox", "0 0 24 24");
       svg.setAttribute("fill", "none");
@@ -6952,7 +6952,7 @@ var require_collis_board_core = __commonJS({
         const el = this.contentEl;
         while (el.firstChild)
           el.removeChild(el.firstChild);
-        el.classList.add("collis-delete-modal");
+        el.classList.add("noval-delete-modal");
         const heading2 = document.createElement("h2");
         heading2.textContent = this.names.length === 1 ? "\u5220\u9664\u8FD9\u5757\u753B\u5E03\uFF1F" : `\u5220\u9664\u8FD9 ${this.names.length} \u5757\u753B\u5E03\uFF1F`;
         const detail = document.createElement("p");
@@ -7241,7 +7241,7 @@ var require_collis_board_core = __commonJS({
               this.entries.set(id, entry);
               pending.push(this.loadMeta(entry));
             } catch (error) {
-              console.error("[Collis] node parse failed", error);
+              console.error("[Noval] node parse failed", error);
             }
           }
           for (const key of Array.from(this.entries.keys())) {
@@ -7362,7 +7362,7 @@ var require_collis_board_core = __commonJS({
           void view.setViewData(json, true);
           restoreViewport(view.canvas, viewport);
         } catch (error) {
-          console.error("[Collis] refresh failed", error);
+          console.error("[Noval] refresh failed", error);
         }
       }
     };
@@ -7393,7 +7393,7 @@ var require_collis_board_core = __commonJS({
         }
       }
     }
-    var BADGE_CLASS = "collis-badge";
+    var BADGE_CLASS = "noval-badge";
     function applyBadges(canvasView, index, settings) {
       var _a, _b, _c, _d;
       const canvas = canvasView.canvas;
@@ -7513,15 +7513,15 @@ var require_collis_board_core = __commonJS({
           void this.commit();
         };
         this.root = document.createElement("div");
-        this.root.className = "collis-inline";
+        this.root.className = "noval-inline";
         this.hostEl = nodeEl;
         this.input = document.createElement("textarea");
-        this.input.className = "collis-inline-input";
+        this.input.className = "noval-inline-input";
         this.input.value = initial;
         this.input.spellcheck = false;
         this.root.appendChild(this.input);
         nodeEl.appendChild(this.root);
-        nodeEl.classList.add("collis-editing");
+        nodeEl.classList.add("noval-editing");
         nodeEl.classList.add("is-selected");
         this.root.addEventListener("pointerdown", (evt) => evt.stopPropagation());
         this.input.addEventListener("mousedown", (evt) => evt.stopPropagation());
@@ -7595,7 +7595,7 @@ var require_collis_board_core = __commonJS({
       }
       destroy() {
         document.removeEventListener("mousedown", this.handleOutside, true);
-        this.hostEl.classList.remove("collis-editing");
+        this.hostEl.classList.remove("noval-editing");
         this.root.remove();
         if (this.onClosed)
           this.onClosed();
@@ -7623,20 +7623,20 @@ var require_collis_board_core = __commonJS({
           void this.commit();
         };
         this.root = document.createElement("div");
-        this.root.className = "collis-inline collis-md-editor";
+        this.root.className = "noval-inline noval-md-editor";
         this.titleInput = document.createElement("input");
-        this.titleInput.className = "collis-md-title inline-title";
+        this.titleInput.className = "noval-md-title inline-title";
         this.titleInput.type = "text";
         this.titleInput.value = file.basename;
         this.titleInput.spellcheck = false;
         this.bodyInput = document.createElement("textarea");
-        this.bodyInput.className = "collis-inline-input collis-md-body";
+        this.bodyInput.className = "noval-inline-input noval-md-body";
         this.bodyInput.value = initialBody;
         this.bodyInput.spellcheck = false;
         this.root.appendChild(this.titleInput);
         this.root.appendChild(this.bodyInput);
         nodeEl.appendChild(this.root);
-        nodeEl.classList.add("collis-editing");
+        nodeEl.classList.add("noval-editing");
         nodeEl.classList.add("is-selected");
         this.root.addEventListener("pointerdown", (evt) => evt.stopPropagation());
         this.root.addEventListener("dblclick", (evt) => evt.stopPropagation());
@@ -7691,7 +7691,7 @@ var require_collis_board_core = __commonJS({
       }
       destroy() {
         document.removeEventListener("mousedown", this.handleOutside, true);
-        this.nodeEl.classList.remove("collis-editing");
+        this.nodeEl.classList.remove("noval-editing");
         this.root.remove();
         if (this.onClosed)
           this.onClosed();
@@ -7707,31 +7707,31 @@ var require_collis_board_core = __commonJS({
         this.file = file;
       }
       onOpen() {
-        this.modalEl.addClass("collis-media-modal");
+        this.modalEl.addClass("noval-media-modal");
         this.titleEl.setText(this.file.basename);
         const src = this.app.vault.getResourcePath(this.file);
         const ext = this.file.extension.toLowerCase();
         if (IMAGE_EXT.includes(ext)) {
-          const img = this.contentEl.createEl("img", { cls: "collis-media-image" });
+          const img = this.contentEl.createEl("img", { cls: "noval-media-image" });
           img.src = src;
           return;
         }
         if (VIDEO_EXT.includes(ext)) {
-          const video = this.contentEl.createEl("video", { cls: "collis-media-video" });
+          const video = this.contentEl.createEl("video", { cls: "noval-media-video" });
           video.src = src;
           video.controls = true;
           video.autoplay = true;
           return;
         }
         if (AUDIO_EXT.includes(ext)) {
-          const audio = this.contentEl.createEl("audio", { cls: "collis-media-audio" });
+          const audio = this.contentEl.createEl("audio", { cls: "noval-media-audio" });
           audio.src = src;
           audio.controls = true;
           audio.autoplay = true;
           return;
         }
         if (ext === "pdf") {
-          const embed = this.contentEl.createEl("embed", { cls: "collis-media-pdf" });
+          const embed = this.contentEl.createEl("embed", { cls: "noval-media-pdf" });
           embed.setAttribute("src", src);
           embed.setAttribute("type", "application/pdf");
           return;
@@ -7755,7 +7755,7 @@ var require_collis_board_core = __commonJS({
         contentEl.createEl("h3", { text: "\u91CD\u547D\u540D\u767D\u677F" });
         const input = contentEl.createEl("input", { type: "text" });
         input.value = this.initial;
-        input.addClass("collis-rename-input");
+        input.addClass("noval-rename-input");
         input.focus();
         input.select();
         const submit = () => {
@@ -7796,7 +7796,7 @@ var require_collis_board_core = __commonJS({
         const { contentEl } = this;
         contentEl.empty();
         contentEl.createEl("h3", { text: this.heading });
-        contentEl.createEl("p", { text: this.message, cls: "collis-confirm-text" });
+        contentEl.createEl("p", { text: this.message, cls: "noval-confirm-text" });
         new import_obsidian9.Setting(contentEl).addButton((button) => button.setButtonText("\u53D6\u6D88").onClick(() => this.close())).addButton(
           (button) => button.setButtonText(this.confirmText).setWarning().onClick(() => {
             this.close();
@@ -7813,7 +7813,7 @@ var require_collis_board_core = __commonJS({
     var CARD_BODY_LINE = /^(\d{1,2}:\d{2})[ \t]+/;
     async function resolveCardFolder(app, fallback) {
       const adapter = app.vault.adapter;
-      const configPath = ".obsidian/plugins/collis/data.json";
+      const configPath = ".obsidian/plugins/noval/data.json";
       try {
         if (await adapter.exists(configPath)) {
           const raw = JSON.parse(await adapter.read(configPath));
@@ -7939,7 +7939,7 @@ ${cardLines2.join("\n")}
           return null;
         return { file: monthPath, blockId };
       } catch (error) {
-        console.error("[Collis] append card failed", error);
+        console.error("[Noval] append card failed", error);
         return null;
       }
     }
@@ -7968,7 +7968,7 @@ ${cardLines2.join("\n")}
         } while (await app.vault.adapter.exists(path));
         return await app.vault.create(path, content);
       } catch (error) {
-        console.error("[Collis] create note failed", error);
+        console.error("[Noval] create note failed", error);
         return null;
       }
     }
@@ -8956,8 +8956,8 @@ ${edgeLines.join("\n")}`);
         this.dragOffset = { ...actions.offset() };
       }
       onOpen() {
-        this.modalEl.addClass("collis-doctor-modal");
-        this.contentEl.addClass("collis-doctor-content");
+        this.modalEl.addClass("noval-doctor-modal");
+        this.contentEl.addClass("noval-doctor-content");
         this.titleEl.setText("\u767D\u677F\u4F53\u68C0");
         this.installDrag();
         this.applyOffset();
@@ -8968,7 +8968,7 @@ ${edgeLines.join("\n")}`);
       }
       installDrag() {
         const title = this.titleEl;
-        title.addClass("collis-doctor-drag");
+        title.addClass("noval-doctor-drag");
         title.setAttribute("title", "\u6309\u4F4F\u8FD9\u91CC\u53EF\u4EE5\u62D6\u52A8\u7A97\u53E3\uFF0C\u8BA9\u51FA\u767D\u677F");
         title.addEventListener("pointerdown", (evt) => {
           if (evt.button !== 0)
@@ -9007,32 +9007,32 @@ ${edgeLines.join("\n")}`);
         const host = this.contentEl;
         host.empty();
         host.createEl("p", {
-          cls: "collis-doctor-summary",
+          cls: "noval-doctor-summary",
           text: this.issues.length === 0 ? "\u672C\u6B21\u6CA1\u6709\u53D1\u73B0\u95EE\u9898\u3002\u62D6\u52A8\u6807\u9898\u680F\u53EF\u4EE5\u8BA9\u51FA\u767D\u677F\u3002" : `\u53D1\u73B0 ${this.issues.length} \u9879\u3002\u53EA\u662F\u62A5\u544A\uFF0C\u4E0D\u4F1A\u81EA\u52A8\u4FEE\u6539\u767D\u677F\uFF1B\u62D6\u52A8\u6807\u9898\u680F\u53EF\u4EE5\u8BA9\u51FA\u767D\u677F\u3002`
         });
-        const scroll = host.createDiv({ cls: "collis-doctor-scroll" });
+        const scroll = host.createDiv({ cls: "noval-doctor-scroll" });
         if (this.issues.length === 0) {
-          scroll.createDiv({ cls: "collis-doctor-empty", text: "\u6CA1\u6709\u95EE\u9898\uFF0C\u53EF\u4EE5\u76F4\u63A5\u5173\u95ED\u3002" });
+          scroll.createDiv({ cls: "noval-doctor-empty", text: "\u6CA1\u6709\u95EE\u9898\uFF0C\u53EF\u4EE5\u76F4\u63A5\u5173\u95ED\u3002" });
         }
         for (const group of GROUPS) {
           const rows = this.issues.filter((issue) => issue.level === group.level);
           if (rows.length === 0)
             continue;
-          const section = scroll.createDiv({ cls: "collis-doctor-group" });
-          const head = section.createDiv({ cls: "collis-doctor-group-head" });
+          const section = scroll.createDiv({ cls: "noval-doctor-group" });
+          const head = section.createDiv({ cls: "noval-doctor-group-head" });
           head.createSpan({ text: group.label });
-          head.createSpan({ cls: "collis-doctor-group-note", text: group.note });
-          head.createSpan({ cls: "collis-doctor-count", text: `${rows.length}` });
+          head.createSpan({ cls: "noval-doctor-group-note", text: group.note });
+          head.createSpan({ cls: "noval-doctor-count", text: `${rows.length}` });
           for (const issue of rows) {
-            const row = section.createDiv({ cls: "collis-doctor-row" });
-            row.createDiv({ cls: `collis-doctor-dot is-${issue.level}` });
-            const body = row.createDiv({ cls: "collis-doctor-body" });
-            body.createDiv({ cls: "collis-doctor-title", text: issue.title });
-            body.createDiv({ cls: "collis-doctor-detail", text: issue.detail });
-            const actions = row.createDiv({ cls: "collis-doctor-actions" });
+            const row = section.createDiv({ cls: "noval-doctor-row" });
+            row.createDiv({ cls: `noval-doctor-dot is-${issue.level}` });
+            const body = row.createDiv({ cls: "noval-doctor-body" });
+            body.createDiv({ cls: "noval-doctor-title", text: issue.title });
+            body.createDiv({ cls: "noval-doctor-detail", text: issue.detail });
+            const actions = row.createDiv({ cls: "noval-doctor-actions" });
             if (issue.nodeIds.length > 0 || issue.edgeId) {
               const locate = actions.createEl("button", {
-                cls: "collis-doctor-btn",
+                cls: "noval-doctor-btn",
                 text: "\u5B9A\u4F4D"
               });
               locate.addEventListener("click", () => this.actions.locate(issue));
@@ -9040,7 +9040,7 @@ ${edgeLines.join("\n")}`);
             if (issue.removableNodeId) {
               const nodeId = issue.removableNodeId;
               const remove = actions.createEl("button", {
-                cls: "collis-doctor-btn is-danger",
+                cls: "noval-doctor-btn is-danger",
                 text: "\u79FB\u9664\u8282\u70B9"
               });
               remove.addEventListener("click", () => this.actions.removeNode(nodeId));
@@ -9048,7 +9048,7 @@ ${edgeLines.join("\n")}`);
             if (issue.kind === "dangling-edge" && issue.edgeId) {
               const edgeId = issue.edgeId;
               const remove = actions.createEl("button", {
-                cls: "collis-doctor-btn is-danger",
+                cls: "noval-doctor-btn is-danger",
                 text: "\u5220\u9664\u8FDE\u7EBF"
               });
               remove.addEventListener("click", () => this.actions.removeEdge(edgeId));
@@ -9056,19 +9056,19 @@ ${edgeLines.join("\n")}`);
             if (issue.kind === "unlabeled-edge" && issue.edgeId) {
               const edgeId = issue.edgeId;
               const label = actions.createEl("button", {
-                cls: "collis-doctor-btn",
+                cls: "noval-doctor-btn",
                 text: "\u6DFB\u52A0\u6807\u7B7E"
               });
               label.addEventListener("click", () => this.actions.addLabel(edgeId));
             }
           }
         }
-        const footer = host.createDiv({ cls: "collis-doctor-footer" });
+        const footer = host.createDiv({ cls: "noval-doctor-footer" });
         footer.createSpan({
-          cls: "collis-doctor-foot",
+          cls: "noval-doctor-foot",
           text: "\u6240\u6709\u4FEE\u590D\u90FD\u9700\u8981\u9010\u6761\u786E\u8BA4\uFF0C\u53EF Ctrl+Z \u64A4\u9500\u3002"
         });
-        const rescan = footer.createEl("button", { cls: "collis-doctor-btn", text: "\u91CD\u65B0\u626B\u63CF" });
+        const rescan = footer.createEl("button", { cls: "noval-doctor-btn", text: "\u91CD\u65B0\u626B\u63CF" });
         rescan.addEventListener("click", () => this.actions.rescan());
       }
       onClose() {
@@ -9118,31 +9118,31 @@ ${edgeLines.join("\n")}`);
         super(app);
       }
       onOpen() {
-        this.modalEl.addClass("collis-help-modal");
+        this.modalEl.addClass("noval-help-modal");
         this.titleEl.setText("\u767D\u677F\u5FEB\u6377\u952E");
         const host = this.contentEl;
         host.empty();
-        host.addClass("collis-help-content");
+        host.addClass("noval-help-content");
         host.createEl("p", {
-          cls: "collis-help-scope",
-          text: "\u4EC5\u9002\u7528\u4E8E Collis \u767D\u677F\u5185\u7684\u64CD\u4F5C\u3002"
+          cls: "noval-help-scope",
+          text: "\u4EC5\u9002\u7528\u4E8E Noval \u767D\u677F\u5185\u7684\u64CD\u4F5C\u3002"
         });
-        const scroll = host.createDiv({ cls: "collis-help-scroll" });
+        const scroll = host.createDiv({ cls: "noval-help-scroll" });
         for (const group of BOARD_SHORTCUTS) {
-          const section = scroll.createDiv({ cls: "collis-help-group" });
-          section.createDiv({ cls: "collis-help-group-title", text: group.title });
+          const section = scroll.createDiv({ cls: "noval-help-group" });
+          section.createDiv({ cls: "noval-help-group-title", text: group.title });
           for (const item of group.items) {
-            const row = section.createDiv({ cls: "collis-help-row" });
-            row.createSpan({ cls: "collis-help-label", text: item.label });
-            const keys = row.createDiv({ cls: "collis-help-keys" });
+            const row = section.createDiv({ cls: "noval-help-row" });
+            row.createSpan({ cls: "noval-help-label", text: item.label });
+            const keys = row.createDiv({ cls: "noval-help-keys" });
             for (const key of item.keys) {
-              keys.createSpan({ cls: "collis-help-key", text: key });
+              keys.createSpan({ cls: "noval-help-key", text: key });
             }
           }
         }
         host.createDiv({
-          cls: "collis-help-foot",
-          text: "\u547D\u4EE4\u7C7B\u64CD\u4F5C\uFF08\u5982\u767D\u677F\u4F53\u68C0\u3001AI \u9762\u677F\uFF09\u7684\u5FEB\u6377\u952E\uFF0C\u53EF\u5728 \u8BBE\u7F6E \u2192 \u5FEB\u6377\u952E \u2192 Collis \u4E2D\u4FEE\u6539\u3002"
+          cls: "noval-help-foot",
+          text: "\u547D\u4EE4\u7C7B\u64CD\u4F5C\uFF08\u5982\u767D\u677F\u4F53\u68C0\u3001AI \u9762\u677F\uFF09\u7684\u5FEB\u6377\u952E\uFF0C\u53EF\u5728 \u8BBE\u7F6E \u2192 \u5FEB\u6377\u952E \u2192 Noval \u4E2D\u4FEE\u6539\u3002"
         });
       }
       onClose() {
@@ -9454,17 +9454,17 @@ ${edgeLines.join("\n")}`);
         this.dragStart = null;
       }
       onOpen() {
-        this.modalEl.addClass("collis-export-modal");
-        this.contentEl.addClass("collis-export-content");
+        this.modalEl.addClass("noval-export-modal");
+        this.contentEl.addClass("noval-export-content");
         this.titleEl.setText("\u5BFC\u51FA Markdown");
         this.installDrag();
         this.contentEl.createDiv({
-          cls: "collis-export-sub",
+          cls: "noval-export-sub",
           text: `\u767D\u677F\u300C${this.options.boardTitle}\u300D\xB7 ${this.options.nodeCount} \u4E2A\u8282\u70B9\u3002\u63A8\u5BFC\u4E0E\u56E0\u679C\u751F\u6210\u5C42\u7EA7\uFF0C\u652F\u6301\u3001\u53CD\u9A73\u3001\u6765\u6E90\u4FDD\u7559\u4E3A\u6CE8\u89E3\u3002`
         });
-        const tabs = this.contentEl.createDiv({ cls: "collis-export-tabs" });
+        const tabs = this.contentEl.createDiv({ cls: "noval-export-tabs" });
         const makeTab = (format, label) => {
-          const button = tabs.createEl("button", { cls: "collis-export-tab", text: label });
+          const button = tabs.createEl("button", { cls: "noval-export-tab", text: label });
           button.dataset.format = format;
           button.addEventListener("click", () => {
             this.format = format;
@@ -9474,19 +9474,19 @@ ${edgeLines.join("\n")}`);
         };
         makeTab("headings", "\u6807\u9898\u5C42\u7EA7");
         makeTab("list", "\u5D4C\u5957\u5217\u8868");
-        this.previewEl = this.contentEl.createEl("textarea", { cls: "collis-export-preview" });
+        this.previewEl = this.contentEl.createEl("textarea", { cls: "noval-export-preview" });
         this.previewEl.readOnly = true;
         this.previewEl.spellcheck = false;
-        const footer = this.contentEl.createDiv({ cls: "collis-export-footer" });
+        const footer = this.contentEl.createDiv({ cls: "noval-export-footer" });
         footer.createDiv({
-          cls: "collis-export-foot",
+          cls: "noval-export-foot",
           text: "\u4FDD\u5B58\u4F1A\u5728\u767D\u677F\u6240\u5728\u76EE\u5F55\u751F\u6210\u540C\u540D\u7B14\u8BB0\uFF0C\u91CD\u540D\u81EA\u52A8\u52A0\u5E8F\u53F7\u3002"
         });
-        const actions = footer.createDiv({ cls: "collis-export-actions" });
-        const copyBtn = actions.createEl("button", { cls: "collis-export-btn", text: "\u590D\u5236" });
+        const actions = footer.createDiv({ cls: "noval-export-actions" });
+        const copyBtn = actions.createEl("button", { cls: "noval-export-btn", text: "\u590D\u5236" });
         copyBtn.addEventListener("click", () => void this.copy());
         const saveBtn = actions.createEl("button", {
-          cls: "mod-cta collis-export-btn",
+          cls: "mod-cta noval-export-btn",
           text: "\u4FDD\u5B58\u4E3A\u7B14\u8BB0"
         });
         saveBtn.addEventListener("click", () => void this.save());
@@ -9497,7 +9497,7 @@ ${edgeLines.join("\n")}`);
       }
       installDrag() {
         const title = this.titleEl;
-        title.addClass("collis-export-drag");
+        title.addClass("noval-export-drag");
         title.setAttribute("title", "\u6309\u4F4F\u8FD9\u91CC\u53EF\u4EE5\u62D6\u52A8\u7A97\u53E3");
         title.addEventListener("pointerdown", (evt) => {
           if (evt.button !== 0)
@@ -9553,7 +9553,7 @@ ${edgeLines.join("\n")}`);
           new import_obsidian15.Notice(`\u5DF2\u4FDD\u5B58\u4E3A\u7B14\u8BB0\uFF1A${path}`);
           this.close();
         } catch (error) {
-          console.error("[Collis] export note failed", error);
+          console.error("[Noval] export note failed", error);
           new import_obsidian15.Notice("\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u767D\u677F\u6240\u5728\u76EE\u5F55\u7684\u5199\u5165\u6743\u9650");
         }
       }
@@ -9563,7 +9563,7 @@ ${edgeLines.join("\n")}`);
         this.tabs = [];
       }
     };
-    var VIEW_TYPE_COLLIS_BOARD = "collis-board";
+    var VIEW_TYPE_NOVAL_BOARD = "noval-board";
     var GRID = 24;
     var MIN_GRID = 10;
     var EDGE_LABEL_MAX = 40;
@@ -9776,17 +9776,17 @@ ${edgeLines.join("\n")}`);
         this.onWheel = (evt) => {
           var _a;
           const target = evt.target;
-          if (target == null ? void 0 : target.closest(".collis-inline"))
+          if (target == null ? void 0 : target.closest(".noval-inline"))
             return;
-          if (target == null ? void 0 : target.closest(".collis-insert-panel"))
+          if (target == null ? void 0 : target.closest(".noval-insert-panel"))
             return;
-          if (target == null ? void 0 : target.closest(".collis-ai-panel"))
+          if (target == null ? void 0 : target.closest(".noval-ai-panel"))
             return;
-          if (target == null ? void 0 : target.closest(".collis-outline-panel"))
+          if (target == null ? void 0 : target.closest(".noval-outline-panel"))
             return;
-          const hoveredBody = target == null ? void 0 : target.closest(".collis-bnode-body");
+          const hoveredBody = target == null ? void 0 : target.closest(".noval-bnode-body");
           if (hoveredBody) {
-            const nodeEl = hoveredBody.closest(".collis-bnode");
+            const nodeEl = hoveredBody.closest(".noval-bnode");
             const nodeId = (_a = nodeEl == null ? void 0 : nodeEl.dataset) == null ? void 0 : _a.nodeId;
             if (nodeId && this.selection.has(nodeId))
               return;
@@ -9817,26 +9817,26 @@ ${edgeLines.join("\n")}`);
           const target = evt.target;
           if (!target)
             return;
-          if (target.closest(".collis-board-toolbar"))
+          if (target.closest(".noval-board-toolbar"))
             return;
-          if (target.closest(".collis-outline-panel"))
+          if (target.closest(".noval-outline-panel"))
             return;
-          const nodeEl = target.closest(".collis-bnode");
+          const nodeEl = target.closest(".noval-bnode");
           const nodeId = (_b = (_a = nodeEl == null ? void 0 : nodeEl.dataset) == null ? void 0 : _a.nodeId) != null ? _b : null;
           this.lastDownNodeId = nodeId;
-          const portEl = target.closest(".collis-port");
+          const portEl = target.closest(".noval-port");
           if (portEl && nodeId) {
             this.startLinkDrag(evt, nodeId, (_c = portEl.dataset.port) != null ? _c : "right");
             return;
           }
-          const handleEl = target.closest(".collis-resize-handle");
+          const handleEl = target.closest(".noval-resize-handle");
           if (handleEl && nodeId) {
             this.startResize(evt, nodeId, (_d = handleEl.dataset.dir) != null ? _d : "se");
             return;
           }
-          if (target.closest(".collis-bnode.is-playing"))
+          if (target.closest(".noval-bnode.is-playing"))
             return;
-          const bodyEl = target.closest(".collis-bnode-body");
+          const bodyEl = target.closest(".noval-bnode-body");
           if (bodyEl && this.isOnScrollbar(bodyEl, evt.clientX))
             return;
           if (evt.button === 1 || evt.button === 0 && this.spaceDown) {
@@ -10003,19 +10003,19 @@ ${edgeLines.join("\n")}`);
           const target = evt.target;
           if (!target)
             return;
-          if (target.closest(".collis-board-toolbar"))
+          if (target.closest(".noval-board-toolbar"))
             return;
-          const group = target.closest(".collis-edge-group");
+          const group = target.closest(".noval-edge-group");
           const edgeId = (_a = group == null ? void 0 : group.getAttribute("data-edge-id")) != null ? _a : null;
           if (edgeId) {
-            const onChip = target.closest(".collis-edge-label-bg, .collis-edge-label") !== null;
+            const onChip = target.closest(".noval-edge-label-bg, .noval-edge-label") !== null;
             this.openEdgeLabelEditor(
               edgeId,
               onChip ? void 0 : this.toWorld(evt.clientX, evt.clientY)
             );
             return;
           }
-          const nodeId = (_d = (_c = this.lastDownNodeId) != null ? _c : (_b = target.closest(".collis-bnode")) == null ? void 0 : _b.getAttribute("data-node-id")) != null ? _d : null;
+          const nodeId = (_d = (_c = this.lastDownNodeId) != null ? _c : (_b = target.closest(".noval-bnode")) == null ? void 0 : _b.getAttribute("data-node-id")) != null ? _d : null;
           if (nodeId) {
             const node2 = this.nodeMap.get(nodeId);
             if (!node2)
@@ -10109,7 +10109,7 @@ ${edgeLines.join("\n")}`);
         };
       }
       getViewType() {
-        return VIEW_TYPE_COLLIS_BOARD;
+        return VIEW_TYPE_NOVAL_BOARD;
       }
       getDisplayText() {
         var _a, _b;
@@ -10178,7 +10178,7 @@ ${edgeLines.join("\n")}`);
         );
         for (const node2 of targets) {
           const el = this.nodeEls.get(node2.id);
-          if (el && el.hasClass("collis-editing"))
+          if (el && el.hasClass("noval-editing"))
             continue;
           await this.renderNode(node2);
         }
@@ -10236,18 +10236,18 @@ ${edgeLines.join("\n")}`);
         this.applyTransform();
       }
       buildUI() {
-        this.containerEl.addClass("collis-board-leaf");
+        this.containerEl.addClass("noval-board-leaf");
         const container = this.contentEl;
         container.empty();
-        container.addClass("collis-board-host");
-        this.root = container.createDiv({ cls: "collis-board" });
-        this.world = this.root.createDiv({ cls: "collis-world" });
-        const toolbar = this.root.createDiv({ cls: "collis-board-toolbar" });
+        container.addClass("noval-board-host");
+        this.root = container.createDiv({ cls: "noval-board" });
+        this.world = this.root.createDiv({ cls: "noval-world" });
+        const toolbar = this.root.createDiv({ cls: "noval-board-toolbar" });
         toolbar.addEventListener("pointerdown", (evt) => evt.stopPropagation());
         toolbar.addEventListener("dblclick", (evt) => evt.stopPropagation());
         const addButton = (icon, label, handler) => {
           const button = toolbar.createEl("button", {
-            cls: "collis-board-btn",
+            cls: "noval-board-btn",
             attr: { "aria-label": label }
           });
           (0, import_obsidian16.setIcon)(button, icon);
@@ -10259,50 +10259,50 @@ ${edgeLines.join("\n")}`);
           return button;
         };
         this.moreBtn = addButton("more-vertical", "\u66F4\u591A", (evt) => this.showBoardMenu(evt));
-        toolbar.createDiv({ cls: "collis-board-sep" });
+        toolbar.createDiv({ cls: "noval-board-sep" });
         addButton("sticky-note", "\u65B0\u5EFA\u4FBF\u7B7E", () => {
           void this.createStickyAtCenter();
         });
         addButton("type", "\u65B0\u5EFA\u6587\u672C", () => {
           void this.createTextAtCenter();
         });
-        toolbar.createDiv({ cls: "collis-board-sep" });
+        toolbar.createDiv({ cls: "noval-board-sep" });
         addButton("file-text", "\u6DFB\u52A0 md \u7B14\u8BB0", () => this.openInsertPanelAtCenter("note"));
         addButton("list", "\u6DFB\u52A0\u5361\u7247\u7B14\u8BB0", () => this.openInsertPanelAtCenter("card"));
         addButton("image", "\u6DFB\u52A0\u5A92\u4F53\u6587\u4EF6", () => this.openInsertPanelAtCenter("media"));
-        toolbar.createDiv({ cls: "collis-board-sep" });
+        toolbar.createDiv({ cls: "noval-board-sep" });
         addButton("plus", "\u653E\u5927", () => this.zoomBy(1.2));
         addButton("maximize", "\u603B\u89C8", () => {
           this.fitToContent();
           this.scheduleSave();
         });
         addButton("minus", "\u7F29\u5C0F", () => this.zoomBy(1 / 1.2));
-        toolbar.createDiv({ cls: "collis-board-sep" });
+        toolbar.createDiv({ cls: "noval-board-sep" });
         this.undoBtn = addButton("undo-2", "\u64A4\u9500", () => void this.undo());
         this.redoBtn = addButton("redo-2", "\u91CD\u505A", () => void this.redo());
         addButton("list-tree", "\u5927\u7EB2", () => this.toggleOutlinePanel());
         addButton("download", "\u5BFC\u51FA Markdown", () => this.openExportModal());
-        toolbar.createDiv({ cls: "collis-board-sep" });
+        toolbar.createDiv({ cls: "noval-board-sep" });
         addButton("help-circle", "\u5E2E\u52A9", () => this.openBoardHelp());
         this.updateHistoryButtons();
-        this.toolbarEl = this.root.createDiv({ cls: "collis-node-toolbar is-hidden" });
+        this.toolbarEl = this.root.createDiv({ cls: "noval-node-toolbar is-hidden" });
         this.toolbarEl.addEventListener("pointerdown", (evt) => evt.stopPropagation());
         this.toolbarEl.addEventListener("dblclick", (evt) => evt.stopPropagation());
-        this.minimapEl = this.root.createDiv({ cls: "collis-minimap is-hidden" });
+        this.minimapEl = this.root.createDiv({ cls: "noval-minimap is-hidden" });
         const miniSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        miniSvg.classList.add("collis-minimap-svg");
+        miniSvg.classList.add("noval-minimap-svg");
         this.minimapEl.appendChild(miniSvg);
         this.minimapSvg = miniSvg;
         this.minimapEl.addEventListener("pointerdown", this.onMinimapDown);
         this.minimapEl.addEventListener("dblclick", (evt) => evt.stopPropagation());
-        this.edgeBar = this.root.createDiv({ cls: "collis-edge-toolbar is-hidden" });
+        this.edgeBar = this.root.createDiv({ cls: "noval-edge-toolbar is-hidden" });
         this.edgeBar.addEventListener("pointerdown", (evt) => evt.stopPropagation());
         this.edgeBar.addEventListener("dblclick", (evt) => evt.stopPropagation());
-        this.zoomEl = this.root.createDiv({ cls: "collis-board-zoom", text: "100%" });
-        this.hintEl = this.root.createDiv({ cls: "collis-board-hint is-hidden" });
-        this.hintEl.createDiv({ cls: "collis-hint-title", text: "\u7A7A\u767D\u767D\u677F" });
+        this.zoomEl = this.root.createDiv({ cls: "noval-board-zoom", text: "100%" });
+        this.hintEl = this.root.createDiv({ cls: "noval-board-hint is-hidden" });
+        this.hintEl.createDiv({ cls: "noval-hint-title", text: "\u7A7A\u767D\u767D\u677F" });
         this.hintEl.createDiv({
-          cls: "collis-hint-sub",
+          cls: "noval-hint-sub",
           text: "\u62D6\u5165\u5361\u7247\u6216\u6587\u4EF6 \xB7 \u53CC\u51FB\u7A7A\u767D\u5904\u65B0\u5EFA\u5361\u7247 \xB7 \u6EDA\u8F6E\u7F29\u653E \xB7 \u7A7A\u683C\u62D6\u52A8\u5E73\u79FB"
         });
         this.root.addEventListener("wheel", this.onWheel, { passive: false });
@@ -10321,7 +10321,7 @@ ${edgeLines.join("\n")}`);
           const target = evt.target;
           if (!(target instanceof SVGElement))
             return;
-          const group = target.closest(".collis-edge-group");
+          const group = target.closest(".noval-edge-group");
           const edgeId = (_a = group == null ? void 0 : group.dataset.edgeId) != null ? _a : null;
           if (!edgeId)
             return;
@@ -10388,7 +10388,7 @@ ${edgeLines.join("\n")}`);
           try {
             await Promise.all(this.nodes.map((node2) => this.renderNode(node2)));
           } catch (error) {
-            console.error("[Collis] node render failed", error);
+            console.error("[Noval] node render failed", error);
           }
           this.renderEdges();
         } finally {
@@ -10456,7 +10456,7 @@ ${edgeLines.join("\n")}`);
           const leaf = this.app.workspace.getLeaf(mode === "window" ? "window" : "tab");
           await leaf.openFile(file, { state: { mode: "preview" } });
         } catch (error) {
-          console.error("[Collis] open card view failed", error);
+          console.error("[Noval] open card view failed", error);
           new import_obsidian16.Notice("\u6253\u5F00\u5361\u7247\u5931\u8D25");
         }
       }
@@ -10525,12 +10525,12 @@ ${edgeLines.join("\n")}`);
         this.closeColorPop();
         if (nodes.length === 0)
           return;
-        const pop = this.root.createDiv({ cls: "collis-color-pop" });
+        const pop = this.root.createDiv({ cls: "noval-color-pop" });
         this.colorPop = pop;
         pop.addEventListener("pointerdown", (event) => event.stopPropagation());
         for (const color of NODE_COLORS) {
           const swatch = pop.createEl("button", {
-            cls: "collis-swatch",
+            cls: "noval-swatch",
             attr: { "aria-label": color.label }
           });
           swatch.dataset.color = color.name;
@@ -10540,7 +10540,7 @@ ${edgeLines.join("\n")}`);
           });
         }
         const custom = pop.createEl("label", {
-          cls: "collis-swatch is-custom",
+          cls: "noval-swatch is-custom",
           attr: { "aria-label": "\u81EA\u5B9A\u4E49\u989C\u8272" }
         });
         const picker = custom.createEl("input", { attr: { type: "color" } });
@@ -10551,7 +10551,7 @@ ${edgeLines.join("\n")}`);
           this.closeColorPop();
         });
         const clear = pop.createEl("button", {
-          cls: "collis-swatch is-clear",
+          cls: "noval-swatch is-clear",
           attr: { "aria-label": "\u65E0\u989C\u8272" }
         });
         (0, import_obsidian16.setIcon)(clear, "ban");
@@ -10586,7 +10586,7 @@ ${edgeLines.join("\n")}`);
         this.closeAlignPop();
         if (nodes.length < 2)
           return;
-        const pop = this.root.createDiv({ cls: "collis-align-pop" });
+        const pop = this.root.createDiv({ cls: "noval-align-pop" });
         this.alignPop = pop;
         pop.addEventListener("pointerdown", (event) => event.stopPropagation());
         const actions = [
@@ -10601,7 +10601,7 @@ ${edgeLines.join("\n")}`);
         ];
         for (const action of actions) {
           const button = pop.createEl("button", {
-            cls: "collis-tool-btn",
+            cls: "noval-tool-btn",
             attr: { "aria-label": action.label }
           });
           (0, import_obsidian16.setIcon)(button, action.icon);
@@ -10972,7 +10972,7 @@ ${text}
       }
       async renameBoard(file, value) {
         var _a, _b;
-        const name = value.replace(/\.(volis|collis)$/i, "").trim();
+        const name = value.replace(/\.(volis|noval)$/i, "").trim();
         if (!name || name === file.basename)
           return;
         const folder = (_b = (_a = file.parent) == null ? void 0 : _a.path) != null ? _b : "";
@@ -10992,7 +10992,7 @@ ${text}
       }
       hasEditingNode() {
         for (const el of this.nodeEls.values()) {
-          if (el.hasClass("collis-editing"))
+          if (el.hasClass("noval-editing"))
             return true;
         }
         return false;
@@ -11058,7 +11058,7 @@ ${text}
           rect.setAttribute("width", String(node2.width));
           rect.setAttribute("height", String(this.nodeHeight(node2)));
           rect.setAttribute("rx", node2.type === "group" ? "8" : "4");
-          rect.setAttribute("class", `collis-mini-node is-${node2.type}`);
+          rect.setAttribute("class", `noval-mini-node is-${node2.type}`);
           svg.appendChild(rect);
         }
         const view = this.svgNode("rect");
@@ -11070,7 +11070,7 @@ ${text}
         view.setAttribute("width", String(rootRect.width / this.scale));
         view.setAttribute("height", String(rootRect.height / this.scale));
         view.setAttribute("rx", "6");
-        view.setAttribute("class", "collis-mini-view");
+        view.setAttribute("class", "noval-mini-view");
         svg.appendChild(view);
       }
       jumpToMinimapPoint(clientX, clientY) {
@@ -11114,7 +11114,7 @@ ${text}
           this.toolbarEl.empty();
           for (const action of actions) {
             const button = this.toolbarEl.createEl("button", {
-              cls: `collis-tool-btn${action.danger ? " is-danger" : ""}`,
+              cls: `noval-tool-btn${action.danger ? " is-danger" : ""}`,
               attr: { "aria-label": action.label }
             });
             button.disabled = action.enabled ? !action.enabled(nodes) : false;
@@ -11247,7 +11247,7 @@ ${text}
         try {
           await Promise.all(copies.map((node2) => this.renderNode(node2)));
         } catch (error) {
-          console.error("[Collis] paste render failed", error);
+          console.error("[Noval] paste render failed", error);
         }
         this.renderEdges();
         this.selection.clear();
@@ -11329,7 +11329,7 @@ ${text}
         try {
           await Promise.all(rebuilds);
         } catch (error) {
-          console.error("[Collis] node rebuild failed", error);
+          console.error("[Noval] node rebuild failed", error);
         }
         this.renderEdges();
         this.updateHint();
@@ -11354,7 +11354,7 @@ ${text}
         const ids = /* @__PURE__ */ new Set();
         for (const id of this.selection) {
           const el = this.nodeEls.get(id);
-          if (el && el.hasClass("collis-editing"))
+          if (el && el.hasClass("noval-editing"))
             continue;
           ids.add(id);
         }
@@ -11388,19 +11388,19 @@ ${text}
         const el = this.nodeEls.get(nodeId);
         if (!el)
           return;
-        el.classList.remove("collis-editing");
+        el.classList.remove("noval-editing");
         el.remove();
         this.nodeEls.delete(nodeId);
       }
       ensureLayers() {
         if (!this.edgesEl || !this.world.contains(this.edgesEl)) {
           const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-          svg.classList.add("collis-edges");
+          svg.classList.add("noval-edges");
           this.world.prepend(svg);
           this.edgesEl = svg;
         }
         if (!this.frameEl || !this.world.contains(this.frameEl)) {
-          this.frameEl = this.world.createDiv({ cls: "collis-selection-frame is-hidden" });
+          this.frameEl = this.world.createDiv({ cls: "noval-selection-frame is-hidden" });
         }
       }
       svgNode(tag) {
@@ -11572,7 +11572,7 @@ ${text}
         svg.style.width = `${vw}px`;
         svg.style.height = `${vh}px`;
         const defs = this.svgNode("defs");
-        defs.innerHTML = '<marker id="collis-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker>';
+        defs.innerHTML = '<marker id="noval-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker>';
         svg.appendChild(defs);
         for (const edge of this.edges) {
           const from = this.nodeMap.get(edge.from);
@@ -11584,19 +11584,19 @@ ${text}
             continue;
           const d = geometry.d;
           const group = this.svgNode("g");
-          group.setAttribute("class", "collis-edge-group");
+          group.setAttribute("class", "noval-edge-group");
           group.dataset.edgeId = edge.id;
           if (edge.id === this.selectedEdgeId)
             group.classList.add("is-selected");
           const hit = this.svgNode("path");
           hit.setAttribute("d", d);
-          hit.setAttribute("class", "collis-edge-hit");
+          hit.setAttribute("class", "noval-edge-hit");
           const path = this.svgNode("path");
           path.setAttribute("d", d);
-          path.setAttribute("class", "collis-edge");
+          path.setAttribute("class", "noval-edge");
           const relation = edge.relation ? EDGE_RELATION_BY_ID.get(edge.relation) : void 0;
           const style = (_a = edge.style) != null ? _a : relation == null ? void 0 : relation.style;
-          path.setAttribute("marker-end", "url(#collis-arrow)");
+          path.setAttribute("marker-end", "url(#noval-arrow)");
           if (style === "dashed")
             path.setAttribute("stroke-dasharray", "6 4");
           const stroke = (_b = this.lineColorOf(edge.color)) != null ? _b : this.lineColorOf(relation == null ? void 0 : relation.color);
@@ -11606,10 +11606,10 @@ ${text}
           if (arrow === "none") {
             path.removeAttribute("marker-end");
           } else {
-            path.setAttribute("marker-end", "url(#collis-arrow)");
+            path.setAttribute("marker-end", "url(#noval-arrow)");
           }
           if (arrow === "both") {
-            path.setAttribute("marker-start", "url(#collis-arrow)");
+            path.setAttribute("marker-start", "url(#noval-arrow)");
           }
           group.appendChild(hit);
           group.appendChild(path);
@@ -11631,7 +11631,7 @@ ${text}
           return;
         const anchor = curvePoint(curve, this.edgeLabelT(edge));
         const text = this.svgNode("text");
-        text.setAttribute("class", stored ? "collis-edge-label" : "collis-edge-label is-relation");
+        text.setAttribute("class", stored ? "noval-edge-label" : "noval-edge-label is-relation");
         text.setAttribute("x", String(anchor.x));
         text.setAttribute("y", String(anchor.y));
         text.setAttribute("text-anchor", "middle");
@@ -11640,7 +11640,7 @@ ${text}
         text.textContent = label;
         const width = this.edgeLabelWidth(label) + EDGE_LABEL_PAD_X * 2;
         const chip = this.svgNode("rect");
-        chip.setAttribute("class", "collis-edge-label-bg");
+        chip.setAttribute("class", "noval-edge-label-bg");
         chip.setAttribute("x", String(anchor.x - width / 2));
         chip.setAttribute("y", String(anchor.y - EDGE_LABEL_HEIGHT / 2));
         chip.setAttribute("width", String(width));
@@ -11703,7 +11703,7 @@ ${text}
           kind = "video";
           icon = "video";
         }
-        const badge = el.createDiv({ cls: "collis-type-badge" });
+        const badge = el.createDiv({ cls: "noval-type-badge" });
         badge.dataset.kind = kind;
         (0, import_obsidian16.setIcon)(badge, icon);
       }
@@ -11712,7 +11712,7 @@ ${text}
         el.addClass("is-group");
         this.nodeText.set(node2.id, (_a = node2.label) != null ? _a : "");
         const input = document.createElement("input");
-        input.className = "collis-group-label";
+        input.className = "noval-group-label";
         input.type = "text";
         input.spellcheck = false;
         input.value = (_b = node2.label) != null ? _b : "\u5206\u7EC4";
@@ -11817,10 +11817,10 @@ ${text}
       }
       async renderNode(node2) {
         const existing = this.nodeEls.get(node2.id);
-        if (existing && existing.hasClass("collis-editing"))
+        if (existing && existing.hasClass("noval-editing"))
           return existing;
         this.staleIds.delete(node2.id);
-        const el = this.world.createDiv({ cls: "collis-bnode" });
+        const el = this.world.createDiv({ cls: "noval-bnode" });
         el.dataset.nodeId = node2.id;
         el.style.width = `${node2.width}px`;
         if (node2.height)
@@ -11829,12 +11829,12 @@ ${text}
         el.toggleClass("is-sticky", node2.type === "text" && Boolean(node2.sticky));
         this.paintColor(el, node2.color);
         for (const dir of ["n", "s", "e", "w", "ne", "nw", "se", "sw"]) {
-          const handle = el.createDiv({ cls: "collis-resize-handle" });
+          const handle = el.createDiv({ cls: "noval-resize-handle" });
           handle.dataset.dir = dir;
         }
         if (node2.type !== "group") {
           for (const side of ["top", "right", "bottom", "left"]) {
-            const port = el.createDiv({ cls: `collis-port is-${side}` });
+            const port = el.createDiv({ cls: `noval-port is-${side}` });
             port.dataset.port = side;
           }
           this.attachTypeBadge(el, node2);
@@ -11857,7 +11857,7 @@ ${text}
           previous.remove();
         if (this.aiPanel && this.aiNumberMap.size >= 2 && this.aiNumberMap.has(node2.id)) {
           const badge = el.createDiv({
-            cls: "collis-ai-node-number",
+            cls: "noval-ai-node-number",
             text: this.aiNumberMap.get(node2.id)
           });
           badge.setAttribute("aria-hidden", "true");
@@ -11867,7 +11867,7 @@ ${text}
         return el;
       }
       async renderTextBody(el, node2) {
-        const body = el.createDiv({ cls: "collis-bnode-body" });
+        const body = el.createDiv({ cls: "noval-bnode-body" });
         this.nodeText.set(node2.id, node2.text);
         if (!node2.text.trim())
           return;
@@ -11881,10 +11881,10 @@ ${text}
           blockId: node2.blockId,
           linkpath: ""
         });
-        const body = el.createDiv({ cls: "collis-bnode-body" });
+        const body = el.createDiv({ cls: "noval-bnode-body" });
         if (meta.stale) {
           this.staleIds.add(node2.id);
-          body.createDiv({ cls: "collis-bnode-placeholder", text: "\u5361\u7247\u5DF2\u5220\u9664" });
+          body.createDiv({ cls: "noval-bnode-placeholder", text: "\u5361\u7247\u5DF2\u5220\u9664" });
           return;
         }
         this.nodeText.set(node2.id, meta.editable);
@@ -11895,7 +11895,7 @@ ${text}
         if (meta.date)
           parts.push(meta.date.slice(5));
         if (parts.length > 0) {
-          el.createDiv({ cls: "collis-bnode-meta", text: parts.join("  ") });
+          el.createDiv({ cls: "noval-bnode-meta", text: parts.join("  ") });
         }
       }
       /**
@@ -11928,15 +11928,15 @@ ${text}
         }
         if (!(file instanceof import_obsidian16.TFile)) {
           this.staleIds.add(node2.id);
-          el.createDiv({ cls: "collis-bnode-placeholder", text: "\u6587\u4EF6\u7F3A\u5931" });
+          el.createDiv({ cls: "noval-bnode-placeholder", text: "\u6587\u4EF6\u7F3A\u5931" });
           return;
         }
         const src = this.app.vault.getResourcePath(file);
         const ext = file.extension.toLowerCase();
         if (ext === "md") {
           el.addClass("is-doc-text");
-          el.createDiv({ cls: "collis-bnode-doc-head", text: file.basename });
-          const body = el.createDiv({ cls: "collis-bnode-body collis-bnode-doc-body" });
+          el.createDiv({ cls: "noval-bnode-doc-head", text: file.basename });
+          const body = el.createDiv({ cls: "noval-bnode-body noval-bnode-doc-body" });
           let content = "";
           try {
             content = await this.app.vault.cachedRead(file);
@@ -11947,12 +11947,12 @@ ${text}
             await import_obsidian16.MarkdownRenderer.render(this.app, content, body, file.path, this);
             this.decorateNumericTags(body);
           } else {
-            body.createDiv({ cls: "collis-bnode-placeholder", text: "\u7A7A\u7B14\u8BB0" });
+            body.createDiv({ cls: "noval-bnode-placeholder", text: "\u7A7A\u7B14\u8BB0" });
           }
           return;
         }
         if (IMAGE_EXT2.includes(ext)) {
-          const img = el.createEl("img", { cls: "collis-bnode-media is-loading" });
+          const img = el.createEl("img", { cls: "noval-bnode-media is-loading" });
           img.draggable = false;
           const reveal = () => img.removeClass("is-loading");
           img.addEventListener("load", reveal);
@@ -11963,20 +11963,20 @@ ${text}
           return;
         }
         if (ext === "pdf") {
-          const embed = el.createEl("embed", { cls: "collis-bnode-media" });
+          const embed = el.createEl("embed", { cls: "noval-bnode-media" });
           embed.setAttribute("src", src);
           embed.setAttribute("type", "application/pdf");
           return;
         }
         if (VIDEO_EXT2.includes(ext)) {
-          const video = el.createEl("video", { cls: "collis-bnode-media is-loading" });
+          const video = el.createEl("video", { cls: "noval-bnode-media is-loading" });
           const revealVideo = () => video.removeClass("is-loading");
           video.addEventListener("loadeddata", revealVideo);
           video.addEventListener("error", revealVideo);
           video.src = src;
           video.muted = true;
           video.preload = "metadata";
-          const play = el.createDiv({ cls: "collis-bnode-play" });
+          const play = el.createDiv({ cls: "noval-bnode-play" });
           play.addEventListener("pointerdown", (evt) => evt.stopPropagation());
           play.addEventListener("click", (evt) => {
             evt.stopPropagation();
@@ -11988,10 +11988,10 @@ ${text}
           });
           return;
         }
-        const audio = el.createEl("audio", { cls: "collis-bnode-media" });
+        const audio = el.createEl("audio", { cls: "noval-bnode-media" });
         audio.src = src;
         audio.controls = false;
-        const audioPlay = el.createDiv({ cls: "collis-bnode-play" });
+        const audioPlay = el.createDiv({ cls: "noval-bnode-play" });
         audioPlay.addEventListener("pointerdown", (evt) => evt.stopPropagation());
         audioPlay.addEventListener("click", (evt) => {
           evt.stopPropagation();
@@ -12200,7 +12200,7 @@ ${text}
         const node2 = this.nodeMap.get(nodeId);
         if (!node2)
           return;
-        if ((_a = this.nodeEls.get(nodeId)) == null ? void 0 : _a.hasClass("collis-editing")) {
+        if ((_a = this.nodeEls.get(nodeId)) == null ? void 0 : _a.hasClass("noval-editing")) {
           new import_obsidian16.Notice("\u8BF7\u5148\u7ED3\u675F\u8FD9\u5F20\u5361\u7247\u7684\u7F16\u8F91\u518D\u79FB\u9664");
           return;
         }
@@ -12524,9 +12524,9 @@ ${result.text}`, cache: true }
           return;
         for (const [tag, nodeId] of this.aiNumberMap) {
           const el = this.nodeEls.get(nodeId);
-          if (!el || el.querySelector(":scope > .collis-ai-node-number"))
+          if (!el || el.querySelector(":scope > .noval-ai-node-number"))
             continue;
-          const badge = el.createDiv({ cls: "collis-ai-node-number", text: tag });
+          const badge = el.createDiv({ cls: "noval-ai-node-number", text: tag });
           badge.setAttribute("aria-hidden", "true");
           this.aiBadges.set(nodeId, badge);
         }
@@ -12629,58 +12629,58 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         this.applyNodeNumbers();
         const rect = this.root.getBoundingClientRect();
         const box = this.selectionBox(targets);
-        const panel = this.root.createDiv({ cls: "collis-ai-panel" });
+        const panel = this.root.createDiv({ cls: "noval-ai-panel" });
         this.aiPanel = panel;
         panel.addEventListener("pointerdown", (evt) => evt.stopPropagation());
         panel.addEventListener("dblclick", (evt) => evt.stopPropagation());
-        const head = panel.createDiv({ cls: "collis-ai-head" });
-        const headIcon = head.createDiv({ cls: "collis-ai-head-icon" });
+        const head = panel.createDiv({ cls: "noval-ai-head" });
+        const headIcon = head.createDiv({ cls: "noval-ai-head-icon" });
         (0, import_obsidian16.setIcon)(headIcon, "sparkles");
         head.createDiv({
-          cls: "collis-ai-head-title",
+          cls: "noval-ai-head-title",
           text: `${selected.length > 0 ? "\u5206\u6790\u9009\u4E2D\u7684" : "\u5206\u6790\u5168\u90E8"} ${targetCount} \u4E2A\u8282\u70B9`
         });
-        head.createDiv({ cls: "collis-ai-head-model", text: (_a = profile == null ? void 0 : profile.name) != null ? _a : "" });
-        head.createDiv({ cls: "collis-ai-head-spacer" });
+        head.createDiv({ cls: "noval-ai-head-model", text: (_a = profile == null ? void 0 : profile.name) != null ? _a : "" });
+        head.createDiv({ cls: "noval-ai-head-spacer" });
         const newBtn = head.createEl("button", {
-          cls: "collis-ai-head-btn",
+          cls: "noval-ai-head-btn",
           attr: { "aria-label": "\u65B0\u5BF9\u8BDD" }
         });
         (0, import_obsidian16.setIcon)(newBtn, "square-pen");
         const historyBtn = head.createEl("button", {
-          cls: "collis-ai-head-btn",
+          cls: "noval-ai-head-btn",
           attr: { "aria-label": "\u5386\u53F2\u5BF9\u8BDD" }
         });
         (0, import_obsidian16.setIcon)(historyBtn, "history");
         const expandBtn = head.createEl("button", {
-          cls: "collis-ai-head-btn",
+          cls: "noval-ai-head-btn",
           attr: { "aria-label": "\u5C55\u5F00" }
         });
         (0, import_obsidian16.setIcon)(expandBtn, "maximize-2");
         const closeBtn = head.createEl("button", {
-          cls: "collis-ai-head-btn",
+          cls: "noval-ai-head-btn",
           attr: { "aria-label": "\u5173\u95ED" }
         });
         (0, import_obsidian16.setIcon)(closeBtn, "x");
-        const stream = panel.createDiv({ cls: "collis-ai-stream" });
-        const dock = panel.createDiv({ cls: "collis-ai-dock" });
-        const compose = dock.createDiv({ cls: "collis-ai-compose" });
+        const stream = panel.createDiv({ cls: "noval-ai-stream" });
+        const dock = panel.createDiv({ cls: "noval-ai-dock" });
+        const compose = dock.createDiv({ cls: "noval-ai-compose" });
         const input = compose.createEl("input", {
-          cls: "collis-ai-input",
+          cls: "noval-ai-input",
           attr: { type: "text", placeholder: "\u95EE\u70B9\u4EC0\u4E48\uFF0C\u6216\u7EE7\u7EED\u8FFD\u95EE\u2026" }
         });
         const sendBtn = compose.createEl("button", {
-          cls: "collis-ai-send",
+          cls: "noval-ai-send",
           attr: { "aria-label": "\u53D1\u9001" }
         });
         (0, import_obsidian16.setIcon)(sendBtn, "arrow-up");
-        const actions = dock.createDiv({ cls: "collis-ai-actions" });
+        const actions = dock.createDiv({ cls: "noval-ai-actions" });
         const insertBtn = actions.createEl("button", {
-          cls: "collis-ai-btn is-primary",
+          cls: "noval-ai-btn is-primary",
           text: "\u63D2\u5165\u4E3A\u65B0\u8282\u70B9"
         });
-        const overwriteBtn = actions.createEl("button", { cls: "collis-ai-btn", text: "\u8986\u76D6\u539F\u8282\u70B9" });
-        const noteBtn = actions.createEl("button", { cls: "collis-ai-btn", text: "\u5B58\u4E3A\u7B14\u8BB0" });
+        const overwriteBtn = actions.createEl("button", { cls: "noval-ai-btn", text: "\u8986\u76D6\u539F\u8282\u70B9" });
+        const noteBtn = actions.createEl("button", { cls: "noval-ai-btn", text: "\u5B58\u4E3A\u7B14\u8BB0" });
         insertBtn.disabled = true;
         noteBtn.disabled = true;
         const single = targets.length === 1 ? targets[0] : null;
@@ -12759,12 +12759,12 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           stream.scrollTop = stream.scrollHeight;
         };
         const addUserBubble = (text) => {
-          const row = stream.createDiv({ cls: "collis-ai-msg is-user" });
-          row.createDiv({ cls: "collis-ai-bubble", text });
+          const row = stream.createDiv({ cls: "noval-ai-msg is-user" });
+          row.createDiv({ cls: "noval-ai-bubble", text });
           scrollDown();
         };
         const refreshPicks = () => {
-          stream.querySelectorAll(".collis-ai-msg.is-ai").forEach((row) => {
+          stream.querySelectorAll(".noval-ai-msg.is-ai").forEach((row) => {
             var _a2;
             const index = Number((_a2 = row.dataset.answerIndex) != null ? _a2 : "-1");
             row.toggleClass("is-picked", this.aiPicked.has(index));
@@ -12780,9 +12780,9 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         };
         const clearPickOutside = (evt) => {
           const target = evt.target;
-          if (target.closest(".collis-ai-msg.is-ai"))
+          if (target.closest(".noval-ai-msg.is-ai"))
             return;
-          if (target.closest(".collis-ai-actions, .collis-ai-compose"))
+          if (target.closest(".noval-ai-actions, .noval-ai-compose"))
             return;
           if (this.aiPicked.size === 0)
             return;
@@ -12794,32 +12794,32 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         const appendContext = (host, snapshot) => {
           if (!snapshot)
             return null;
-          const details = host.createEl("details", { cls: "collis-ai-context" });
+          const details = host.createEl("details", { cls: "noval-ai-context" });
           const summary = details.createEl("summary");
-          const label = summary.createSpan({ cls: "collis-ai-context-label", text: "\u5DF2\u8BFB\u53D6\u4E0A\u4E0B\u6587" });
+          const label = summary.createSpan({ cls: "noval-ai-context-label", text: "\u5DF2\u8BFB\u53D6\u4E0A\u4E0B\u6587" });
           summary.createSpan({
-            cls: "collis-ai-context-count",
+            cls: "noval-ai-context-count",
             text: `${snapshot.nodes.length} \u4E2A\u8282\u70B9 \xB7 ${formatTokens(snapshot.usedTokens)} token`
           });
-          const body = details.createDiv({ cls: "collis-ai-context-body" });
+          const body = details.createDiv({ cls: "noval-ai-context-body" });
           for (const node2 of snapshot.nodes) {
-            const line = body.createDiv({ cls: "collis-ai-context-row" });
-            line.createSpan({ cls: "collis-ai-context-tag", text: node2.tag });
-            line.createSpan({ cls: "collis-ai-context-name", text: node2.label });
+            const line = body.createDiv({ cls: "noval-ai-context-row" });
+            line.createSpan({ cls: "noval-ai-context-tag", text: node2.tag });
+            line.createSpan({ cls: "noval-ai-context-name", text: node2.label });
             line.createSpan({
-              cls: "collis-ai-context-size",
+              cls: "noval-ai-context-size",
               text: node2.readable ? `${node2.charsSent}/${node2.charsTotal} \u5B57` : "\u4EC5\u6587\u4EF6\u540D"
             });
             if (node2.note)
-              line.createSpan({ cls: "collis-ai-context-flag", text: node2.note });
+              line.createSpan({ cls: "noval-ai-context-flag", text: node2.note });
           }
           for (const note of snapshot.notes) {
-            body.createDiv({ cls: "collis-ai-context-note", text: note });
+            body.createDiv({ cls: "noval-ai-context-note", text: note });
           }
           return label;
         };
         const appendCopy = (host, text) => {
-          const button = host.createEl("button", { cls: "collis-ai-reply-icon" });
+          const button = host.createEl("button", { cls: "noval-ai-reply-icon" });
           (0, import_obsidian16.setIcon)(button, "copy");
           button.addEventListener("click", (evt) => {
             evt.stopPropagation();
@@ -12840,14 +12840,14 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           const index = this.aiAnswers.length;
           this.aiAnswers.push(text);
           this.aiSnapshots.push(snapshot);
-          const row = stream.createDiv({ cls: "collis-ai-msg is-ai" });
+          const row = stream.createDiv({ cls: "noval-ai-msg is-ai" });
           row.dataset.answerIndex = String(index);
           appendContext(row, snapshot);
           const refMap = snapshot ? new Map(snapshot.nodes.map((node2) => [node2.tag, node2.id])) : this.aiNumberMap;
-          const body = row.createDiv({ cls: "collis-ai-reply" });
+          const body = row.createDiv({ cls: "noval-ai-reply" });
           await import_obsidian16.MarkdownRenderer.render(this.app, this.decorateAnswer(text, refMap), body, "", this);
           this.linkAnswerRefs(body, refMap);
-          const bar = row.createDiv({ cls: "collis-ai-reply-bar" });
+          const bar = row.createDiv({ cls: "noval-ai-reply-bar" });
           appendCopy(bar, text);
           if (selectable) {
             row.addEventListener("click", (evt) => {
@@ -12877,10 +12877,10 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           "\u7EC4\u7EC7\u8BED\u8A00\u4E2D\u2026"
         ];
         const addPending = (snapshot) => {
-          const row = stream.createDiv({ cls: "collis-ai-msg is-status" });
+          const row = stream.createDiv({ cls: "noval-ai-msg is-status" });
           const contextLabel = appendContext(row, snapshot);
           const label = contextLabel != null ? contextLabel : row.createSpan({
-            cls: "collis-ai-thinking",
+            cls: "noval-ai-thinking",
             text: thinkingLines[0]
           });
           label.setText(thinkingLines[0]);
@@ -12899,19 +12899,19 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           return { row, stop, say };
         };
         const addError = (text, retry) => {
-          const row = stream.createDiv({ cls: "collis-ai-msg is-error" });
-          const body = row.createDiv({ cls: "collis-ai-error" });
-          body.createDiv({ cls: "collis-ai-error-title", text: "\u8BF7\u6C42\u672A\u6210\u529F" });
-          body.createDiv({ cls: "collis-ai-error-summary", text });
-          const details = body.createEl("details", { cls: "collis-ai-error-detail" });
+          const row = stream.createDiv({ cls: "noval-ai-msg is-error" });
+          const body = row.createDiv({ cls: "noval-ai-error" });
+          body.createDiv({ cls: "noval-ai-error-title", text: "\u8BF7\u6C42\u672A\u6210\u529F" });
+          body.createDiv({ cls: "noval-ai-error-summary", text });
+          const details = body.createEl("details", { cls: "noval-ai-error-detail" });
           details.createEl("summary", { text: "\u67E5\u770B\u539F\u56E0" });
           const pre = details.createEl("pre", { text });
           pre.createEl("span", {
-            cls: "collis-ai-error-hint",
+            cls: "noval-ai-error-hint",
             text: "\u53EF\u68C0\u67E5\u8BE5\u6A21\u578B\u7684\u8F93\u51FA\u4E0A\u9650\u3001\u601D\u8003\u6A21\u5F0F\u6216\u63A5\u53E3\u5730\u5740\u540E\u91CD\u8BD5\u3002"
           });
-          const bar = body.createDiv({ cls: "collis-ai-reply-bar" });
-          const retryBtn = bar.createEl("button", { cls: "collis-ai-reply-icon" });
+          const bar = body.createDiv({ cls: "noval-ai-reply-bar" });
+          const retryBtn = bar.createEl("button", { cls: "noval-ai-reply-icon" });
           (0, import_obsidian16.setIcon)(retryBtn, "rotate-ccw");
           retryBtn.addEventListener("click", (evt) => {
             evt.stopPropagation();
@@ -13088,7 +13088,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           this.aiSnapshots = [];
           this.aiPicked = /* @__PURE__ */ new Set();
           stream.empty();
-          stream.createDiv({ cls: "collis-ai-empty-hint", text: "\u65B0\u5BF9\u8BDD\u5DF2\u5F00\u59CB\uFF0C\u9009\u4E2D\u7684\u8282\u70B9\u4FDD\u6301\u4E0D\u53D8\u3002" });
+          stream.createDiv({ cls: "noval-ai-empty-hint", text: "\u65B0\u5BF9\u8BDD\u5DF2\u5F00\u59CB\uFF0C\u9009\u4E2D\u7684\u8282\u70B9\u4FDD\u6301\u4E0D\u53D8\u3002" });
           insertBtn.disabled = true;
           noteBtn.disabled = true;
           if (overwriteTarget)
@@ -13266,14 +13266,14 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           return;
         const boardPath = (_b = (_a = this.file) == null ? void 0 : _a.path) != null ? _b : "";
         const items = this.plugin.settings.conversations.filter((conversation) => conversation.boardPath === boardPath).sort((a, b) => b.updatedAt - a.updatedAt);
-        const pop = this.root.createDiv({ cls: "collis-ai-history" });
+        const pop = this.root.createDiv({ cls: "noval-ai-history" });
         this.historyPop = pop;
         pop.addEventListener("pointerdown", (evt) => evt.stopPropagation());
         pop.addEventListener("dblclick", (evt) => evt.stopPropagation());
-        const head = pop.createDiv({ cls: "collis-ai-history-head" });
-        head.createDiv({ cls: "collis-ai-history-heading", text: "\u5BF9\u8BDD\u8BB0\u5F55" });
+        const head = pop.createDiv({ cls: "noval-ai-history-head" });
+        head.createDiv({ cls: "noval-ai-history-heading", text: "\u5BF9\u8BDD\u8BB0\u5F55" });
         if (items.length > 0) {
-          const clear = head.createEl("button", { cls: "collis-ai-history-clear", text: "\u5168\u90E8\u5220\u9664" });
+          const clear = head.createEl("button", { cls: "noval-ai-history-clear", text: "\u5168\u90E8\u5220\u9664" });
           clear.addEventListener("click", () => {
             new ConfirmModal(
               this.app,
@@ -13292,22 +13292,22 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           });
         }
         if (items.length === 0) {
-          pop.createDiv({ cls: "collis-ai-history-empty", text: "\u8FD9\u5757\u767D\u677F\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u8BB0\u5F55" });
+          pop.createDiv({ cls: "noval-ai-history-empty", text: "\u8FD9\u5757\u767D\u677F\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u8BB0\u5F55" });
         }
         for (const conversation of items) {
-          const row = pop.createDiv({ cls: "collis-ai-history-item" });
+          const row = pop.createDiv({ cls: "noval-ai-history-item" });
           if (conversation.id === this.aiConversationId)
             row.addClass("is-current");
-          const iconEl = row.createDiv({ cls: "collis-ai-history-icon" });
+          const iconEl = row.createDiv({ cls: "noval-ai-history-icon" });
           (0, import_obsidian16.setIcon)(iconEl, "message-square");
-          const body = row.createDiv({ cls: "collis-ai-history-body" });
-          body.createDiv({ cls: "collis-ai-history-name", text: conversation.title });
+          const body = row.createDiv({ cls: "noval-ai-history-body" });
+          body.createDiv({ cls: "noval-ai-history-name", text: conversation.title });
           body.createDiv({
-            cls: "collis-ai-history-time",
+            cls: "noval-ai-history-time",
             text: this.formatStamp(conversation.updatedAt)
           });
           const del = row.createEl("button", {
-            cls: "collis-ai-history-del",
+            cls: "noval-ai-history-del",
             attr: { "aria-label": "\u5220\u9664\u8FD9\u6761\u8BB0\u5F55" }
           });
           (0, import_obsidian16.setIcon)(del, "trash-2");
@@ -13323,7 +13323,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           });
         }
         const anchorRect = anchor.getBoundingClientRect();
-        const panelEl = anchor.closest(".collis-ai-panel");
+        const panelEl = anchor.closest(".noval-ai-panel");
         const panelRect = (_c = panelEl == null ? void 0 : panelEl.getBoundingClientRect()) != null ? _c : anchorRect;
         const rootRect = this.root.getBoundingClientRect();
         const width = 300;
@@ -13389,7 +13389,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
               fragment.appendChild(document.createTextNode(match[0]));
             } else {
               const button = document.createElement("button");
-              button.className = "collis-ai-nref";
+              button.className = "noval-ai-nref";
               button.type = "button";
               button.textContent = match[0];
               button.addEventListener("click", (evt) => {
@@ -13540,7 +13540,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       openNodeSearch() {
         this.closeSearchPanel();
         const rect = this.root.getBoundingClientRect();
-        const panel = this.root.createDiv({ cls: "collis-insert-panel" });
+        const panel = this.root.createDiv({ cls: "noval-insert-panel" });
         const width = 328;
         const left = Math.max(8, (rect.width - width) / 2);
         const top = Math.max(48, rect.height * 0.22);
@@ -13548,7 +13548,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         panel.style.top = `${Math.round(top)}px`;
         panel.addEventListener("pointerdown", (evt) => evt.stopPropagation());
         panel.addEventListener("dblclick", (evt) => evt.stopPropagation());
-        const head = panel.createDiv({ cls: "collis-insert-head" });
+        const head = panel.createDiv({ cls: "noval-insert-head" });
         let dragOrigin = null;
         head.addEventListener("pointerdown", (evt) => {
           if (evt.target.closest("input, button"))
@@ -13580,15 +13580,15 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         };
         head.addEventListener("pointerup", endDrag);
         head.addEventListener("pointercancel", endDrag);
-        const headIcon = head.createDiv({ cls: "collis-insert-head-icon" });
+        const headIcon = head.createDiv({ cls: "noval-insert-head-icon" });
         (0, import_obsidian16.setIcon)(headIcon, "search");
         const input = head.createEl("input", {
-          cls: "collis-insert-input",
+          cls: "noval-insert-input",
           attr: { type: "text", placeholder: "\u5728\u767D\u677F\u4E2D\u67E5\u627E\u8282\u70B9\u2026" }
         });
-        const list = panel.createDiv({ cls: "collis-insert-list" });
+        const list = panel.createDiv({ cls: "noval-insert-list" });
         panel.createDiv({
-          cls: "collis-insert-foot",
+          cls: "noval-insert-foot",
           text: "\u2191\u2193 \u9009\u62E9 \xB7 Enter \u5B9A\u4F4D \xB7 Esc \u53D6\u6D88"
         });
         this.searchPanel = panel;
@@ -13598,29 +13598,29 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         const render = () => {
           list.empty();
           if (results.length === 0) {
-            list.createDiv({ cls: "collis-insert-empty", text: "\u6CA1\u6709\u5339\u914D\u7684\u8282\u70B9" });
+            list.createDiv({ cls: "noval-insert-empty", text: "\u6CA1\u6709\u5339\u914D\u7684\u8282\u70B9" });
             return;
           }
           results.forEach((node2, index) => {
             var _a;
-            const row = list.createDiv({ cls: "collis-insert-item" });
+            const row = list.createDiv({ cls: "noval-insert-item" });
             if (index === active) {
               row.addClass("is-active");
               window.requestAnimationFrame(() => row.scrollIntoView({ block: "nearest" }));
             }
-            const iconEl = row.createDiv({ cls: "collis-insert-item-icon" });
+            const iconEl = row.createDiv({ cls: "noval-insert-item-icon" });
             (0, import_obsidian16.setIcon)(
               iconEl,
               node2.type === "card" ? "list" : node2.type === "group" ? "group" : node2.type === "text" ? "type" : "file-text"
             );
-            const body = row.createDiv({ cls: "collis-insert-item-body" });
+            const body = row.createDiv({ cls: "noval-insert-item-body" });
             const text = ((_a = this.nodeText.get(node2.id)) != null ? _a : "").replace(/\s+/g, " ").trim();
             body.createDiv({
-              cls: "collis-insert-title",
+              cls: "noval-insert-title",
               text: text.slice(0, 48) || "\uFF08\u7A7A\u8282\u70B9\uFF09"
             });
             body.createDiv({
-              cls: "collis-insert-sub",
+              cls: "noval-insert-sub",
               text: node2.type === "card" ? "\u5361\u7247" : node2.type === "group" ? "\u5206\u7EC4" : node2.type === "text" ? "\u6587\u672C\u8282\u70B9" : node2.file
             });
             row.addEventListener("click", () => {
@@ -13701,12 +13701,12 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         const boxWidth = 320;
         const screenX = world.x * this.scale + this.tx;
         const screenY = world.y * this.scale + this.ty;
-        const panel = this.root.createDiv({ cls: "collis-insert-panel" });
+        const panel = this.root.createDiv({ cls: "noval-insert-panel" });
         panel.style.left = `${Math.round(Math.max(8, Math.min(screenX, rect.width - boxWidth - 8)))}px`;
         panel.style.top = `${Math.round(Math.max(8, Math.min(screenY, rect.height - 300)))}px`;
         panel.addEventListener("pointerdown", (evt) => evt.stopPropagation());
         panel.addEventListener("dblclick", (evt) => evt.stopPropagation());
-        const head = panel.createDiv({ cls: "collis-insert-head" });
+        const head = panel.createDiv({ cls: "noval-insert-head" });
         let dragOrigin = null;
         head.addEventListener("pointerdown", (evt) => {
           if (evt.target.closest("input, button"))
@@ -13738,14 +13738,14 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         };
         head.addEventListener("pointerup", endDrag);
         head.addEventListener("pointercancel", endDrag);
-        const headIcon = head.createDiv({ cls: "collis-insert-head-icon" });
+        const headIcon = head.createDiv({ cls: "noval-insert-head-icon" });
         (0, import_obsidian16.setIcon)(headIcon, "search");
         const input = head.createEl("input", {
-          cls: "collis-insert-input",
+          cls: "noval-insert-input",
           attr: { type: "text", placeholder: "\u641C\u7D22\u5361\u7247\u3001\u7B14\u8BB0\uFF0C\u6216\u65B0\u5EFA\u2026" }
         });
-        const list = panel.createDiv({ cls: "collis-insert-list" });
-        panel.createDiv({ cls: "collis-insert-foot", text: "\u2191\u2193 \u9009\u62E9 \xB7 Enter \u786E\u8BA4 \xB7 Esc \u53D6\u6D88" });
+        const list = panel.createDiv({ cls: "noval-insert-list" });
+        panel.createDiv({ cls: "noval-insert-foot", text: "\u2191\u2193 \u9009\u62E9 \xB7 Enter \u786E\u8BA4 \xB7 Esc \u53D6\u6D88" });
         this.insertPanel = panel;
         let items = [];
         let active = 0;
@@ -13753,21 +13753,21 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         const render = () => {
           list.empty();
           items.forEach((item, index) => {
-            const row = list.createDiv({ cls: "collis-insert-item" });
+            const row = list.createDiv({ cls: "noval-insert-item" });
             if (index === active) {
               row.addClass("is-active");
               window.requestAnimationFrame(() => {
                 row.scrollIntoView({ block: "nearest" });
               });
             }
-            const iconEl = row.createDiv({ cls: "collis-insert-item-icon" });
+            const iconEl = row.createDiv({ cls: "noval-insert-item-icon" });
             (0, import_obsidian16.setIcon)(
               iconEl,
               item.kind === "card" ? "list" : item.kind === "note" ? "file-text" : item.kind === "media" ? "image" : "type"
             );
-            const body = row.createDiv({ cls: "collis-insert-item-body" });
-            body.createDiv({ cls: "collis-insert-title", text: item.title });
-            body.createDiv({ cls: "collis-insert-sub", text: item.sub });
+            const body = row.createDiv({ cls: "noval-insert-item-body" });
+            body.createDiv({ cls: "noval-insert-title", text: item.title });
+            body.createDiv({ cls: "noval-insert-sub", text: item.sub });
             row.addEventListener("click", () => void choose(index));
           });
         };
@@ -13981,7 +13981,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
             line.setAttribute("x2", String(right));
             line.setAttribute("y2", String(guide.pos));
           }
-          line.setAttribute("class", "collis-guide");
+          line.setAttribute("class", "noval-guide");
           svg.appendChild(line);
         }
       }
@@ -14001,7 +14001,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         const height = this.nodeHeight(from);
         const anchor = side === "top" ? { x: from.x + from.width / 2, y: from.y } : side === "bottom" ? { x: from.x + from.width / 2, y: from.y + height } : side === "left" ? { x: from.x, y: from.y + height / 2 } : { x: from.x + from.width, y: from.y + height / 2 };
         const preview = this.svgNode("path");
-        preview.setAttribute("class", "collis-edge is-preview");
+        preview.setAttribute("class", "noval-edge is-preview");
         this.edgesEl.appendChild(preview);
         this.setLinkTarget(null);
         this.linkDrag = {
@@ -14021,7 +14021,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           return;
         const world = this.toWorld(evt.clientX, evt.clientY);
         const hit = document.elementFromPoint(evt.clientX, evt.clientY);
-        let hovered = (_b = (_a = hit == null ? void 0 : hit.closest(".collis-bnode")) == null ? void 0 : _a.getAttribute("data-node-id")) != null ? _b : null;
+        let hovered = (_b = (_a = hit == null ? void 0 : hit.closest(".noval-bnode")) == null ? void 0 : _a.getAttribute("data-node-id")) != null ? _b : null;
         if (!hovered) {
           const near = this.nodeNear(world.x, world.y, 24 / this.scale);
           hovered = (_c = near == null ? void 0 : near.id) != null ? _c : null;
@@ -14055,8 +14055,8 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         } catch (error) {
         }
         const hit = document.elementFromPoint(evt.clientX, evt.clientY);
-        const nodeEl = hit == null ? void 0 : hit.closest(".collis-bnode");
-        const portSide = (_b = (_a = hit == null ? void 0 : hit.closest(".collis-port")) == null ? void 0 : _a.dataset.port) != null ? _b : null;
+        const nodeEl = hit == null ? void 0 : hit.closest(".noval-bnode");
+        const portSide = (_b = (_a = hit == null ? void 0 : hit.closest(".noval-port")) == null ? void 0 : _a.dataset.port) != null ? _b : null;
         const world = this.toWorld(evt.clientX, evt.clientY);
         let targetId = (_c = nodeEl == null ? void 0 : nodeEl.getAttribute("data-node-id")) != null ? _c : null;
         if (!targetId) {
@@ -14096,23 +14096,23 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         bar.empty();
         for (const color of NODE_COLORS) {
           const dot = bar.createEl("button", {
-            cls: "collis-edge-dot",
+            cls: "noval-edge-dot",
             attr: { "aria-label": color.label }
           });
           dot.style.background = color.line;
           dot.addEventListener("click", () => this.styleSelectedEdge({ color: color.name }));
         }
         const picker = bar.createEl("label", {
-          cls: "collis-edge-dot is-custom",
+          cls: "noval-edge-dot is-custom",
           attr: { "aria-label": "\u81EA\u5B9A\u4E49\u989C\u8272" }
         });
         const input = picker.createEl("input", { attr: { type: "color" } });
         input.value = "#888888";
         input.addEventListener("change", () => this.styleSelectedEdge({ color: input.value }));
-        bar.createDiv({ cls: "collis-edge-sep" });
+        bar.createDiv({ cls: "noval-edge-sep" });
         const arrowBtn = (arrow, icon, label) => {
           const button = bar.createEl("button", {
-            cls: "collis-tool-btn",
+            cls: "noval-tool-btn",
             attr: { "aria-label": label }
           });
           (0, import_obsidian16.setIcon)(button, icon);
@@ -14121,9 +14121,9 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         arrowBtn("target", "arrow-right", "\u5355\u5411\u7BAD\u5934");
         arrowBtn("both", "arrow-left-right", "\u53CC\u5411\u7BAD\u5934");
         arrowBtn("none", "minus", "\u65E0\u7BAD\u5934");
-        bar.createDiv({ cls: "collis-edge-sep" });
+        bar.createDiv({ cls: "noval-edge-sep" });
         this.edgeRelationBtn = bar.createEl("button", {
-          cls: "collis-tool-btn",
+          cls: "noval-tool-btn",
           attr: { "aria-label": "\u8BBE\u7F6E\u5173\u7CFB" }
         });
         (0, import_obsidian16.setIcon)(this.edgeRelationBtn, "git-branch");
@@ -14132,7 +14132,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
             this.openEdgeLabelEditor(this.selectedEdgeId, void 0, "relation");
         });
         this.edgeLabelBtn = bar.createEl("button", {
-          cls: "collis-tool-btn",
+          cls: "noval-tool-btn",
           attr: { "aria-label": "\u6DFB\u52A0\u6807\u7B7E" }
         });
         (0, import_obsidian16.setIcon)(this.edgeLabelBtn, "tag");
@@ -14140,9 +14140,9 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           if (this.selectedEdgeId)
             this.openEdgeLabelEditor(this.selectedEdgeId);
         });
-        bar.createDiv({ cls: "collis-edge-sep" });
+        bar.createDiv({ cls: "noval-edge-sep" });
         const remove = bar.createEl("button", {
-          cls: "collis-tool-btn is-danger",
+          cls: "noval-tool-btn is-danger",
           attr: { "aria-label": "\u5220\u9664\u8FDE\u7EBF" }
         });
         (0, import_obsidian16.setIcon)(remove, "trash-2");
@@ -14223,11 +14223,11 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           return;
         const t = at ? clampLabelT(nearestCurveT(curve, at)) : this.edgeLabelT(edge);
         this.closeEdgeLabelEditor(true);
-        const wrap = this.world.createDiv({ cls: "collis-edge-label-editor" });
+        const wrap = this.world.createDiv({ cls: "noval-edge-label-editor" });
         wrap.addEventListener("pointerdown", (evt) => evt.stopPropagation());
         wrap.addEventListener("dblclick", (evt) => evt.stopPropagation());
         const select = wrap.createEl("select", {
-          cls: "collis-edge-relation-select",
+          cls: "noval-edge-relation-select",
           attr: { "aria-label": "\u8FDE\u7EBF\u5173\u7CFB" }
         });
         select.createEl("option", { text: "\u65E0\u5173\u7CFB", value: "" });
@@ -14236,7 +14236,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         }
         select.value = (_a = edge.relation) != null ? _a : "";
         const input = wrap.createEl("input", {
-          cls: "collis-edge-label-input",
+          cls: "noval-edge-label-input",
           attr: {
             type: "text",
             placeholder: "\u8F93\u5165\u6807\u7B7E",
@@ -14356,7 +14356,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       }
       paintEdgeSelection() {
         var _a;
-        const groups = (_a = this.edgesEl) == null ? void 0 : _a.querySelectorAll(".collis-edge-group");
+        const groups = (_a = this.edgesEl) == null ? void 0 : _a.querySelectorAll(".noval-edge-group");
         if (!groups)
           return;
         for (const group of Array.from(groups)) {
@@ -14439,7 +14439,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         this.root.addClass("is-panning");
       }
       stopAllPlayback() {
-        this.world.querySelectorAll(".collis-bnode.is-playing").forEach((element) => {
+        this.world.querySelectorAll(".noval-bnode.is-playing").forEach((element) => {
           const el = element;
           el.removeClass("is-playing");
           const video = el.querySelector("video");
@@ -14447,7 +14447,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
             video.pause();
             video.controls = false;
           }
-          const play = el.querySelector(".collis-bnode-play");
+          const play = el.querySelector(".noval-bnode-play");
           if (play)
             play.removeClass("is-hidden");
         });
@@ -14473,7 +14473,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         }
         const rect = this.root.getBoundingClientRect();
         this.boxStart = { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
-        this.boxEl = this.root.createDiv({ cls: "collis-select-box" });
+        this.boxEl = this.root.createDiv({ cls: "noval-select-box" });
         this.boxEl.style.left = `${this.boxStart.x}px`;
         this.boxEl.style.top = `${this.boxStart.y}px`;
         this.drag = { type: "box", pointerId: evt.pointerId };
@@ -14603,7 +14603,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         const el = existingEl != null ? existingEl : this.nodeEls.get(node2.id);
         if (!el)
           return;
-        if (el.hasClass("collis-editing"))
+        if (el.hasClass("noval-editing"))
           return;
         const restoreBar = () => window.setTimeout(() => this.updateToolbar(), 0);
         if (node2.type === "text") {
@@ -14708,7 +14708,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           await this.app.vault.createBinary(path, buffer);
           return path;
         } catch (error) {
-          console.error("[Collis] import file failed", error);
+          console.error("[Noval] import file failed", error);
           return null;
         }
       }
@@ -14779,25 +14779,25 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           this.renderOutlinePanel();
           return;
         }
-        const panel = this.root.createDiv({ cls: "collis-outline-panel" });
+        const panel = this.root.createDiv({ cls: "noval-outline-panel" });
         panel.style.left = `${this.outlinePos.left}px`;
         panel.style.top = `${this.outlinePos.top}px`;
         panel.addEventListener("pointerdown", (evt) => evt.stopPropagation());
         panel.addEventListener("dblclick", (evt) => evt.stopPropagation());
         panel.addEventListener("wheel", (evt) => evt.stopPropagation(), { passive: true });
-        const head = panel.createDiv({ cls: "collis-outline-head" });
-        const headIcon = head.createDiv({ cls: "collis-outline-head-icon" });
+        const head = panel.createDiv({ cls: "noval-outline-head" });
+        const headIcon = head.createDiv({ cls: "noval-outline-head-icon" });
         (0, import_obsidian16.setIcon)(headIcon, "list-tree");
-        head.createDiv({ cls: "collis-outline-head-title", text: "\u5927\u7EB2" });
-        this.outlineMetaEl = head.createDiv({ cls: "collis-outline-head-meta" });
-        head.createDiv({ cls: "collis-outline-head-spacer" });
+        head.createDiv({ cls: "noval-outline-head-title", text: "\u5927\u7EB2" });
+        this.outlineMetaEl = head.createDiv({ cls: "noval-outline-head-meta" });
+        head.createDiv({ cls: "noval-outline-head-spacer" });
         const closeBtn = head.createEl("button", {
-          cls: "collis-outline-head-btn",
+          cls: "noval-outline-head-btn",
           attr: { "aria-label": "\u5173\u95ED" }
         });
         (0, import_obsidian16.setIcon)(closeBtn, "x");
         closeBtn.addEventListener("click", () => this.closeOutlinePanel());
-        this.outlineBodyEl = panel.createDiv({ cls: "collis-outline-body" });
+        this.outlineBodyEl = panel.createDiv({ cls: "noval-outline-body" });
         this.outlinePanel = panel;
         this.installOutlineDrag(panel, head);
         this.outlineSignatureCache = "";
@@ -14868,7 +14868,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         const result = buildOutline(inputs, this.edges, (input) => this.outlineInfoOf(input));
         if (result.nodeCount === 0) {
           body.createDiv({
-            cls: "collis-outline-empty",
+            cls: "noval-outline-empty",
             text: "\u767D\u677F\u4E0A\u8FD8\u6CA1\u6709\u8282\u70B9\u3002\u65B0\u5EFA\u5361\u7247\u6216\u4FBF\u7B7E\u540E\uFF0C\u8FD9\u91CC\u4F1A\u6309\u7ED3\u6784\u5217\u51FA\u5B83\u4EEC\u3002"
           });
           this.updateOutlineMeta(result);
@@ -14879,12 +14879,12 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         }
         if (result.cycle) {
           body.createDiv({
-            cls: "collis-outline-note",
+            cls: "noval-outline-note",
             text: "\u68C0\u6D4B\u5230\u5FAA\u73AF\u7684\u63A8\u5BFC/\u56E0\u679C\u5173\u7CFB\uFF0C\u73AF\u4E0A\u7684\u4E00\u6761\u8FDE\u7EBF\u5DF2\u5728\u5927\u7EB2\u4E2D\u8DF3\u8FC7\u3002"
           });
         } else if (!result.hasHierarchy) {
           body.createDiv({
-            cls: "collis-outline-note",
+            cls: "noval-outline-note",
             text: "\u8FD8\u6CA1\u6709\u63A8\u5BFC\u6216\u56E0\u679C\u8FDE\u7EBF\uFF0C\u8282\u70B9\u6309\u4F4D\u7F6E\u5E73\u94FA\u3002\u7ED9\u8FDE\u7EBF\u8BBE\u7F6E\u300C\u63A8\u5BFC\u300D\u6216\u300C\u56E0\u679C\u300D\u5373\u53EF\u751F\u6210\u5C42\u7EA7\u3002"
           });
         }
@@ -14903,14 +14903,14 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       }
       renderOutlineItem(host, item, depth) {
         const collapsed = this.outlineCollapsed.has(item.id);
-        const row = host.createDiv({ cls: "collis-outline-row" });
+        const row = host.createDiv({ cls: "noval-outline-row" });
         row.dataset.nodeId = item.id;
         row.toggleClass("is-root", depth === 0);
         row.toggleClass("is-active", this.selection.has(item.id));
         row.toggleClass("is-group", item.kind === "group");
         if (item.children.length > 0) {
           const toggle = row.createEl("button", {
-            cls: "collis-outline-toggle",
+            cls: "noval-outline-toggle",
             attr: { "aria-label": collapsed ? "\u5C55\u5F00" : "\u6298\u53E0" }
           });
           (0, import_obsidian16.setIcon)(toggle, collapsed ? "chevron-right" : "chevron-down");
@@ -14923,44 +14923,44 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
             this.renderOutlinePanel();
           });
         } else {
-          row.createDiv({ cls: "collis-outline-toggle is-empty" });
+          row.createDiv({ cls: "noval-outline-toggle is-empty" });
         }
-        const main = row.createDiv({ cls: "collis-outline-main" });
-        const titleRow = main.createDiv({ cls: "collis-outline-title-row" });
-        const title = titleRow.createDiv({ cls: "collis-outline-title", text: item.title });
+        const main = row.createDiv({ cls: "noval-outline-main" });
+        const titleRow = main.createDiv({ cls: "noval-outline-title-row" });
+        const title = titleRow.createDiv({ cls: "noval-outline-title", text: item.title });
         title.setAttribute("title", item.title);
         if (item.relation) {
           titleRow.createSpan({
-            cls: `collis-outline-relation is-${item.relation}`,
+            cls: `noval-outline-relation is-${item.relation}`,
             text: item.relation === "derives" ? "\u63A8\u5BFC" : "\u56E0\u679C"
           });
         }
-        const badges = titleRow.createDiv({ cls: "collis-outline-badges" });
+        const badges = titleRow.createDiv({ cls: "noval-outline-badges" });
         if (item.badges.supports > 0) {
           badges.createSpan({
-            cls: "collis-outline-badge is-supports",
+            cls: "noval-outline-badge is-supports",
             text: `\u652F\u6301 ${item.badges.supports}`
           });
         }
         if (item.badges.refutes > 0) {
           badges.createSpan({
-            cls: "collis-outline-badge is-refutes",
+            cls: "noval-outline-badge is-refutes",
             text: `\u53CD\u9A73 ${item.badges.refutes}`
           });
         }
         if (item.badges.source > 0) {
           badges.createSpan({
-            cls: "collis-outline-badge is-source",
+            cls: "noval-outline-badge is-source",
             text: `\u6765\u6E90 ${item.badges.source}`
           });
         }
         if (item.snippet) {
-          main.createDiv({ cls: "collis-outline-snippet", text: item.snippet });
+          main.createDiv({ cls: "noval-outline-snippet", text: item.snippet });
         }
         row.addEventListener("click", () => this.focusNodeInBoard(item.id));
         if (collapsed || item.children.length === 0)
           return;
-        const kids = host.createDiv({ cls: "collis-outline-children" });
+        const kids = host.createDiv({ cls: "noval-outline-children" });
         for (const child of item.children) {
           this.renderOutlineItem(kids, child, depth + 1);
         }
@@ -14989,7 +14989,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       updateOutlineActive() {
         if (!this.outlinePanel)
           return;
-        const rows = this.outlinePanel.querySelectorAll(".collis-outline-row");
+        const rows = this.outlinePanel.querySelectorAll(".noval-outline-row");
         rows.forEach((row) => {
           row.toggleClass(
             "is-active",
@@ -15229,7 +15229,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
             try {
               this.inject(menu, node2);
             } catch (error) {
-              console.error("[Collis] menu injection failed", error);
+              console.error("[Noval] menu injection failed", error);
             }
           })
         );
@@ -15267,11 +15267,11 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       }
       onOpen() {
         const { contentEl, titleEl, modalEl } = this;
-        modalEl.addClass("collis-editor-modal");
+        modalEl.addClass("noval-editor-modal");
         titleEl.setText("\u7F16\u8F91\u5361\u7247");
-        const metaEl = contentEl.createDiv({ cls: "collis-editor-meta" });
+        const metaEl = contentEl.createDiv({ cls: "noval-editor-meta" });
         metaEl.setText(this.describe());
-        const textarea = contentEl.createEl("textarea", { cls: "collis-editor-input" });
+        const textarea = contentEl.createEl("textarea", { cls: "noval-editor-input" });
         textarea.value = this.value;
         textarea.addEventListener("input", () => {
           this.value = textarea.value;
@@ -15287,7 +15287,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           const end = textarea.value.length;
           textarea.setSelectionRange(end, end);
         }, 40);
-        const footer = contentEl.createDiv({ cls: "collis-editor-footer" });
+        const footer = contentEl.createDiv({ cls: "noval-editor-footer" });
         const cancel = footer.createEl("button", { text: "\u53D6\u6D88" });
         cancel.addEventListener("click", () => this.close());
         const save = footer.createEl("button", { text: "\u4FDD\u5B58", cls: "mod-cta" });
@@ -15354,7 +15354,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.addClass("collis-ai-modal");
+        contentEl.addClass("noval-ai-modal");
         contentEl.createEl("h3", { text: this.draft.name ? "\u7F16\u8F91\u6A21\u578B\u914D\u7F6E" : "\u6DFB\u52A0\u6A21\u578B\u914D\u7F6E" });
         new import_obsidian19.Setting(contentEl).setName("\u5FEB\u901F\u586B\u5165").setDesc("\u9009\u4E00\u4E2A\u670D\u52A1\u81EA\u52A8\u586B\u597D\u5730\u5740\u548C\u6A21\u578B\uFF0CKey \u4ECD\u9700\u81EA\u5DF1\u586B\u3002").addDropdown((dropdown) => {
           dropdown.addOption("", "\u9009\u62E9\u670D\u52A1\u2026");
@@ -15416,7 +15416,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         });
         host.createEl("h4", { text: "\u6A21\u578B\u80FD\u529B" });
         host.createDiv({
-          cls: "collis-ai-hint",
+          cls: "noval-ai-hint",
           text: "\u8FD9\u4E24\u9879\u586B\u7684\u662F\u300C\u8FD9\u4E2A\u6A21\u578B\u80FD\u5403\u591A\u5C11\u300D\uFF0C\u4E0D\u662F\u63D2\u4EF6\u7684\u9650\u5236\u3002\u7559\u7A7A\u8868\u793A\u6309\u6A21\u578B\u540D\u81EA\u52A8\u63A8\u65AD\uFF1B\u586B\u9519\u4E86\u53EA\u4F1A\u8BA9\u63D2\u4EF6\u5C11\u7528\u6216\u591A\u7528\u4E00\u70B9\u4F59\u91CF\uFF0C\u4E0D\u4F1A\u635F\u574F\u6570\u636E\u3002"
         });
         const capability = (_a = this.draft.capability) != null ? _a : inferCapability(this.draft.model);
@@ -15554,7 +15554,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         void fn();
       };
     }
-    var CollisBoardSettingTab = class extends import_obsidian20.PluginSettingTab {
+    var NovalBoardSettingTab = class extends import_obsidian20.PluginSettingTab {
       constructor(app, plugin) {
         super(app, plugin);
         this.plugin = plugin;
@@ -15562,7 +15562,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       display() {
         const { containerEl } = this;
         containerEl.empty();
-        containerEl.addClass("collis-settings");
+        containerEl.addClass("noval-settings");
         new import_obsidian20.Setting(containerEl).setName("\u5E38\u89C4").setHeading();
         this.divider(containerEl);
         new import_obsidian20.Setting(containerEl).setName("\u89D2\u6807").setHeading();
@@ -15586,8 +15586,8 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
             await this.plugin.saveSettings();
           })
         );
-        new import_obsidian20.Setting(containerEl).setName("\u5361\u7247\u7B14\u8BB0\u76EE\u5F55").setDesc("\u4ECE\u767D\u677F\u8F6C\u6210\u5361\u7247\u65F6\u5199\u5230\u8FD9\u91CC\u3002\u7559\u7A7A\u5219\u81EA\u52A8\u8BFB Collis \u7684\u8BBE\u7F6E\uFF0C\u8BFB\u4E0D\u5230\u7528 00-Inbox/\u901F\u8BB0\u3002").addText(
-          (text) => text.setPlaceholder("\u7559\u7A7A = \u8DDF\u968F Collis").setValue(this.plugin.settings.cardFolder).onChange(async (value) => {
+        new import_obsidian20.Setting(containerEl).setName("\u5361\u7247\u7B14\u8BB0\u76EE\u5F55").setDesc("\u4ECE\u767D\u677F\u8F6C\u6210\u5361\u7247\u65F6\u5199\u5230\u8FD9\u91CC\u3002\u7559\u7A7A\u5219\u81EA\u52A8\u8BFB Noval \u7684\u8BBE\u7F6E\uFF0C\u8BFB\u4E0D\u5230\u7528 00-Inbox/\u901F\u8BB0\u3002").addText(
+          (text) => text.setPlaceholder("\u7559\u7A7A = \u8DDF\u968F Noval").setValue(this.plugin.settings.cardFolder).onChange(async (value) => {
             this.plugin.settings.cardFolder = value.trim();
             await this.plugin.saveSettings();
           })
@@ -15599,7 +15599,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       }
       /** A thin rule between sections; keeps the long settings page scannable. */
       divider(host) {
-        host.createDiv({ cls: "collis-settings-divider" });
+        host.createDiv({ cls: "noval-settings-divider" });
       }
       renderAI(containerEl) {
         new import_obsidian20.Setting(containerEl).setName("AI").setHeading();
@@ -15612,7 +15612,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           })
         );
         containerEl.createDiv({
-          cls: "collis-ai-hint",
+          cls: "noval-ai-hint",
           text: "\u53D1\u9001\u91CF\u7531\u6A21\u578B\u81EA\u5DF1\u7684\u7A97\u53E3\u51B3\u5B9A\uFF0C\u63D2\u4EF6\u4E0D\u989D\u5916\u8BBE\u9650\uFF1B\u5B9E\u9645\u7528\u91CF\u89C1 AI \u9762\u677F\u9876\u90E8\u3002\u6279\u91CF\u5904\u7406\u4E0A\u767E\u6761\u5361\u7247\u65F6\u5EFA\u8BAE\u9009 200K \u4EE5\u4E0A\u7A97\u53E3\u7684\u6A21\u578B\u3002"
         });
         new import_obsidian20.Setting(containerEl).setName("\u9ED8\u8BA4\u601D\u8003\u6A21\u5F0F").setDesc(
@@ -15641,7 +15641,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       /** Every density knob lives here so tuning later needs no code change. */
       renderAdvanced(containerEl, save) {
         const ai = this.plugin.settings.ai;
-        const details = containerEl.createEl("details", { cls: "collis-ai-advanced" });
+        const details = containerEl.createEl("details", { cls: "noval-ai-advanced" });
         details.createEl("summary", { text: "\u9AD8\u7EA7 \xB7 \u5185\u5BB9\u5206\u914D\u89C4\u5219" });
         new import_obsidian20.Setting(details).setName("\u7B14\u8BB0\u6BCF\u7BC7\u4FDD\u5E95\uFF08\u5B57\u7B26\uFF09").setDesc("\u957F\u7B14\u8BB0\u88AB\u538B\u7F29\u65F6\u81F3\u5C11\u4FDD\u7559\u8FD9\u4E48\u591A\u5B57\uFF0C\u907F\u514D\u53EA\u5269\u5F00\u5934\u4E00\u53E5\u3002").addText((text) => {
           text.inputEl.type = "number";
@@ -15685,40 +15685,40 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       }
       renderCards(containerEl, save) {
         const ai = this.plugin.settings.ai;
-        const listEl = containerEl.createDiv({ cls: "collis-ai-cards" });
+        const listEl = containerEl.createDiv({ cls: "noval-ai-cards" });
         const renderCards = () => {
           var _a;
           listEl.empty();
           if (ai.profiles.length === 0) {
             listEl.createDiv({
-              cls: "collis-ai-empty",
+              cls: "noval-ai-empty",
               text: "\u8FD8\u6CA1\u6709\u6A21\u578B\u914D\u7F6E\u3002\u70B9\u4E0B\u9762\u7684\u300C\u6DFB\u52A0\u914D\u7F6E\u300D\u65B0\u5EFA\u4E00\u4E2A\u3002"
             });
             return;
           }
           for (const profile of ai.profiles) {
             const active = profile.id === ai.activeId;
-            const card = listEl.createDiv({ cls: "collis-ai-card" });
+            const card = listEl.createDiv({ cls: "noval-ai-card" });
             if (active)
               card.addClass("is-active");
             card.createDiv({
-              cls: "collis-ai-avatar",
+              cls: "noval-ai-avatar",
               text: (profile.name || "?").trim().charAt(0).toUpperCase()
             });
-            const main = card.createDiv({ cls: "collis-ai-card-main" });
-            main.createDiv({ cls: "collis-ai-card-name", text: profile.name || "\u672A\u547D\u540D\u914D\u7F6E" });
+            const main = card.createDiv({ cls: "noval-ai-card-main" });
+            main.createDiv({ cls: "noval-ai-card-name", text: profile.name || "\u672A\u547D\u540D\u914D\u7F6E" });
             const capability = (_a = profile.capability) != null ? _a : inferCapability(profile.model);
             main.createDiv({
-              cls: "collis-ai-card-meta",
+              cls: "noval-ai-card-meta",
               text: `${describeCapability(capability)} \xB7 ${capabilitySourceLabel(capability.source)} \xB7 ${profile.protocol === "anthropic" ? "Anthropic" : "OpenAI \u517C\u5BB9"}`
             });
             main.createDiv({
-              cls: "collis-ai-card-url",
+              cls: "noval-ai-card-url",
               text: profile.baseUrl || "\u672A\u586B\u5199\u63A5\u53E3\u5730\u5740"
             });
-            const actions = card.createDiv({ cls: "collis-ai-card-actions" });
+            const actions = card.createDiv({ cls: "noval-ai-card-actions" });
             if (!active) {
-              const useBtn = actions.createEl("button", { cls: "collis-ai-use", text: "\u542F\u7528" });
+              const useBtn = actions.createEl("button", { cls: "noval-ai-use", text: "\u542F\u7528" });
               useBtn.addEventListener("click", voidAsync(async () => {
                 ai.activeId = profile.id;
                 ai.enabled = true;
@@ -15727,7 +15727,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
               }));
             }
             const editBtn = actions.createEl("button", {
-              cls: "collis-ai-icon",
+              cls: "noval-ai-icon",
               attr: { "aria-label": "\u7F16\u8F91" }
             });
             (0, import_obsidian20.setIcon)(editBtn, "pencil");
@@ -15744,7 +15744,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
               }).open();
             });
             const delBtn = actions.createEl("button", {
-              cls: "collis-ai-icon is-danger",
+              cls: "noval-ai-icon is-danger",
               attr: { "aria-label": "\u5220\u9664" }
             });
             (0, import_obsidian20.setIcon)(delBtn, "trash-2");
@@ -15818,7 +15818,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         const detail = document.createElement("p");
         detail.textContent = this.count ? `\u91CC\u9762\u7684 ${this.count} \u4E2A\u6587\u4EF6\u4F1A\u4E00\u8D77\u79FB\u52A8\uFF0C\u5185\u5BB9\u4E0D\u53D8\u3002\u4E5F\u53EF\u4EE5\u4FDD\u7559\u65E7\u6587\u4EF6\u5939\uFF0C\u7A0D\u540E\u81EA\u5DF1\u6574\u7406\u3002` : "\u8FD9\u4E2A\u6587\u4EF6\u5939\u662F\u7A7A\u7684\uFF0C\u6539\u540D\u4E0D\u4F1A\u5F71\u54CD\u4EFB\u4F55\u5185\u5BB9\u3002";
         const row = document.createElement("div");
-        row.className = "collis-rename-actions";
+        row.className = "noval-rename-actions";
         const cancel = document.createElement("button");
         cancel.textContent = "\u6682\u65F6\u4E0D\u6539";
         cancel.addEventListener("click", () => {
@@ -15884,10 +15884,10 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       );
       host.appendChild(svg);
     }
-    var CollisBoardPlugin = class extends import_obsidian21.Plugin {
+    var NovalBoardPlugin = class extends import_obsidian21.Plugin {
       constructor() {
         super(...arguments);
-        this.collisViewRef = null;
+        this.novalViewRef = null;
         this.observer = null;
         this.observedContainer = null;
         this.timer = null;
@@ -15911,14 +15911,14 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         );
         this.registerActions();
         new ContextMenuInjector(this.app, this.registry, (nodeId) => this.buildContext(nodeId)).install(this);
-        this.addSettingTab(new CollisBoardSettingTab(this.app, this));
+        this.addSettingTab(new NovalBoardSettingTab(this.app, this));
         this.registerCommands();
         this.registerWatchers();
         this.installInlineEditing();
-        this.registerView(VIEW_TYPE_COLLIS_BOARD, (leaf) => new BoardView(leaf, this));
-        this.registerExtensions(["collis"], VIEW_TYPE_COLLIS_BOARD);
-        this.installCollis();
-        const ribbon = this.addRibbonIcon("dot", "Collis", () => {
+        this.registerView(VIEW_TYPE_NOVAL_BOARD, (leaf) => new BoardView(leaf, this));
+        this.registerExtensions(["noval"], VIEW_TYPE_NOVAL_BOARD);
+        this.installNoval();
+        const ribbon = this.addRibbonIcon("dot", "Noval", () => {
           void this.openBoardGallery();
         });
         paintRibbonIcon(ribbon);
@@ -15926,16 +15926,16 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           this.scheduleRefresh(300);
         });
       }
-      /** Installs the board wall. collis's own board view, paths and commands stay
+      /** Installs the board wall. noval's own board view, paths and commands stay
        *  exactly as they were; this only adds one view and one folder entry point. */
-      installCollis() {
+      installNoval() {
         this.registerView(VIEW_TYPE_GALLERY, (leaf) => {
           const view = new BoardGalleryView(leaf, this);
-          this.collisViewRef = view;
+          this.novalViewRef = view;
           return view;
         });
         this.addCommand({
-          id: "open-collis-gallery",
+          id: "open-noval-gallery",
           name: "\u6253\u5F00\u753B\u5E03\u96C6",
           callback: () => {
             void this.openBoardGallery();
@@ -15943,12 +15943,12 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         });
       }
       /** Single folder used by the wall. Users can change it in data.json. */
-      get collisFolder() {
+      get novalFolder() {
         var _a;
-        return ((_a = this.settings.collis) == null ? void 0 : _a.boardFolder) || "\u753B\u5E03";
+        return ((_a = this.settings.noval) == null ? void 0 : _a.boardFolder) || "\u753B\u5E03";
       }
       async ensureBoardFolder() {
-        const path = this.collisFolder;
+        const path = this.novalFolder;
         const existing = this.app.vault.getAbstractFileByPath(path);
         if (existing instanceof import_obsidian21.TFolder)
           return;
@@ -16013,13 +16013,13 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       /** Create from inside the wall, so the file always lands in its folder. */
       async createGalleryBoard() {
         await this.ensureBoardFolder();
-        const file = await createBoardItem(this.app, this.collisFolder);
+        const file = await createBoardItem(this.app, this.novalFolder);
         await this.openBoardFile(file.path);
-        this.refreshCollis();
+        this.refreshNoval();
       }
-      refreshCollis() {
+      refreshNoval() {
         var _a;
-        (_a = this.collisViewRef) == null ? void 0 : _a.refreshWall();
+        (_a = this.novalViewRef) == null ? void 0 : _a.refreshWall();
       }
       async openBoard() {
         const boards = listBoards(this.app);
@@ -16046,7 +16046,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         const file = this.app.vault.getAbstractFileByPath(path);
         if (!(file instanceof import_obsidian21.TFile))
           return;
-        for (const leaf2 of this.app.workspace.getLeavesOfType(VIEW_TYPE_COLLIS_BOARD)) {
+        for (const leaf2 of this.app.workspace.getLeavesOfType(VIEW_TYPE_NOVAL_BOARD)) {
           const view = leaf2.view;
           if (((_a = view.file) == null ? void 0 : _a.path) === file.path) {
             void this.app.workspace.revealLeaf(leaf2);
@@ -16077,8 +16077,8 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           ...loaded != null ? loaded : {},
           ai: normalizeAISettings(loaded == null ? void 0 : loaded.ai),
           conversations: Array.isArray(loaded == null ? void 0 : loaded.conversations) ? loaded.conversations : [],
-          collis: normalizeCollisSettings(
-            (loaded == null ? void 0 : loaded.collis) ?? (loaded == null ? void 0 : loaded.workbench)
+          noval: normalizeNovalSettings(
+            (loaded == null ? void 0 : loaded.noval) ?? (loaded == null ? void 0 : loaded.workbench)
           )
         };
       }
@@ -16116,7 +16116,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
             this.painting = false;
           }
         } catch (error) {
-          console.error("[Collis] refresh failed", error);
+          console.error("[Noval] refresh failed", error);
         }
       }
       ensureObserver(view) {
@@ -16166,7 +16166,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         const view = this.getCanvasView();
         const canvas = view == null ? void 0 : view.canvas;
         const nodes = (canvas == null ? void 0 : canvas.nodes) ? collectNodes(canvas.nodes) : [];
-        console.warn("[Collis] self-check", {
+        console.warn("[Noval] self-check", {
           version: this.manifest.version,
           hasCanvasView: !!view,
           hasCanvas: !!canvas,
@@ -16177,7 +16177,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         const first = nodes[0];
         if (first) {
           const data = typeof first.getData === "function" ? (_a = first.getData()) != null ? _a : {} : first;
-          console.warn("[Collis] first node", {
+          console.warn("[Noval] first node", {
             keys: Object.keys(data),
             type: data.type,
             text: data.text,
@@ -16186,7 +16186,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           });
         }
         new import_obsidian21.Notice(
-          `Collis \u81EA\u68C0 \xB7 \u753B\u5E03:${view ? "\u6709" : "\u65E0"} \xB7 \u8282\u70B9:${nodes.length} \xB7 \u8BC6\u522B:${this.index.size}`,
+          `Noval \u81EA\u68C0 \xB7 \u753B\u5E03:${view ? "\u6709" : "\u65E0"} \xB7 \u8282\u70B9:${nodes.length} \xB7 \u8BC6\u522B:${this.index.size}`,
           1e4
         );
       }
@@ -16225,7 +16225,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
             const target = evt.target;
             if (!target)
               return;
-            if (target.closest(".collis-inline"))
+            if (target.closest(".noval-inline"))
               return;
             const nodeEl = target.closest(".canvas-node");
             if (!nodeEl) {
@@ -16291,7 +16291,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
             if (Date.now() >= this.suppressDblClickUntil)
               return;
             const target = evt.target;
-            if (target == null ? void 0 : target.closest(".collis-inline"))
+            if (target == null ? void 0 : target.closest(".noval-inline"))
               return;
             evt.preventDefault();
             evt.stopPropagation();
@@ -16631,12 +16631,12 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
   }
 });
 
-// src/collis-gallery.js
-var require_collis_gallery = __commonJS({
-  "src/collis-gallery.js"(exports2, module2) {
+// src/noval-gallery.js
+var require_noval_gallery = __commonJS({
+  "src/noval-gallery.js"(exports2, module2) {
     var { Menu: Menu2, Modal: Modal2, Notice: Notice2, setIcon: setIcon2, TFile } = require("obsidian");
     var SVG_NS = "http://www.w3.org/2000/svg";
-    var BOARD_EXTENSION = "collis";
+    var BOARD_EXTENSION = "noval";
     var PAD = 7;
     var MAX_NODES = 14;
     var MAX_CARDS = 6;
@@ -16837,7 +16837,7 @@ var require_collis_gallery = __commonJS({
         ...items.map((item) => `${item.file.path}:${item.mtime}:${item.nodes}:${item.edges}`)
       ].join("|");
     }
-    function collisMark() {
+    function novalMark() {
       const svg = document.createElementNS(SVG_NS, "svg");
       svg.setAttribute("viewBox", "0 0 24 24");
       svg.setAttribute("fill", "none");
@@ -16918,7 +16918,7 @@ var require_collis_gallery = __commonJS({
         const el = this.contentEl;
         while (el.firstChild)
           el.removeChild(el.firstChild);
-        el.classList.add("collis-delete-modal");
+        el.classList.add("noval-delete-modal");
         const heading = document.createElement("h2");
         heading.textContent = this.names.length === 1 ? "\u5220\u9664\u8FD9\u5757\u753B\u5E03\uFF1F" : `\u5220\u9664\u8FD9 ${this.names.length} \u5757\u753B\u5E03\uFF1F`;
         const detail = document.createElement("p");
@@ -16948,10 +16948,10 @@ var require_collis_gallery = __commonJS({
           el.removeChild(el.firstChild);
       }
     };
-    var CollisGalleryPanel2 = class {
-      constructor(app, collisPlugin) {
+    var NovalGalleryPanel2 = class {
+      constructor(app, novalPlugin) {
         this.app = app;
-        this.collis = collisPlugin;
+        this.noval = novalPlugin;
         this.root = null;
         this.items = [];
         this.sortMode = "created";
@@ -17010,7 +17010,7 @@ var require_collis_gallery = __commonJS({
         if (this.watching)
           return;
         this.watching = true;
-        const inFolder = (path) => isBoardPath(path, this.collis.collisFolder);
+        const inFolder = (path) => isBoardPath(path, this.noval.novalFolder);
         this.vaultRefs.push(
           this.app.vault.on("modify", (file) => {
             if (inFolder(file.path))
@@ -17056,7 +17056,7 @@ var require_collis_gallery = __commonJS({
       }
       reportError(stage, error) {
         const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-        console.error(`[collis] \u753B\u5E03\u96C6${stage}\u5931\u8D25`, error);
+        console.error(`[noval] \u753B\u5E03\u96C6${stage}\u5931\u8D25`, error);
         if (this.root) {
           this.clearRoot(this.root);
           const box = document.createElement("div");
@@ -17074,7 +17074,7 @@ var require_collis_gallery = __commonJS({
       async loadItems() {
         let items = [];
         try {
-          items = await listBoardItems(this.app, this.collis.collisFolder);
+          items = await listBoardItems(this.app, this.noval.novalFolder);
         } catch {
           new Notice2("\u8BFB\u53D6\u753B\u5E03\u5217\u8868\u5931\u8D25");
         }
@@ -17148,7 +17148,7 @@ var require_collis_gallery = __commonJS({
       buildEmpty(searching) {
         const empty = node("div", "vw-empty");
         const art = node("div", "vw-empty-art");
-        art.appendChild(collisMark());
+        art.appendChild(novalMark());
         const title = node("div", "vw-empty-title");
         title.textContent = searching ? "\u6CA1\u6709\u5339\u914D\u7684\u753B\u5E03" : "\u8FD8\u6CA1\u6709\u753B\u5E03";
         const hint = document.createElement("p");
@@ -17329,7 +17329,7 @@ var require_collis_gallery = __commonJS({
         if (!nodes.length) {
           cover.classList.add("is-blank");
           const ghost = node("span", "vw-cover-ghost");
-          ghost.appendChild(collisMark());
+          ghost.appendChild(novalMark());
           cover.appendChild(ghost);
           return cover;
         }
@@ -17350,7 +17350,7 @@ var require_collis_gallery = __commonJS({
         return cover;
       }
       openBoard(item) {
-        void this.collis.openBoardFile(item.file.path);
+        void this.noval.openBoardFile(item.file.path);
       }
       setMulti(on) {
         this.multi = on;
@@ -17414,22 +17414,22 @@ var require_collis_gallery = __commonJS({
       }
       async createBoard() {
         try {
-          await this.collis.createGalleryBoard();
+          await this.noval.createGalleryBoard();
           await this.loadItems();
         } catch (error) {
           new Notice2(error instanceof Error ? error.message : "\u65B0\u5EFA\u753B\u5E03\u5931\u8D25");
         }
       }
     };
-    module2.exports = { CollisGalleryPanel: CollisGalleryPanel2 };
+    module2.exports = { NovalGalleryPanel: NovalGalleryPanel2 };
   }
 });
 
-// src/collis-notes.js
-var require_collis_notes = __commonJS({
-  "src/collis-notes.js"(exports2, module2) {
+// src/noval-notes.js
+var require_noval_notes = __commonJS({
+  "src/noval-notes.js"(exports2, module2) {
     var { Notice: Notice2, setIcon: setIcon2, TFile } = require("obsidian");
-    var CollisBundle2 = require_collis_core();
+    var NovalBundle2 = require_noval_notes_core();
     var ICONS = {
       search: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>',
       review: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4.3l2.8 1.7"/></svg>',
@@ -17451,10 +17451,10 @@ var require_collis_notes = __commonJS({
       return Math.max(0, Math.round((now - target) / 864e5));
     }
     var TAG_RE = /#([^\s#\[\]()]+)/g;
-    var CollisNotesPanel2 = class {
-      constructor(app, collis, hostView) {
+    var NovalNotesPanel2 = class {
+      constructor(app, noval, hostView) {
         this.app = app;
-        this.collis = collis;
+        this.noval = noval;
         this.hostView = hostView || null;
         this.container = null;
         this.listWrap = null;
@@ -17635,17 +17635,17 @@ var require_collis_notes = __commonJS({
           this._pending = true;
           return;
         }
-        if (!this.collis || typeof this.collis.readAllCards !== "function") {
+        if (!this.noval || typeof this.noval.readAllCards !== "function") {
           if (this.subEl)
-            this.subEl.setText("Collis \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u67E5\u770B\u63A7\u5236\u53F0\u65E5\u5FD7\u3002");
+            this.subEl.setText("Noval \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u67E5\u770B\u63A7\u5236\u53F0\u65E5\u5FD7\u3002");
           return;
         }
         this._loading = true;
         let cards = [];
         try {
-          cards = await this.collis.readAllCards();
+          cards = await this.noval.readAllCards();
         } catch (e) {
-          console.error("[collis] \u8BFB\u53D6\u5361\u7247\u5931\u8D25", e);
+          console.error("[noval] \u8BFB\u53D6\u5361\u7247\u5931\u8D25", e);
           cards = [];
         }
         this._loading = false;
@@ -17765,7 +17765,7 @@ var require_collis_notes = __commonJS({
           return String(card.bodyLower || "").includes(raw) || lowerTags.some((t) => t.includes(raw)) || String(card.date || "").includes(raw);
         });
       }
-      /** 生效条件数：搜索词也算一条，和 Collis 一致 */
+      /** 生效条件数：搜索词也算一条，和 Noval 一致 */
       activeFilterCount() {
         return (String(this.query || "").trim() ? 1 : 0) + (this.refFilter ? 1 : 0) + this.tags.length + (this.untagged ? 1 : 0);
       }
@@ -17773,15 +17773,15 @@ var require_collis_notes = __commonJS({
       effectiveRefFilter() {
         if (!this.refFilter)
           return "";
-        if (!this.collis || typeof this.collis.refsReady !== "function")
+        if (!this.noval || typeof this.noval.refsReady !== "function")
           return "";
-        return this.collis.refsReady() ? this.refFilter : "";
+        return this.noval.refsReady() ? this.refFilter : "";
       }
       refCount(card) {
-        if (!this.collis || typeof this.collis.refCount !== "function")
+        if (!this.noval || typeof this.noval.refCount !== "function")
           return 0;
         try {
-          return this.collis.refCount(card) || 0;
+          return this.noval.refCount(card) || 0;
         } catch (e) {
           return 0;
         }
@@ -17839,7 +17839,7 @@ var require_collis_notes = __commonJS({
         this.tags = cur;
         this.afterFilterChange();
       }
-      /** 正文里点标签：只用这一个标签筛选，换掉原来的多选条件（与 Collis 侧栏一致） */
+      /** 正文里点标签：只用这一个标签筛选，换掉原来的多选条件（与 Noval 侧栏一致） */
       setFilterTags(list) {
         this.tags = (list || []).filter(Boolean);
         if (this.tags.length)
@@ -18080,7 +18080,7 @@ var require_collis_notes = __commonJS({
         const key = this.cardKey(card);
         const picked = this.selectMode && this.selected.has(key);
         const editing = this.editingKey === key;
-        const sections = CollisBundle2.qmCardSections(card.body);
+        const sections = NovalBundle2.qmCardSections(card.body);
         const el = list.createDiv({ cls: "qm-card" + (picked ? " is-picked" : "") });
         el.setAttribute("data-qm-date", card.date || "");
         el.setAttribute("data-qm-time", card.time || "");
@@ -18173,7 +18173,7 @@ var require_collis_notes = __commonJS({
             new Notice2("\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A");
             return;
           }
-          const ok = await this.collis.updateCard(card, text);
+          const ok = await this.noval.updateCard(card, text);
           if (!ok) {
             new Notice2("\u4FDD\u5B58\u5931\u8D25\uFF0C\u5361\u7247\u4F4D\u7F6E\u53EF\u80FD\u5DF2\u53D8\u5316");
             return;
@@ -18223,7 +18223,7 @@ var require_collis_notes = __commonJS({
             save.onclick = async (ev) => {
               ev.stopPropagation();
               const text = this.appendEditing && this.appendEditing.key === key ? this.appendEditing.text : ta.value;
-              const ok = await this.collis.updateAppend(card, index, text);
+              const ok = await this.noval.updateAppend(card, index, text);
               if (!ok)
                 return;
               this.appendEditing = null;
@@ -18256,8 +18256,8 @@ var require_collis_notes = __commonJS({
         this.renderAll();
       }
       confirmDeleteAppend(card, index) {
-        new CollisBundle2.ConfirmModal(this.app, "\u5220\u9664\u8FD9\u6761\u8FFD\u52A0\uFF1F", async () => {
-          const ok = await this.collis.deleteAppend(card, index);
+        new NovalBundle2.ConfirmModal(this.app, "\u5220\u9664\u8FD9\u6761\u8FFD\u52A0\uFF1F", async () => {
+          const ok = await this.noval.deleteAppend(card, index);
           if (!ok)
             return;
           this.appendEditing = null;
@@ -18303,7 +18303,7 @@ var require_collis_notes = __commonJS({
             new Notice2("\u5199\u70B9\u4EC0\u4E48\u518D\u8FFD\u52A0\u5427");
             return;
           }
-          const ok = await this.collis.appendToCard(card, text);
+          const ok = await this.noval.appendToCard(card, text);
           if (!ok)
             return;
           this.appendDrafting = null;
@@ -18320,11 +18320,11 @@ var require_collis_notes = __commonJS({
           }
         });
       }
-      /** 引用小红点：数字与提示文案都与 Collis 的 paintRefDot 一致 */
+      /** 引用小红点：数字与提示文案都与 Noval 的 paintRefDot 一致 */
       paintRefDot(el, card) {
         if (!el)
           return;
-        const info = this.collis.refSummary ? this.collis.refSummary(card) : null;
+        const info = this.noval.refSummary ? this.noval.refSummary(card) : null;
         const n = info ? info.notes : 0;
         if (!n) {
           el.addClass("is-hidden");
@@ -18346,7 +18346,7 @@ var require_collis_notes = __commonJS({
         el.setAttribute("title", lines.join("\n"));
       }
       renderCardBody(bodyEl, card, textOverride) {
-        const text = textOverride != null ? String(textOverride) : CollisBundle2.qmCardSections(String(card.body || "")).original;
+        const text = textOverride != null ? String(textOverride) : NovalBundle2.qmCardSections(String(card.body || "")).original;
         TAG_RE.lastIndex = 0;
         let last = 0;
         let match;
@@ -18387,7 +18387,7 @@ var require_collis_notes = __commonJS({
         this.treeEl = null;
         this.renderFilterBtnState();
       }
-      /* ---------------- 筛选浮层（与 Collis 同一套 DOM / 逻辑） ---------------- */
+      /* ---------------- 筛选浮层（与 Noval 同一套 DOM / 逻辑） ---------------- */
       openFilterPanel() {
         if (this.pop && this.popOwner === this.filterBtn) {
           this.closePop();
@@ -18536,10 +18536,10 @@ var require_collis_notes = __commonJS({
       openMoreMenu() {
         const hit = this.filteredCards().length;
         const total = this.cards.length;
-        const cap = this.collis.settings && this.collis.settings.maxCards || 0;
+        const cap = this.noval.settings && this.noval.settings.maxCards || 0;
         const capNote = cap > 0 && hit > cap ? " \xB7 \u663E\u793A\u6700\u8FD1 " + cap : "";
         const countLine = (hit === total ? "\u5171 " + total + " \u6761\u5361\u7247" : "\u5171 " + total + " \u6761 \xB7 \u547D\u4E2D " + hit + " \u6761") + capNote;
-        const n = (this.collis.settings && this.collis.settings.trash || []).length;
+        const n = (this.noval.settings && this.noval.settings.trash || []).length;
         const items = [
           { title: countLine, icon: "arrow-right", disabled: true },
           { separator: true },
@@ -18551,17 +18551,17 @@ var require_collis_notes = __commonJS({
           {
             title: n ? "\u6700\u8FD1\u5220\u9664 " + n : "\u6700\u8FD1\u5220\u9664",
             icon: "trash-2",
-            onClick: () => new CollisBundle2.TrashModal(this.app, this.collis).open()
+            onClick: () => new NovalBundle2.TrashModal(this.app, this.noval).open()
           },
           {
             title: "\u6253\u5F00\u672C\u6708\u6587\u4EF6",
             icon: "file-text",
-            onClick: () => this.collis.openCurrentMonthFile()
+            onClick: () => this.noval.openCurrentMonthFile()
           },
           {
             title: "\u68C0\u67E5\u5B64\u513F\u5361\u7247",
             icon: "search-check",
-            onClick: () => new CollisBundle2.OrphanModal(this.app, this.collis).open()
+            onClick: () => new NovalBundle2.OrphanModal(this.app, this.noval).open()
           },
           { separator: true },
           {
@@ -18572,7 +18572,7 @@ var require_collis_notes = __commonJS({
         ];
         return this.showMenu(items, this.moreBtn);
       }
-      /* ---------------- 「更多」菜单（复刻 Collis 的 showMenu） ---------------- */
+      /* ---------------- 「更多」菜单（复刻 Noval 的 showMenu） ---------------- */
       showMenu(items, anchor) {
         if (this.menuEl && this.menuAnchor === anchor) {
           this.closeMenu();
@@ -18637,7 +18637,7 @@ var require_collis_notes = __commonJS({
           this.menuAnchor = null;
         }
       }
-      /* ---------------- 多选（与 Collis 同一套交互） ---------------- */
+      /* ---------------- 多选（与 Noval 同一套交互） ---------------- */
       cardKey(card) {
         return (card.file ? card.file.path : "") + "|" + card.date + "|" + card.time + "|" + (card.id || String(card.body || "").slice(0, 24));
       }
@@ -18706,11 +18706,11 @@ var require_collis_notes = __commonJS({
         const picked = this.cards.filter((c) => this.selected.has(this.cardKey(c)));
         if (!picked.length)
           return;
-        new CollisBundle2.ConfirmModal(
+        new NovalBundle2.ConfirmModal(
           this.app,
           "\u5220\u9664\u9009\u4E2D\u7684 " + picked.length + " \u6761\u5361\u7247\uFF1F",
           async () => {
-            const res = await this.collis.deleteCards(picked);
+            const res = await this.noval.deleteCards(picked);
             this.selectMode = false;
             this.selected.clear();
             await this.load();
@@ -18725,7 +18725,7 @@ var require_collis_notes = __commonJS({
           ""
         ).open();
       }
-      /* ---------------- 回看（复刻 Collis 的覆盖视图） ---------------- */
+      /* ---------------- 回看（复刻 Noval 的覆盖视图） ---------------- */
       openReview() {
         if (!this.reviewEl)
           return;
@@ -18773,7 +18773,7 @@ var require_collis_notes = __commonJS({
         const list = el.createDiv({ cls: "qm-review-list" });
         for (const card of this.reviewCards) {
           const key = this.cardKey(card);
-          const sections = CollisBundle2.qmCardSections(card.body);
+          const sections = NovalBundle2.qmCardSections(card.body);
           const box = list.createDiv({ cls: "qm-rv-card" });
           const rhead = box.createDiv({ cls: "qm-rv-head" });
           const meta = rhead.createDiv({ cls: "qm-rv-meta" });
@@ -18847,7 +18847,7 @@ var require_collis_notes = __commonJS({
         this.reviewCards = next;
       }
       openCardMenu(cardEl, card, anchorBtn) {
-        const info = this.collis.refSummary ? this.collis.refSummary(card) : null;
+        const info = this.noval.refSummary ? this.noval.refSummary(card) : null;
         const n = info ? info.notes : 0;
         const anchor = anchorBtn || cardEl.querySelector(".qm-more");
         const items = [
@@ -18855,7 +18855,7 @@ var require_collis_notes = __commonJS({
             title: "\u590D\u5236\u5168\u6587",
             icon: "copy",
             onClick: async () => {
-              await this.collis.copy(CollisBundle2.qmPasteText(card.body));
+              await this.noval.copy(NovalBundle2.qmPasteText(card.body));
               new Notice2("\u5DF2\u590D\u5236\u5361\u7247\u5168\u6587");
             }
           },
@@ -18864,13 +18864,13 @@ var require_collis_notes = __commonJS({
           { title: "\u8FFD\u52A0", icon: "plus", onClick: () => this.beginAppend(card) },
           { separator: true }
         ];
-        if (this.collis.refsReady && !this.collis.refsReady()) {
+        if (this.noval.refsReady && !this.noval.refsReady()) {
           items.push({ title: "\u5F15\u7528\u7EDF\u8BA1\u51C6\u5907\u4E2D\u2026", icon: "corner-down-right", disabled: true });
         } else if (n) {
           items.push({
             title: "\u88AB " + n + " \u7BC7\u7B14\u8BB0\u5F15\u7528\u2026",
             icon: "corner-down-right",
-            onClick: () => new CollisBundle2.RefListModal(this.app, info, (r) => this.openRef(r.path, r.line)).open()
+            onClick: () => new NovalBundle2.RefListModal(this.app, info, (r) => this.openRef(r.path, r.line)).open()
           });
         } else {
           items.push({
@@ -18893,17 +18893,17 @@ var require_collis_notes = __commonJS({
         });
         return this.showMenu(items, anchor);
       }
-      /** 复制块链接：跟随「嵌入」开关，与 Collis 一致 */
+      /** 复制块链接：跟随「嵌入」开关，与 Noval 一致 */
       async copyRef(card) {
         const hadId = !!card.id && card.idOnLastLine;
-        const id = await this.collis.ensureId(card);
+        const id = await this.noval.ensureId(card);
         if (!id) {
           new Notice2("\u6CA1\u627E\u5230\u8FD9\u5F20\u5361\u7247\uFF0C\u8BF7\u6539\u7528\u300C\u590D\u5236\u5168\u6587\u300D");
           return;
         }
-        const bang = this.collis.settings.blockRefEmbed ? "!" : "";
-        const ref = bang + "[[" + this.collis.linkTarget(card) + "#^" + id + "]]";
-        await this.collis.copy(ref);
+        const bang = this.noval.settings.blockRefEmbed ? "!" : "";
+        const ref = bang + "[[" + this.noval.linkTarget(card) + "#^" + id + "]]";
+        await this.noval.copy(ref);
         new Notice2(
           (hadId ? "\u5DF2\u590D\u5236\uFF1A" : "\u5DF2\u4E3A\u8FD9\u6761\u5361\u7247\u8865\u4E0A\u5757 ID\uFF0C\u5DF2\u590D\u5236\uFF1A") + ref,
           7e3
@@ -18935,7 +18935,7 @@ var require_collis_notes = __commonJS({
         this.editingKey = key;
         this.editingDraft = {
           key,
-          text: CollisBundle2.qmCardSections(String(card.body || "")).original
+          text: NovalBundle2.qmCardSections(String(card.body || "")).original
         };
         this.renderAll();
       }
@@ -18960,8 +18960,8 @@ var require_collis_notes = __commonJS({
         let hit = null;
         try {
           const text = String(await this.app.vault.read(file) || "").replace(/\r\n?/g, "\n");
-          hit = CollisBundle2.qmLocateCard(text, card, {
-            strict: this.collis.settings.strictCardId !== false
+          hit = NovalBundle2.qmLocateCard(text, card, {
+            strict: this.noval.settings.strictCardId !== false
           });
         } catch (e) {
           hit = null;
@@ -18986,14 +18986,14 @@ var require_collis_notes = __commonJS({
         }
       }
       confirmDelete(card) {
-        const info = this.collis.refSummary ? this.collis.refSummary(card) : null;
+        const info = this.noval.refSummary ? this.noval.refSummary(card) : null;
         const n = info ? info.notes : 0;
         const detail = n ? "\u8FD9\u5F20\u5361\u8FD8\u88AB " + n + " \u7BC7\u7B14\u8BB0\u5F15\u7528\uFF0C\u5220\u9664\u540E\u8FD9\u4E9B\u5F15\u7528\u4F1A\u5931\u6548\u3002" : "";
-        new CollisBundle2.ConfirmModal(
+        new NovalBundle2.ConfirmModal(
           this.app,
           "\u5220\u9664\u8FD9\u6761\u5361\u7247\uFF1F",
           async () => {
-            await this.collis.deleteCard(card);
+            await this.noval.deleteCard(card);
             await this.load();
           },
           detail
@@ -19009,17 +19009,17 @@ var require_collis_notes = __commonJS({
         const text = this.input ? this.input.value.trim() : "";
         if (!text)
           return;
-        if (!this.collis || typeof this.collis.appendCard !== "function") {
-          new Notice2("Collis \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u6682\u65F6\u4E0D\u80FD\u8BB0\u5F55");
+        if (!this.noval || typeof this.noval.appendCard !== "function") {
+          new Notice2("Noval \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u6682\u65F6\u4E0D\u80FD\u8BB0\u5F55");
           return;
         }
         this.saveBtn.disabled = true;
         this.saveBtn.classList.add("is-disabled");
         let ok = false;
         try {
-          ok = await this.collis.appendCard(text);
+          ok = await this.noval.appendCard(text);
         } catch (e) {
-          console.error("[collis] \u5199\u5165\u5361\u7247\u5931\u8D25", e);
+          console.error("[noval] \u5199\u5165\u5361\u7247\u5931\u8D25", e);
         }
         if (ok) {
           this.input.value = "";
@@ -19044,14 +19044,14 @@ var require_collis_notes = __commonJS({
         }
       }
       openSidebar() {
-        if (this.hostView && this.hostView.openCollis) {
-          this.hostView.openCollis();
+        if (this.hostView && this.hostView.openNoval) {
+          this.hostView.openNoval();
           return;
         }
-        this.app.commands.executeCommandById("collis:open-cards");
+        this.app.commands.executeCommandById("noval:open-cards");
       }
     };
-    module2.exports = { CollisNotesPanel: CollisNotesPanel2 };
+    module2.exports = { NovalNotesPanel: NovalNotesPanel2 };
   }
 });
 
@@ -19068,10 +19068,10 @@ var {
   setIcon,
   addIcon
 } = require("obsidian");
-var CollisBundle = require_collis_core();
-var CollisBoardBundle = require_collis_board_core();
-var { CollisGalleryPanel } = require_collis_gallery();
-var { CollisNotesPanel } = require_collis_notes();
+var NovalBundle = require_noval_notes_core();
+var NovalBoardBundle = require_noval_board_core();
+var { NovalGalleryPanel } = require_noval_gallery();
+var { NovalNotesPanel } = require_noval_notes();
 function resolvePluginClass(bundle, fallbackName) {
   if (typeof bundle === "function")
     return bundle;
@@ -19081,14 +19081,16 @@ function resolvePluginClass(bundle, fallbackName) {
     return bundle[fallbackName];
   return null;
 }
+var NOTES_ID = "noval-notes";
+var BOARD_ID = "noval-board";
 var BUNDLED_PLUGINS = [
   {
-    id: "collis",
+    id: NOTES_ID,
     className: "QuickMemoPlugin",
-    bundle: CollisBundle,
+    bundle: NovalBundle,
     manifest: {
-      id: "collis",
-      name: "Collis",
+      id: NOTES_ID,
+      name: "Noval",
       version: "2.0.5",
       minAppVersion: "1.4.0",
       description: "\u5728\u77E5\u8BC6\u5E93\u91CC\u901F\u8BB0\uFF1A\u4E0D\u5EFA\u6587\u4EF6\u3001\u4E0D\u8D77\u6807\u9898\uFF0C\u6309\u6708\u5B58\u8FDB\u672C\u5730 Markdown\u3002",
@@ -19097,12 +19099,12 @@ var BUNDLED_PLUGINS = [
     }
   },
   {
-    id: "collis-board",
-    className: "CollisBoardPlugin",
-    bundle: CollisBoardBundle,
+    id: BOARD_ID,
+    className: "NovalBoardPlugin",
+    bundle: NovalBoardBundle,
     manifest: {
-      id: "collis-board",
-      name: "Collis",
+      id: BOARD_ID,
+      name: "Noval",
       version: "0.6.2",
       minAppVersion: "1.13.0",
       description: "Canvas \u601D\u8003\u5DE5\u4F5C\u53F0\uFF1A\u753B\u5E03\u96C6\u3001\u8BED\u4E49\u8FDE\u7EBF\u3001\u5927\u7EB2\u3001Markdown \u5BFC\u51FA\u4E0E AI\u3002",
@@ -19111,12 +19113,22 @@ var BUNDLED_PLUGINS = [
     }
   }
 ];
-var VIEW_TYPE = "collis-view";
+var VIEW_TYPE = "noval-view";
 var QM_VIEW_TYPE = "qm-cards-view";
-var PLUGIN_ICON_ID = CollisBundle && CollisBundle.ICON_ID || "collis-mark";
-var PLUGIN_ICON_SVG = CollisBundle && CollisBundle.ICON_MARK || "";
+var PLUGIN_ICON_ID = NovalBundle && NovalBundle.ICON_ID || "noval-mark";
+var PLUGIN_ICON_SVG = NovalBundle && NovalBundle.ICON_MARK || "";
 var CARD_FOLDER = "00-Inbox/\u901F\u8BB0";
-var BOARD_EXT = "collis";
+var BOARD_EXT = "noval";
+var LEGACY = {
+  // 旧版 data.json 里的设置键，也是旧独立插件的目录名
+  notesId: "collis",
+  boardId: "collis-board",
+  sidebarKey: "collisSidebarOpen",
+  // 旧白板后缀：volis 是合并前的，collis 是更名前的
+  boardExt: ["collis", "volis"],
+  // 旧标签页类型：升级后先把残留标签页关掉，避免留下打不开的空标签
+  viewTypes: ["collis-view", "collis-board", "collis-gallery"]
+};
 var ATTACHMENT_EXTENSIONS = /* @__PURE__ */ new Set([
   // 图片
   "png",
@@ -19311,7 +19323,7 @@ var DEFAULT_SETTINGS = {
   workspaceName: "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0",
   navCollapsed: false,
   // 上次退出时卡片笔记右侧栏是否开着，用于重启后恢复
-  collisSidebarOpen: false,
+  novalSidebarOpen: false,
   // 用户点过“忽略”的未知 module 值，避免同一提示反复出现
   ignoredModuleValues: [],
   // 收件箱策略：root = 只收库根目录里散落的文件；unassigned / all 作为后续扩展接口
@@ -19560,18 +19572,18 @@ function paintNoteThumb(app, thumb, file) {
   });
 }
 var WB_TOOLTIP_SCOPE = [
-  ".collis-view",
+  ".noval-view",
   ".qm-view",
   ".qm-root",
-  ".collis-board-leaf",
-  ".collis-board-host",
-  ".collis-board",
+  ".noval-board-leaf",
+  ".noval-board-host",
+  ".noval-board",
   ".cl-root",
   ".vw-frame",
-  ".collis-doctor-content",
-  ".collis-export-content",
-  ".collis-ai-modal",
-  ".collis-settings"
+  ".noval-doctor-content",
+  ".noval-export-content",
+  ".noval-ai-modal",
+  ".noval-settings"
 ].join(",");
 function wbInTooltipScope(el) {
   try {
@@ -20282,7 +20294,7 @@ var AddFilesModal = class extends Modal {
     this.contentEl.empty();
   }
 };
-var CollisView = class extends ItemView {
+var NovalView = class extends ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -20301,13 +20313,13 @@ var CollisView = class extends ItemView {
     return VIEW_TYPE;
   }
   getDisplayText() {
-    return "Collis";
+    return "Noval";
   }
   getIcon() {
     return PLUGIN_ICON_ID;
   }
   async onOpen() {
-    this.containerEl.addClass("collis-view");
+    this.containerEl.addClass("noval-view");
     this.contentEl.addClass("cl-content");
     this.render();
     this.watchWidth();
@@ -20323,7 +20335,7 @@ var CollisView = class extends ItemView {
       this._ro.disconnect();
       this._ro = null;
     }
-    document.body.classList.remove("collis-focus");
+    document.body.classList.remove("noval-focus");
     this.focus = false;
     this.destroyGallery();
     this.destroyNotes();
@@ -20367,7 +20379,7 @@ var CollisView = class extends ItemView {
   }
   /* 收件箱 / 模块归属用的全量清单：
    * 整个 vault 的 Markdown 都算，只排除卡片笔记的月度聚合文件。
-   * 白板是 .collis，不在 getMarkdownFiles() 里，天然被排除。
+   * 白板是 .noval，不在 getMarkdownFiles() 里，天然被排除。
    * 不再按顶层文件夹白名单过滤，避免文件在文件树里一挪位置就“消失”。 */
   vaultFiles() {
     return this.app.vault.getMarkdownFiles().filter(
@@ -20650,16 +20662,16 @@ var CollisView = class extends ItemView {
     new AddFilesModal(this.app, candidates, (files) => this.assignToModule(files, mod)).open();
   }
   // 收件箱也收录附件：图片 / 视频 / PDF / 音频等，排除白板和隐藏目录。
-  // 只收白名单里的扩展名，白板的历史备份（xxx.volis.json、xxx.collis.bak）
+  // 只收白名单里的扩展名，白板的历史备份（xxx.volis.json、xxx.noval.bak）
   // 这类复合后缀不会再混进来。
   vaultAttachments() {
     return this.app.vault.getFiles().filter((file) => {
       if (file.extension === "md")
         return false;
-      if (["collis", "volis", "canvas"].includes(file.extension.toLowerCase()))
+      if (["noval", "volis", "canvas"].includes(file.extension.toLowerCase()))
         return false;
       const lower = file.path.toLowerCase();
-      if (lower.includes(".volis.") || lower.includes(".collis."))
+      if (lower.includes(".volis.") || lower.includes(".noval."))
         return false;
       if (!ATTACHMENT_EXTENSIONS.has(file.extension.toLowerCase()))
         return false;
@@ -20683,10 +20695,10 @@ var CollisView = class extends ItemView {
     if (!file)
       return false;
     const ext = String(file.extension || "").toLowerCase();
-    if (["collis", "volis", "canvas"].includes(ext))
+    if (["noval", "volis", "canvas"].includes(ext))
       return false;
     const lower = file.path.toLowerCase();
-    if (lower.includes(".volis.") || lower.includes(".collis."))
+    if (lower.includes(".volis.") || lower.includes(".noval."))
       return false;
     if (isIgnoredPath(file.path))
       return false;
@@ -21191,8 +21203,8 @@ var CollisView = class extends ItemView {
       return false;
     }
   }
-  openCollis() {
-    const ok = this.runCommand("collis:open-cards");
+  openNoval() {
+    const ok = this.runCommand(NOTES_ID + ":open-cards");
     if (ok)
       return;
     const leaf = this.app.workspace.getRightLeaf(false);
@@ -21200,16 +21212,16 @@ var CollisView = class extends ItemView {
       leaf.setViewState({ type: "qm-cards-view", active: true });
       this.app.workspace.revealLeaf(leaf);
     } else {
-      new Notice("\u6CA1\u6709\u627E\u5230 Collis \u89C6\u56FE");
+      new Notice("\u6CA1\u6709\u627E\u5230 Noval \u89C6\u56FE");
     }
   }
   quickCapture() {
-    if (!this.runCommand("collis:quick-capture")) {
-      new Notice("\u672A\u627E\u5230 Collis \u7684\u5FEB\u901F\u8BB0\u5F55\u547D\u4EE4");
+    if (!this.runCommand(NOTES_ID + ":quick-capture")) {
+      new Notice("\u672A\u627E\u5230 Noval \u7684\u5FEB\u901F\u8BB0\u5F55\u547D\u4EE4");
     }
   }
   // 画布集现在就是「白板」页本身，所有入口都切到这一页，不再开新标签。
-  openCollisGallery() {
+  openNovalGallery() {
     this.go("canvas");
   }
   openSettings() {
@@ -21217,12 +21229,12 @@ var CollisView = class extends ItemView {
       this.app.setting.open();
       this.app.setting.openTabById(this.plugin.manifest.id);
     } catch (e) {
-      new Notice("\u8BF7\u624B\u52A8\u6253\u5F00\u8BBE\u7F6E \u2192 Collis");
+      new Notice("\u8BF7\u624B\u52A8\u6253\u5F00\u8BBE\u7F6E \u2192 Noval");
     }
   }
   setFocus(on) {
     this.focus = on;
-    document.body.classList.toggle("collis-focus", on);
+    document.body.classList.toggle("noval-focus", on);
     this.render();
   }
   setNavCollapsed(on) {
@@ -21285,10 +21297,10 @@ var CollisView = class extends ItemView {
   }
   // 卡片总数只有读文件才知道，导航先渲染，数字到了再补进徽标。
   fillCardCount(item) {
-    const collis = this.plugin.childPlugins && this.plugin.childPlugins.collis || this.app.plugins.plugins && this.app.plugins.plugins.collis;
-    if (!collis || typeof collis.readAllCards !== "function")
+    const noval = this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID] || this.app.plugins.plugins && this.app.plugins.plugins[LEGACY.notesId];
+    if (!noval || typeof noval.readAllCards !== "function")
       return;
-    collis.readAllCards().then((cards) => {
+    noval.readAllCards().then((cards) => {
       const total = Array.isArray(cards) ? cards.length : 0;
       this._cardCount = total;
       if (!item.isConnected)
@@ -21409,7 +21421,7 @@ var CollisView = class extends ItemView {
     this.renderNav(root);
     const main = root.createDiv({ cls: "cl-main" });
     const restore = main.createDiv({ cls: "cl-navrestore" });
-    restore.setAttribute("aria-label", "\u5C55\u5F00 Collis \u4FA7\u680F");
+    restore.setAttribute("aria-label", "\u5C55\u5F00 Noval \u4FA7\u680F");
     setIcon(restore, "chevrons-right");
     restore.onclick = () => this.setNavCollapsed(false);
     const scroll = main.createDiv({ cls: "cl-scroll" });
@@ -21439,10 +21451,10 @@ var CollisView = class extends ItemView {
     brandText.createDiv({ cls: "cl-brand-name", text: brandName });
     brandText.createDiv({
       cls: "cl-brand-sub",
-      text: brandName === "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0" ? "Collis Workspace" : "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0"
+      text: brandName === "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0" ? "Noval Workspace" : "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0"
     });
     const collapseBtn = brand.createDiv({ cls: "cl-navtoggle" });
-    collapseBtn.setAttribute("aria-label", "\u6536\u8D77 Collis \u4FA7\u680F");
+    collapseBtn.setAttribute("aria-label", "\u6536\u8D77 Noval \u4FA7\u680F");
     setIcon(collapseBtn, "chevrons-left");
     collapseBtn.onclick = () => this.setNavCollapsed(true);
     const navList = nav.createDiv({ cls: "cl-navlist" });
@@ -21657,9 +21669,9 @@ var CollisView = class extends ItemView {
         captureInput.focus();
         return;
       }
-      const collis = this.plugin.childPlugins && this.plugin.childPlugins.collis;
-      if (collis && typeof collis.appendCard === "function") {
-        const ok = await collis.appendCard(text);
+      const noval = this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID];
+      if (noval && typeof noval.appendCard === "function") {
+        const ok = await noval.appendCard(text);
         if (ok) {
           captureInput.value = "";
           window.setTimeout(() => {
@@ -21795,7 +21807,7 @@ var CollisView = class extends ItemView {
       resumeGrid.createDiv({ cls: "cl-hm-empty", text: "\u8FD8\u6CA1\u6709\u53EF\u7EE7\u7EED\u7684\u5185\u5BB9\u3002" });
     }
     for (const file of recentFiles) {
-      const isBoard = file.extension === "collis";
+      const isBoard = file.extension === "noval";
       const mod = isBoard ? null : this.moduleForFile(file);
       const color = isBoard ? "#9b8cff" : mod && mod.color || "#3f7fd1";
       const fm = isBoard ? {} : getFm(this.app, file);
@@ -21859,7 +21871,7 @@ var CollisView = class extends ItemView {
     boardHead.createDiv({ cls: "cl-hm-title", text: "\u6700\u8FD1\u767D\u677F" });
     boardHead.createDiv({ cls: "cl-hm-sub", text: boards.length + " \u5757" });
     const boardMore = boardHead.createDiv({ cls: "cl-hm-more", text: "\u753B\u5E03\u96C6 \u203A" });
-    boardMore.onclick = () => this.openCollisGallery();
+    boardMore.onclick = () => this.openNovalGallery();
     const boardGrid = boardCard.createDiv({ cls: "cl-hm-boards" });
     const boardEls = [];
     boards.slice(0, 3).forEach((file, index) => {
@@ -21884,7 +21896,7 @@ var CollisView = class extends ItemView {
     const noteMore = noteHead.createDiv({ cls: "cl-hm-more", text: "\u6253\u5F00 \u203A" });
     noteMore.onclick = () => this.go("notes");
     const noteWrap = noteCard.createDiv({ cls: "cl-hm-notes" });
-    page.createDiv({ cls: "cl-hm-foot", text: "\u6570\u636E\u5B9E\u65F6\u8BFB\u53D6 \xB7 Collis v" + this.plugin.manifest.version });
+    page.createDiv({ cls: "cl-hm-foot", text: "\u6570\u636E\u5B9E\u65F6\u8BFB\u53D6 \xB7 Noval v" + this.plugin.manifest.version });
     this.fillHomeBoards(boardEls);
     this.fillHomeCards(noteWrap);
   }
@@ -22033,7 +22045,7 @@ var CollisView = class extends ItemView {
     if (!cards.length) {
       container.createDiv({
         cls: "cl-empty",
-        text: "\u8FD8\u6CA1\u6709\u901F\u8BB0\u5361\u7247\u3002\u7528 Collis \u8BB0\u4E00\u6761\uFF0C\u5B83\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC\u3002"
+        text: "\u8FD8\u6CA1\u6709\u901F\u8BB0\u5361\u7247\u3002\u7528 Noval \u8BB0\u4E00\u6761\uFF0C\u5B83\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC\u3002"
       });
       return;
     }
@@ -22058,7 +22070,7 @@ var CollisView = class extends ItemView {
     if (!boards.length) {
       container.createDiv({
         cls: "cl-empty",
-        text: "\u8FD8\u6CA1\u6709 .collis \u767D\u677F\u3002\u53BB\u753B\u5E03\u96C6\u65B0\u5EFA\u4E00\u5F20\u3002"
+        text: "\u8FD8\u6CA1\u6709 .noval \u767D\u677F\u3002\u53BB\u753B\u5E03\u96C6\u65B0\u5EFA\u4E00\u5F20\u3002"
       });
       return;
     }
@@ -22946,38 +22958,38 @@ var CollisView = class extends ItemView {
   }
   renderCanvas(el) {
     el.addClass("cl-scroll-canvas");
-    const collisBoard = this.plugin.childPlugins && this.plugin.childPlugins["collis-board"];
-    if (!collisBoard) {
+    const novalBoard = this.plugin.childPlugins && this.plugin.childPlugins[BOARD_ID];
+    if (!novalBoard) {
       const head = el.createDiv({ cls: "cl-pagehead" });
       head.createEl("h1", { text: "\u767D\u677F" });
       head.createDiv({
         cls: "cl-sub",
-        text: "Collis \u753B\u5E03\u96C6\u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u6253\u5F00\u63A7\u5236\u53F0\u67E5\u770B [collis] \u65E5\u5FD7\u3002"
+        text: "Noval \u753B\u5E03\u96C6\u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u6253\u5F00\u63A7\u5236\u53F0\u67E5\u770B [noval] \u65E5\u5FD7\u3002"
       });
       return;
     }
     if (!this.gallery)
-      this.gallery = new CollisGalleryPanel(this.app, collisBoard);
+      this.gallery = new NovalGalleryPanel(this.app, novalBoard);
     this.gallery.mount(el);
   }
   renderNotes(el) {
     el.addClass("cl-scroll-notes");
-    const collis = this.plugin.childPlugins && this.plugin.childPlugins.collis || this.app.plugins.plugins && this.app.plugins.plugins.collis;
-    if (!collis) {
+    const noval = this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID] || this.app.plugins.plugins && this.app.plugins.plugins[LEGACY.notesId];
+    if (!noval) {
       const head = el.createDiv({ cls: "cl-pagehead" });
       head.createEl("h1", { text: "\u5361\u7247\u7B14\u8BB0" });
       head.createDiv({
         cls: "cl-sub",
-        text: "Collis \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u6253\u5F00\u63A7\u5236\u53F0\u67E5\u770B [collis] \u65E5\u5FD7\u3002"
+        text: "Noval \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u6253\u5F00\u63A7\u5236\u53F0\u67E5\u770B [noval] \u65E5\u5FD7\u3002"
       });
       return;
     }
     if (!this.notes)
-      this.notes = new CollisNotesPanel(this.app, collis, this);
+      this.notes = new NovalNotesPanel(this.app, noval, this);
     this.notes.mount(el);
   }
 };
-var CollisSettingTab = class extends PluginSettingTab {
+var NovalSettingTab = class extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -22996,7 +23008,7 @@ var CollisSettingTab = class extends PluginSettingTab {
         });
       })
     );
-    new Setting(containerEl).setName("\u6253\u5F00\u65F6\u8FDB\u5165\u4E13\u6CE8\u6A21\u5F0F").setDesc("\u9690\u85CF\u5DE6\u4FA7\u680F\u3001\u6807\u7B7E\u680F\u548C\u72B6\u6001\u680F\uFF0C\u4FDD\u7559\u53F3\u4FA7\u680F\uFF0C\u65B9\u4FBF\u540C\u65F6\u4F7F\u7528 Collis \u548C\u5176\u4ED6\u9762\u677F\u3002").addToggle(
+    new Setting(containerEl).setName("\u6253\u5F00\u65F6\u8FDB\u5165\u4E13\u6CE8\u6A21\u5F0F").setDesc("\u9690\u85CF\u5DE6\u4FA7\u680F\u3001\u6807\u7B7E\u680F\u548C\u72B6\u6001\u680F\uFF0C\u4FDD\u7559\u53F3\u4FA7\u680F\uFF0C\u65B9\u4FBF\u540C\u65F6\u4F7F\u7528 Noval \u548C\u5176\u4ED6\u9762\u677F\u3002").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.focusOnOpen).onChange(async (value) => {
         this.plugin.settings.focusOnOpen = value;
         await this.plugin.saveSettings();
@@ -23012,7 +23024,7 @@ var CollisSettingTab = class extends PluginSettingTab {
         if (leaf && leaf.view && leaf.view.openModuleManager) {
           leaf.view.openModuleManager();
         } else {
-          new Notice("\u8BF7\u5148\u6253\u5F00 Collis \u5DE5\u4F5C\u53F0\uFF0C\u518D\u7BA1\u7406\u6A21\u5757\u3002");
+          new Notice("\u8BF7\u5148\u6253\u5F00 Noval \u5DE5\u4F5C\u53F0\uFF0C\u518D\u7BA1\u7406\u6A21\u5757\u3002");
         }
       })
     );
@@ -23036,7 +23048,7 @@ var CollisSettingTab = class extends PluginSettingTab {
       text: "\u8BE5\u76EE\u5F55\u4E0D\u4F1A\u51FA\u73B0\u5728\u6A21\u5757\u5BFC\u822A\u91CC\uFF0C\u4E5F\u4E0D\u4F1A\u8FDB\u5165\u6536\u4EF6\u7BB1\u3002\u628A\u5361\u7247\u6587\u4EF6\u79FB\u51FA\u8FD9\u4E2A\u76EE\u5F55\uFF0C\u5B83\u5C31\u4F1A\u53D8\u6210\u666E\u901A\u7B14\u8BB0\u3002"
     });
     new Setting(containerEl).setName("\u753B\u5E03").setHeading();
-    const board = this.plugin.childPlugins && this.plugin.childPlugins["collis-board"];
+    const board = this.plugin.childPlugins && this.plugin.childPlugins[BOARD_ID];
     if (!board) {
       containerEl.createEl("p", {
         cls: "cl-settings-hint",
@@ -23046,12 +23058,12 @@ var CollisSettingTab = class extends PluginSettingTab {
     }
     let boardFolderTimer = null;
     new Setting(containerEl).setName("\u753B\u5E03\u6587\u4EF6\u5939").setDesc("\u65B0\u5EFA\u753B\u5E03\u65F6\u4FDD\u5B58\u5230\u8FD9\u4E2A\u6587\u4EF6\u5939\uFF0C\u9ED8\u8BA4\u300C\u753B\u5E03\u300D\u3002\u4FEE\u6539\u540E\u8BE5\u6587\u4EF6\u5939\u4E0D\u4F1A\u4F5C\u4E3A\u6A21\u5757\u51FA\u73B0\u3002").addText(
-      (text) => text.setPlaceholder("\u753B\u5E03").setValue(board.settings.collis && board.settings.collis.boardFolder || "").onChange((value) => {
+      (text) => text.setPlaceholder("\u753B\u5E03").setValue(board.settings.noval && board.settings.noval.boardFolder || "").onChange((value) => {
         if (boardFolderTimer)
           window.clearTimeout(boardFolderTimer);
         boardFolderTimer = window.setTimeout(async () => {
-          board.settings.collis = board.settings.collis || {};
-          board.settings.collis.boardFolder = value.trim();
+          board.settings.noval = board.settings.noval || {};
+          board.settings.noval.boardFolder = value.trim();
           await board.saveSettings();
           if (this.plugin.syncModulesFromVault()) {
             await this.plugin.persistSettings();
@@ -23083,7 +23095,7 @@ var CollisSettingTab = class extends PluginSettingTab {
     }
   }
 };
-module.exports = class CollisPlugin extends Plugin {
+module.exports = class NovalPlugin extends Plugin {
   async onload() {
     const saved = await this.readHostData();
     const firstRun = !saved || !Array.isArray(saved.modules);
@@ -23130,23 +23142,23 @@ module.exports = class CollisPlugin extends Plugin {
     if (settingsDirty)
       await this.persistSettings();
     this.requestRefresh = debounce(() => this.refreshAll(), 700, true);
-    this.registerView(VIEW_TYPE, (leaf) => new CollisView(leaf, this));
+    this.registerView(VIEW_TYPE, (leaf) => new NovalView(leaf, this));
     if (PLUGIN_ICON_SVG)
       addIcon(PLUGIN_ICON_ID, PLUGIN_ICON_SVG);
-    this.addRibbonIcon(PLUGIN_ICON_ID, "\u6253\u5F00 Collis", () => this.activateView());
+    this.addRibbonIcon(PLUGIN_ICON_ID, "\u6253\u5F00 Noval", () => this.activateView());
     this.addCommand({
-      id: "open-collis",
-      name: "\u6253\u5F00 Collis",
+      id: "open-noval",
+      name: "\u6253\u5F00 Noval",
       callback: () => this.activateView()
     });
     this.addCommand({
-      id: "open-collis-focus",
-      name: "\u6253\u5F00 Collis\uFF08\u4E13\u6CE8\u6A21\u5F0F\uFF09",
+      id: "open-noval-focus",
+      name: "\u6253\u5F00 Noval\uFF08\u4E13\u6CE8\u6A21\u5F0F\uFF09",
       callback: () => this.activateView(true)
     });
     this.addCommand({
-      id: "toggle-collis-focus",
-      name: "\u5207\u6362 Collis \u4E13\u6CE8\u6A21\u5F0F",
+      id: "toggle-noval-focus",
+      name: "\u5207\u6362 Noval \u4E13\u6CE8\u6A21\u5F0F",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (leaf && leaf.view && leaf.view.setFocus) {
@@ -23155,8 +23167,8 @@ module.exports = class CollisPlugin extends Plugin {
       }
     });
     this.addCommand({
-      id: "toggle-collis-nav",
-      name: "\u5207\u6362 Collis \u4FA7\u680F",
+      id: "toggle-noval-nav",
+      name: "\u5207\u6362 Noval \u4FA7\u680F",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (leaf && leaf.view && leaf.view.setNavCollapsed) {
@@ -23165,7 +23177,7 @@ module.exports = class CollisPlugin extends Plugin {
       }
     });
     this.addCommand({
-      id: "open-collis-notes",
+      id: "open-noval-notes",
       name: "\u6253\u5F00\u5361\u7247\u7B14\u8BB0",
       callback: async () => {
         await this.activateView();
@@ -23176,7 +23188,7 @@ module.exports = class CollisPlugin extends Plugin {
     });
     this.addCommand({
       id: "quick-capture",
-      name: "\u5FEB\u901F\u8BB0\u4E00\u6761\uFF08Collis\uFF09",
+      name: "\u5FEB\u901F\u8BB0\u4E00\u6761\uFF08Noval\uFF09",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (leaf && leaf.view && leaf.view.quickCapture)
@@ -23185,7 +23197,7 @@ module.exports = class CollisPlugin extends Plugin {
     });
     this.addCommand({
       id: "open-canvas-gallery",
-      name: "\u6253\u5F00 Collis \u753B\u5E03\u96C6",
+      name: "\u6253\u5F00 Noval \u753B\u5E03\u96C6",
       callback: async () => {
         await this.activateView();
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
@@ -23193,7 +23205,7 @@ module.exports = class CollisPlugin extends Plugin {
           leaf.view.go("canvas");
       }
     });
-    this.addSettingTab(new CollisSettingTab(this.app, this));
+    this.addSettingTab(new NovalSettingTab(this.app, this));
     await this.loadBundledPlugins();
     if (this.syncModulesFromVault())
       await this.persistSettings();
@@ -23228,9 +23240,9 @@ module.exports = class CollisPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => this.closeLegacyViews());
     this.app.workspace.onLayoutReady(() => this.migrateBoardExtension());
     this.registerEvent(
-      this.app.workspace.on("layout-change", () => this.syncCollisSidebarState())
+      this.app.workspace.on("layout-change", () => this.syncNovalSidebarState())
     );
-    this.app.workspace.onLayoutReady(() => this.restoreCollisSidebar());
+    this.app.workspace.onLayoutReady(() => this.restoreNovalSidebar());
     this.registerEvent(this.app.vault.on("modify", () => this.requestRefresh()));
     this.registerEvent(
       this.app.vault.on("create", (file) => {
@@ -23268,9 +23280,9 @@ module.exports = class CollisPlugin extends Plugin {
         const type = leaf && leaf.view ? leaf.view.getViewType() : null;
         if (type === VIEW_TYPE) {
           if (leaf.view.focus)
-            document.body.classList.add("collis-focus");
+            document.body.classList.add("noval-focus");
         } else {
-          document.body.classList.remove("collis-focus");
+          document.body.classList.remove("noval-focus");
         }
       })
     );
@@ -23328,52 +23340,52 @@ module.exports = class CollisPlugin extends Plugin {
       this.saveSettings();
   }
   onunload() {
-    document.body.classList.remove("collis-focus");
+    document.body.classList.remove("noval-focus");
     this.unloadBundledPlugins();
   }
   // 清理旧版插件残留的独立视图，避免启动后右侧栏还挂着旧画布视图。
-  // 注意：qm-cards-view 现在是内置 Collis 的正式右侧栏，不能再当旧视图清掉，
+  // 注意：qm-cards-view 现在是内置 Noval 的正式右侧栏，不能再当旧视图清掉，
   // 否则每次启动都会把上次开着的卡片笔记关掉。
   closeLegacyViews() {
-    const types = ["volis-board", "volis-workbench"];
+    const types = LEGACY.viewTypes.concat(["volis-board", "volis-workbench"]);
     for (const type of types) {
       try {
         this.app.workspace.detachLeavesOfType(type);
       } catch (error) {
-        console.error("[collis] \u6E05\u7406\u65E7\u89C6\u56FE\u5931\u8D25: " + type, error);
+        console.error("[noval] \u6E05\u7406\u65E7\u89C6\u56FE\u5931\u8D25: " + type, error);
       }
     }
   }
   /* 卡片笔记右侧栏的启动恢复。
    * Obsidian 本身会保存工作区布局，但自定义视图注册较晚时可能被丢掉，
    * 所以这里再用一个布尔标记兜底：上次开着就恢复，上次关了就不动。 */
-  restoreCollisSidebar() {
-    this._collisLayoutReady = true;
+  restoreNovalSidebar() {
+    this._novalLayoutReady = true;
     const leaves = this.app.workspace.getLeavesOfType(QM_VIEW_TYPE);
     if (leaves.length) {
-      if (!this.settings.collisSidebarOpen) {
-        this.settings.collisSidebarOpen = true;
+      if (!this.settings.novalSidebarOpen) {
+        this.settings.novalSidebarOpen = true;
         this.persistSettings();
       }
       this.app.workspace.revealLeaf(leaves[0]);
       return;
     }
-    if (!this.settings.collisSidebarOpen)
+    if (!this.settings.novalSidebarOpen)
       return;
-    this.openCollisSidebar();
+    this.openNovalSidebar();
   }
-  syncCollisSidebarState() {
-    if (!this._collisLayoutReady)
+  syncNovalSidebarState() {
+    if (!this._novalLayoutReady)
       return;
     const open = this.app.workspace.getLeavesOfType(QM_VIEW_TYPE).length > 0;
-    if (open === !!this.settings.collisSidebarOpen)
+    if (open === !!this.settings.novalSidebarOpen)
       return;
-    this.settings.collisSidebarOpen = open;
+    this.settings.novalSidebarOpen = open;
     this.persistSettings();
   }
-  openCollisSidebar() {
+  openNovalSidebar() {
     try {
-      if (this.app.commands.executeCommandById("collis:open-cards"))
+      if (this.app.commands.executeCommandById(NOTES_ID + ":open-cards"))
         return;
     } catch (error) {
     }
@@ -23383,16 +23395,17 @@ module.exports = class CollisPlugin extends Plugin {
     leaf.setViewState({ type: QM_VIEW_TYPE, active: true });
     this.app.workspace.revealLeaf(leaf);
   }
-  /* 一次性迁移：插件更名为 Collis 后，白板后缀从 .volis 改成 .collis。
+  /* 一次性迁移：插件更名为 Noval 后，白板后缀从 .volis 改成 .noval。
    * 只改扩展名，不碰文件内容；目标同名文件已存在时跳过，避免覆盖。 */
   async migrateBoardExtension() {
-    const legacy = this.app.vault.getFiles().filter((file) => file.extension.toLowerCase() === "volis");
+    const oldExt = LEGACY.boardExt.map((ext) => "." + ext);
+    const legacy = this.app.vault.getFiles().filter((file) => oldExt.includes("." + file.extension.toLowerCase()));
     if (!legacy.length)
       return;
     let moved = 0;
     let skipped = 0;
     for (const file of legacy) {
-      const next = file.path.replace(/\.volis$/i, ".collis");
+      const next = file.path.slice(0, file.path.length - file.extension.length) + BOARD_EXT;
       if (this.app.vault.getAbstractFileByPath(next)) {
         skipped += 1;
         continue;
@@ -23402,20 +23415,40 @@ module.exports = class CollisPlugin extends Plugin {
         moved += 1;
       } catch (error) {
         skipped += 1;
-        console.error("[collis] \u767D\u677F\u540E\u7F00\u8FC1\u79FB\u5931\u8D25: " + file.path, error);
+        console.error("[noval] \u767D\u677F\u540E\u7F00\u8FC1\u79FB\u5931\u8D25: " + file.path, error);
       }
     }
     if (moved) {
-      new Notice("\u5DF2\u628A " + moved + " \u5F20\u767D\u677F\u7684\u6269\u5C55\u540D\u66F4\u65B0\u4E3A .collis");
+      new Notice("\u5DF2\u628A " + moved + " \u5F20\u767D\u677F\u7684\u6269\u5C55\u540D\u66F4\u65B0\u4E3A .noval");
     }
     if (skipped) {
-      console.warn("[collis] \u6709 " + skipped + " \u5F20\u767D\u677F\u672A\u80FD\u8FC1\u79FB\uFF0C\u8BF7\u68C0\u67E5\u540C\u540D\u6587\u4EF6");
+      console.warn("[noval] \u6709 " + skipped + " \u5F20\u767D\u677F\u672A\u80FD\u8FC1\u79FB\uFF0C\u8BF7\u68C0\u67E5\u540C\u540D\u6587\u4EF6");
     }
   }
   async readHostData() {
-    if (!this.hostData)
-      this.hostData = await this.loadData() || {};
+    if (!this.hostData) {
+      const raw = await this.loadData() || {};
+      this.hostData = raw;
+      if (this.migrateLegacyKeys(raw))
+        await this.writeHostData();
+    }
     return this.hostData;
+  }
+  // 把旧键原样搬到新键（不复制内容，只换键名），旧键删掉。
+  migrateLegacyKeys(data) {
+    let changed = false;
+    const move = (from, to) => {
+      if (from === to || data[from] === void 0)
+        return;
+      if (data[to] === void 0)
+        data[to] = data[from];
+      delete data[from];
+      changed = true;
+    };
+    move(LEGACY.notesId, NOTES_ID);
+    move(LEGACY.boardId, BOARD_ID);
+    move(LEGACY.sidebarKey, "novalSidebarOpen");
+    return changed;
   }
   async writeHostData() {
     await this.saveData(this.hostData || {});
@@ -23428,44 +23461,34 @@ module.exports = class CollisPlugin extends Plugin {
     }
   }
   // 旧版独立插件的设置分别在各自文件夹的 data.json。
-  // 第一次启动时搬进 collis/data.json，搬完后那两个文件夹可以随时删掉。
+  // 第一次启动时搬进 noval/data.json，搬完后那些文件夹可以随时删掉。
   async migrateLegacySettings() {
     const data = await this.readHostData();
     let dirty = false;
-    try {
-      const legacyRaw = await this.app.vault.adapter.read(
-        this.app.vault.configDir + "/plugins/workbench/data.json"
-      );
-      const legacy = JSON.parse(legacyRaw);
-      if (legacy && typeof legacy === "object") {
-        for (const [key, value] of Object.entries(legacy)) {
-          if (!(key in data)) {
-            data[key] = value;
-            dirty = true;
-          }
-        }
-      }
-    } catch (error) {
-    }
-    if (!data["collis-board"] && data.volis) {
-      data["collis-board"] = data.volis;
+    if (!data[BOARD_ID] && data.volis) {
+      data[BOARD_ID] = data.volis;
       delete data.volis;
       dirty = true;
     }
-    for (const spec of BUNDLED_PLUGINS) {
-      if (spec.id === this.manifest.id)
+    for (const [id, legacyId] of [
+      [NOTES_ID, LEGACY.notesId],
+      [BOARD_ID, LEGACY.boardId]
+    ]) {
+      if (data[id])
         continue;
-      if (data[spec.id])
-        continue;
-      const path = this.app.vault.configDir + "/plugins/" + spec.id + "/data.json";
-      try {
-        const raw = await this.app.vault.adapter.read(path);
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object") {
-          data[spec.id] = parsed;
-          dirty = true;
+      for (const dir of [id, legacyId]) {
+        try {
+          const raw = await this.app.vault.adapter.read(
+            this.app.vault.configDir + "/plugins/" + dir + "/data.json"
+          );
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            data[id] = parsed;
+            dirty = true;
+            break;
+          }
+        } catch (error) {
         }
-      } catch (error) {
       }
     }
     if (dirty)
@@ -23481,7 +23504,7 @@ module.exports = class CollisPlugin extends Plugin {
       return false;
     }
   }
-  // 子插件的读写重定向到 collis 的 data.json，键名分别是 collis / collis-board。
+  // 子插件的读写重定向到 noval 的 data.json，键名分别是 noval / noval-board。
   attachChildSettings(child, id) {
     child.loadData = async () => {
       const data = await this.readHostData();
@@ -23495,7 +23518,7 @@ module.exports = class CollisPlugin extends Plugin {
   }
   async loadBundledPlugin(spec) {
     if (this.isStandaloneEnabled(spec.id)) {
-      console.log("[collis] \u72EC\u7ACB\u63D2\u4EF6\u5DF2\u542F\u7528\uFF0C\u8DF3\u8FC7\u5185\u7F6E " + spec.id);
+      console.log("[noval] \u72EC\u7ACB\u63D2\u4EF6\u5DF2\u542F\u7528\uFF0C\u8DF3\u8FC7\u5185\u7F6E " + spec.id);
       return;
     }
     try {
@@ -23504,7 +23527,7 @@ module.exports = class CollisPlugin extends Plugin {
         throw new Error("\u672A\u627E\u5230\u53EF\u7528\u7684\u63D2\u4EF6\u7C7B");
       }
       const manifest = Object.assign({}, spec.manifest);
-      manifest.dir = this.manifest.dir || this.app.vault.configDir + "/plugins/collis";
+      manifest.dir = this.manifest.dir || this.app.vault.configDir + "/plugins/noval";
       const child = new PluginClass(this.app, manifest);
       this.attachChildSettings(child, spec.id);
       const noElement = () => document.createElement("div");
@@ -23518,10 +23541,10 @@ module.exports = class CollisPlugin extends Plugin {
       await child.onload();
       this.childPlugins = this.childPlugins || {};
       this.childPlugins[spec.id] = child;
-      console.log("[collis] \u5DF2\u52A0\u8F7D\u5185\u7F6E\u63D2\u4EF6 " + manifest.id);
+      console.log("[noval] \u5DF2\u52A0\u8F7D\u5185\u7F6E\u63D2\u4EF6 " + manifest.id);
     } catch (error) {
-      console.error("[collis] \u5185\u7F6E\u63D2\u4EF6\u542F\u52A8\u5931\u8D25: " + spec.id, error);
-      new Notice("Collis\uFF1A\u5185\u7F6E " + spec.id + " \u542F\u52A8\u5931\u8D25\uFF0C\u8BF7\u67E5\u770B\u63A7\u5236\u53F0");
+      console.error("[noval] \u5185\u7F6E\u63D2\u4EF6\u542F\u52A8\u5931\u8D25: " + spec.id, error);
+      new Notice("Noval\uFF1A\u5185\u7F6E " + spec.id + " \u542F\u52A8\u5931\u8D25\uFF0C\u8BF7\u67E5\u770B\u63A7\u5236\u53F0");
     }
   }
   unloadBundledPlugins() {
@@ -23531,14 +23554,14 @@ module.exports = class CollisPlugin extends Plugin {
       try {
         child.unload();
       } catch (error) {
-        console.error("[collis] \u5185\u7F6E\u63D2\u4EF6\u5378\u8F7D\u5931\u8D25", error);
+        console.error("[noval] \u5185\u7F6E\u63D2\u4EF6\u5378\u8F7D\u5931\u8D25", error);
       }
     }
   }
   /* 画布文件夹路径：跟随画布子插件的设置，未加载时按默认「画布」。 */
   canvasFolderPath() {
-    const board = this.childPlugins && this.childPlugins["collis-board"];
-    const folder = String(board && board.collisFolder || "\u753B\u5E03").replace(/^\/+|\/+$/g, "");
+    const board = this.childPlugins && this.childPlugins[BOARD_ID];
+    const folder = String(board && board.novalFolder || "\u753B\u5E03").replace(/^\/+|\/+$/g, "");
     return folder || "\u753B\u5E03";
   }
   /* 启动同步：把库根目录下已有的文件夹同步成模块入口。
@@ -23605,7 +23628,7 @@ module.exports = class CollisPlugin extends Plugin {
     data.focusOnOpen = this.settings.focusOnOpen;
     data.workspaceName = this.settings.workspaceName;
     data.navCollapsed = !!this.settings.navCollapsed;
-    data.collisSidebarOpen = !!this.settings.collisSidebarOpen;
+    data.novalSidebarOpen = !!this.settings.novalSidebarOpen;
     data.ignoredModuleValues = this.settings.ignoredModuleValues || [];
     data.inboxAssigned = this.settings.inboxAssigned || {};
     data.inboxPolicy = this.settings.inboxPolicy || "root";
