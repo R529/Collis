@@ -19253,6 +19253,15 @@ function isIgnoredPath(filePath) {
   const name = base.replace(/\.[^.]+$/, "").toLowerCase();
   return EXCLUDED_FILE_NAMES.has(name);
 }
+function sanitizeFolderName(value) {
+  return String(value || "").trim().replace(/[\\/:*?"<>|]/g, "_").replace(/[. ]+$/, "").replace(/^\/+|\/+$/g, "");
+}
+function isToolFolder(path) {
+  const dir = String(path || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+  if (!dir)
+    return false;
+  return dir.split("/").some((part) => EXCLUDED_DIR_NAMES.has(part));
+}
 var DEFAULT_MODULES = [
   {
     id: "learning",
@@ -19304,7 +19313,15 @@ var DEFAULT_SETTINGS = {
   // 上次退出时卡片笔记右侧栏是否开着，用于重启后恢复
   collisSidebarOpen: false,
   // 用户点过“忽略”的未知 module 值，避免同一提示反复出现
-  ignoredModuleValues: []
+  ignoredModuleValues: [],
+  // 收件箱策略：root = 只收库根目录里散落的文件；unassigned / all 作为后续扩展接口
+  inboxPolicy: "root",
+  // 已从导航删除、但文件仍保留在磁盘上的文件夹模块
+  hiddenModuleFolders: [],
+  // 素材归属表：路径 -> 模块 id。
+  // 素材没有 frontmatter，归入模块后靠这张表记住归属；
+  // 收件箱据此判断是否已处理，模块页据此决定素材属于谁。
+  inboxAssigned: {}
 };
 var ACTIVE_STATUSES = [
   "active",
@@ -19629,6 +19646,22 @@ var MODULE_COLORS = [
   "#c2568a",
   "#8a6d3b"
 ];
+async function ensureVaultFolder(app, path) {
+  const parts = String(path || "").split("/").filter(Boolean);
+  let cur = "";
+  for (const part of parts) {
+    cur = cur ? cur + "/" + part : part;
+    const found = app.vault.getAbstractFileByPath(cur);
+    if (!found)
+      await app.vault.createFolder(cur);
+    else if (!Array.isArray(found.children))
+      throw new Error("\u300C" + cur + "\u300D\u5DF2\u88AB\u540C\u540D\u6587\u4EF6\u5360\u7528");
+  }
+  return cur;
+}
+function moduleIdOf(mod) {
+  return String(mod && (mod.id || mod.module || mod.name) || "").trim();
+}
 var ModuleEditorModal = class extends Modal {
   constructor(app, options) {
     super(app);
@@ -19645,11 +19678,10 @@ var ModuleEditorModal = class extends Modal {
     contentEl.createEl("h2", { text: this.module ? "\u7F16\u8F91\u6A21\u5757" : "\u65B0\u5EFA\u6A21\u5757" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "\u6A21\u5757\u53EA\u662F\u4E00\u4E2A\u7B5B\u9009\u5165\u53E3\uFF0C\u4E0D\u4F1A\u642C\u52A8\u6216\u590D\u5236\u4F60\u7684\u6587\u4EF6\u3002"
+      text: "\u6A21\u5757\u5C31\u662F\u6587\u4EF6\u5939\uFF1A\u4FDD\u5B58\u65F6\u4F1A\u540C\u6B65\u5728\u6587\u4EF6\u6811\u91CC\u521B\u5EFA\u5BF9\u5E94\u76EE\u5F55\uFF0C\u6A21\u5757\u5185\u5BB9\u53EA\u8BA4\u8FD9\u4E2A\u76EE\u5F55\u91CC\u7684\u6587\u4EF6\u3002"
     });
     let name = this.module ? this.module.name || "" : this.initialName;
     let folder = this.module && this.module.folder || "";
-    let keywords = this.module && Array.isArray(this.module.keywords) ? this.module.keywords.join("\u3001") : "";
     new Setting(contentEl).setName("\u540D\u79F0").setDesc("\u663E\u793A\u5728\u5BFC\u822A\u91CC\u7684\u540D\u5B57").addText(
       (t) => t.setValue(name).setPlaceholder("\u4F8B\u5982\uFF1A\u5065\u8EAB\u8BB0\u5F55").onChange((v) => {
         name = v;
@@ -19688,7 +19720,7 @@ var ModuleEditorModal = class extends Modal {
       colorDots.push(dot);
     });
     let folderInput = null;
-    new Setting(contentEl).setName("\u4FDD\u5B58\u6587\u4EF6\u5939").setDesc("\u65B0\u5EFA\u7B14\u8BB0\u4FDD\u5B58\u5230\u8FD9\u91CC\uFF1B\u4E0D\u9009\u5219\u6BCF\u6B21\u65B0\u5EFA\u65F6\u5148\u6311\u3002\u6587\u4EF6\u5939\u53EF\u4EE5\u73B0\u573A\u65B0\u5EFA\u3002").addText((t) => {
+    new Setting(contentEl).setName("\u6A21\u5757\u6587\u4EF6\u5939").setDesc("\u4FDD\u5B58\u65F6\u81EA\u52A8\u521B\u5EFA\u3002\u4E0D\u586B\u5219\u7528\u6A21\u5757\u540D\uFF1B\u586B\u5199\u591A\u7EA7\u8DEF\u5F84\uFF08\u5982 \u5A92\u4F53\u6587\u4EF6/\u5BA2\u6237\uFF09\u4E5F\u53EF\u4EE5\u3002").addText((t) => {
       folderInput = t;
       t.setValue(folder).setPlaceholder("\u672A\u9009\u62E9").onChange((v) => {
         folder = v;
@@ -19705,11 +19737,6 @@ var ModuleEditorModal = class extends Modal {
         }).open();
       });
     });
-    new Setting(contentEl).setName("\u7B5B\u9009\u6807\u7B7E").setDesc("\u53EF\u9009\u3002\u7528\u9017\u53F7\u6216\u987F\u53F7\u5206\u9694\uFF1B\u6CA1\u6709 module \u5B57\u6BB5\u7684\u7B14\u8BB0\u4F1A\u6309\u8FD9\u4E9B\u6807\u7B7E\u515C\u5E95\u5F52\u7C7B").addText(
-      (t) => t.setValue(keywords).setPlaceholder("\u4F8B\u5982\uFF1A\u5065\u8EAB\u3001\u8FD0\u52A8").onChange((v) => {
-        keywords = v;
-      })
-    );
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
     if (this.module && this.options.onDelete) {
       const del = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664\u6A21\u5757" });
@@ -19737,10 +19764,6 @@ var ModuleEditorModal = class extends Modal {
         return;
       }
       const folderValue = String(folder || "").trim().replace(/^\/+|\/+$/g, "");
-      if (folderValue && !this.app.vault.getAbstractFileByPath(folderValue)) {
-        new Notice("\u6587\u4EF6\u5939\u300C" + folderValue + "\u300D\u4E0D\u5B58\u5728\uFF0C\u8BF7\u70B9\u300C\u9009\u62E9\u300D\u6311\u4E00\u4E2A\u6216\u65B0\u5EFA");
-        return;
-      }
       const id = this.module && this.module.id ? this.module.id : "mod-" + Date.now().toString(36);
       const next = Object.assign({}, this.module || {}, {
         id,
@@ -19748,8 +19771,7 @@ var ModuleEditorModal = class extends Modal {
         name: finalName,
         icon: this.icon,
         color: this.color,
-        folder: folderValue,
-        keywords: String(keywords || "").split(/[,，、\s]+/).map((v) => v.trim()).filter(Boolean)
+        folder: folderValue || sanitizeFolderName(finalName)
       });
       this.close();
       if (this.options.onSave)
@@ -19791,6 +19813,99 @@ var DeleteFilesModal = class extends Modal {
     this.contentEl.empty();
   }
 };
+var DissolveModuleModal = class extends Modal {
+  constructor(app, info, onConfirm) {
+    super(app);
+    this.info = info || {};
+    this.onConfirm = onConfirm;
+  }
+  finish(value) {
+    const callback = this.onConfirm;
+    this.onConfirm = null;
+    if (callback)
+      callback(value);
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("cl-modaleditor");
+    contentEl.createEl("h2", { text: "\u5220\u9664\u6A21\u5757\u300C" + (this.info.name || "") + "\u300D\uFF1F" });
+    const parts = [];
+    if (this.info.fileCount)
+      parts.push(this.info.fileCount + " \u4E2A\u6587\u4EF6");
+    if (this.info.folderCount)
+      parts.push(this.info.folderCount + " \u4E2A\u5B50\u6587\u4EF6\u5939");
+    contentEl.createDiv({
+      cls: "cl-modal-hint",
+      text: parts.length ? "\u4F1A\u628A " + parts.join("\u3001") + " \u4E0A\u79FB\u5230\u300C" + (this.info.parentLabel || "\u4E0A\u4E00\u7EA7") + "\u300D\uFF0C\u7136\u540E\u5220\u9664\u7A7A\u7684\u6A21\u5757\u6587\u4EF6\u5939\u3002\u4E0D\u4F1A\u5220\u9664\u4EFB\u4F55\u7B14\u8BB0\u5185\u5BB9\u3002" : "\u8FD9\u4E2A\u6A21\u5757\u6587\u4EF6\u5939\u662F\u7A7A\u7684\uFF0C\u4F1A\u76F4\u63A5\u79FB\u9664\u6A21\u5757\u5E76\u5220\u9664\u7A7A\u6587\u4EF6\u5939\u3002"
+    });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
+    cancel.onclick = () => {
+      this.finish(false);
+      this.close();
+    };
+    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u4E0A\u79FB\u5E76\u5220\u9664\u6A21\u5757" });
+    ok.onclick = () => {
+      this.finish(true);
+      this.close();
+    };
+  }
+  onClose() {
+    this.contentEl.empty();
+    this.finish(false);
+  }
+};
+var RenameModuleModal = class extends Modal {
+  constructor(app, name, onSubmit) {
+    super(app);
+    this.name = name || "";
+    this.onSubmit = onSubmit;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("cl-modaleditor");
+    contentEl.createEl("h2", { text: "\u91CD\u547D\u540D\u6A21\u5757" });
+    contentEl.createDiv({
+      cls: "cl-modal-hint",
+      text: "\u4F1A\u540C\u6B65\u91CD\u547D\u540D\u6587\u4EF6\u6811\u4E2D\u7684\u6587\u4EF6\u5939\uFF0C\u6A21\u5757\u91CC\u7684\u7B14\u8BB0\u548C\u5B50\u6A21\u5757\u4F1A\u4E00\u8D77\u6539\u540D\u3002"
+    });
+    let value = this.name;
+    let inputEl = null;
+    new Setting(contentEl).setName("\u65B0\u540D\u79F0").addText((text) => {
+      text.setValue(this.name).onChange((next) => {
+        value = next;
+      });
+      inputEl = text.inputEl;
+      inputEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          this.submit(value);
+        }
+      });
+    });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
+    cancel.onclick = () => this.close();
+    const ok = foot.createEl("button", { cls: "cl-btn mod-cta", text: "\u91CD\u547D\u540D" });
+    ok.onclick = () => this.submit(value);
+    window.setTimeout(() => {
+      if (inputEl) {
+        inputEl.focus();
+        inputEl.select();
+      }
+    }, 0);
+  }
+  submit(value) {
+    const callback = this.onSubmit;
+    this.onSubmit = null;
+    if (callback)
+      callback(String(value || "").trim());
+    this.close();
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
 var FolderPickerModal = class extends Modal {
   constructor(app, options) {
     super(app);
@@ -19814,16 +19929,7 @@ var FolderPickerModal = class extends Modal {
   }
   // 逐级建目录，父级不存在时一并补上；创建后文件树会自动出现
   async ensureFolder(path) {
-    const parts = String(path).split("/").filter(Boolean);
-    let cur = "";
-    for (const part of parts) {
-      cur = cur ? cur + "/" + part : part;
-      const found = this.app.vault.getAbstractFileByPath(cur);
-      if (!found)
-        await this.app.vault.createFolder(cur);
-      else if (!Array.isArray(found.children))
-        throw new Error("\u300C" + cur + "\u300D\u5DF2\u88AB\u540C\u540D\u6587\u4EF6\u5360\u7528");
-    }
+    return ensureVaultFolder(this.app, path);
   }
   onOpen() {
     const { contentEl } = this;
@@ -19948,7 +20054,7 @@ var ModulePickerModal = class extends Modal {
     contentEl.createEl("h2", { text: "\u5F52\u5165\u6A21\u5757" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "\u9009\u4E2D\u7684\u7B14\u8BB0\u548C\u7D20\u6750\u4F1A\u79FB\u5230\u8BE5\u6A21\u5757\u7684\u6587\u4EF6\u5939\uFF1B\u7B14\u8BB0\u4F1A\u540C\u65F6\u5199\u5165 module \u5B57\u6BB5\u3002"
+      text: "\u9009\u4E2D\u7684\u6587\u4EF6\u4F1A\u79FB\u52A8\u5230\u8BE5\u6A21\u5757\u7684\u4FDD\u5B58\u6587\u4EF6\u5939\uFF0C\u5E76\u8BB0\u5F55\u5F52\u5C5E\uFF1B\u7B14\u8BB0\u540C\u65F6\u5199\u5165 module \u5B57\u6BB5\u3002\u591A\u4E2A\u6A21\u5757\u5171\u7528\u540C\u4E00\u6587\u4EF6\u5939\u65F6\u4F1A\u81EA\u52A8\u653E\u8FDB\u8BE5\u6A21\u5757\u7684\u5B50\u76EE\u5F55\u3002"
     });
     const list = contentEl.createDiv({ cls: "cl-picklist" });
     this.modules.forEach((mod) => {
@@ -19981,9 +20087,7 @@ var ModuleManagerModal = class extends Modal {
   constructor(app, options) {
     super(app);
     this.options = options || {};
-    this.armedId = null;
-    this.dragEl = null;
-    this.dragBlocked = false;
+    this.expanded = /* @__PURE__ */ new Set();
   }
   onOpen() {
     const { contentEl } = this;
@@ -19991,9 +20095,9 @@ var ModuleManagerModal = class extends Modal {
     contentEl.createEl("h2", { text: "\u7BA1\u7406\u6A21\u5757" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "\u62D6\u52A8\u5DE6\u4FA7\u628A\u624B\u53EF\u4EE5\u6392\u5E8F\uFF0C\u987A\u5E8F\u4F1A\u540C\u6B65\u5230\u5DE6\u8FB9\u5BFC\u822A\u3002\u5220\u9664\u6A21\u5757\u53EA\u4F1A\u79FB\u9664\u7B5B\u9009\u5165\u53E3\uFF0C\u4E0D\u4F1A\u5220\u9664\u7B14\u8BB0\u6587\u4EF6\u3002"
+      text: "\u6309\u6587\u4EF6\u6811\u5C42\u7EA7\u5C55\u793A\u3002\u5220\u9664\u6A21\u5757\u65F6\uFF0C\u91CC\u9762\u7684\u6587\u4EF6\u548C\u5B50\u6587\u4EF6\u5939\u4F1A\u6574\u4F53\u4E0A\u79FB\u4E00\u7EA7\uFF0C\u4E0D\u4F1A\u5220\u9664\u4EFB\u4F55\u5185\u5BB9\u3002"
     });
-    this.listEl = contentEl.createDiv({ cls: "cl-picklist" });
+    this.listEl = contentEl.createDiv({ cls: "cl-picklist cl-modtree" });
     this.renderList();
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
     const create = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u65B0\u5EFA\u6A21\u5757" });
@@ -20007,84 +20111,172 @@ var ModuleManagerModal = class extends Modal {
   }
   renderList() {
     const list = this.listEl;
+    if (!list)
+      return;
     list.empty();
-    const mods = this.options.getModules ? this.options.getModules() : [];
-    if (!mods.length) {
+    const roots = this.options.getRootModules ? this.options.getRootModules() : [];
+    if (!roots.length) {
       list.createDiv({ cls: "cl-modal-hint", text: "\u8FD8\u6CA1\u6709\u6A21\u5757\uFF0C\u70B9\u4E0B\u9762\u7684\u300C\u65B0\u5EFA\u6A21\u5757\u300D\u3002" });
       return;
     }
-    mods.forEach((mod) => {
+    const all = this.options.getAllModules ? this.options.getAllModules() : roots;
+    const draw = (mod, depth) => {
+      const key = moduleIdOf(mod);
+      const children = this.options.getChildren ? this.options.getChildren(mod) : [];
+      const isOpen = this.expanded.has(key);
       const row = list.createDiv({ cls: "cl-modrow" });
-      row.dataset.modId = mod.id;
-      row.setAttribute("draggable", "true");
-      const grip = row.createDiv({ cls: "cl-modrow-grip" });
-      setIcon(grip, "grip-vertical");
+      row.style.paddingLeft = 8 + depth * 18 + "px";
+      const toggle = row.createDiv({ cls: "cl-modrow-toggle" });
+      if (children.length) {
+        setIcon(toggle, isOpen ? "chevron-down" : "chevron-right");
+        toggle.onclick = () => {
+          if (isOpen)
+            this.expanded.delete(key);
+          else
+            this.expanded.add(key);
+          this.renderList();
+        };
+      } else {
+        toggle.addClass("is-blank");
+      }
       const iconEl = row.createDiv({ cls: "cl-pickicon" });
-      iconEl.style.setProperty("--dot-color", mod.color || "var(--interactive-accent)");
-      setIcon(iconEl, mod.icon || "file-text");
-      row.createDiv({ cls: "cl-modrow-name", text: mod.name });
-      row.addEventListener("mousedown", (evt) => {
-        this.dragBlocked = !!(evt.target.closest && evt.target.closest("button"));
-      });
-      row.addEventListener("dragstart", (evt) => {
-        if (this.dragBlocked) {
-          evt.preventDefault();
-          return;
-        }
-        this.dragEl = row;
-        row.addClass("is-dragging");
-        if (evt.dataTransfer) {
-          evt.dataTransfer.effectAllowed = "move";
-          evt.dataTransfer.setData("text/plain", mod.id);
-        }
-      });
-      row.addEventListener("dragover", (evt) => {
-        if (!this.dragEl || this.dragEl === row)
-          return;
-        evt.preventDefault();
-        if (evt.dataTransfer)
-          evt.dataTransfer.dropEffect = "move";
-        const rect = row.getBoundingClientRect();
-        const after = evt.clientY > rect.top + rect.height / 2;
-        list.insertBefore(this.dragEl, after ? row.nextSibling : row);
-      });
-      row.addEventListener("dragend", () => {
-        row.removeClass("is-dragging");
-        this.dragEl = null;
-        this.dragBlocked = false;
-        this.commitOrder();
-      });
+      const index = all.indexOf(mod);
+      const tint = index >= 0 ? index % 5 : depth % 5;
+      iconEl.addClass("cl-tint-" + tint);
+      iconEl.style.setProperty("--dot-color", mod.color || "var(--tint)");
+      setIcon(iconEl, mod.icon || (children.length ? "folder" : "file-text"));
+      const main = row.createDiv({ cls: "cl-modrow-main" });
+      main.createDiv({ cls: "cl-modrow-name", text: mod.name });
+      const folder = this.options.getFolder ? this.options.getFolder(mod) : mod.folder || "";
+      if (folder)
+        main.createDiv({ cls: "cl-modrow-path", text: folder });
       const edit = row.createEl("button", { cls: "cl-btn", text: "\u7F16\u8F91" });
       edit.onclick = () => {
         this.close();
         if (this.options.onEdit)
           this.options.onEdit(mod);
       };
-      const armed = this.armedId === mod.id;
-      const del = row.createEl("button", {
-        cls: "cl-btn cl-btn-danger",
-        text: armed ? "\u786E\u8BA4\u5220\u9664" : "\u5220\u9664"
-      });
-      del.onclick = () => {
-        if (this.armedId !== mod.id) {
-          this.armedId = mod.id;
-          this.renderList();
+      const del = row.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664" });
+      del.onclick = async () => {
+        if (!this.options.onDissolve)
           return;
-        }
-        this.armedId = null;
-        if (this.options.onDelete)
-          this.options.onDelete(mod);
+        await this.options.onDissolve(mod);
         this.renderList();
       };
-    });
+      if (children.length && isOpen)
+        children.forEach((child) => draw(child, depth + 1));
+    };
+    roots.forEach((mod) => draw(mod, 0));
   }
-  // 按当前 DOM 顺序回写模块顺序，导航会同步更新
-  commitOrder() {
-    if (!this.listEl)
-      return;
-    const order = Array.from(this.listEl.querySelectorAll(".cl-modrow")).map((row) => row.dataset.modId).filter(Boolean);
-    if (this.options.onReorder)
-      this.options.onReorder(order);
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var NamePromptModal = class extends Modal {
+  constructor(app, options) {
+    super(app);
+    this.options = options || {};
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("cl-modaleditor");
+    contentEl.createEl("h2", { text: this.options.title || "\u65B0\u5EFA" });
+    if (this.options.hint) {
+      contentEl.createDiv({ cls: "cl-modal-hint", text: this.options.hint });
+    }
+    const input = contentEl.createEl("input", {
+      cls: "cl-modalfilter",
+      attr: { type: "text", placeholder: this.options.placeholder || "\u8BF7\u8F93\u5165\u540D\u79F0" }
+    });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
+    cancel.onclick = () => this.close();
+    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u521B\u5EFA" });
+    ok.onclick = () => {
+      const value = String(input.value || "").trim();
+      if (!value) {
+        new Notice("\u8BF7\u8F93\u5165\u540D\u79F0");
+        input.focus();
+        return;
+      }
+      this.close();
+      if (this.options.onSubmit)
+        this.options.onSubmit(value);
+    };
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter")
+        ok.click();
+    });
+    window.setTimeout(() => input.focus(), 0);
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var AddFilesModal = class extends Modal {
+  constructor(app, files, onConfirm) {
+    super(app);
+    this.files = files || [];
+    this.onConfirm = onConfirm;
+    this.selected = /* @__PURE__ */ new Set();
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("cl-modaleditor");
+    contentEl.createEl("h2", { text: "\u5F52\u5165\u6587\u4EF6" });
+    contentEl.createDiv({
+      cls: "cl-modal-hint",
+      text: "\u52FE\u9009\u8981\u79FB\u8FDB\u5F53\u524D\u6A21\u5757\u7684\u7B14\u8BB0\uFF0C\u786E\u8BA4\u540E\u4F1A\u5199\u5165 module \u5B57\u6BB5\u5E76\u79FB\u52A8\u5230\u6A21\u5757\u6587\u4EF6\u5939\u3002"
+    });
+    const filter = contentEl.createEl("input", {
+      cls: "cl-modalfilter",
+      attr: { type: "text", placeholder: "\u7B5B\u9009\u6807\u9898\u6216\u8DEF\u5F84\u2026" }
+    });
+    const list = contentEl.createDiv({ cls: "cl-picklist" });
+    const empty = contentEl.createDiv({ cls: "cl-modal-hint" });
+    const draw = () => {
+      const q = String(filter.value || "").trim().toLowerCase();
+      const rows = this.files.filter((f) => !q || f.path.toLowerCase().includes(q));
+      list.empty();
+      empty.setText(this.files.length ? "\u6CA1\u6709\u5339\u914D\u7684\u7B14\u8BB0\u3002" : "\u5E93\u91CC\u6CA1\u6709\u53EF\u5F52\u5165\u7684\u7B14\u8BB0\u3002");
+      empty.toggle(rows.length === 0);
+      rows.forEach((file) => {
+        const row = list.createDiv({ cls: "cl-pickitem" });
+        const box = row.createEl("input", { attr: { type: "checkbox" } });
+        box.checked = this.selected.has(file.path);
+        box.onclick = (event) => {
+          event.stopPropagation();
+          if (box.checked)
+            this.selected.add(file.path);
+          else
+            this.selected.delete(file.path);
+        };
+        row.createDiv({ cls: "cl-pickname", text: file.path });
+        row.onclick = () => {
+          box.checked = !box.checked;
+          if (box.checked)
+            this.selected.add(file.path);
+          else
+            this.selected.delete(file.path);
+        };
+      });
+    };
+    filter.addEventListener("input", draw);
+    draw();
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
+    cancel.onclick = () => this.close();
+    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u5F52\u5165" });
+    ok.onclick = () => {
+      const chosen = this.files.filter((file) => this.selected.has(file.path));
+      if (!chosen.length) {
+        new Notice("\u8BF7\u5148\u52FE\u9009\u7B14\u8BB0");
+        return;
+      }
+      this.close();
+      if (this.onConfirm)
+        this.onConfirm(chosen);
+    };
   }
   onClose() {
     this.contentEl.empty();
@@ -20103,6 +20295,7 @@ var CollisView = class extends ItemView {
     this._needsRefresh = false;
     this.gallery = null;
     this.notes = null;
+    this._navExpanded = /* @__PURE__ */ new Set();
   }
   getViewType() {
     return VIEW_TYPE;
@@ -20193,59 +20386,15 @@ var CollisView = class extends ItemView {
     const value = raw === null || raw === void 0 ? "" : String(raw).trim().toLowerCase();
     return value ? [value] : [];
   }
-  // 旧数据的兜底规则：文件夹前缀、type、标签。
-  // 只在文件头没有写 module 时使用，保证升级后老笔记不会突然“消失”。
-  fileFitsModule(file, fm, mod) {
-    if (Array.isArray(mod.types) && fm && mod.types.includes(fm.type))
-      return true;
-    if (mod.folder && file.path.startsWith(mod.folder + "/"))
-      return true;
-    if (Array.isArray(mod.keywords) && mod.keywords.length) {
-      const tags = getTags(fm).map((t) => t.toLowerCase());
-      return tags.some(
-        (tag) => mod.keywords.some((k) => tag.includes(String(k).toLowerCase()))
-      );
+  /* 素材归属表只作为「归入」的附加记录（path -> 模块 id）。
+   * 模块内容以文件夹为准；这张表服务于后续可切换的 unassigned 收件箱策略。 */
+  ownershipMap() {
+    const settings = this.plugin.settings;
+    if (!settings.inboxAssigned || typeof settings.inboxAssigned !== "object") {
+      settings.inboxAssigned = {};
     }
-    return false;
+    return settings.inboxAssigned;
   }
-  /* 归属表：一篇笔记只归一个模块。
-   * 顺序是“显式字段 → 兜底规则”，多个模块都命中时按导航里的先后顺序取第一个，
-   * 这样统计数字不会再因为模糊标签而翻倍。卡片笔记的月度聚合文件不参与。 */
-  buildOwnership(files) {
-    const mods = this.getModules().map((mod) => ({
-      mod,
-      id: String(mod.id || mod.module || mod.name || ""),
-      keys: this.moduleKeys(mod)
-    }));
-    const own = /* @__PURE__ */ new Map();
-    for (const file of files) {
-      if (file.path.startsWith(CARD_FOLDER + "/"))
-        continue;
-      const fm = getFm(this.app, file);
-      const explicit = this.explicitModule(fm);
-      let hit = null;
-      if (explicit.length) {
-        hit = mods.find((entry) => explicit.some((v) => entry.keys.includes(v)));
-      }
-      if (!hit)
-        hit = mods.find((entry) => this.fileFitsModule(file, fm, entry.mod));
-      if (hit)
-        own.set(file.path, hit.id);
-    }
-    this._ownership = own;
-    return own;
-  }
-  filesFor(mod) {
-    const files = this.vaultFiles();
-    const own = this._ownership || this.buildOwnership(files);
-    const id = String(mod.id || mod.module || mod.name || "");
-    return files.filter((file) => own.get(file.path) === id);
-  }
-  /* 模块页收录范围：
-   *   - 按 frontmatter / type / 标签归属到本模块的笔记；
-   *   - 模块保存文件夹里的图片、视频、PDF、音频等素材附件。
-   * 附件没有 frontmatter，只能按文件夹认领；导航计数仍只统计笔记，
-   * 不影响首页和收集箱的现有口径。 */
   // 模块没有单独设置文件夹时，用模块名建一个同名目录。
   moduleTargetFolder(mod) {
     const raw = String(mod && (mod.folder || mod.name || mod.id || mod.module) || "").trim();
@@ -20264,22 +20413,241 @@ var CollisView = class extends ItemView {
     }
     return path;
   }
+  /* 模块页收录范围（与 Obsidian 文件树一致）：
+   *   - 只认模块文件夹里「直接」存放的文件；
+   *   - 子文件夹的内容属于子模块，不向上汇总；
+   *   - 不再按 frontmatter / type / 标签猜归属，文件放在哪个文件夹就属于哪个模块。 */
   moduleFiles(mod) {
-    const notes = this.filesFor(mod);
-    const seen = new Set(notes.map((file) => file.path));
-    const out = notes.slice();
-    const dir = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
-    if (dir) {
-      this.vaultAttachments().forEach((file) => {
-        if (seen.has(file.path))
+    return this.folderFiles(this.moduleTargetFolder(mod), false);
+  }
+  /* 读取文件夹下的直接子文件。folder 不存在时返回空数组，不报错。 */
+  folderFiles(dir, includeChildren) {
+    const target = String(dir || "").replace(/^\/+|\/+$/g, "");
+    if (!target)
+      return [];
+    const node = this.app.vault.getAbstractFileByPath(target);
+    if (!node || !Array.isArray(node.children))
+      return [];
+    const out = [];
+    const walk = (folder) => {
+      (folder.children || []).forEach((child) => {
+        if (Array.isArray(child.children)) {
+          if (includeChildren)
+            walk(child);
           return;
-        if (file.path.indexOf(dir + "/") !== 0)
-          return;
-        seen.add(file.path);
-        out.push(file);
+        }
+        if (!isIgnoredPath(child.path))
+          out.push(child);
       });
-    }
+    };
+    walk(node);
     return out;
+  }
+  /* ---------------- 模块层级（完全跟随文件树） ----------------
+   * 模块 = 文件夹；子模块 = 该文件夹下真实存在的直接子文件夹。
+   * 不再依赖 settings 里的 parent 字段，文件夹移到哪，层级就跟到哪。
+   * 模块页只统计笔记，附件一律不参与计数、也不在模块页展示。 */
+  isHiddenModuleFolder(path) {
+    const dir = String(path || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+    if (!dir)
+      return false;
+    return (this.plugin.settings.hiddenModuleFolders || []).some(
+      (item) => String(item || "").replace(/^\/+|\/+$/g, "").toLowerCase() === dir
+    );
+  }
+  // 只排除工具/AI 目录、速记卡目录和用户手动删掉的目录；
+  // 附件、媒体文件夹同样是模块，按文件树正常显示
+  isModuleFolderIgnored(path) {
+    const dir = String(path || "").replace(/^\/+|\/+$/g, "");
+    if (!dir)
+      return true;
+    if (dir === CARD_FOLDER)
+      return true;
+    if (this.isCanvasModuleFolder(dir))
+      return true;
+    if (isToolFolder(dir))
+      return true;
+    return this.isHiddenModuleFolder(dir);
+  }
+  /* 画布文件夹归白板工作区使用，不再作为模块出现在导航里。
+   * 路径跟随画布子插件的设置，默认「画布」。 */
+  isCanvasModuleFolder(path) {
+    const folder = this.plugin.canvasFolderPath();
+    return String(path || "").replace(/^\/+|\/+$/g, "").toLowerCase() === folder.toLowerCase();
+  }
+  /* 文件夹 → 模块：优先复用 settings 里的配置（名称/图标/颜色），
+   * 没有配置时生成一个临时模块（id = dir:路径），文件树里的文件夹也能直接进入。 */
+  moduleForFolder(path) {
+    const dir = String(path || "").replace(/^\/+|\/+$/g, "");
+    if (!dir)
+      return null;
+    if (this.isCanvasModuleFolder(dir))
+      return null;
+    const configured = this.getModules().find(
+      (mod) => this.moduleTargetFolder(mod).toLowerCase() === dir.toLowerCase()
+    );
+    if (configured)
+      return configured;
+    if (this.isModuleFolderIgnored(dir))
+      return null;
+    if (!this.app.vault.getAbstractFileByPath(dir))
+      return null;
+    const name = dir.split("/").pop();
+    return {
+      id: "dir:" + dir,
+      module: "dir:" + dir,
+      name,
+      folder: dir,
+      icon: "folder",
+      implicit: true
+    };
+  }
+  // 文件属于哪个模块：从文件所在文件夹逐级往上找，命中的最近一层就是归属
+  // （包含没写进配置的隐式子文件夹，保证深层笔记也能在首页/归入逻辑里定位）
+  moduleForFile(file) {
+    if (!file)
+      return null;
+    let dir = String(file.path || "").split("/").slice(0, -1).join("/");
+    while (dir) {
+      const mod = this.moduleForFolder(dir);
+      if (mod)
+        return mod;
+      dir = dir.split("/").slice(0, -1).join("/");
+    }
+    return null;
+  }
+  moduleById(id) {
+    const direct = this.getModules().find((mod) => moduleIdOf(mod) === id);
+    if (direct)
+      return direct;
+    const value = String(id || "");
+    if (value.startsWith("dir:"))
+      return this.moduleForFolder(value.slice(4));
+    return null;
+  }
+  submodulesOf(mod) {
+    const dir = this.moduleTargetFolder(mod);
+    if (!dir)
+      return [];
+    const node = this.app.vault.getAbstractFileByPath(dir);
+    if (!node || !Array.isArray(node.children))
+      return [];
+    return node.children.filter((child) => Array.isArray(child.children)).filter((child) => !this.isModuleFolderIgnored(child.path)).map((child) => this.moduleForFolder(child.path)).filter(Boolean).sort((a, b) => String(a.name).localeCompare(String(b.name), "zh"));
+  }
+  moduleNoteFiles(mod) {
+    return this.moduleFiles(mod).filter(
+      (file) => String(file.extension || "").toLowerCase() === "md"
+    );
+  }
+  // 含所有后代的笔记数；循环引用时用 visited 兜底，避免死循环
+  moduleTreeNoteFiles(mod, visited) {
+    const seenIds = visited || /* @__PURE__ */ new Set();
+    const id = moduleIdOf(mod);
+    if (!id || seenIds.has(id))
+      return [];
+    seenIds.add(id);
+    const out = this.moduleNoteFiles(mod).slice();
+    this.submodulesOf(mod).forEach((child) => {
+      out.push(...this.moduleTreeNoteFiles(child, seenIds));
+    });
+    return out;
+  }
+  /* 导航根节点：没有被别的模块文件夹包含的配置模块。
+   * 顶层模块是用户挑出来的「入口」，入口以下则完全镜像文件树。 */
+  rootModules() {
+    const mods = this.getModules();
+    const dirs = mods.map((mod) => this.moduleTargetFolder(mod)).filter(Boolean);
+    return mods.filter((mod) => {
+      const dir = this.moduleTargetFolder(mod);
+      if (dir && this.isCanvasModuleFolder(dir))
+        return false;
+      if (!dir)
+        return true;
+      return !dirs.some((other) => other && other !== dir && dir.startsWith(other + "/"));
+    });
+  }
+  // 从根模块到当前文件夹的链路，用于面包屑和导航展开
+  modulePath(mod) {
+    const dir = this.moduleTargetFolder(mod);
+    if (!dir)
+      return [mod];
+    let root = null;
+    this.rootModules().forEach((candidate) => {
+      const cdir = this.moduleTargetFolder(candidate);
+      if (!cdir)
+        return;
+      if (dir !== cdir && !dir.startsWith(cdir + "/"))
+        return;
+      if (!root || cdir.length > this.moduleTargetFolder(root).length)
+        root = candidate;
+    });
+    if (!root)
+      return [mod];
+    const rootDir = this.moduleTargetFolder(root);
+    const chain = [root];
+    if (dir !== rootDir) {
+      let acc = rootDir;
+      dir.slice(rootDir.length + 1).split("/").filter(Boolean).forEach((seg) => {
+        acc += "/" + seg;
+        const node = this.moduleForFolder(acc);
+        if (node)
+          chain.push(node);
+      });
+      const last = chain[chain.length - 1];
+      if (last && last.id !== mod.id)
+        chain.push(mod);
+    } else if (root.id !== mod.id) {
+      chain[0] = mod;
+    }
+    return chain;
+  }
+  promptSubmodule(parent) {
+    const parentDir = this.moduleTargetFolder(parent);
+    new NamePromptModal(this.app, {
+      title: "\u65B0\u5EFA\u5B50\u6A21\u5757",
+      hint: "\u4F1A\u5728\u300C" + (parentDir || "\u5E93\u6839\u76EE\u5F55") + "\u300D\u4E0B\u65B0\u5EFA\u540C\u540D\u6587\u4EF6\u5939\uFF1B\u5B50\u6A21\u5757\u8DDF\u968F\u6587\u4EF6\u5939\uFF0C\u4E0D\u4F1A\u91CD\u590D\u5B58\u5C42\u7EA7\u914D\u7F6E\u3002",
+      placeholder: "\u4F8B\u5982\uFF1A\u5BA2\u6237",
+      onSubmit: async (raw) => {
+        const name = sanitizeFolderName(raw);
+        if (!name)
+          return;
+        const dir = parentDir ? parentDir + "/" + name : name;
+        const existing = this.getModules().find(
+          (mod) => this.moduleTargetFolder(mod) === dir
+        );
+        if (existing) {
+          this.go(moduleIdOf(existing));
+          return;
+        }
+        try {
+          await ensureVaultFolder(this.app, dir);
+        } catch (error) {
+          new Notice("\u521B\u5EFA\u6587\u4EF6\u5939\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
+          return;
+        }
+        const id = "mod-" + Date.now().toString(36);
+        const list = this.getModules().slice();
+        list.push({
+          id,
+          module: id,
+          name,
+          folder: dir,
+          icon: "folder",
+          color: parent.color || void 0
+        });
+        this.plugin.settings.modules = list;
+        this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => path !== dir);
+        this._ownership = null;
+        await this.plugin.saveSettings();
+        this.go(id);
+      }
+    }).open();
+  }
+  addFilesToModule(mod) {
+    const dir = this.moduleTargetFolder(mod);
+    const own = new Set(this.folderFiles(dir, false).map((file) => file.path));
+    const candidates = this.app.vault.getFiles().filter((file) => !own.has(file.path) && this.isInboxFile(file)).sort((a, b) => b.stat.mtime - a.stat.mtime);
+    new AddFilesModal(this.app, candidates, (files) => this.assignToModule(files, mod)).open();
   }
   // 收件箱也收录附件：图片 / 视频 / PDF / 音频等，排除白板和隐藏目录。
   // 只收白名单里的扩展名，白板的历史备份（xxx.volis.json、xxx.collis.bak）
@@ -20298,16 +20666,42 @@ var CollisView = class extends ItemView {
       return !isIgnoredPath(file.path);
     });
   }
-  /* 收集箱 = 待处理队列，不是某个文件夹。
-   * 判断依据只看 frontmatter 里有没有写下被认可的 module：
-   *   - 没写 module → 进收件箱；
-   *   - 写了但没有任何模块认领（拼错/旧值）→ 也进收件箱，方便修正；
-   *   - 写了且能对应上模块 → 已归属，离开收件箱。
-   * 不再用文件夹 / 标签 / type 的兜底规则判断收件箱归属，
-   * 否则 Clippings 这类默认文件夹里的新文件会被自动“认领”，
-   * 导致文件树里有文件、收件箱却是空的。
-   */
+  /* 收件箱策略接口：
+   *   root       —— 默认。只收库根目录下散落的文件（不在任何文件夹里的）；
+   *   unassigned —— 旧口径：按 frontmatter module 是否已归属来判断；
+   *   all        —— 全库文件。
+   * 后续要改规则，只改 inboxPolicy 的返回值和对应分支即可。 */
+  inboxPolicy() {
+    const value = String(this.plugin.settings.inboxPolicy || "").toLowerCase();
+    return value === "unassigned" || value === "all" ? value : "root";
+  }
+  // 库根目录文件：路径里没有 "/"（也就是不在任何文件夹里）
+  rootFiles() {
+    return this.app.vault.getFiles().filter((file) => String(file.path).indexOf("/") === -1);
+  }
+  isInboxFile(file) {
+    if (!file)
+      return false;
+    const ext = String(file.extension || "").toLowerCase();
+    if (["collis", "volis", "canvas"].includes(ext))
+      return false;
+    const lower = file.path.toLowerCase();
+    if (lower.includes(".volis.") || lower.includes(".collis."))
+      return false;
+    if (isIgnoredPath(file.path))
+      return false;
+    if (file.path.startsWith(CARD_FOLDER + "/"))
+      return false;
+    return true;
+  }
   inboxFiles() {
+    const policy = this.inboxPolicy();
+    if (policy === "root") {
+      return this.rootFiles().filter((file) => this.isInboxFile(file)).sort((a, b) => b.stat.mtime - a.stat.mtime);
+    }
+    if (policy === "all") {
+      return this.app.vault.getFiles().filter((file) => this.isInboxFile(file)).sort((a, b) => b.stat.mtime - a.stat.mtime);
+    }
     const md = this.vaultFiles();
     const known = /* @__PURE__ */ new Set();
     this.getModules().forEach((mod) => {
@@ -20319,7 +20713,12 @@ var CollisView = class extends ItemView {
         return true;
       return !explicit.some((v) => known.has(v));
     });
-    return pending.concat(this.vaultAttachments()).sort((a, b) => b.stat.mtime - a.stat.mtime);
+    const assigned = this.ownershipMap();
+    const attachments = this.vaultAttachments().filter((file) => {
+      const owner = assigned[file.path];
+      return !(owner && known.has(String(owner).trim().toLowerCase()));
+    });
+    return pending.concat(attachments).sort((a, b) => b.stat.mtime - a.stat.mtime);
   }
   // 文件里写了 module，但没有任何模块配置认领这个值（且用户没点过忽略）。
   unknownModuleValues() {
@@ -20346,17 +20745,234 @@ var CollisView = class extends ItemView {
       return;
     this.app.workspace.getLeaf("tab").openFile(file);
   }
+  /* 删除模块只删配置，不动磁盘文件。
+   * 文件夹还在，所以要记进 hiddenModuleFolders，否则会被当成隐式模块又冒出来。 */
+  async removeModuleConfig(target) {
+    const folder = this.moduleTargetFolder(target);
+    const list = this.getModules().filter((m) => m.id !== target.id);
+    this.plugin.settings.modules = list;
+    if (folder && !list.some((m) => this.moduleTargetFolder(m) === folder)) {
+      const hidden = new Set(this.plugin.settings.hiddenModuleFolders || []);
+      hidden.add(folder);
+      this.plugin.settings.hiddenModuleFolders = Array.from(hidden);
+    }
+    if (this.active === target.id)
+      this.active = "home";
+    this._ownership = null;
+    await this.plugin.saveSettings();
+  }
+  // 上移时遇到同名文件/文件夹就加序号，绝不覆盖已有内容
+  uniqueVaultPath(parentPath, name, isFolder) {
+    const base = parentPath ? parentPath + "/" : "";
+    const text = String(name || "");
+    const dot = isFolder ? -1 : text.lastIndexOf(".");
+    const stem = dot > 0 ? text.slice(0, dot) : text;
+    const ext = dot > 0 ? text.slice(dot) : "";
+    let candidate = base + text;
+    let index = 2;
+    while (this.app.vault.getAbstractFileByPath(candidate)) {
+      candidate = base + stem + " (" + index + ")" + ext;
+      index += 1;
+    }
+    return candidate;
+  }
+  /* 删除模块 = 把这一层溶解到上一级：
+   * 直接文件与子文件夹整体上移，再移除模块配置并清掉空文件夹。不删除任何内容。 */
+  async dissolveModule(target) {
+    const folder = this.moduleTargetFolder(target);
+    if (!folder)
+      return;
+    const node = this.app.vault.getAbstractFileByPath(folder);
+    const parentPath = folder.indexOf("/") === -1 ? "" : folder.slice(0, folder.lastIndexOf("/"));
+    const parentLabel = parentPath ? parentPath.split("/").pop() : "\u5E93\u6839\u76EE\u5F55";
+    if (!node || !Array.isArray(node.children)) {
+      await this.removeModuleConfig(target);
+      new Notice("\u5DF2\u79FB\u9664\u6A21\u5757\u300C" + target.name + "\u300D");
+      this.render();
+      return;
+    }
+    const children = node.children.slice();
+    const files = children.filter((child) => !Array.isArray(child.children));
+    const folders = children.filter((child) => Array.isArray(child.children));
+    const confirmed = await new Promise((resolve) => {
+      new DissolveModuleModal(
+        this.app,
+        {
+          name: target.name,
+          parentLabel,
+          fileCount: files.length,
+          folderCount: folders.length
+        },
+        resolve
+      ).open();
+    });
+    if (!confirmed)
+      return;
+    let movedFiles = 0;
+    let movedFolders = 0;
+    try {
+      for (const child of files) {
+        const dest = this.uniqueVaultPath(parentPath, child.name, false);
+        await this.app.fileManager.renameFile(child, dest);
+        movedFiles += 1;
+      }
+      for (const child of folders) {
+        const oldPath = child.path;
+        const dest = this.uniqueVaultPath(parentPath, child.name, true);
+        await this.app.fileManager.renameFile(child, dest);
+        this.plugin.remapModuleFolder(oldPath, dest);
+        movedFolders += 1;
+      }
+    } catch (error) {
+      new Notice("\u4E0A\u79FB\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
+      await this.plugin.saveSettings();
+      this.render();
+      return;
+    }
+    const remain = this.getModules().filter(
+      (mod) => this.moduleTargetFolder(mod).toLowerCase() !== folder.toLowerCase()
+    );
+    const byFolder = /* @__PURE__ */ new Map();
+    const deduped = [];
+    remain.forEach((mod) => {
+      const key = this.moduleTargetFolder(mod).toLowerCase() || "id:" + mod.id;
+      const prev = byFolder.get(key);
+      if (!prev) {
+        byFolder.set(key, mod);
+        deduped.push(mod);
+        return;
+      }
+      const prevAuto = String(prev.id || "").startsWith("dir:");
+      const nextAuto = String(mod.id || "").startsWith("dir:");
+      if (prevAuto && !nextAuto) {
+        const index = deduped.indexOf(prev);
+        if (index >= 0)
+          deduped[index] = mod;
+        byFolder.set(key, mod);
+      }
+    });
+    this.plugin.settings.modules = deduped;
+    this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => String(path).toLowerCase() !== folder.toLowerCase());
+    if (this.active === target.id)
+      this.active = "home";
+    this._ownership = null;
+    try {
+      const left = this.app.vault.getAbstractFileByPath(folder);
+      if (left && Array.isArray(left.children) && !left.children.length) {
+        if (this.app.fileManager && typeof this.app.fileManager.trashFile === "function") {
+          await this.app.fileManager.trashFile(left);
+        } else {
+          await this.app.vault.trash(left, true);
+        }
+      }
+    } catch (error) {
+    }
+    await this.plugin.saveSettings();
+    this.render();
+    new Notice(
+      "\u5DF2\u5220\u9664\u6A21\u5757\u300C" + target.name + "\u300D\uFF1A" + (movedFiles ? movedFiles + " \u4E2A\u6587\u4EF6" : "\u65E0\u6587\u4EF6") + (movedFolders ? "\u3001" + movedFolders + " \u4E2A\u6587\u4EF6\u5939" : "") + "\u5DF2\u4E0A\u79FB\u5230" + parentLabel
+    );
+  }
+  /* 模块右键菜单：和文件树一样，就地重命名或删除，操作同步到文件夹。 */
+  showModuleMenu(mod, event) {
+    if (!mod)
+      return;
+    const menu = new Menu();
+    menu.addItem(
+      (item) => item.setTitle("\u91CD\u547D\u540D\u2026").setIcon("pencil").onClick(() => this.renameModule(mod))
+    );
+    menu.addItem(
+      (item) => item.setTitle("\u7F16\u8F91\u6A21\u5757\u2026").setIcon("settings").onClick(() => this.openModuleEditor(mod))
+    );
+    menu.addSeparator();
+    menu.addItem(
+      (item) => item.setTitle("\u5220\u9664\u6A21\u5757\u2026").setIcon("trash").onClick(() => {
+        void this.dissolveModule(mod);
+      })
+    );
+    menu.showAtMouseEvent(event);
+  }
+  renameModule(mod) {
+    if (!mod)
+      return;
+    const oldFolder = this.moduleTargetFolder(mod);
+    new RenameModuleModal(this.app, mod.name || oldFolder.split("/").pop(), async (value) => {
+      const name = sanitizeFolderName(value);
+      if (!name) {
+        new Notice('\u540D\u79F0\u4E0D\u80FD\u4E3A\u7A7A\uFF0C\u4E5F\u4E0D\u80FD\u5305\u542B \\ / : * ? " < > | \u7B49\u5B57\u7B26\u3002');
+        return;
+      }
+      const parent = oldFolder.indexOf("/") === -1 ? "" : oldFolder.slice(0, oldFolder.lastIndexOf("/"));
+      const newFolder = parent ? parent + "/" + name : name;
+      if (!oldFolder) {
+        mod.name = name;
+        mod.folder = newFolder;
+        await this.plugin.saveSettings();
+        this.render();
+        return;
+      }
+      if (newFolder === oldFolder && name === mod.name)
+        return;
+      if (newFolder.toLowerCase() !== oldFolder.toLowerCase()) {
+        if (this.app.vault.getAbstractFileByPath(newFolder)) {
+          new Notice("\u5DF2\u5B58\u5728\u540C\u540D\u6587\u4EF6\u5939\uFF1A" + newFolder);
+          return;
+        }
+      }
+      const node = this.app.vault.getAbstractFileByPath(oldFolder);
+      if (node) {
+        try {
+          await this.app.fileManager.renameFile(node, newFolder);
+        } catch (error) {
+          new Notice("\u91CD\u547D\u540D\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
+          return;
+        }
+      }
+      this.plugin.remapModuleFolder(oldFolder, newFolder);
+      mod.name = name;
+      mod.folder = newFolder;
+      const oldId = "dir:" + oldFolder;
+      const newId = "dir:" + newFolder;
+      const remapId = (id) => {
+        if (id === oldId)
+          return newId;
+        if (id.indexOf(oldId + "/") === 0)
+          return newId + id.slice(oldId.length);
+        return id;
+      };
+      this.active = remapId(this.active);
+      const expanded = /* @__PURE__ */ new Set();
+      this._navExpanded.forEach((id) => expanded.add(remapId(id)));
+      this._navExpanded = expanded;
+      await this.plugin.saveSettings();
+      this.render();
+      new Notice("\u5DF2\u91CD\u547D\u540D\u4E3A\u300C" + name + "\u300D");
+    }).open();
+  }
   openModuleEditor(mod, initialName) {
     const mods = this.getModules();
     const index = mod ? mods.findIndex((m) => m.id === mod.id) : -1;
     new ModuleEditorModal(this.app, {
       module: mod,
       initialName: initialName || "",
+      modules: mods,
       // 内置模块没有 color 字段，打开编辑器时用它在导航里的预设色，避免一编辑就变色
       initialColor: index >= 0 ? MODULE_COLORS[index % MODULE_COLORS.length] : MODULE_COLORS[0],
       onSave: async (next) => {
+        const folder = this.moduleTargetFolder(next);
+        try {
+          await ensureVaultFolder(this.app, folder);
+        } catch (error) {
+          new Notice("\u521B\u5EFA\u6A21\u5757\u6587\u4EF6\u5939\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
+          return;
+        }
+        next.folder = folder;
+        this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => path !== folder);
         const list = this.getModules().slice();
-        const idx = list.findIndex((m) => m.id === next.id);
+        let idx = list.findIndex((m) => m.id === next.id);
+        if (idx < 0) {
+          idx = list.findIndex((m) => this.moduleTargetFolder(m) === folder);
+        }
         if (idx >= 0)
           list[idx] = next;
         else
@@ -20369,40 +20985,25 @@ var CollisView = class extends ItemView {
         this._pendingAssign = null;
         if (pending && pending.length)
           this.assignToModule(pending, next);
+        else if (!mod)
+          this.go(next.id);
       },
       onDelete: mod ? async (target) => {
-        const list = this.getModules().filter((m) => m.id !== target.id);
-        this.plugin.settings.modules = list;
-        if (this.active === target.id)
-          this.active = "home";
-        this._ownership = null;
-        await this.plugin.saveSettings();
+        await this.removeModuleConfig(target);
         new Notice("\u5DF2\u5220\u9664\u6A21\u5757\u300C" + target.name + "\u300D\uFF0C\u7B14\u8BB0\u6587\u4EF6\u672A\u53D7\u5F71\u54CD");
       } : null
     }).open();
   }
   openModuleManager() {
     new ModuleManagerModal(this.app, {
-      getModules: () => this.getModules(),
+      getRootModules: () => this.rootModules(),
+      getChildren: (mod) => this.submodulesOf(mod),
+      getAllModules: () => this.getModules(),
+      getFolder: (mod) => this.moduleTargetFolder(mod),
       onCreate: () => this.openModuleEditor(null),
       onEdit: (mod) => this.openModuleEditor(mod),
-      onReorder: async (orderIds) => {
-        const byId = new Map(this.getModules().map((m) => [m.id, m]));
-        const list = orderIds.map((id) => byId.get(id)).filter(Boolean);
-        if (!list.length || list.length !== byId.size)
-          return;
-        this.plugin.settings.modules = list;
-        this._ownership = null;
-        await this.plugin.saveSettings();
-      },
-      onDelete: async (mod) => {
-        const list = this.getModules().filter((m) => m.id !== mod.id);
-        this.plugin.settings.modules = list;
-        if (this.active === mod.id)
-          this.active = "home";
-        this._ownership = null;
-        await this.plugin.saveSettings();
-        new Notice("\u5DF2\u5220\u9664\u6A21\u5757\u300C" + mod.name + "\u300D\uFF0C\u7B14\u8BB0\u6587\u4EF6\u672A\u53D7\u5F71\u54CD");
+      onDissolve: async (mod) => {
+        await this.dissolveModule(mod);
       }
     }).open();
   }
@@ -20443,42 +21044,61 @@ var CollisView = class extends ItemView {
       setTimeout(finish, timeout);
     });
   }
-  // 归入模块：笔记写 module 字段，所有文件都移到模块文件夹。
+  /* 归入模块（与文件树一致）：
+   *   - 文件直接移动到模块文件夹，归入后自然出现在该模块页；
+   *   - 笔记顺手写 module 字段（只是元数据，模块归属仍以文件夹为准）；
+   *   - 素材在归属表里留一条记录，兼容后续切回 unassigned 收件箱策略。 */
   async assignToModule(files, mod) {
     if (!files || !files.length)
       return;
-    const value = String(mod.module || mod.id || mod.name);
+    const rawId = moduleIdOf(mod);
+    const value = String(rawId).startsWith("dir:") ? mod.name : rawId;
     const dir = this.moduleTargetFolder(mod);
     try {
       if (dir)
-        await this.ensureFolder(dir);
+        await ensureVaultFolder(this.app, dir);
     } catch (e) {
       new Notice("\u65E0\u6CD5\u521B\u5EFA\u6A21\u5757\u6587\u4EF6\u5939\u300C" + dir + "\u300D\uFF1A" + (e.message || e));
       return;
     }
     let done = 0;
     let moved = 0;
+    let failed = 0;
+    let firstError = "";
+    const assigned = this.ownershipMap();
     for (const file of files) {
       try {
-        if (String(file.extension || "").toLowerCase() === "md") {
+        const oldPath = file.path;
+        const isNote = String(file.extension || "").toLowerCase() === "md";
+        if (isNote) {
           await this.app.fileManager.processFrontMatter(file, (fm) => {
             fm.module = value;
           });
           await this.waitForMetadata(file);
         }
         const target = this.uniqueFilePath(dir, file);
-        if (target && file.path !== target) {
+        if (target && oldPath !== target) {
           await this.app.fileManager.renameFile(file, target);
           moved += 1;
+          if (!isNote) {
+            delete assigned[oldPath];
+            assigned[target] = value;
+          }
+        } else if (!isNote) {
+          assigned[oldPath] = value;
         }
         done += 1;
       } catch (e) {
+        failed += 1;
+        if (!firstError)
+          firstError = e && e.message || String(e);
       }
     }
+    await this.plugin.saveSettings();
     this._ownership = null;
     this._inboxSel = /* @__PURE__ */ new Set();
     new Notice(
-      "\u5DF2\u5F52\u5165\u300C" + mod.name + "\u300D\uFF1A" + done + " \u9879" + (moved ? "\uFF08\u79FB\u52A8 " + moved + " \u9879\uFF09" : "")
+      "\u5DF2\u5F52\u5165\u300C" + mod.name + "\u300D\uFF1A" + done + " \u9879" + (moved ? "\uFF08\u79FB\u52A8 " + moved + " \u9879\uFF09" : "") + (failed ? "\uFF1B\u5931\u8D25 " + failed + " \u9879\uFF1A" + firstError : "")
     );
     this.render();
   }
@@ -20506,27 +21126,25 @@ var CollisView = class extends ItemView {
   }
   // 一次性采纳收集箱里的全部归属建议
   async applyAllSuggestions(files) {
-    let total = 0;
+    const groups = /* @__PURE__ */ new Map();
     for (const file of files) {
       if (file.extension !== "md")
         continue;
       const mod = this.suggestModuleFor(file);
       if (!mod)
         continue;
-      const value = String(mod.module || mod.id);
-      try {
-        await this.app.fileManager.processFrontMatter(file, (fm) => {
-          fm.module = value;
-        });
-        await this.waitForMetadata(file);
-        total += 1;
-      } catch (e) {
-      }
+      const key = moduleIdOf(mod);
+      if (!groups.has(key))
+        groups.set(key, { mod, files: [] });
+      groups.get(key).files.push(file);
     }
-    this._ownership = null;
-    this._inboxSel = /* @__PURE__ */ new Set();
-    new Notice(total ? "\u6309\u5EFA\u8BAE\u5F52\u5165 " + total + " \u7BC7" : "\u6CA1\u6709\u53EF\u5F52\u5165\u7684\u7B14\u8BB0");
-    this.render();
+    if (!groups.size) {
+      new Notice("\u6CA1\u6709\u53EF\u5F52\u5165\u7684\u7B14\u8BB0");
+      return;
+    }
+    for (const group of groups.values()) {
+      await this.assignToModule(group.files, group.mod);
+    }
   }
   // 删除收集箱条目：笔记和附件都移入系统回收站，可随时恢复
   deleteFiles(files, onDone) {
@@ -20544,9 +21162,13 @@ var CollisView = class extends ItemView {
           done += 1;
           if (this._inboxSel)
             this._inboxSel.delete(file.path);
+          if (this.plugin.settings.inboxAssigned) {
+            delete this.plugin.settings.inboxAssigned[file.path];
+          }
         } catch (e) {
         }
       }
+      await this.plugin.saveSettings();
       this._ownership = null;
       new Notice("\u5DF2\u5220\u9664 " + done + " \u4E2A\u6587\u4EF6\uFF0C\u53EF\u5728\u56DE\u6536\u7AD9\u6062\u590D");
       if (typeof onDone === "function")
@@ -20635,7 +21257,16 @@ var CollisView = class extends ItemView {
       this.destroyGallery();
     if (this.active === "notes" && id !== "notes")
       this.destroyNotes();
-    this.active = id;
+    const mod = this.moduleById(id);
+    const builtin = ["home", "inbox", "canvas", "notes"].includes(id);
+    if (!mod && !builtin) {
+      this.active = "home";
+    } else {
+      this.active = id;
+      if (mod) {
+        this.modulePath(mod).slice(0, -1).forEach((node) => this._navExpanded.add(moduleIdOf(node)));
+      }
+    }
     this.render();
   }
   destroyGallery() {
@@ -20767,7 +21398,6 @@ var CollisView = class extends ItemView {
   render() {
     this._mdFiles = this.app.vault.getMarkdownFiles();
     this._contentFiles = this._mdFiles.filter(isContentFile);
-    this.buildOwnership(this.vaultFiles());
     if (this.active !== "canvas")
       this.destroyGallery();
     if (this.active !== "notes")
@@ -20792,7 +21422,7 @@ var CollisView = class extends ItemView {
     } else if (this.active === "home") {
       this.renderHome(scroll);
     } else {
-      const mod = this.getModules().find((m) => m.id === this.active);
+      const mod = this.moduleById(this.active);
       if (mod)
         this.renderModule(scroll, mod);
       else
@@ -20821,11 +21451,24 @@ var CollisView = class extends ItemView {
       g.createDiv({ cls: "cl-navcap", text: caption });
       return g;
     };
-    const addItem = (parent, { label, icon, tile, color, active, count, onClick }) => {
+    const addItem = (parent, { label, icon, tile, color, active, count, onClick, onContextMenu, depth = 0, chevron = false, hasChildren = false, expanded = false, onToggle }) => {
       const item = parent.createDiv({
-        cls: "cl-navitem" + (active ? " is-active" : "")
+        cls: "cl-navitem" + (active ? " is-active" : "") + (depth > 0 ? " is-sub" : "")
       });
       item.setAttribute("aria-label", label);
+      if (depth > 0)
+        item.style.paddingLeft = 9 + depth * 14 + "px";
+      if (chevron) {
+        const chev = item.createDiv({ cls: "cl-navchev" + (hasChildren ? "" : " is-blank") });
+        if (hasChildren) {
+          setIcon(chev, expanded ? "chevron-down" : "chevron-right");
+          chev.onclick = (event) => {
+            event.stopPropagation();
+            if (onToggle)
+              onToggle();
+          };
+        }
+      }
       const iconEl = item.createDiv({
         cls: "cl-navicon" + (tile ? " cl-navtile " + tile : "")
       });
@@ -20836,6 +21479,13 @@ var CollisView = class extends ItemView {
       if (count > 0)
         item.createDiv({ cls: "cl-navcount", text: String(count) });
       item.onclick = onClick;
+      if (onContextMenu) {
+        item.oncontextmenu = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onContextMenu(event);
+        };
+      }
       return item;
     };
     const overview = group("OVERVIEW");
@@ -20864,20 +21514,50 @@ var CollisView = class extends ItemView {
     manageModule.setAttribute("aria-label", "\u7BA1\u7406\u6A21\u5757");
     setIcon(manageModule, "more-horizontal");
     manageModule.onclick = () => this.openModuleManager();
-    this.getModules().forEach((mod, index) => {
+    const allModules = this.getModules();
+    const roots = this.rootModules();
+    const drawModule = (mod, depth) => {
+      const key = moduleIdOf(mod);
+      const children = this.submodulesOf(mod);
+      const expanded = this._navExpanded.has(key);
+      const index = allModules.indexOf(mod);
       addItem(modules, {
         label: mod.name,
-        icon: mod.icon || "file",
-        tile: "cl-tint-" + index % 5,
+        icon: mod.icon || (children.length ? "folder" : "file-text"),
+        tile: "cl-tint-" + (index >= 0 ? index % 5 : depth % 5),
         color: mod.color,
-        active: this.active === mod.id,
-        count: this.moduleFiles(mod).length,
-        onClick: () => this.go(mod.id)
+        active: this.active === key,
+        count: this.moduleNoteFiles(mod).length,
+        depth,
+        chevron: true,
+        hasChildren: children.length > 0,
+        expanded,
+        onContextMenu: (event) => this.showModuleMenu(mod, event),
+        onToggle: () => {
+          if (expanded)
+            this._navExpanded.delete(key);
+          else
+            this._navExpanded.add(key);
+          this.render();
+        },
+        // 与文件树一致：有子模块时，点击模块名本身就展开/折叠；没有子模块则只做导航
+        onClick: () => {
+          if (children.length) {
+            if (expanded)
+              this._navExpanded.delete(key);
+            else
+              this._navExpanded.add(key);
+          }
+          this.go(key);
+        }
       });
-    });
+      if (expanded)
+        children.forEach((child) => drawModule(child, depth + 1));
+    };
+    roots.forEach((mod) => drawModule(mod, 0));
     const workspace = group("WORKSPACE");
     addItem(workspace, {
-      label: "\u767D\u677F",
+      label: "\u753B\u5E03",
       icon: "presentation",
       active: this.active === "canvas",
       count: this.getBoardFiles().length,
@@ -20904,7 +21584,6 @@ var CollisView = class extends ItemView {
     setIcon(settingsIcon, "settings");
     settingsBtn.createDiv({ cls: "cl-navlabel", text: "\u8BBE\u7F6E" });
     settingsBtn.onclick = () => this.openSettings();
-    foot.createDiv({ cls: "cl-navversion", text: "v" + this.plugin.manifest.version });
   }
   renderHome(el) {
     el.addClass("cl-hm-scroll");
@@ -21117,8 +21796,7 @@ var CollisView = class extends ItemView {
     }
     for (const file of recentFiles) {
       const isBoard = file.extension === "collis";
-      const ownId = this._ownership ? this._ownership.get(file.path) : null;
-      const mod = ownId ? modules.find((m) => String(m.id || m.module || m.name || "") === ownId) : null;
+      const mod = isBoard ? null : this.moduleForFile(file);
       const color = isBoard ? "#9b8cff" : mod && mod.color || "#3f7fd1";
       const fm = isBoard ? {} : getFm(this.app, file);
       const typeText = isBoard ? "BOARD" : fm && fm.status ? String(fm.status).toUpperCase() : "NOTE";
@@ -21146,7 +21824,7 @@ var CollisView = class extends ItemView {
     modMore.onclick = () => this.openSettings();
     const modGrid = modCard.createDiv({ cls: "cl-hm-mods" });
     const ranked = modules.map((mod) => {
-      const files = this.filesFor(mod);
+      const files = this.moduleNoteFiles(mod);
       const active = files.filter(
         (f) => ACTIVE_STATUSES.includes(String(getFm(this.app, f).status || "").toLowerCase())
       ).length;
@@ -21424,7 +22102,7 @@ var CollisView = class extends ItemView {
     }
     headMain.createDiv({
       cls: "cl-inbox-sub",
-      text: "\u6563\u843D\u5728\u5E93\u91CC\u7684\u7B14\u8BB0\u548C\u7D20\u6750\uFF0C\u5F52\u5165\u6A21\u5757\u540E\u81EA\u52A8\u79BB\u5F00"
+      text: "\u53EA\u663E\u793A\u6563\u843D\u5728\u5E93\u6839\u76EE\u5F55\u3001\u8FD8\u6CA1\u8FDB\u4EFB\u4F55\u6587\u4EF6\u5939\u7684\u6587\u4EF6\uFF1B\u5F52\u5165\u6A21\u5757\u540E\u81EA\u52A8\u79BB\u5F00"
     });
     const headActions = head.createDiv({ cls: "cl-inbox-head-actions" });
     const refreshBtn = headActions.createEl("button", { cls: "cl-inbox-refresh" });
@@ -21436,7 +22114,7 @@ var CollisView = class extends ItemView {
     ).length;
     const stats = page.createDiv({ cls: "cl-inbox-stats" });
     [
-      ["\u5F85\u5F52\u5C5E", files.length],
+      ["\u6839\u76EE\u5F55\u5F85\u5904\u7406", files.length],
       ["\u6709\u5F52\u5C5E\u5EFA\u8BAE", suggestions.size],
       ["\u672C\u5468\u65B0\u589E", weekCount]
     ].forEach(([label, value]) => {
@@ -21516,6 +22194,7 @@ var CollisView = class extends ItemView {
       anchorMenuBelow(menu, sortBtn);
     };
     const banners = page.createDiv({ cls: "cl-inbox-banners" });
+    banners.hidden = true;
     const bulk = page.createDiv({ cls: "cl-inbox-bulk" });
     bulk.hidden = true;
     const bulkLabel = bulk.createSpan({ cls: "cl-inbox-bulkcount" });
@@ -21535,7 +22214,7 @@ var CollisView = class extends ItemView {
     const list = page.createDiv({ cls: "cl-inbox-list" });
     const foot = page.createDiv({ cls: "cl-inbox-foot" });
     foot.createSpan({
-      text: "\u5168\u5E93\u626B\u63CF " + (this.vaultFiles().length + this.vaultAttachments().length) + " \u4E2A\u6587\u4EF6 \xB7 \u81EA\u52A8\u6392\u9664\u767D\u677F\u3001\u5361\u7247\u7B14\u8BB0\u4E0E\u6280\u672F\u76EE\u5F55"
+      text: this.inboxPolicy() === "root" ? "\u5E93\u6839\u76EE\u5F55 " + this.rootFiles().length + " \u4E2A\u6587\u4EF6 \xB7 \u6587\u4EF6\u5939\u5185\u7684\u6587\u4EF6\u4E0D\u8FDB\u5165\u6536\u4EF6\u7BB1" : "\u5168\u5E93\u626B\u63CF " + (this.vaultFiles().length + this.vaultAttachments().length) + " \u4E2A\u6587\u4EF6"
     });
     foot.createSpan({
       cls: "cl-inbox-footright",
@@ -21552,7 +22231,6 @@ var CollisView = class extends ItemView {
       this._inboxQuery = query.value;
       paint();
     };
-    this.renderUnknownBanners(banners);
     if (!files.length)
       bulk.remove();
     const typeInfo = (file) => {
@@ -21833,47 +22511,25 @@ var CollisView = class extends ItemView {
     });
   }
   renderModule(el, mod) {
-    const files = this.moduleFiles(mod).sort((a, b) => b.stat.mtime - a.stat.mtime);
-    const dir = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
-    const tintPalette = ["#b394af", "#e9c77e", "#ce7379", "#7fa9b6", "#5d86a4"];
+    const allNotes = this.moduleNoteFiles(mod).sort((a, b) => b.stat.mtime - a.stat.mtime);
+    const children = this.submodulesOf(mod);
     const mods = this.getModules();
+    const tintPalette = ["#b394af", "#e9c77e", "#ce7379", "#7fa9b6", "#5d86a4"];
     const modIndex = mods.findIndex((m) => m.id === mod.id);
     const tint = mod.color || tintPalette[(modIndex < 0 ? 0 : modIndex) % tintPalette.length];
-    const TYPE_LABELS = {
-      pdf: "PDF",
-      doc: "Word",
-      docx: "Word",
-      xls: "\u8868\u683C",
-      xlsx: "\u8868\u683C",
-      csv: "\u8868\u683C",
-      ppt: "\u6F14\u793A",
-      pptx: "\u6F14\u793A",
-      epub: "\u7535\u5B50\u4E66",
-      txt: "\u6587\u672C",
-      rtf: "\u6587\u672C",
-      zip: "\u538B\u7F29\u5305",
-      rar: "\u538B\u7F29\u5305",
-      "7z": "\u538B\u7F29\u5305",
-      tar: "\u538B\u7F29\u5305",
-      gz: "\u538B\u7F29\u5305",
-      bz2: "\u538B\u7F29\u5305",
-      xz: "\u538B\u7F29\u5305"
+    const childHue = (child, index) => child.color || tintPalette[(Math.max(modIndex, 0) + 1 + index) % tintPalette.length];
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTs = today.getTime();
+    const weekTs = todayTs - 6 * 864e5;
+    const groupOf = (ts) => ts >= todayTs ? "\u4ECA\u5929" : ts >= weekTs ? "\u672C\u5468" : "\u66F4\u65E9";
+    const pad2 = (n) => String(n).padStart(2, "0");
+    const fmtDate = (ts) => {
+      const d = new Date(ts);
+      if (ts >= todayTs)
+        return pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+      return d.getMonth() + 1 + "-" + pad2(d.getDate());
     };
-    const kindOf = (file) => fileKind(file);
-    const labelOf = (file) => {
-      const ext = String(file.extension || "").toLowerCase();
-      if (TYPE_LABELS[ext])
-        return TYPE_LABELS[ext];
-      return THUMB_KIND_LABELS[kindOf(file)];
-    };
-    const iconOf = (kind) => ({
-      note: "file-text",
-      image: "image",
-      video: "video",
-      audio: "music",
-      doc: "file-text",
-      other: "file"
-    })[kind] || "file";
     const fmtSize = (bytes) => {
       const n = Number(bytes || 0);
       if (!n)
@@ -21885,19 +22541,14 @@ var CollisView = class extends ItemView {
       let i = 0;
       while (value >= 1024 && i < units.length - 1) {
         value /= 1024;
-        i++;
+        i += 1;
       }
       return (value >= 10 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, "")) + " " + units[i];
     };
-    const today = /* @__PURE__ */ new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTs = today.getTime();
-    const weekTs = todayTs - 6 * 864e5;
-    const groupOf = (ts) => ts >= todayTs ? "\u4ECA\u5929" : ts >= weekTs ? "\u672C\u5468" : "\u66F4\u65E9";
     let mode = mod.view === "grid" ? "grid" : "list";
-    let filter = "all";
-    let sort = "recent";
     let query = "";
+    let searching = false;
+    const liveToday = allNotes.some((file) => file.stat.mtime >= todayTs);
     if (this._mdSelModule !== mod.id) {
       this._mdSelModule = mod.id;
       this._mdMulti = false;
@@ -21913,32 +22564,71 @@ var CollisView = class extends ItemView {
     };
     el.empty();
     el.addClass("cl-md-scroll");
-    const page = el.createDiv({ cls: "cl-md-page" });
-    const head = page.createDiv({ cls: "cl-md-head" });
-    const headMain = head.createDiv({ cls: "cl-md-head-main" });
-    const titleRow = headMain.createDiv({ cls: "cl-md-title-row" });
-    const modtile = titleRow.createDiv({ cls: "cl-md-modtile" });
-    modtile.style.setProperty("--tint", tint);
-    setIcon(modtile, mod.icon || "file-text");
-    titleRow.createEl("h1", { text: mod.name });
-    const countPill = titleRow.createSpan({ cls: "cl-md-count" });
-    headMain.createEl("p", {
-      cls: "cl-md-desc",
-      text: dir ? dir + " \xB7 \u7B14\u8BB0\u6309 frontmatter \u805A\u5408\uFF0C\u56FE\u7247 / \u89C6\u9891 / \u6587\u6863\u7B49\u6309\u6587\u4EF6\u5939\u6536\u5F55" : "\u5C1A\u672A\u8BBE\u7F6E\u4FDD\u5B58\u6587\u4EF6\u5939 \xB7 \u65B0\u5EFA\u7B14\u8BB0\u65F6\u4F1A\u5148\u9009\u62E9\u4F4D\u7F6E"
+    const page = el.createDiv({ cls: "cl-md-page cl-mdv" });
+    const crumbs = page.createDiv({ cls: "cl-mdv-crumbs" });
+    const homeChip = crumbs.createSpan({
+      cls: "cl-mdv-chip",
+      text: this.plugin.settings.workspaceName || "\u5DE5\u4F5C\u53F0"
     });
-    const headActs = head.createDiv({ cls: "cl-md-head-actions" });
-    const addBtn = headActs.createEl("button", { cls: "cl-md-btn cl-md-btn-primary" });
-    setIcon(addBtn, "plus");
-    addBtn.appendText("\u65B0\u5EFA\u7B14\u8BB0");
-    addBtn.onclick = () => this.createModuleNote(mod);
-    const moreBtn = headActs.createEl("button", { cls: "cl-md-btn cl-md-more", attr: { "aria-label": "\u66F4\u591A\u64CD\u4F5C" } });
+    homeChip.onclick = () => this.go("home");
+    const chain = this.modulePath(mod);
+    chain.forEach((node, index) => {
+      crumbs.createSpan({ cls: "cl-mdv-csep", text: "/" });
+      if (index === chain.length - 1) {
+        crumbs.createEl("b", { text: node.name });
+      } else {
+        const chip = crumbs.createSpan({ cls: "cl-mdv-chip", text: node.name });
+        chip.onclick = () => this.go(node.id);
+      }
+    });
+    const head = page.createDiv({ cls: "cl-mdv-head" });
+    const headMain = head.createDiv({ cls: "cl-mdv-headmain" });
+    const titleRow = headMain.createDiv({ cls: "cl-mdv-title" });
+    titleRow.createEl("h1", { text: mod.name });
+    titleRow.createSpan({ cls: "cl-mdv-num", text: "\u672C\u5C42 " + allNotes.length + " \u7BC7" });
+    if (liveToday) {
+      const live = titleRow.createSpan({ cls: "cl-mdv-live" });
+      live.createEl("i");
+      live.appendText("\u4ECA\u5929\u6709\u66F4\u65B0");
+    }
+    const treeNotes = children.length ? this.moduleTreeNoteFiles(mod).length : allNotes.length;
+    const newest = allNotes.length ? allNotes.reduce((max, file) => Math.max(max, file.stat.mtime), 0) : 0;
+    const meta = headMain.createDiv({ cls: "cl-mdv-meta" });
+    const metaPart = (text) => meta.createSpan({ text });
+    const metaDot = () => meta.createSpan({ cls: "cl-mdv-dotsep", text: "\xB7" });
+    metaPart(children.length + " \u4E2A\u5B50\u6A21\u5757");
+    if (children.length) {
+      metaDot();
+      metaPart("\u542B\u5B50\u6A21\u5757 " + treeNotes + " \u7BC7");
+    } else if (newest) {
+      metaDot();
+      metaPart("\u6700\u540E\u6D3B\u52A8 " + fmtDate(newest));
+    }
+    const acts = head.createDiv({ cls: "cl-mdv-acts" });
+    const searchBtn = acts.createDiv({
+      cls: "cl-mdv-ibtn" + (searching ? " is-on" : ""),
+      attr: { "aria-label": "\u7B5B\u9009\u7B14\u8BB0", role: "button" }
+    });
+    setIcon(searchBtn, "search");
+    const moreBtn = acts.createDiv({
+      cls: "cl-mdv-ibtn",
+      attr: { "aria-label": "\u66F4\u591A\u64CD\u4F5C", role: "button" }
+    });
     setIcon(moreBtn, "more-horizontal");
-    moreBtn.appendText("\u66F4\u591A");
-    moreBtn.onclick = (event) => {
+    moreBtn.onclick = () => {
       const menu = new Menu();
       menu.addItem(
         (item) => item.setTitle("\u7F16\u8F91\u6A21\u5757").setIcon("settings").onClick(() => this.openModuleEditor(mod))
       );
+      menu.addItem(
+        (item) => item.setTitle("\u91CD\u547D\u540D\u6A21\u5757\u2026").setIcon("pencil").onClick(() => this.renameModule(mod))
+      );
+      menu.addItem(
+        (item) => item.setTitle("\u5220\u9664\u6A21\u5757\u2026").setIcon("trash").onClick(() => {
+          void this.dissolveModule(mod);
+        })
+      );
+      menu.addSeparator();
       menu.addItem(
         (item) => item.setTitle(this._mdMulti ? "\u9000\u51FA\u591A\u9009" : "\u591A\u9009\u5220\u9664").setIcon("list-checks").setChecked(this._mdMulti).onClick(() => {
           this._mdMulti = !this._mdMulti;
@@ -21947,53 +22637,108 @@ var CollisView = class extends ItemView {
           draw();
         })
       );
+      menu.addItem(
+        (item) => item.setTitle("\u7BA1\u7406\u6A21\u5757").setIcon("folder-cog").onClick(() => this.openModuleManager())
+      );
       anchorMenuBelow(menu, moreBtn);
     };
-    const stats = page.createDiv({ cls: "cl-md-stats" });
-    const addStat = (num, label) => {
-      const cell = stats.createDiv({ cls: "cl-md-stat" });
-      cell.createSpan({ cls: "cl-md-stat-num", text: String(num) });
-      cell.createSpan({ cls: "cl-md-stat-label", text: label });
+    const newBtn = acts.createEl("button", { cls: "cl-mdv-btn is-primary" });
+    setIcon(newBtn.createSpan({ cls: "cl-mdv-btnico" }), "plus");
+    newBtn.appendText("\u65B0\u5EFA");
+    setIcon(newBtn.createSpan({ cls: "cl-mdv-caret" }), "chevron-down");
+    newBtn.onclick = () => {
+      const menu = new Menu();
+      menu.addItem(
+        (item) => item.setTitle("\u65B0\u5EFA\u7B14\u8BB0").setIcon("file-plus").onClick(() => this.createModuleNote(mod))
+      );
+      menu.addItem(
+        (item) => item.setTitle("\u65B0\u5EFA\u5B50\u6A21\u5757").setIcon("folder-plus").onClick(() => this.promptSubmodule(mod))
+      );
+      menu.addSeparator();
+      menu.addItem(
+        (item) => item.setTitle("\u5F52\u5165\u6587\u4EF6").setIcon("download").onClick(() => this.addFilesToModule(mod))
+      );
+      anchorMenuBelow(menu, newBtn);
     };
-    const noteCount = files.filter((file) => kindOf(file) === "note").length;
-    addStat(files.length, "\u5168\u90E8\u6587\u4EF6");
-    addStat(noteCount, "\u7B14\u8BB0");
-    addStat(files.length - noteCount, "\u7D20\u6750\uFF08\u56FE\u7247 / \u89C6\u9891 / \u97F3\u9891 / \u6587\u6863\uFF09");
-    const controls = page.createDiv({ cls: "cl-md-controls" });
-    const search = controls.createDiv({ cls: "cl-md-search" });
-    const searchIcon = search.createSpan({ cls: "cl-md-searchico" });
-    setIcon(searchIcon, "search");
-    const input = search.createEl("input", {
-      cls: "cl-md-query",
-      attr: { placeholder: "\u7B5B\u9009\u6807\u9898\u6216\u8DEF\u5F84", type: "text" }
+    const searchWrap = page.createDiv({ cls: "cl-mdv-search" + (searching ? " is-on" : "") });
+    const queryInput = searchWrap.createEl("input", {
+      cls: "cl-mdv-searchinput",
+      attr: { type: "text", placeholder: "\u7B5B\u9009\u672C\u5C42\u7B14\u8BB0\u2026" }
     });
-    const typeSeg = controls.createDiv({ cls: "cl-md-seg" });
-    [
-      ["all", "\u5168\u90E8"],
-      ["note", "\u7B14\u8BB0"],
-      ["image", "\u56FE\u7247"],
-      ["video", "\u89C6\u9891"],
-      ["doc", "\u6587\u6863"],
-      ["audio", "\u97F3\u9891"],
-      ["other", "\u5176\u4ED6"]
-    ].forEach(([key, label]) => {
-      const btn = typeSeg.createEl("button", { cls: "cl-md-segbtn", text: label });
-      btn.dataset.kind = key;
-      if (key === filter)
-        btn.addClass("is-active");
+    queryInput.addEventListener("input", () => {
+      query = queryInput.value;
+      draw();
     });
-    const viewSeg = controls.createDiv({ cls: "cl-md-viewseg" });
-    const listBtn = viewSeg.createEl("button", { cls: "cl-md-segbtn", text: "\u5217\u8868" });
-    listBtn.dataset.view = "list";
-    const gridBtn = viewSeg.createEl("button", { cls: "cl-md-segbtn", text: "\u7F51\u683C" });
-    gridBtn.dataset.view = "grid";
-    const sortWrap = controls.createDiv({ cls: "cl-md-sort" });
-    const sortBtn = sortWrap.createEl("button", { cls: "cl-md-sortbtn" });
-    const sortText = sortBtn.createSpan({ text: "\u6700\u8FD1\u66F4\u65B0" });
-    const sortIcon = sortBtn.createSpan({ cls: "cl-md-sortico" });
-    setIcon(sortIcon, "chevron-down");
-    const body = page.createDiv({ cls: "cl-md-body" });
-    const selBar = page.createDiv({ cls: "cl-md-selbar" });
+    searchBtn.onclick = () => {
+      searching = !searching;
+      searchWrap.classList.toggle("is-on", searching);
+      searchBtn.classList.toggle("is-on", searching);
+      if (searching)
+        queryInput.focus();
+    };
+    const subSec = page.createDiv({ cls: "cl-mdv-sec" });
+    subSec.createEl("h3", { text: "\u5B50\u6A21\u5757" });
+    subSec.createSpan({ cls: "cl-mdv-count", text: String(children.length) });
+    subSec.createSpan({ cls: "cl-mdv-line" });
+    if (children.length) {
+      const manage = subSec.createSpan({ cls: "cl-mdv-secact", text: "\u7BA1\u7406" });
+      manage.onclick = () => this.openModuleManager();
+    }
+    if (children.length) {
+      const grid = page.createDiv({ cls: "cl-mdv-mods" });
+      children.forEach((child, index) => {
+        const childTree = this.moduleTreeNoteFiles(child);
+        const childNewest = childTree.length ? childTree.reduce((max, file) => Math.max(max, file.stat.mtime), 0) : 0;
+        const card = grid.createDiv({ cls: "cl-mdv-modcard" });
+        card.style.setProperty("--hue", childHue(child, index));
+        card.createDiv({ cls: "cl-mdv-wash" });
+        card.createDiv({ cls: "cl-mdv-hair" });
+        const top = card.createDiv({ cls: "cl-mdv-mctop" });
+        top.createSpan({ cls: "cl-mdv-huedot" });
+        top.createSpan({ cls: "cl-mdv-mcname", text: child.name });
+        const num = card.createDiv({ cls: "cl-mdv-mcnum" });
+        num.appendText(String(this.moduleNoteFiles(child).length));
+        num.createSpan({ text: "\u7BC7" });
+        card.createDiv({
+          cls: "cl-mdv-mcmeta",
+          text: childNewest ? "\u6700\u8FD1 " + fmtDate(childNewest) : "\u6682\u65E0\u7B14\u8BB0"
+        });
+        card.onclick = () => this.go(child.id);
+        card.oncontextmenu = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.showModuleMenu(child, event);
+        };
+      });
+      const addCard = grid.createDiv({ cls: "cl-mdv-modcard is-add" });
+      const addInner = addCard.createDiv({ cls: "cl-mdv-addinner" });
+      setIcon(addInner.createSpan({ cls: "cl-mdv-addicon" }), "plus");
+      addInner.appendText("\u65B0\u5EFA\u5B50\u6A21\u5757");
+      addCard.onclick = () => this.promptSubmodule(mod);
+    } else {
+      const shelf = page.createDiv({ cls: "cl-mdv-shelf" });
+      const shelfIcon = shelf.createDiv({ cls: "cl-mdv-shelf-icon" });
+      setIcon(shelfIcon, "folder-plus");
+      const shelfText = shelf.createDiv({ cls: "cl-mdv-shelf-text" });
+      shelfText.createDiv({ cls: "cl-mdv-shelf-title", text: "\u8FD8\u6CA1\u6709\u5B50\u6A21\u5757" });
+      shelfText.createDiv({
+        cls: "cl-mdv-shelf-sub",
+        text: "\u5B50\u6A21\u5757\u5C31\u662F\u6587\u4EF6\u5939\uFF0C\u7528\u6765\u7EE7\u7EED\u5206\u5C42\u3002\u4E5F\u53EF\u4EE5\u4E0D\u5EFA\uFF0C\u76F4\u63A5\u5728\u8FD9\u4E00\u5C42\u5199\u7B14\u8BB0\u3002"
+      });
+      const shelfBtn = shelf.createEl("button", { cls: "cl-mdv-shelf-btn" });
+      setIcon(shelfBtn.createSpan({ cls: "cl-mdv-addicon" }), "plus");
+      shelfBtn.appendText("\u65B0\u5EFA\u5B50\u6A21\u5757");
+      shelfBtn.onclick = () => this.promptSubmodule(mod);
+    }
+    const noteSec = page.createDiv({ cls: "cl-mdv-sec" });
+    noteSec.createEl("h3", { text: "\u672C\u5C42\u7B14\u8BB0" });
+    const noteCount = noteSec.createSpan({ cls: "cl-mdv-count", text: String(allNotes.length) });
+    noteSec.createSpan({ cls: "cl-mdv-line" });
+    const viewSw = noteSec.createSpan({ cls: "cl-mdv-viewsw" });
+    const listBtn = viewSw.createSpan({ text: "\u5217\u8868" });
+    const gridBtn = viewSw.createSpan({ text: "\u5361\u7247" });
+    const body = page.createDiv({ cls: "cl-md-body cl-mdv-body" });
+    const selBar = el.createDiv({ cls: "cl-md-selbar" });
     const selCount = selBar.createSpan({ cls: "cl-md-selcount" });
     const selCancel = selBar.createEl("button", { cls: "cl-md-btn", text: "\u53D6\u6D88" });
     selCancel.onclick = () => {
@@ -22003,7 +22748,7 @@ var CollisView = class extends ItemView {
     };
     const selDelete = selBar.createEl("button", { cls: "cl-md-btn cl-md-btn-danger", text: "\u5220\u9664\u6240\u9009" });
     selDelete.onclick = () => {
-      const chosen = files.filter((file) => this._mdSel.has(file.path));
+      const chosen = allNotes.filter((file) => this._mdSel.has(file.path));
       if (!chosen.length)
         return;
       this.deleteFiles(chosen, () => {
@@ -22012,202 +22757,133 @@ var CollisView = class extends ItemView {
         this.refresh();
       });
     };
-    const foot = page.createDiv({ cls: "cl-md-foot" });
-    const footLeft = foot.createSpan();
-    const footRight = foot.createSpan({ cls: "cl-md-footright" });
-    const sortItems = (items) => {
-      if (sort === "name") {
-        items.sort((a, b) => a.file.basename.localeCompare(b.file.basename, "zh"));
-      } else if (sort === "size") {
-        items.sort((a, b) => (b.file.stat.size || 0) - (a.file.stat.size || 0));
-      } else {
-        items.sort((a, b) => b.file.stat.mtime - a.file.stat.mtime);
-      }
-    };
-    const renderList = (parent, items) => {
+    const renderList = (items) => {
       const groups = /* @__PURE__ */ new Map([["\u4ECA\u5929", []], ["\u672C\u5468", []], ["\u66F4\u65E9", []]]);
-      items.forEach((item) => {
-        groups.get(groupOf(item.file.stat.mtime)).push(item);
-      });
+      items.forEach((file) => groups.get(groupOf(file.stat.mtime)).push(file));
       groups.forEach((list, name) => {
         if (!list.length)
           return;
-        const section = parent.createDiv({ cls: "cl-md-group" });
-        const groupHead = section.createDiv({ cls: "cl-md-group-head" });
-        groupHead.createSpan({ cls: "cl-md-group-name", text: name });
-        groupHead.createSpan({ cls: "cl-md-group-count", text: String(list.length) });
-        groupHead.createSpan({ cls: "cl-md-group-line" });
-        list.forEach((item) => {
-          const picked = this._mdSel.has(item.file.path);
-          const card = section.createDiv({ cls: "cl-md-card cl-md-kind-" + item.kind });
+        body.createDiv({ cls: "cl-mdv-glabel", text: name });
+        list.forEach((file) => {
+          const picked = this._mdSel.has(file.path);
+          const row = body.createDiv({
+            cls: "cl-mdv-row" + (this._mdMulti && picked ? " is-selected" : "")
+          });
+          row.style.setProperty("--hue", tint);
+          const glyph = row.createDiv({ cls: "cl-mdv-glyph" });
           if (this._mdMulti) {
-            card.addClass("is-multi");
-            if (picked)
-              card.addClass("is-selected");
-            const check = card.createDiv({ cls: "cl-md-check" });
-            const box = check.createEl("input", {
-              attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + item.file.basename }
+            const box = glyph.createEl("input", {
+              attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + file.basename }
             });
             box.checked = picked;
             box.onclick = (event) => {
               event.stopPropagation();
-              toggleSelect(item.file.path);
+              toggleSelect(file.path);
             };
+          } else {
+            setIcon(glyph, "file-text");
           }
-          const type = card.createDiv({ cls: "cl-md-type" });
-          setIcon(type, item.icon);
-          const main = card.createDiv({ cls: "cl-md-main" });
-          main.createDiv({ cls: "cl-md-name", text: item.file.basename });
-          main.createDiv({ cls: "cl-md-path", text: item.file.path });
-          const meta = card.createDiv({ cls: "cl-md-meta" });
-          meta.createEl("b", { text: item.label });
-          meta.createSpan({ cls: "cl-md-metadot" });
-          meta.createSpan({ cls: "cl-md-size", text: fmtSize(item.file.stat.size) });
-          card.createDiv({ cls: "cl-md-time", text: formatTime(item.file.stat.mtime) });
+          const main = row.createDiv({ cls: "cl-mdv-rowmain" });
+          main.createDiv({ cls: "cl-mdv-rowtitle", text: file.basename });
+          main.createDiv({ cls: "cl-mdv-rowsub", text: file.path });
+          row.createDiv({ cls: "cl-mdv-tag", text: mod.name });
+          row.createDiv({ cls: "cl-mdv-date", text: fmtDate(file.stat.mtime) });
           if (!this._mdMulti) {
-            const acts = card.createDiv({ cls: "cl-md-actions" });
-            const openBtn = acts.createEl("button", { cls: "cl-md-act" });
-            openBtn.setAttribute("aria-label", "\u6253\u5F00");
-            setIcon(openBtn, "external-link");
-            openBtn.onclick = (event) => {
+            const del = row.createDiv({
+              cls: "cl-mdv-del",
+              attr: { "aria-label": "\u5220\u9664 " + file.basename, role: "button" }
+            });
+            setIcon(del, "trash-2");
+            del.onclick = (event) => {
               event.stopPropagation();
-              this.openFile(item.file);
-            };
-            const delBtn = acts.createEl("button", { cls: "cl-md-act is-danger" });
-            delBtn.setAttribute("aria-label", "\u5220\u9664");
-            setIcon(delBtn, "trash-2");
-            delBtn.onclick = (event) => {
-              event.stopPropagation();
-              this.deleteFiles([item.file]);
+              this.deleteFiles([file]);
             };
           }
-          card.onclick = () => {
+          row.onclick = () => {
             if (this._mdMulti)
-              toggleSelect(item.file.path);
+              toggleSelect(file.path);
             else
-              this.openFile(item.file);
+              this.openFile(file);
           };
         });
       });
     };
-    const renderGrid = (parent, items) => {
-      const grid = parent.createDiv({ cls: "cl-md-grid" });
-      items.forEach((item) => {
-        const picked = this._mdSel.has(item.file.path);
+    const renderGrid = (items) => {
+      const grid = body.createDiv({ cls: "cl-md-grid" });
+      items.forEach((file) => {
+        const picked = this._mdSel.has(file.path);
         const tile = grid.createDiv({
-          cls: "cl-md-tile cl-md-kind-" + item.kind + (this._mdMulti && picked ? " is-selected" : "")
+          cls: "cl-md-tile cl-md-kind-note" + (this._mdMulti && picked ? " is-selected" : "")
         });
         const thumb = tile.createDiv({ cls: "cl-md-thumb" });
-        if (item.kind === "note") {
-          paintNoteThumb(this.app, thumb, item.file);
-        } else if (item.kind === "image" || item.kind === "video") {
-          paintMediaThumb(this.app, thumb, item.file, item.kind);
-        } else {
-          setIcon(thumb, item.icon);
-        }
+        paintNoteThumb(this.app, thumb, file);
         if (this._mdMulti) {
           const check = tile.createDiv({ cls: "cl-md-tilecheck" });
           const box = check.createEl("input", {
-            attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + item.file.basename }
+            attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + file.basename }
           });
           box.checked = picked;
           box.onclick = (event) => {
             event.stopPropagation();
-            toggleSelect(item.file.path);
+            toggleSelect(file.path);
           };
         }
-        tile.createDiv({ cls: "cl-md-tilename", text: item.file.basename });
+        tile.createDiv({ cls: "cl-md-tilename", text: file.basename });
         const tileMeta = tile.createDiv({ cls: "cl-md-tilemeta" });
-        tileMeta.createSpan({ text: item.label });
-        tileMeta.createSpan({ text: fmtSize(item.file.stat.size) });
+        tileMeta.createSpan({ text: "\u7B14\u8BB0" });
+        tileMeta.createSpan({ text: fmtSize(file.stat.size) });
         if (!this._mdMulti) {
           const del = tile.createEl("button", {
             cls: "cl-md-tiledel",
-            attr: { "aria-label": "\u5220\u9664 " + item.file.basename }
+            attr: { "aria-label": "\u5220\u9664 " + file.basename }
           });
           setIcon(del, "trash-2");
           del.onclick = (event) => {
             event.stopPropagation();
-            this.deleteFiles([item.file]);
+            this.deleteFiles([file]);
           };
         }
         tile.onclick = () => {
           if (this._mdMulti)
-            toggleSelect(item.file.path);
+            toggleSelect(file.path);
           else
-            this.openFile(item.file);
+            this.openFile(file);
         };
       });
     };
-    const updateFoot = () => {
-      footLeft.setText("\u5171 " + files.length + " \u4E2A\u6587\u4EF6 \xB7 \u7B14\u8BB0\u6309 frontmatter \u805A\u5408\uFF0C\u7D20\u6750\u6309\u6A21\u5757\u6587\u4EF6\u5939\u6536\u5F55");
-      if (!files.length) {
-        footRight.setText("");
-        return;
-      }
-      const newest = files.reduce((max, file) => Math.max(max, file.stat.mtime), 0);
-      footRight.setText("\u6700\u8FD1\u66F4\u65B0 " + formatTime(newest));
-    };
-    const renderEmpty = () => {
-      stats.style.display = "none";
-      controls.style.display = "none";
-      foot.style.display = "none";
-      const empty = body.createDiv({ cls: "cl-md-empty" });
-      empty.style.setProperty("--tint", tint);
-      const art = empty.createDiv({ cls: "cl-md-emptyart" });
-      setIcon(art, "file-text");
-      empty.createEl("h2", { text: "\u8FD9\u4E2A\u6A21\u5757\u8FD8\u6CA1\u6709\u6587\u4EF6" });
-      empty.createEl("p", {
-        cls: "cl-md-emptysub",
-        text: "\u70B9\u300C\u65B0\u5EFA\u7B14\u8BB0\u300D\u4F1A\u5728\u8FD9\u91CC\u751F\u6210\u7B2C\u4E00\u7BC7\u7B14\u8BB0\uFF1B\u56FE\u7247\u3001\u89C6\u9891\u3001PDF\u3001\u97F3\u9891\u653E\u8FDB\u6A21\u5757\u6587\u4EF6\u5939\u540E\uFF0C\u4E5F\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u8FD9\u4E00\u9875\u3002"
-      });
-      const acts = empty.createDiv({ cls: "cl-md-emptyacts" });
-      const newBtn = acts.createEl("button", { cls: "cl-md-btn cl-md-btn-primary" });
-      setIcon(newBtn, "plus");
-      newBtn.appendText("\u65B0\u5EFA\u7B14\u8BB0");
-      newBtn.onclick = () => this.createModuleNote(mod);
-      if (dir) {
-        empty.createDiv({ cls: "cl-md-emptymeta", text: "\u4FDD\u5B58\u4F4D\u7F6E " + dir });
-      }
-    };
     const draw = () => {
-      listBtn.classList.toggle("is-active", mode === "list");
-      gridBtn.classList.toggle("is-active", mode === "grid");
-      const segBtns = typeSeg.querySelectorAll("[data-kind]");
-      for (let i = 0; i < segBtns.length; i++) {
-        segBtns[i].classList.toggle("is-active", segBtns[i].dataset.kind === filter);
-      }
-      sortText.setText(sort === "name" ? "\u540D\u79F0" : sort === "size" ? "\u5927\u5C0F" : "\u6700\u8FD1\u66F4\u65B0");
-      selBar.classList.toggle("is-on", !!this._mdMulti && files.length > 0);
+      listBtn.classList.toggle("is-on", mode === "list");
+      gridBtn.classList.toggle("is-on", mode === "grid");
+      selBar.classList.toggle("is-on", !!this._mdMulti && allNotes.length > 0);
       selCount.setText("\u5DF2\u9009 " + selected.size + " \u9879");
       selDelete.disabled = selected.size === 0;
+      noteCount.setText(String(allNotes.length));
       const q = query.trim().toLowerCase();
-      const items = files.filter((file) => filter === "all" || kindOf(file) === filter).filter((file) => !q || file.path.toLowerCase().includes(q)).map((file) => ({ file, kind: kindOf(file), label: labelOf(file), icon: iconOf(kindOf(file)) }));
-      sortItems(items);
-      countPill.setText(files.length + " \u4E2A\u6587\u4EF6");
+      const items = allNotes.filter((file) => !q || file.path.toLowerCase().includes(q));
       body.empty();
-      if (!files.length) {
-        renderEmpty();
+      if (!allNotes.length) {
+        const blank = body.createDiv({ cls: "cl-mdv-blank" });
+        const blankIcon = blank.createDiv({ cls: "cl-mdv-blank-icon" });
+        setIcon(blankIcon, "file-text");
+        const blankText = blank.createDiv({ cls: "cl-mdv-blank-text" });
+        blankText.createDiv({ cls: "cl-mdv-blank-title", text: "\u8FD9\u4E00\u5C42\u8FD8\u6CA1\u6709\u7B14\u8BB0" });
+        blankText.createDiv({
+          cls: "cl-mdv-blank-sub",
+          text: "\u76F4\u63A5\u5728\u7236\u6A21\u5757\u5199\u53EF\u4EE5\uFF1B\u4E5F\u53EF\u4EE5\u70B9\u4E0A\u9762\u7684\u5B50\u6A21\u5757\u7EE7\u7EED\u5206\u5C42\u3002"
+        });
+        const blankBtn = blank.createEl("button", { cls: "cl-mdv-blank-btn", text: "\u65B0\u5EFA\u7B14\u8BB0" });
+        blankBtn.onclick = () => this.createModuleNote(mod);
         return;
       }
-      stats.style.display = "";
-      controls.style.display = "";
-      foot.style.display = "";
       if (!items.length) {
-        body.createDiv({ cls: "cl-md-nomatch", text: "\u6CA1\u6709\u5339\u914D\u7684\u6587\u4EF6" });
-      } else if (mode === "grid") {
-        renderGrid(body, items);
-      } else {
-        renderList(body, items);
+        body.createDiv({ cls: "cl-mdv-nomatch", text: "\u6CA1\u6709\u5339\u914D\u7684\u7B14\u8BB0" });
+        return;
       }
-      updateFoot();
+      if (mode === "grid")
+        renderGrid(items);
+      else
+        renderList(items);
     };
-    typeSeg.querySelectorAll("[data-kind]").forEach((btn) => {
-      btn.onclick = () => {
-        filter = btn.dataset.kind;
-        draw();
-      };
-    });
     listBtn.onclick = () => {
       mode = "list";
       mod.view = "list";
@@ -22220,39 +22896,19 @@ var CollisView = class extends ItemView {
       this.plugin.persistSettings();
       draw();
     };
-    input.addEventListener("input", () => {
-      query = input.value;
-      draw();
-    });
-    sortBtn.onclick = (event) => {
-      const menu = new Menu();
-      [
-        ["recent", "\u6700\u8FD1\u66F4\u65B0"],
-        ["name", "\u540D\u79F0"],
-        ["size", "\u5927\u5C0F"]
-      ].forEach(([key, label]) => {
-        menu.addItem((item) => {
-          item.setTitle(label).setChecked(sort === key).onClick(() => {
-            sort = key;
-            draw();
-          });
-        });
-      });
-      anchorMenuBelow(menu, sortBtn);
-    };
     draw();
   }
-  // 在模块里新建笔记：用模块的保存文件夹；没设置就先让用户挑。
-  // 不再自动创建目录，避免又冒出一个和已有文件夹编号不同的副本。
-  createModuleNote(mod) {
-    const dir = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
+  // 在模块里新建笔记：用模块的文件夹，不存在就补建。
+  async createModuleNote(mod) {
+    const dir = this.moduleTargetFolder(mod);
     if (!dir) {
       this.pickModuleFolder(mod);
       return;
     }
-    if (!this.app.vault.getAbstractFileByPath(dir)) {
-      new Notice("\u6A21\u5757\u7684\u4FDD\u5B58\u6587\u4EF6\u5939\u300C" + dir + "\u300D\u4E0D\u5B58\u5728\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9");
-      this.pickModuleFolder(mod);
+    try {
+      await ensureVaultFolder(this.app, dir);
+    } catch (error) {
+      new Notice("\u521B\u5EFA\u6A21\u5757\u6587\u4EF6\u5939\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
       return;
     }
     this.createNoteInFolder(mod, dir);
@@ -22277,7 +22933,7 @@ var CollisView = class extends ItemView {
       path = folder + "/\u672A\u547D\u540D\u7B14\u8BB0 " + stamp + "-" + n + ".md";
       n += 1;
     }
-    const moduleValue = mod.id || mod.name;
+    const moduleValue = String(mod.id || "").startsWith("dir:") ? mod.name : mod.id || mod.name;
     const content = "---\nmodule: " + moduleValue + "\nstatus: \u8349\u7A3F\ncreated: " + now.toISOString().slice(0, 10) + "\n---\n\n";
     try {
       const file = await this.app.vault.create(path, content);
@@ -22329,8 +22985,8 @@ var CollisSettingTab = class extends PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Collis \u8BBE\u7F6E" });
-    new Setting(containerEl).setName("\u5DE5\u4F5C\u53F0\u540D\u79F0").setDesc("\u663E\u793A\u5728\u5DE6\u4FA7\u5BFC\u822A\u9876\u90E8\u7684\u540D\u5B57\uFF0C\u7559\u7A7A\u5219\u7528\u300C\u4E2A\u4EBA\u5DE5\u4F5C\u53F0\u300D\u3002").addText(
+    new Setting(containerEl).setName("\u5E38\u89C4").setHeading();
+    new Setting(containerEl).setName("\u5DE5\u4F5C\u53F0\u540D\u79F0").setDesc("\u663E\u793A\u5728\u5DE6\u4FA7\u5BFC\u822A\u9876\u90E8\u7684\u540D\u79F0\u3002\u7559\u7A7A\u5219\u4F7F\u7528\u300C\u4E2A\u4EBA\u5DE5\u4F5C\u53F0\u300D\u3002").addText(
       (text) => text.setPlaceholder("\u4E2A\u4EBA\u5DE5\u4F5C\u53F0").setValue(this.plugin.settings.workspaceName || "").onChange(async (value) => {
         this.plugin.settings.workspaceName = value.trim() || "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0";
         await this.plugin.persistSettings();
@@ -22340,54 +22996,139 @@ var CollisSettingTab = class extends PluginSettingTab {
         });
       })
     );
-    new Setting(containerEl).setName("\u6253\u5F00 Collis \u65F6\u8FDB\u5165\u4E13\u6CE8\u6A21\u5F0F").setDesc("\u9690\u85CF\u5DE6\u4FA7\u680F\u3001\u6807\u7B7E\u680F\u548C\u72B6\u6001\u680F\uFF1B\u53F3\u4FA7\u680F\u4FDD\u7559\uFF0C\u65B9\u4FBF\u540C\u65F6\u4F7F\u7528 Collis \u548C Claudian\u3002").addToggle(
+    new Setting(containerEl).setName("\u6253\u5F00\u65F6\u8FDB\u5165\u4E13\u6CE8\u6A21\u5F0F").setDesc("\u9690\u85CF\u5DE6\u4FA7\u680F\u3001\u6807\u7B7E\u680F\u548C\u72B6\u6001\u680F\uFF0C\u4FDD\u7559\u53F3\u4FA7\u680F\uFF0C\u65B9\u4FBF\u540C\u65F6\u4F7F\u7528 Collis \u548C\u5176\u4ED6\u9762\u677F\u3002").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.focusOnOpen).onChange(async (value) => {
         this.plugin.settings.focusOnOpen = value;
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("p", {
-      cls: "cl-settings-hint",
-      text: "\u6A21\u5757\u914D\u7F6E\u662F JSON \u6570\u7EC4\u3002\u6BCF\u9879\u652F\u6301 id\u3001name\u3001icon\u3001color\u3001module\u3001types\u3001folder\u3001keywords\u3002\u4E5F\u53EF\u4EE5\u5728\u5BFC\u822A\u91CC\u70B9\u300C\u65B0\u5EFA\u6A21\u5757\u300D\u7528\u56FE\u5F62\u754C\u9762\u6DFB\u52A0\u3002"
-    });
-    const textarea = containerEl.createEl("textarea", { cls: "cl-settings-json" });
-    textarea.value = JSON.stringify(this.plugin.settings.modules, null, 2);
-    new Setting(containerEl).addButton(
-      (button) => button.setButtonText("\u4FDD\u5B58\u6A21\u5757\u914D\u7F6E").setCta().onClick(async () => {
-        try {
-          const parsed = JSON.parse(textarea.value);
-          if (!Array.isArray(parsed)) {
-            throw new Error("\u5FC5\u987B\u662F\u4E00\u4E2A\u6570\u7EC4");
-          }
-          if (parsed.some((m) => !m || !m.id || !m.name)) {
-            throw new Error("\u6BCF\u4E2A\u6A21\u5757\u5FC5\u987B\u6709 id \u548C name");
-          }
-          this.plugin.settings.modules = parsed;
-          await this.plugin.saveSettings();
-          new Notice("\u6A21\u5757\u914D\u7F6E\u5DF2\u4FDD\u5B58");
-        } catch (e) {
-          new Notice("JSON \u9519\u8BEF\uFF1A" + e.message, 6e3);
+    new Setting(containerEl).setName("\u6A21\u5757").setHeading();
+    new Setting(containerEl).setName("\u6A21\u5757\u4E0E\u6587\u4EF6\u6811").setDesc(
+      "\u6A21\u5757\u4E0E\u6587\u4EF6\u5939\u4E00\u4E00\u5BF9\u5E94\uFF1A\u6A21\u5757\u9875\u53EA\u663E\u793A\u8BE5\u6587\u4EF6\u5939\u4E0B\u76F4\u63A5\u5B58\u653E\u7684\u7B14\u8BB0\uFF0C\u5B50\u6587\u4EF6\u5939\u4F1A\u81EA\u52A8\u6210\u4E3A\u5B50\u6A21\u5757\u3002\u65B0\u5EFA\u6A21\u5757\u65F6\u4F1A\u540C\u6B65\u521B\u5EFA\u540C\u540D\u6587\u4EF6\u5939\u3002"
+    );
+    new Setting(containerEl).setName("\u7BA1\u7406\u6A21\u5757").setDesc("\u65B0\u5EFA\u3001\u7F16\u8F91\u3001\u5220\u9664\u6A21\u5757\uFF0C\u6216\u67E5\u770B\u6A21\u5757\u5BF9\u5E94\u7684\u6587\u4EF6\u6811\u5C42\u7EA7\u3002").addButton(
+      (button) => button.setButtonText("\u6253\u5F00\u6A21\u5757\u7BA1\u7406").onClick(() => {
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+        if (leaf && leaf.view && leaf.view.openModuleManager) {
+          leaf.view.openModuleManager();
+        } else {
+          new Notice("\u8BF7\u5148\u6253\u5F00 Collis \u5DE5\u4F5C\u53F0\uFF0C\u518D\u7BA1\u7406\u6A21\u5757\u3002");
         }
+      })
+    );
+    new Setting(containerEl).setName("\u6536\u4EF6\u7BB1").setHeading();
+    new Setting(containerEl).setName("\u6536\u5F55\u8303\u56F4").setDesc("\u51B3\u5B9A\u6536\u4EF6\u7BB1\u663E\u793A\u54EA\u4E9B\u6587\u4EF6\u3002\u9ED8\u8BA4\u53EA\u663E\u793A\u5E93\u6839\u76EE\u5F55\u4E2D\u6563\u843D\u7684\u6587\u4EF6\u3002").addDropdown(
+      (dropdown) => dropdown.addOption("root", "\u4EC5\u5E93\u6839\u76EE\u5F55\uFF08\u63A8\u8350\uFF09").addOption("unassigned", "\u65E7\u7248\u672A\u5F52\u5C5E\u7B14\u8BB0\uFF08\u517C\u5BB9\uFF09").addOption("all", "\u5168\u5E93\u6240\u6709\u6587\u4EF6\uFF08\u8C28\u614E\uFF09").setValue(this.plugin.settings.inboxPolicy || "root").onChange(async (value) => {
+        this.plugin.settings.inboxPolicy = value;
+        await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("p", {
       cls: "cl-settings-hint",
-      text: "\u5339\u914D\u987A\u5E8F\uFF1Amodule \u5B57\u6BB5\uFF08\u4E2D\u82F1\u6587\u90FD\u8BA4\uFF09\u2192 type \u2192 folder \u524D\u7F00 \u2192 \u6807\u7B7E\u5173\u952E\u8BCD\u3002\u4E00\u7BC7\u7B14\u8BB0\u53EA\u5F52\u4E00\u4E2A\u6A21\u5757\uFF0C\u6309\u5BFC\u822A\u987A\u5E8F\u5148\u547D\u4E2D\u5148\u5F97\uFF1B\u90FD\u4E0D\u547D\u4E2D\u4F1A\u8FDB\u6536\u96C6\u7BB1\u7684\u5F85\u5904\u7406\u961F\u5217\u3002"
+      text: "\u6587\u4EF6\u79FB\u5165\u6A21\u5757\u6587\u4EF6\u5939\u540E\u4F1A\u81EA\u52A8\u79BB\u5F00\u6536\u4EF6\u7BB1\u3002\u8BE5\u7B56\u7565\u4FDD\u7559\u4E3A\u53EF\u5207\u6362\u63A5\u53E3\uFF0C\u540E\u7EED\u89C4\u5219\u53EF\u4EE5\u7EE7\u7EED\u6269\u5C55\u3002"
     });
+    new Setting(containerEl).setName("\u5361\u7247\u7B14\u8BB0").setHeading();
+    new Setting(containerEl).setName("\u5361\u7247\u5B58\u653E\u4F4D\u7F6E").setDesc(
+      "\u6240\u6709\u5361\u7247\u548C\u4ECE\u753B\u5E03\u8F6C\u6362\u7684\u5361\u7247\u90FD\u5199\u5165\u8FD9\u4E2A\u6587\u4EF6\u5939\u3002\u56FA\u5B9A\u8DEF\u5F84\u53EF\u4EE5\u907F\u514D\u5361\u7247\u6563\u843D\u3001\u88AB\u7B97\u8FDB\u6A21\u5757\uFF0C\u6216\u5728\u4E0D\u540C\u8BBE\u5907\u4E0A\u5206\u6210\u4E24\u5904\u3002"
+    ).addText((text) => text.setValue(CARD_FOLDER).setDisabled(true));
+    containerEl.createEl("p", {
+      cls: "cl-settings-hint",
+      text: "\u8BE5\u76EE\u5F55\u4E0D\u4F1A\u51FA\u73B0\u5728\u6A21\u5757\u5BFC\u822A\u91CC\uFF0C\u4E5F\u4E0D\u4F1A\u8FDB\u5165\u6536\u4EF6\u7BB1\u3002\u628A\u5361\u7247\u6587\u4EF6\u79FB\u51FA\u8FD9\u4E2A\u76EE\u5F55\uFF0C\u5B83\u5C31\u4F1A\u53D8\u6210\u666E\u901A\u7B14\u8BB0\u3002"
+    });
+    new Setting(containerEl).setName("\u753B\u5E03").setHeading();
+    const board = this.plugin.childPlugins && this.plugin.childPlugins["collis-board"];
+    if (!board) {
+      containerEl.createEl("p", {
+        cls: "cl-settings-hint",
+        text: "\u753B\u5E03\u7EC4\u4EF6\u672A\u52A0\u8F7D\uFF0C\u6682\u65F6\u65E0\u6CD5\u914D\u7F6E\u753B\u5E03\u548C AI\u3002\u8BF7\u91CD\u8F7D\u63D2\u4EF6\u540E\u518D\u8BD5\u3002"
+      });
+      return;
+    }
+    let boardFolderTimer = null;
+    new Setting(containerEl).setName("\u753B\u5E03\u6587\u4EF6\u5939").setDesc("\u65B0\u5EFA\u753B\u5E03\u65F6\u4FDD\u5B58\u5230\u8FD9\u4E2A\u6587\u4EF6\u5939\uFF0C\u9ED8\u8BA4\u300C\u753B\u5E03\u300D\u3002\u4FEE\u6539\u540E\u8BE5\u6587\u4EF6\u5939\u4E0D\u4F1A\u4F5C\u4E3A\u6A21\u5757\u51FA\u73B0\u3002").addText(
+      (text) => text.setPlaceholder("\u753B\u5E03").setValue(board.settings.collis && board.settings.collis.boardFolder || "").onChange((value) => {
+        if (boardFolderTimer)
+          window.clearTimeout(boardFolderTimer);
+        boardFolderTimer = window.setTimeout(async () => {
+          board.settings.collis = board.settings.collis || {};
+          board.settings.collis.boardFolder = value.trim();
+          await board.saveSettings();
+          if (this.plugin.syncModulesFromVault()) {
+            await this.plugin.persistSettings();
+          }
+          this.plugin.refreshAll();
+        }, 600);
+      })
+    );
+    new Setting(containerEl).setName("\u8282\u70B9\u89D2\u6807").setDesc("\u5728\u753B\u5E03\u5361\u7247\u8282\u70B9\u4E0A\u663E\u793A\u65E5\u671F\u89D2\u6807\uFF0C\u53EA\u5F71\u54CD\u753B\u5E03\u663E\u793A\uFF0C\u4E0D\u6539\u52A8\u5361\u7247\u6B63\u6587\u3002").addToggle(
+      (toggle) => toggle.setValue(!!board.settings.showBadge).onChange(async (value) => {
+        board.settings.showBadge = value;
+        await board.saveSettings();
+      })
+    );
+    new Setting(containerEl).setName("\u89D2\u6807\u5185\u5BB9").setDesc("\u7CBE\u7B80\u53EA\u663E\u793A\u65E5\u671F\uFF1B\u5B8C\u6574\u663E\u793A\u6807\u7B7E\u3001\u65E5\u671F\u548C\u65F6\u95F4\u3002").addDropdown(
+      (dropdown) => dropdown.addOption("date", "\u7CBE\u7B80\uFF0811-11\uFF09").addOption("full", "\u5B8C\u6574\uFF08#\u6807\u7B7E 11-11 11:08\uFF09").setValue(board.settings.badgeFormat === "full" ? "full" : "date").onChange(async (value) => {
+        board.settings.badgeFormat = value === "full" ? "full" : "date";
+        await board.saveSettings();
+      })
+    );
+    const boardTab = board._settingTab;
+    if (boardTab && typeof boardTab.renderAI === "function") {
+      boardTab.renderAI(containerEl);
+    } else {
+      containerEl.createEl("p", {
+        cls: "cl-settings-hint",
+        text: "AI \u8BBE\u7F6E\u754C\u9762\u672A\u5C31\u7EEA\uFF0C\u8BF7\u91CD\u8F7D\u63D2\u4EF6\u540E\u518D\u8BD5\u3002"
+      });
+    }
   }
 };
 module.exports = class CollisPlugin extends Plugin {
   async onload() {
     const saved = await this.readHostData();
+    const firstRun = !saved || !Array.isArray(saved.modules);
     this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
+    let settingsDirty = false;
     if (!Array.isArray(this.settings.modules)) {
-      this.settings.modules = DEFAULT_MODULES;
+      this.settings.modules = [];
     } else {
       this.settings.modules = this.settings.modules.map((mod) => {
         const base = DEFAULT_MODULES.find((d) => d.id === mod.id);
-        return Object.assign({}, base || {}, mod);
+        const merged = Object.assign({}, base || {}, mod);
+        if (!merged.folder)
+          merged.folder = sanitizeFolderName(merged.name);
+        return merged;
       });
+      const kept = this.settings.modules.filter(
+        (mod) => !(String(mod.id || "").startsWith("dir:") && isToolFolder(mod.folder))
+      );
+      if (kept.length !== this.settings.modules.length) {
+        this.settings.modules = kept;
+        settingsDirty = true;
+      }
+      const seenFolders = /* @__PURE__ */ new Set();
+      const deduped = this.settings.modules.filter((mod) => {
+        const key = String(mod.folder || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+        if (!key)
+          return true;
+        if (seenFolders.has(key))
+          return false;
+        seenFolders.add(key);
+        return true;
+      });
+      if (deduped.length !== this.settings.modules.length) {
+        this.settings.modules = deduped;
+        settingsDirty = true;
+      }
     }
+    if (this.syncModulesFromVault())
+      settingsDirty = true;
+    if (firstRun && !this.settings.modules.length) {
+      this.settings.modules = DEFAULT_MODULES;
+      settingsDirty = true;
+    }
+    if (settingsDirty)
+      await this.persistSettings();
     this.requestRefresh = debounce(() => this.refreshAll(), 700, true);
     this.registerView(VIEW_TYPE, (leaf) => new CollisView(leaf, this));
     if (PLUGIN_ICON_SVG)
@@ -22454,6 +23195,8 @@ module.exports = class CollisPlugin extends Plugin {
     });
     this.addSettingTab(new CollisSettingTab(this.app, this));
     await this.loadBundledPlugins();
+    if (this.syncModulesFromVault())
+      await this.persistSettings();
     this._ttObserver = new MutationObserver((mutations) => {
       for (let i = 0; i < mutations.length; i++) {
         const m = mutations[i];
@@ -22489,9 +23232,36 @@ module.exports = class CollisPlugin extends Plugin {
     );
     this.app.workspace.onLayoutReady(() => this.restoreCollisSidebar());
     this.registerEvent(this.app.vault.on("modify", () => this.requestRefresh()));
-    this.registerEvent(this.app.vault.on("create", () => this.requestRefresh()));
-    this.registerEvent(this.app.vault.on("delete", () => this.requestRefresh()));
-    this.registerEvent(this.app.vault.on("rename", () => this.requestRefresh()));
+    this.registerEvent(
+      this.app.vault.on("create", (file) => {
+        this.requestRefresh();
+        const path = String(file && file.path || "");
+        if (file && Array.isArray(file.children) && path && path.indexOf("/") === -1) {
+          const hidden = this.settings.hiddenModuleFolders || [];
+          if (hidden.includes(path)) {
+            this.settings.hiddenModuleFolders = hidden.filter((item) => item !== path);
+          }
+          if (this.syncModulesFromVault())
+            this.persistSettings();
+        }
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on("delete", (file) => {
+        this.dropOwnership(file.path);
+        if (file && Array.isArray(file.children) && this.pruneMissingAutoModules()) {
+          this.persistSettings();
+        }
+        this.requestRefresh();
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) => {
+        this.remapOwnership(oldPath, file.path);
+        this.remapModuleFolder(oldPath, file.path);
+        this.requestRefresh();
+      })
+    );
     this.registerEvent(this.app.metadataCache.on("resolved", () => this.requestRefresh()));
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf) => {
@@ -22504,6 +23274,58 @@ module.exports = class CollisPlugin extends Plugin {
         }
       })
     );
+  }
+  // 素材归属表跟着文件改名 / 删除走，避免记录指向不存在的旧路径。
+  remapOwnership(oldPath, newPath) {
+    const map = this.settings && this.settings.inboxAssigned;
+    if (!map || !oldPath || !newPath || oldPath === newPath)
+      return;
+    if (!(oldPath in map))
+      return;
+    map[newPath] = map[oldPath];
+    delete map[oldPath];
+    this.saveSettings();
+  }
+  dropOwnership(path) {
+    const map = this.settings && this.settings.inboxAssigned;
+    if (!map || !path || !(path in map))
+      return;
+    delete map[path];
+    this.saveSettings();
+  }
+  // 模块的保存文件夹被整体改名 / 移动时，同步更新配置里的路径。
+  remapModuleFolder(oldPath, newPath) {
+    const modules = this.settings && this.settings.modules || [];
+    if (!oldPath || !newPath || oldPath === newPath)
+      return;
+    let changed = false;
+    for (const mod of modules) {
+      const folder = String(mod.folder || "");
+      if (!folder)
+        continue;
+      if (folder === oldPath) {
+        mod.folder = newPath;
+        changed = true;
+      } else if (folder.indexOf(oldPath + "/") === 0) {
+        mod.folder = newPath + folder.slice(oldPath.length);
+        changed = true;
+      }
+    }
+    const hidden = this.settings && this.settings.hiddenModuleFolders || [];
+    const nextHidden = hidden.map((path) => {
+      const value = String(path || "");
+      if (value === oldPath)
+        return newPath;
+      if (value.indexOf(oldPath + "/") === 0)
+        return newPath + value.slice(oldPath.length);
+      return value;
+    });
+    if (nextHidden.join("\n") !== hidden.join("\n")) {
+      this.settings.hiddenModuleFolders = nextHidden;
+      changed = true;
+    }
+    if (changed)
+      this.saveSettings();
   }
   onunload() {
     document.body.classList.remove("collis-focus");
@@ -22688,7 +23510,8 @@ module.exports = class CollisPlugin extends Plugin {
       const noElement = () => document.createElement("div");
       child.addRibbonIcon = noElement;
       child.addStatusBarItem = noElement;
-      child.addSettingTab = () => {
+      child.addSettingTab = (tab) => {
+        child._settingTab = tab;
       };
       child._loaded = true;
       this.bundled.push(child);
@@ -22712,6 +23535,70 @@ module.exports = class CollisPlugin extends Plugin {
       }
     }
   }
+  /* 画布文件夹路径：跟随画布子插件的设置，未加载时按默认「画布」。 */
+  canvasFolderPath() {
+    const board = this.childPlugins && this.childPlugins["collis-board"];
+    const folder = String(board && board.collisFolder || "\u753B\u5E03").replace(/^\/+|\/+$/g, "");
+    return folder || "\u753B\u5E03";
+  }
+  /* 启动同步：把库根目录下已有的文件夹同步成模块入口。
+   * 只跳过工具/AI/构建目录（vault-scripts、node_modules、.claude …）和画布目录；
+   * 附件、媒体文件等普通文件夹同样同步。子文件夹由模块页按文件树自动生成，
+   * 用户手动删除的模块记录在 hiddenModuleFolders 里，不会被重新加回。 */
+  syncModulesFromVault() {
+    const root = this.app.vault.getRoot && this.app.vault.getRoot();
+    if (!root || !Array.isArray(root.children))
+      return false;
+    const normalize = (value) => String(value || "").replace(/^\/+|\/+$/g, "");
+    const keyOf = (value) => normalize(value).toLowerCase();
+    const canvasKey = keyOf(this.canvasFolderPath());
+    const beforeCount = (this.settings.modules || []).length;
+    this.settings.modules = (this.settings.modules || []).filter(
+      (mod) => keyOf(mod.folder) !== canvasKey
+    );
+    let changed = this.settings.modules.length !== beforeCount;
+    const hidden = new Set((this.settings.hiddenModuleFolders || []).map(keyOf));
+    const configured = new Set(
+      (this.settings.modules || []).map((mod) => keyOf(mod.folder)).filter(Boolean)
+    );
+    root.children.filter((child) => child && Array.isArray(child.children)).filter((child) => {
+      const path = String(child.path || "");
+      if (!path || path.split("/").some((part) => part.startsWith(".")))
+        return false;
+      if (keyOf(path) === canvasKey)
+        return false;
+      return !isToolFolder(path);
+    }).sort((a, b) => String(a.name).localeCompare(String(b.name), "zh")).forEach((folder) => {
+      const path = normalize(folder.path);
+      const key = keyOf(path);
+      if (!path || configured.has(key) || hidden.has(key))
+        return;
+      this.settings.modules.push({
+        id: "dir:" + path,
+        name: folder.name,
+        icon: "folder",
+        folder: path
+      });
+      configured.add(key);
+      changed = true;
+    });
+    return changed;
+  }
+  /* 文件树里的文件夹被删掉后，清掉对应的自动模块；
+   * 手动创建的模块保留配置，等文件夹恢复后还能继续用。 */
+  pruneMissingAutoModules() {
+    const before = (this.settings.modules || []).length;
+    this.settings.modules = (this.settings.modules || []).filter((mod) => {
+      const id = String(mod.id || "");
+      if (!id.startsWith("dir:"))
+        return true;
+      const folder = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
+      if (!folder)
+        return true;
+      return Boolean(this.app.vault.getAbstractFileByPath(folder));
+    });
+    return this.settings.modules.length !== before;
+  }
   async persistSettings() {
     const data = await this.readHostData();
     data.modules = this.settings.modules;
@@ -22720,6 +23607,9 @@ module.exports = class CollisPlugin extends Plugin {
     data.navCollapsed = !!this.settings.navCollapsed;
     data.collisSidebarOpen = !!this.settings.collisSidebarOpen;
     data.ignoredModuleValues = this.settings.ignoredModuleValues || [];
+    data.inboxAssigned = this.settings.inboxAssigned || {};
+    data.inboxPolicy = this.settings.inboxPolicy || "root";
+    data.hiddenModuleFolders = this.settings.hiddenModuleFolders || [];
     await this.writeHostData();
   }
   async saveSettings() {

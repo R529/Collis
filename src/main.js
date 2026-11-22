@@ -166,6 +166,22 @@ function isIgnoredPath(filePath) {
   return EXCLUDED_FILE_NAMES.has(name);
 }
 
+// 文件夹名与模块名保持同一个规则，避免「模块叫 A、目录叫 B」的偏差
+function sanitizeFolderName(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/[. ]+$/, "")
+    .replace(/^\/+|\/+$/g, "");
+}
+
+// 给工具 / AI / 构建用的目录（vault-scripts、node_modules、.claude …）不当作模块
+function isToolFolder(path) {
+  const dir = String(path || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+  if (!dir) return false;
+  return dir.split("/").some((part) => EXCLUDED_DIR_NAMES.has(part));
+}
+
 const DEFAULT_MODULES = [
   {
     id: "learning",
@@ -218,7 +234,15 @@ const DEFAULT_SETTINGS = {
   // 上次退出时卡片笔记右侧栏是否开着，用于重启后恢复
   collisSidebarOpen: false,
   // 用户点过“忽略”的未知 module 值，避免同一提示反复出现
-  ignoredModuleValues: []
+  ignoredModuleValues: [],
+  // 收件箱策略：root = 只收库根目录里散落的文件；unassigned / all 作为后续扩展接口
+  inboxPolicy: "root",
+  // 已从导航删除、但文件仍保留在磁盘上的文件夹模块
+  hiddenModuleFolders: [],
+  // 素材归属表：路径 -> 模块 id。
+  // 素材没有 frontmatter，归入模块后靠这张表记住归属；
+  // 收件箱据此判断是否已处理，模块页据此决定素材属于谁。
+  inboxAssigned: {}
 };
 
 const ACTIVE_STATUSES = [
@@ -551,8 +575,28 @@ const MODULE_COLORS = [
   "#8a6d3b"
 ];
 
-/* 模块编辑器：名称 / 图标 / 颜色 / 默认文件夹 / 标签。
- * 只改插件配置，不碰任何笔记文件；删除模块也只删配置。 */
+/* 逐级建目录，父级不存在时一并补上；创建后文件树会自动出现。
+ * 放在顶层，供各个视图/弹窗共用，避免某个类里漏定义直接报 is not a function。 */
+async function ensureVaultFolder(app, path) {
+  const parts = String(path || "").split("/").filter(Boolean);
+  let cur = "";
+  for (const part of parts) {
+    cur = cur ? cur + "/" + part : part;
+    const found = app.vault.getAbstractFileByPath(cur);
+    if (!found) await app.vault.createFolder(cur);
+    else if (!Array.isArray(found.children)) throw new Error("「" + cur + "」已被同名文件占用");
+  }
+  return cur;
+}
+
+/* 模块的唯一标识：优先 id，其次旧字段 module / name。
+ * 归属表、frontmatter、导航都用它，避免各处取值顺序不一致。 */
+function moduleIdOf(mod) {
+  return String((mod && (mod.id || mod.module || mod.name)) || "").trim();
+}
+
+/* 模块编辑器：名称 / 图标 / 颜色 / 文件夹。
+ * 保存时会把模块文件夹同步创建到文件树；删除模块只删配置，不动笔记文件。 */
 class ModuleEditorModal extends Modal {
   constructor(app, options) {
     super(app);
@@ -570,14 +614,11 @@ class ModuleEditorModal extends Modal {
     contentEl.createEl("h2", { text: this.module ? "编辑模块" : "新建模块" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "模块只是一个筛选入口，不会搬动或复制你的文件。"
+      text: "模块就是文件夹：保存时会同步在文件树里创建对应目录，模块内容只认这个目录里的文件。"
     });
 
     let name = this.module ? this.module.name || "" : this.initialName;
     let folder = (this.module && this.module.folder) || "";
-    let keywords = this.module && Array.isArray(this.module.keywords)
-      ? this.module.keywords.join("、")
-      : "";
 
     new Setting(contentEl)
       .setName("名称")
@@ -627,8 +668,8 @@ class ModuleEditorModal extends Modal {
 
     let folderInput = null;
     new Setting(contentEl)
-      .setName("保存文件夹")
-      .setDesc("新建笔记保存到这里；不选则每次新建时先挑。文件夹可以现场新建。")
+      .setName("模块文件夹")
+      .setDesc("保存时自动创建。不填则用模块名；填写多级路径（如 媒体文件/客户）也可以。")
       .addText((t) => {
         folderInput = t;
         t.setValue(folder)
@@ -648,18 +689,6 @@ class ModuleEditorModal extends Modal {
           }).open();
         });
       });
-
-    new Setting(contentEl)
-      .setName("筛选标签")
-      .setDesc("可选。用逗号或顿号分隔；没有 module 字段的笔记会按这些标签兜底归类")
-      .addText((t) =>
-        t
-          .setValue(keywords)
-          .setPlaceholder("例如：健身、运动")
-          .onChange((v) => {
-            keywords = v;
-          })
-      );
 
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
 
@@ -690,12 +719,10 @@ class ModuleEditorModal extends Modal {
         new Notice("请先填写模块名称");
         return;
       }
-      // 只接受已存在的文件夹；手填错路径时不静默创建目录
-      const folderValue = String(folder || "").trim().replace(/^\/+|\/+$/g, "");
-      if (folderValue && !this.app.vault.getAbstractFileByPath(folderValue)) {
-        new Notice("文件夹「" + folderValue + "」不存在，请点「选择」挑一个或新建");
-        return;
-      }
+      // 模块 = 文件夹：文件夹可以不存在，保存时统一创建（见 onSave）
+      const folderValue = String(folder || "")
+        .trim()
+        .replace(/^\/+|\/+$/g, "");
       const id = this.module && this.module.id ? this.module.id : "mod-" + Date.now().toString(36);
       const next = Object.assign({}, this.module || {}, {
         id,
@@ -703,11 +730,7 @@ class ModuleEditorModal extends Modal {
         name: finalName,
         icon: this.icon,
         color: this.color,
-        folder: folderValue,
-        keywords: String(keywords || "")
-          .split(/[,，、\s]+/)
-          .map((v) => v.trim())
-          .filter(Boolean)
+        folder: folderValue || sanitizeFolderName(finalName)
       });
       this.close();
       if (this.options.onSave) this.options.onSave(next);
@@ -757,6 +780,112 @@ class DeleteFilesModal extends Modal {
   }
 }
 
+/* 删除模块确认：说明会把文件和子文件夹上移一级，再清掉空文件夹。 */
+class DissolveModuleModal extends Modal {
+  constructor(app, info, onConfirm) {
+    super(app);
+    this.info = info || {};
+    this.onConfirm = onConfirm;
+  }
+
+  finish(value) {
+    const callback = this.onConfirm;
+    this.onConfirm = null;
+    if (callback) callback(value);
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("cl-modaleditor");
+    contentEl.createEl("h2", { text: "删除模块「" + (this.info.name || "") + "」？" });
+
+    const parts = [];
+    if (this.info.fileCount) parts.push(this.info.fileCount + " 个文件");
+    if (this.info.folderCount) parts.push(this.info.folderCount + " 个子文件夹");
+    contentEl.createDiv({
+      cls: "cl-modal-hint",
+      text: parts.length
+        ? "会把 " + parts.join("、") + " 上移到「" + (this.info.parentLabel || "上一级") +
+          "」，然后删除空的模块文件夹。不会删除任何笔记内容。"
+        : "这个模块文件夹是空的，会直接移除模块并删除空文件夹。"
+    });
+
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
+    cancel.onclick = () => {
+      this.finish(false);
+      this.close();
+    };
+    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "上移并删除模块" });
+    ok.onclick = () => {
+      this.finish(true);
+      this.close();
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+    this.finish(false);
+  }
+}
+
+/* 重命名模块：同时重命名文件树里的文件夹，保持两者一致。 */
+class RenameModuleModal extends Modal {
+  constructor(app, name, onSubmit) {
+    super(app);
+    this.name = name || "";
+    this.onSubmit = onSubmit;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("cl-modaleditor");
+    contentEl.createEl("h2", { text: "重命名模块" });
+    contentEl.createDiv({
+      cls: "cl-modal-hint",
+      text: "会同步重命名文件树中的文件夹，模块里的笔记和子模块会一起改名。"
+    });
+
+    let value = this.name;
+    let inputEl = null;
+    new Setting(contentEl).setName("新名称").addText((text) => {
+      text.setValue(this.name).onChange((next) => {
+        value = next;
+      });
+      inputEl = text.inputEl;
+      inputEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          this.submit(value);
+        }
+      });
+    });
+
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
+    cancel.onclick = () => this.close();
+    const ok = foot.createEl("button", { cls: "cl-btn mod-cta", text: "重命名" });
+    ok.onclick = () => this.submit(value);
+    window.setTimeout(() => {
+      if (inputEl) {
+        inputEl.focus();
+        inputEl.select();
+      }
+    }, 0);
+  }
+
+  submit(value) {
+    const callback = this.onSubmit;
+    this.onSubmit = null;
+    if (callback) callback(String(value || "").trim());
+    this.close();
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
 /* 选择保存文件夹：可以挑已有的目录，也可以直接新建一个。 */
 class FolderPickerModal extends Modal {
   constructor(app, options) {
@@ -780,14 +909,7 @@ class FolderPickerModal extends Modal {
 
   // 逐级建目录，父级不存在时一并补上；创建后文件树会自动出现
   async ensureFolder(path) {
-    const parts = String(path).split("/").filter(Boolean);
-    let cur = "";
-    for (const part of parts) {
-      cur = cur ? cur + "/" + part : part;
-      const found = this.app.vault.getAbstractFileByPath(cur);
-      if (!found) await this.app.vault.createFolder(cur);
-      else if (!Array.isArray(found.children)) throw new Error("「" + cur + "」已被同名文件占用");
-    }
+    return ensureVaultFolder(this.app, path);
   }
 
   onOpen() {
@@ -922,7 +1044,7 @@ class ModulePickerModal extends Modal {
     contentEl.createEl("h2", { text: "归入模块" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "选中的笔记和素材会移到该模块的文件夹；笔记会同时写入 module 字段。"
+      text: "选中的文件会移动到该模块的保存文件夹，并记录归属；笔记同时写入 module 字段。多个模块共用同一文件夹时会自动放进该模块的子目录。"
     });
 
     const list = contentEl.createDiv({ cls: "cl-picklist" });
@@ -953,15 +1075,13 @@ class ModulePickerModal extends Modal {
   }
 }
 
-/* 管理模块：列表里可以编辑或删除。
- * 删除只移除配置，不删任何笔记文件。 */
+/* 管理模块：按文件树层级展示，每一级都可以编辑或删除。
+ * 删除会把该层的文件和子文件夹整体上移一级，再移除空文件夹。 */
 class ModuleManagerModal extends Modal {
   constructor(app, options) {
     super(app);
     this.options = options || {};
-    this.armedId = null;
-    this.dragEl = null;
-    this.dragBlocked = false;
+    this.expanded = new Set();
   }
 
   onOpen() {
@@ -970,10 +1090,10 @@ class ModuleManagerModal extends Modal {
     contentEl.createEl("h2", { text: "管理模块" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "拖动左侧把手可以排序，顺序会同步到左边导航。删除模块只会移除筛选入口，不会删除笔记文件。"
+      text: "按文件树层级展示。删除模块时，里面的文件和子文件夹会整体上移一级，不会删除任何内容。"
     });
 
-    this.listEl = contentEl.createDiv({ cls: "cl-picklist" });
+    this.listEl = contentEl.createDiv({ cls: "cl-picklist cl-modtree" });
     this.renderList();
 
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
@@ -988,56 +1108,48 @@ class ModuleManagerModal extends Modal {
 
   renderList() {
     const list = this.listEl;
+    if (!list) return;
     list.empty();
-    const mods = this.options.getModules ? this.options.getModules() : [];
-    if (!mods.length) {
+    const roots = this.options.getRootModules ? this.options.getRootModules() : [];
+    if (!roots.length) {
       list.createDiv({ cls: "cl-modal-hint", text: "还没有模块，点下面的「新建模块」。" });
       return;
     }
+    // 默认全部收起，和导航保持一致，点箭头才展开
+    const all = this.options.getAllModules ? this.options.getAllModules() : roots;
 
-    mods.forEach((mod) => {
+    const draw = (mod, depth) => {
+      const key = moduleIdOf(mod);
+      const children = this.options.getChildren ? this.options.getChildren(mod) : [];
+      const isOpen = this.expanded.has(key);
+
       const row = list.createDiv({ cls: "cl-modrow" });
-      row.dataset.modId = mod.id;
-      row.setAttribute("draggable", "true");
+      row.style.paddingLeft = 8 + depth * 18 + "px";
 
-      const grip = row.createDiv({ cls: "cl-modrow-grip" });
-      setIcon(grip, "grip-vertical");
+      const toggle = row.createDiv({ cls: "cl-modrow-toggle" });
+      if (children.length) {
+        setIcon(toggle, isOpen ? "chevron-down" : "chevron-right");
+        toggle.onclick = () => {
+          if (isOpen) this.expanded.delete(key);
+          else this.expanded.add(key);
+          this.renderList();
+        };
+      } else {
+        toggle.addClass("is-blank");
+      }
 
+      // 图标与颜色完全对齐左侧导航：一样的默认图标、一样的预设色板
       const iconEl = row.createDiv({ cls: "cl-pickicon" });
-      iconEl.style.setProperty("--dot-color", mod.color || "var(--interactive-accent)");
-      setIcon(iconEl, mod.icon || "file-text");
-      row.createDiv({ cls: "cl-modrow-name", text: mod.name });
+      const index = all.indexOf(mod);
+      const tint = index >= 0 ? index % 5 : depth % 5;
+      iconEl.addClass("cl-tint-" + tint);
+      iconEl.style.setProperty("--dot-color", mod.color || "var(--tint)");
+      setIcon(iconEl, mod.icon || (children.length ? "folder" : "file-text"));
 
-      // 从按钮上按下时不触发拖动，避免点编辑/删除时误拖整行
-      row.addEventListener("mousedown", (evt) => {
-        this.dragBlocked = !!(evt.target.closest && evt.target.closest("button"));
-      });
-      row.addEventListener("dragstart", (evt) => {
-        if (this.dragBlocked) {
-          evt.preventDefault();
-          return;
-        }
-        this.dragEl = row;
-        row.addClass("is-dragging");
-        if (evt.dataTransfer) {
-          evt.dataTransfer.effectAllowed = "move";
-          evt.dataTransfer.setData("text/plain", mod.id);
-        }
-      });
-      row.addEventListener("dragover", (evt) => {
-        if (!this.dragEl || this.dragEl === row) return;
-        evt.preventDefault();
-        if (evt.dataTransfer) evt.dataTransfer.dropEffect = "move";
-        const rect = row.getBoundingClientRect();
-        const after = evt.clientY > rect.top + rect.height / 2;
-        list.insertBefore(this.dragEl, after ? row.nextSibling : row);
-      });
-      row.addEventListener("dragend", () => {
-        row.removeClass("is-dragging");
-        this.dragEl = null;
-        this.dragBlocked = false;
-        this.commitOrder();
-      });
+      const main = row.createDiv({ cls: "cl-modrow-main" });
+      main.createDiv({ cls: "cl-modrow-name", text: mod.name });
+      const folder = this.options.getFolder ? this.options.getFolder(mod) : mod.folder || "";
+      if (folder) main.createDiv({ cls: "cl-modrow-path", text: folder });
 
       const edit = row.createEl("button", { cls: "cl-btn", text: "编辑" });
       edit.onclick = () => {
@@ -1045,31 +1157,132 @@ class ModuleManagerModal extends Modal {
         if (this.options.onEdit) this.options.onEdit(mod);
       };
 
-      const armed = this.armedId === mod.id;
-      const del = row.createEl("button", {
-        cls: "cl-btn cl-btn-danger",
-        text: armed ? "确认删除" : "删除"
-      });
-      del.onclick = () => {
-        if (this.armedId !== mod.id) {
-          this.armedId = mod.id;
-          this.renderList();
-          return;
-        }
-        this.armedId = null;
-        if (this.options.onDelete) this.options.onDelete(mod);
+      const del = row.createEl("button", { cls: "cl-btn cl-btn-danger", text: "删除" });
+      del.onclick = async () => {
+        if (!this.options.onDissolve) return;
+        await this.options.onDissolve(mod);
         this.renderList();
       };
-    });
+
+      if (children.length && isOpen) children.forEach((child) => draw(child, depth + 1));
+    };
+
+    roots.forEach((mod) => draw(mod, 0));
   }
 
-  // 按当前 DOM 顺序回写模块顺序，导航会同步更新
-  commitOrder() {
-    if (!this.listEl) return;
-    const order = Array.from(this.listEl.querySelectorAll(".cl-modrow"))
-      .map((row) => row.dataset.modId)
-      .filter(Boolean);
-    if (this.options.onReorder) this.options.onReorder(order);
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+/* 轻量命名弹窗：新建子模块这类只需要一个名字的操作。 */
+class NamePromptModal extends Modal {
+  constructor(app, options) {
+    super(app);
+    this.options = options || {};
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("cl-modaleditor");
+    contentEl.createEl("h2", { text: this.options.title || "新建" });
+    if (this.options.hint) {
+      contentEl.createDiv({ cls: "cl-modal-hint", text: this.options.hint });
+    }
+    const input = contentEl.createEl("input", {
+      cls: "cl-modalfilter",
+      attr: { type: "text", placeholder: this.options.placeholder || "请输入名称" }
+    });
+
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
+    cancel.onclick = () => this.close();
+    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "创建" });
+    ok.onclick = () => {
+      const value = String(input.value || "").trim();
+      if (!value) {
+        new Notice("请输入名称");
+        input.focus();
+        return;
+      }
+      this.close();
+      if (this.options.onSubmit) this.options.onSubmit(value);
+    };
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") ok.click();
+    });
+    window.setTimeout(() => input.focus(), 0);
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+/* 归入文件：从库里挑笔记，移进当前模块（写 module 字段并移动文件）。 */
+class AddFilesModal extends Modal {
+  constructor(app, files, onConfirm) {
+    super(app);
+    this.files = files || [];
+    this.onConfirm = onConfirm;
+    this.selected = new Set();
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("cl-modaleditor");
+    contentEl.createEl("h2", { text: "归入文件" });
+    contentEl.createDiv({
+      cls: "cl-modal-hint",
+      text: "勾选要移进当前模块的笔记，确认后会写入 module 字段并移动到模块文件夹。"
+    });
+
+    const filter = contentEl.createEl("input", {
+      cls: "cl-modalfilter",
+      attr: { type: "text", placeholder: "筛选标题或路径…" }
+    });
+    const list = contentEl.createDiv({ cls: "cl-picklist" });
+    const empty = contentEl.createDiv({ cls: "cl-modal-hint" });
+
+    const draw = () => {
+      const q = String(filter.value || "").trim().toLowerCase();
+      const rows = this.files.filter((f) => !q || f.path.toLowerCase().includes(q));
+      list.empty();
+      empty.setText(this.files.length ? "没有匹配的笔记。" : "库里没有可归入的笔记。");
+      empty.toggle(rows.length === 0);
+      rows.forEach((file) => {
+        const row = list.createDiv({ cls: "cl-pickitem" });
+        const box = row.createEl("input", { attr: { type: "checkbox" } });
+        box.checked = this.selected.has(file.path);
+        box.onclick = (event) => {
+          event.stopPropagation();
+          if (box.checked) this.selected.add(file.path);
+          else this.selected.delete(file.path);
+        };
+        row.createDiv({ cls: "cl-pickname", text: file.path });
+        row.onclick = () => {
+          box.checked = !box.checked;
+          if (box.checked) this.selected.add(file.path);
+          else this.selected.delete(file.path);
+        };
+      });
+    };
+    filter.addEventListener("input", draw);
+    draw();
+
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
+    cancel.onclick = () => this.close();
+    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "归入" });
+    ok.onclick = () => {
+      const chosen = this.files.filter((file) => this.selected.has(file.path));
+      if (!chosen.length) {
+        new Notice("请先勾选笔记");
+        return;
+      }
+      this.close();
+      if (this.onConfirm) this.onConfirm(chosen);
+    };
   }
 
   onClose() {
@@ -1091,6 +1304,8 @@ class CollisView extends ItemView {
     this._needsRefresh = false;
     this.gallery = null;
     this.notes = null;
+    // 左侧模块树里手动展开的节点（当前模块的祖先会自动展开，不依赖这里）
+    this._navExpanded = new Set();
   }
 
   getViewType() {
@@ -1200,57 +1415,16 @@ class CollisView extends ItemView {
     return value ? [value] : [];
   }
 
-  // 旧数据的兜底规则：文件夹前缀、type、标签。
-  // 只在文件头没有写 module 时使用，保证升级后老笔记不会突然“消失”。
-  fileFitsModule(file, fm, mod) {
-    if (Array.isArray(mod.types) && fm && mod.types.includes(fm.type)) return true;
-    if (mod.folder && file.path.startsWith(mod.folder + "/")) return true;
-    if (Array.isArray(mod.keywords) && mod.keywords.length) {
-      const tags = getTags(fm).map((t) => t.toLowerCase());
-      return tags.some((tag) =>
-        mod.keywords.some((k) => tag.includes(String(k).toLowerCase()))
-      );
+  /* 素材归属表只作为「归入」的附加记录（path -> 模块 id）。
+   * 模块内容以文件夹为准；这张表服务于后续可切换的 unassigned 收件箱策略。 */
+  ownershipMap() {
+    const settings = this.plugin.settings;
+    if (!settings.inboxAssigned || typeof settings.inboxAssigned !== "object") {
+      settings.inboxAssigned = {};
     }
-    return false;
+    return settings.inboxAssigned;
   }
 
-  /* 归属表：一篇笔记只归一个模块。
-   * 顺序是“显式字段 → 兜底规则”，多个模块都命中时按导航里的先后顺序取第一个，
-   * 这样统计数字不会再因为模糊标签而翻倍。卡片笔记的月度聚合文件不参与。 */
-  buildOwnership(files) {
-    const mods = this.getModules().map((mod) => ({
-      mod,
-      id: String(mod.id || mod.module || mod.name || ""),
-      keys: this.moduleKeys(mod)
-    }));
-    const own = new Map();
-    for (const file of files) {
-      if (file.path.startsWith(CARD_FOLDER + "/")) continue;
-      const fm = getFm(this.app, file);
-      const explicit = this.explicitModule(fm);
-      let hit = null;
-      if (explicit.length) {
-        hit = mods.find((entry) => explicit.some((v) => entry.keys.includes(v)));
-      }
-      if (!hit) hit = mods.find((entry) => this.fileFitsModule(file, fm, entry.mod));
-      if (hit) own.set(file.path, hit.id);
-    }
-    this._ownership = own;
-    return own;
-  }
-
-  filesFor(mod) {
-    const files = this.vaultFiles();
-    const own = this._ownership || this.buildOwnership(files);
-    const id = String(mod.id || mod.module || mod.name || "");
-    return files.filter((file) => own.get(file.path) === id);
-  }
-
-  /* 模块页收录范围：
-   *   - 按 frontmatter / type / 标签归属到本模块的笔记；
-   *   - 模块保存文件夹里的图片、视频、PDF、音频等素材附件。
-   * 附件没有 frontmatter，只能按文件夹认领；导航计数仍只统计笔记，
-   * 不影响首页和收集箱的现有口径。 */
   // 模块没有单独设置文件夹时，用模块名建一个同名目录。
   moduleTargetFolder(mod) {
     const raw = String((mod && (mod.folder || mod.name || mod.id || mod.module)) || "").trim();
@@ -1271,20 +1445,244 @@ class CollisView extends ItemView {
     return path;
   }
 
+  /* 模块页收录范围（与 Obsidian 文件树一致）：
+   *   - 只认模块文件夹里「直接」存放的文件；
+   *   - 子文件夹的内容属于子模块，不向上汇总；
+   *   - 不再按 frontmatter / type / 标签猜归属，文件放在哪个文件夹就属于哪个模块。 */
   moduleFiles(mod) {
-    const notes = this.filesFor(mod);
-    const seen = new Set(notes.map((file) => file.path));
-    const out = notes.slice();
-    const dir = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
-    if (dir) {
-      this.vaultAttachments().forEach((file) => {
-        if (seen.has(file.path)) return;
-        if (file.path.indexOf(dir + "/") !== 0) return;
-        seen.add(file.path);
-        out.push(file);
+    return this.folderFiles(this.moduleTargetFolder(mod), false);
+  }
+
+  /* 读取文件夹下的直接子文件。folder 不存在时返回空数组，不报错。 */
+  folderFiles(dir, includeChildren) {
+    const target = String(dir || "").replace(/^\/+|\/+$/g, "");
+    if (!target) return [];
+    const node = this.app.vault.getAbstractFileByPath(target);
+    if (!node || !Array.isArray(node.children)) return [];
+    const out = [];
+    const walk = (folder) => {
+      (folder.children || []).forEach((child) => {
+        if (Array.isArray(child.children)) {
+          if (includeChildren) walk(child);
+          return;
+        }
+        if (!isIgnoredPath(child.path)) out.push(child);
       });
-    }
+    };
+    walk(node);
     return out;
+  }
+
+  /* ---------------- 模块层级（完全跟随文件树） ----------------
+   * 模块 = 文件夹；子模块 = 该文件夹下真实存在的直接子文件夹。
+   * 不再依赖 settings 里的 parent 字段，文件夹移到哪，层级就跟到哪。
+   * 模块页只统计笔记，附件一律不参与计数、也不在模块页展示。 */
+  isHiddenModuleFolder(path) {
+    const dir = String(path || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+    if (!dir) return false;
+    return (this.plugin.settings.hiddenModuleFolders || []).some(
+      (item) => String(item || "").replace(/^\/+|\/+$/g, "").toLowerCase() === dir
+    );
+  }
+
+  // 只排除工具/AI 目录、速记卡目录和用户手动删掉的目录；
+  // 附件、媒体文件夹同样是模块，按文件树正常显示
+  isModuleFolderIgnored(path) {
+    const dir = String(path || "").replace(/^\/+|\/+$/g, "");
+    if (!dir) return true;
+    if (dir === CARD_FOLDER) return true;
+    if (this.isCanvasModuleFolder(dir)) return true;
+    if (isToolFolder(dir)) return true;
+    return this.isHiddenModuleFolder(dir);
+  }
+
+  /* 画布文件夹归白板工作区使用，不再作为模块出现在导航里。
+   * 路径跟随画布子插件的设置，默认「画布」。 */
+  isCanvasModuleFolder(path) {
+    const folder = this.plugin.canvasFolderPath();
+    return String(path || "").replace(/^\/+|\/+$/g, "").toLowerCase() === folder.toLowerCase();
+  }
+
+  /* 文件夹 → 模块：优先复用 settings 里的配置（名称/图标/颜色），
+   * 没有配置时生成一个临时模块（id = dir:路径），文件树里的文件夹也能直接进入。 */
+  moduleForFolder(path) {
+    const dir = String(path || "").replace(/^\/+|\/+$/g, "");
+    if (!dir) return null;
+    if (this.isCanvasModuleFolder(dir)) return null;
+    const configured = this.getModules().find(
+      (mod) =>
+        this.moduleTargetFolder(mod).toLowerCase() === dir.toLowerCase()
+    );
+    if (configured) return configured;
+    if (this.isModuleFolderIgnored(dir)) return null;
+    if (!this.app.vault.getAbstractFileByPath(dir)) return null;
+    const name = dir.split("/").pop();
+    return {
+      id: "dir:" + dir,
+      module: "dir:" + dir,
+      name,
+      folder: dir,
+      icon: "folder",
+      implicit: true
+    };
+  }
+
+  // 文件属于哪个模块：从文件所在文件夹逐级往上找，命中的最近一层就是归属
+  // （包含没写进配置的隐式子文件夹，保证深层笔记也能在首页/归入逻辑里定位）
+  moduleForFile(file) {
+    if (!file) return null;
+    let dir = String(file.path || "").split("/").slice(0, -1).join("/");
+    while (dir) {
+      const mod = this.moduleForFolder(dir);
+      if (mod) return mod;
+      dir = dir.split("/").slice(0, -1).join("/");
+    }
+    return null;
+  }
+
+  moduleById(id) {
+    const direct = this.getModules().find((mod) => moduleIdOf(mod) === id);
+    if (direct) return direct;
+    const value = String(id || "");
+    if (value.startsWith("dir:")) return this.moduleForFolder(value.slice(4));
+    return null;
+  }
+
+  submodulesOf(mod) {
+    const dir = this.moduleTargetFolder(mod);
+    if (!dir) return [];
+    const node = this.app.vault.getAbstractFileByPath(dir);
+    if (!node || !Array.isArray(node.children)) return [];
+    return node.children
+      .filter((child) => Array.isArray(child.children))
+      .filter((child) => !this.isModuleFolderIgnored(child.path))
+      .map((child) => this.moduleForFolder(child.path))
+      .filter(Boolean)
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), "zh"));
+  }
+
+  moduleNoteFiles(mod) {
+    return this.moduleFiles(mod).filter(
+      (file) => String(file.extension || "").toLowerCase() === "md"
+    );
+  }
+
+  // 含所有后代的笔记数；循环引用时用 visited 兜底，避免死循环
+  moduleTreeNoteFiles(mod, visited) {
+    const seenIds = visited || new Set();
+    const id = moduleIdOf(mod);
+    if (!id || seenIds.has(id)) return [];
+    seenIds.add(id);
+    const out = this.moduleNoteFiles(mod).slice();
+    this.submodulesOf(mod).forEach((child) => {
+      out.push(...this.moduleTreeNoteFiles(child, seenIds));
+    });
+    return out;
+  }
+
+  /* 导航根节点：没有被别的模块文件夹包含的配置模块。
+   * 顶层模块是用户挑出来的「入口」，入口以下则完全镜像文件树。 */
+  rootModules() {
+    const mods = this.getModules();
+    const dirs = mods
+      .map((mod) => this.moduleTargetFolder(mod))
+      .filter(Boolean);
+    return mods.filter((mod) => {
+      const dir = this.moduleTargetFolder(mod);
+      if (dir && this.isCanvasModuleFolder(dir)) return false;
+      if (!dir) return true;
+      return !dirs.some((other) => other && other !== dir && dir.startsWith(other + "/"));
+    });
+  }
+
+  // 从根模块到当前文件夹的链路，用于面包屑和导航展开
+  modulePath(mod) {
+    const dir = this.moduleTargetFolder(mod);
+    if (!dir) return [mod];
+    let root = null;
+    this.rootModules().forEach((candidate) => {
+      const cdir = this.moduleTargetFolder(candidate);
+      if (!cdir) return;
+      if (dir !== cdir && !dir.startsWith(cdir + "/")) return;
+      if (!root || cdir.length > this.moduleTargetFolder(root).length) root = candidate;
+    });
+    if (!root) return [mod];
+    const rootDir = this.moduleTargetFolder(root);
+    const chain = [root];
+    if (dir !== rootDir) {
+      let acc = rootDir;
+      dir
+        .slice(rootDir.length + 1)
+        .split("/")
+        .filter(Boolean)
+        .forEach((seg) => {
+          acc += "/" + seg;
+          const node = this.moduleForFolder(acc);
+          if (node) chain.push(node);
+        });
+      const last = chain[chain.length - 1];
+      if (last && last.id !== mod.id) chain.push(mod);
+    } else if (root.id !== mod.id) {
+      chain[0] = mod;
+    }
+    return chain;
+  }
+
+  promptSubmodule(parent) {
+    const parentDir = this.moduleTargetFolder(parent);
+    new NamePromptModal(this.app, {
+      title: "新建子模块",
+      hint:
+        "会在「" + (parentDir || "库根目录") + "」下新建同名文件夹；子模块跟随文件夹，不会重复存层级配置。",
+      placeholder: "例如：客户",
+      onSubmit: async (raw) => {
+        const name = sanitizeFolderName(raw);
+        if (!name) return;
+        const dir = parentDir ? parentDir + "/" + name : name;
+        // 该文件夹已经有模块配置时直接进入，避免两个模块指向同一个目录
+        const existing = this.getModules().find(
+          (mod) => this.moduleTargetFolder(mod) === dir
+        );
+        if (existing) {
+          this.go(moduleIdOf(existing));
+          return;
+        }
+        try {
+          await ensureVaultFolder(this.app, dir);
+        } catch (error) {
+          new Notice("创建文件夹失败：" + (error && error.message ? error.message : error));
+          return;
+        }
+        const id = "mod-" + Date.now().toString(36);
+        const list = this.getModules().slice();
+        list.push({
+          id,
+          module: id,
+          name,
+          folder: dir,
+          icon: "folder",
+          color: parent.color || undefined
+        });
+        this.plugin.settings.modules = list;
+        // 重新建出来的文件夹要能从「已隐藏」里恢复
+        this.plugin.settings.hiddenModuleFolders = (
+          this.plugin.settings.hiddenModuleFolders || []
+        ).filter((path) => path !== dir);
+        this._ownership = null;
+        await this.plugin.saveSettings();
+        this.go(id);
+      }
+    }).open();
+  }
+
+  addFilesToModule(mod) {
+    const dir = this.moduleTargetFolder(mod);
+    const own = new Set(this.folderFiles(dir, false).map((file) => file.path));
+    const candidates = this.app.vault
+      .getFiles()
+      .filter((file) => !own.has(file.path) && this.isInboxFile(file))
+      .sort((a, b) => b.stat.mtime - a.stat.mtime);
+    new AddFilesModal(this.app, candidates, (files) => this.assignToModule(files, mod)).open();
   }
 
   // 收件箱也收录附件：图片 / 视频 / PDF / 音频等，排除白板和隐藏目录。
@@ -1302,16 +1700,51 @@ class CollisView extends ItemView {
     });
   }
 
-  /* 收集箱 = 待处理队列，不是某个文件夹。
-   * 判断依据只看 frontmatter 里有没有写下被认可的 module：
-   *   - 没写 module → 进收件箱；
-   *   - 写了但没有任何模块认领（拼错/旧值）→ 也进收件箱，方便修正；
-   *   - 写了且能对应上模块 → 已归属，离开收件箱。
-   * 不再用文件夹 / 标签 / type 的兜底规则判断收件箱归属，
-   * 否则 Clippings 这类默认文件夹里的新文件会被自动“认领”，
-   * 导致文件树里有文件、收件箱却是空的。
-   */
+  /* 收件箱策略接口：
+   *   root       —— 默认。只收库根目录下散落的文件（不在任何文件夹里的）；
+   *   unassigned —— 旧口径：按 frontmatter module 是否已归属来判断；
+   *   all        —— 全库文件。
+   * 后续要改规则，只改 inboxPolicy 的返回值和对应分支即可。 */
+  inboxPolicy() {
+    const value = String(this.plugin.settings.inboxPolicy || "").toLowerCase();
+    return value === "unassigned" || value === "all" ? value : "root";
+  }
+
+  // 库根目录文件：路径里没有 "/"（也就是不在任何文件夹里）
+  rootFiles() {
+    return this.app.vault.getFiles().filter((file) => String(file.path).indexOf("/") === -1);
+  }
+
+  isInboxFile(file) {
+    if (!file) return false;
+    const ext = String(file.extension || "").toLowerCase();
+    if (["collis", "volis", "canvas"].includes(ext)) return false;
+    const lower = file.path.toLowerCase();
+    if (lower.includes(".volis.") || lower.includes(".collis.")) return false;
+    if (isIgnoredPath(file.path)) return false;
+    if (file.path.startsWith(CARD_FOLDER + "/")) return false;
+    return true;
+  }
+
   inboxFiles() {
+    const policy = this.inboxPolicy();
+
+    if (policy === "root") {
+      // 与文件树一致：只看根目录里没被文件夹收走的文件，
+      // 不再关心 frontmatter / 附件归属表。
+      return this.rootFiles()
+        .filter((file) => this.isInboxFile(file))
+        .sort((a, b) => b.stat.mtime - a.stat.mtime);
+    }
+
+    if (policy === "all") {
+      return this.app.vault
+        .getFiles()
+        .filter((file) => this.isInboxFile(file))
+        .sort((a, b) => b.stat.mtime - a.stat.mtime);
+    }
+
+    // unassigned：保留旧口径，方便以后切回“按归属判断”
     const md = this.vaultFiles();
     const known = new Set();
     this.getModules().forEach((mod) => {
@@ -1322,8 +1755,13 @@ class CollisView extends ItemView {
       if (!explicit.length) return true;
       return !explicit.some((v) => known.has(v));
     });
+    const assigned = this.ownershipMap();
+    const attachments = this.vaultAttachments().filter((file) => {
+      const owner = assigned[file.path];
+      return !(owner && known.has(String(owner).trim().toLowerCase()));
+    });
     return pending
-      .concat(this.vaultAttachments())
+      .concat(attachments)
       .sort((a, b) => b.stat.mtime - a.stat.mtime);
   }
 
@@ -1351,17 +1789,260 @@ class CollisView extends ItemView {
     this.app.workspace.getLeaf("tab").openFile(file);
   }
 
+  /* 删除模块只删配置，不动磁盘文件。
+   * 文件夹还在，所以要记进 hiddenModuleFolders，否则会被当成隐式模块又冒出来。 */
+  async removeModuleConfig(target) {
+    const folder = this.moduleTargetFolder(target);
+    const list = this.getModules().filter((m) => m.id !== target.id);
+    this.plugin.settings.modules = list;
+    if (folder && !list.some((m) => this.moduleTargetFolder(m) === folder)) {
+      const hidden = new Set(this.plugin.settings.hiddenModuleFolders || []);
+      hidden.add(folder);
+      this.plugin.settings.hiddenModuleFolders = Array.from(hidden);
+    }
+    if (this.active === target.id) this.active = "home";
+    this._ownership = null;
+    await this.plugin.saveSettings();
+  }
+
+  // 上移时遇到同名文件/文件夹就加序号，绝不覆盖已有内容
+  uniqueVaultPath(parentPath, name, isFolder) {
+    const base = parentPath ? parentPath + "/" : "";
+    const text = String(name || "");
+    const dot = isFolder ? -1 : text.lastIndexOf(".");
+    const stem = dot > 0 ? text.slice(0, dot) : text;
+    const ext = dot > 0 ? text.slice(dot) : "";
+    let candidate = base + text;
+    let index = 2;
+    while (this.app.vault.getAbstractFileByPath(candidate)) {
+      candidate = base + stem + " (" + index + ")" + ext;
+      index += 1;
+    }
+    return candidate;
+  }
+
+  /* 删除模块 = 把这一层溶解到上一级：
+   * 直接文件与子文件夹整体上移，再移除模块配置并清掉空文件夹。不删除任何内容。 */
+  async dissolveModule(target) {
+    const folder = this.moduleTargetFolder(target);
+    if (!folder) return;
+    const node = this.app.vault.getAbstractFileByPath(folder);
+    const parentPath = folder.indexOf("/") === -1 ? "" : folder.slice(0, folder.lastIndexOf("/"));
+    const parentLabel = parentPath ? parentPath.split("/").pop() : "库根目录";
+
+    // 文件夹已经不存在：只清理配置和隐藏记录
+    if (!node || !Array.isArray(node.children)) {
+      await this.removeModuleConfig(target);
+      new Notice("已移除模块「" + target.name + "」");
+      this.render();
+      return;
+    }
+
+    const children = node.children.slice();
+    const files = children.filter((child) => !Array.isArray(child.children));
+    const folders = children.filter((child) => Array.isArray(child.children));
+
+    const confirmed = await new Promise((resolve) => {
+      new DissolveModuleModal(
+        this.app,
+        {
+          name: target.name,
+          parentLabel,
+          fileCount: files.length,
+          folderCount: folders.length
+        },
+        resolve
+      ).open();
+    });
+    if (!confirmed) return;
+
+    let movedFiles = 0;
+    let movedFolders = 0;
+    try {
+      for (const child of files) {
+        const dest = this.uniqueVaultPath(parentPath, child.name, false);
+        await this.app.fileManager.renameFile(child, dest);
+        movedFiles += 1;
+      }
+      for (const child of folders) {
+        const oldPath = child.path;
+        const dest = this.uniqueVaultPath(parentPath, child.name, true);
+        await this.app.fileManager.renameFile(child, dest);
+        // 子文件夹里的模块配置跟着换路径，上移后仍然是模块
+        this.plugin.remapModuleFolder(oldPath, dest);
+        movedFolders += 1;
+      }
+    } catch (error) {
+      new Notice("上移失败：" + (error && error.message ? error.message : error));
+      await this.plugin.saveSettings();
+      this.render();
+      return;
+    }
+
+    // 移除这一层的模块配置（子级配置已随目录迁移）
+    const remain = this.getModules().filter(
+      (mod) => this.moduleTargetFolder(mod).toLowerCase() !== folder.toLowerCase()
+    );
+    // 迁移过程中文件树事件可能补出自动模块，这里按文件夹去重，优先保留自定义配置
+    const byFolder = new Map();
+    const deduped = [];
+    remain.forEach((mod) => {
+      const key = this.moduleTargetFolder(mod).toLowerCase() || "id:" + mod.id;
+      const prev = byFolder.get(key);
+      if (!prev) {
+        byFolder.set(key, mod);
+        deduped.push(mod);
+        return;
+      }
+      const prevAuto = String(prev.id || "").startsWith("dir:");
+      const nextAuto = String(mod.id || "").startsWith("dir:");
+      if (prevAuto && !nextAuto) {
+        const index = deduped.indexOf(prev);
+        if (index >= 0) deduped[index] = mod;
+        byFolder.set(key, mod);
+      }
+    });
+    this.plugin.settings.modules = deduped;
+    this.plugin.settings.hiddenModuleFolders = (
+      this.plugin.settings.hiddenModuleFolders || []
+    ).filter((path) => String(path).toLowerCase() !== folder.toLowerCase());
+    if (this.active === target.id) this.active = "home";
+    this._ownership = null;
+
+    // 目录已空：移入回收站，保持文件树干净
+    try {
+      const left = this.app.vault.getAbstractFileByPath(folder);
+      if (left && Array.isArray(left.children) && !left.children.length) {
+        if (this.app.fileManager && typeof this.app.fileManager.trashFile === "function") {
+          await this.app.fileManager.trashFile(left);
+        } else {
+          await this.app.vault.trash(left, true);
+        }
+      }
+    } catch (error) {
+      // 空目录删除失败不影响模块移除，保留即可
+    }
+
+    await this.plugin.saveSettings();
+    this.render();
+    new Notice(
+      "已删除模块「" + target.name + "」：" +
+        (movedFiles ? movedFiles + " 个文件" : "无文件") +
+        (movedFolders ? "、" + movedFolders + " 个文件夹" : "") +
+        "已上移到" + parentLabel
+    );
+  }
+
+  /* 模块右键菜单：和文件树一样，就地重命名或删除，操作同步到文件夹。 */
+  showModuleMenu(mod, event) {
+    if (!mod) return;
+    const menu = new Menu();
+    menu.addItem((item) =>
+      item.setTitle("重命名…").setIcon("pencil").onClick(() => this.renameModule(mod))
+    );
+    menu.addItem((item) =>
+      item.setTitle("编辑模块…").setIcon("settings").onClick(() => this.openModuleEditor(mod))
+    );
+    menu.addSeparator();
+    menu.addItem((item) =>
+      item
+        .setTitle("删除模块…")
+        .setIcon("trash")
+        .onClick(() => {
+          void this.dissolveModule(mod);
+        })
+    );
+    menu.showAtMouseEvent(event);
+  }
+
+  renameModule(mod) {
+    if (!mod) return;
+    const oldFolder = this.moduleTargetFolder(mod);
+    new RenameModuleModal(this.app, mod.name || oldFolder.split("/").pop(), async (value) => {
+      const name = sanitizeFolderName(value);
+      if (!name) {
+        new Notice("名称不能为空，也不能包含 \\ / : * ? \" < > | 等字符。");
+        return;
+      }
+      const parent =
+        oldFolder.indexOf("/") === -1 ? "" : oldFolder.slice(0, oldFolder.lastIndexOf("/"));
+      const newFolder = parent ? parent + "/" + name : name;
+      if (!oldFolder) {
+        mod.name = name;
+        mod.folder = newFolder;
+        await this.plugin.saveSettings();
+        this.render();
+        return;
+      }
+      if (newFolder === oldFolder && name === mod.name) return;
+      // Windows 上大小写不敏感，只有真正换了路径才检查重名
+      if (newFolder.toLowerCase() !== oldFolder.toLowerCase()) {
+        if (this.app.vault.getAbstractFileByPath(newFolder)) {
+          new Notice("已存在同名文件夹：" + newFolder);
+          return;
+        }
+      }
+      const node = this.app.vault.getAbstractFileByPath(oldFolder);
+      if (node) {
+        try {
+          await this.app.fileManager.renameFile(node, newFolder);
+        } catch (error) {
+          new Notice("重命名失败：" + (error && error.message ? error.message : error));
+          return;
+        }
+      }
+      this.plugin.remapModuleFolder(oldFolder, newFolder);
+      mod.name = name;
+      mod.folder = newFolder;
+
+      // 隐式模块的 id 跟着路径走，当前选中和展开状态也要迁移
+      const oldId = "dir:" + oldFolder;
+      const newId = "dir:" + newFolder;
+      const remapId = (id) => {
+        if (id === oldId) return newId;
+        if (id.indexOf(oldId + "/") === 0) return newId + id.slice(oldId.length);
+        return id;
+      };
+      this.active = remapId(this.active);
+      const expanded = new Set();
+      this._navExpanded.forEach((id) => expanded.add(remapId(id)));
+      this._navExpanded = expanded;
+
+      await this.plugin.saveSettings();
+      this.render();
+      new Notice("已重命名为「" + name + "」");
+    }).open();
+  }
+
   openModuleEditor(mod, initialName) {
     const mods = this.getModules();
     const index = mod ? mods.findIndex((m) => m.id === mod.id) : -1;
     new ModuleEditorModal(this.app, {
       module: mod,
       initialName: initialName || "",
+      modules: mods,
       // 内置模块没有 color 字段，打开编辑器时用它在导航里的预设色，避免一编辑就变色
       initialColor: index >= 0 ? MODULE_COLORS[index % MODULE_COLORS.length] : MODULE_COLORS[0],
       onSave: async (next) => {
+        const folder = this.moduleTargetFolder(next);
+        try {
+          // 模块 = 文件夹：保存时同步创建，父模块同样会出现在文件树里
+          await ensureVaultFolder(this.app, folder);
+        } catch (error) {
+          new Notice("创建模块文件夹失败：" + (error && error.message ? error.message : error));
+          return;
+        }
+        next.folder = folder;
+        this.plugin.settings.hiddenModuleFolders = (
+          this.plugin.settings.hiddenModuleFolders || []
+        ).filter((path) => path !== folder);
+
         const list = this.getModules().slice();
-        const idx = list.findIndex((m) => m.id === next.id);
+        let idx = list.findIndex((m) => m.id === next.id);
+        // 同一文件夹只保留一个模块：新建时撞到已有目录就合并到那条配置上
+        if (idx < 0) {
+          idx = list.findIndex((m) => this.moduleTargetFolder(m) === folder);
+        }
         if (idx >= 0) list[idx] = next;
         else list.push(next);
         this.plugin.settings.modules = list;
@@ -1373,14 +2054,11 @@ class CollisView extends ItemView {
         const pending = this._pendingAssign;
         this._pendingAssign = null;
         if (pending && pending.length) this.assignToModule(pending, next);
+        else if (!mod) this.go(next.id);
       },
       onDelete: mod
         ? async (target) => {
-            const list = this.getModules().filter((m) => m.id !== target.id);
-            this.plugin.settings.modules = list;
-            if (this.active === target.id) this.active = "home";
-            this._ownership = null;
-            await this.plugin.saveSettings();
+            await this.removeModuleConfig(target);
             new Notice("已删除模块「" + target.name + "」，笔记文件未受影响");
           }
         : null
@@ -1389,25 +2067,14 @@ class CollisView extends ItemView {
 
   openModuleManager() {
     new ModuleManagerModal(this.app, {
-      getModules: () => this.getModules(),
+      getRootModules: () => this.rootModules(),
+      getChildren: (mod) => this.submodulesOf(mod),
+      getAllModules: () => this.getModules(),
+      getFolder: (mod) => this.moduleTargetFolder(mod),
       onCreate: () => this.openModuleEditor(null),
       onEdit: (mod) => this.openModuleEditor(mod),
-      onReorder: async (orderIds) => {
-        const byId = new Map(this.getModules().map((m) => [m.id, m]));
-        const list = orderIds.map((id) => byId.get(id)).filter(Boolean);
-        // 顺序信息不完整时保持原样，避免误删模块配置
-        if (!list.length || list.length !== byId.size) return;
-        this.plugin.settings.modules = list;
-        this._ownership = null;
-        await this.plugin.saveSettings();
-      },
-      onDelete: async (mod) => {
-        const list = this.getModules().filter((m) => m.id !== mod.id);
-        this.plugin.settings.modules = list;
-        if (this.active === mod.id) this.active = "home";
-        this._ownership = null;
-        await this.plugin.saveSettings();
-        new Notice("已删除模块「" + mod.name + "」，笔记文件未受影响");
+      onDissolve: async (mod) => {
+        await this.dissolveModule(mod);
       }
     }).open();
   }
@@ -1448,42 +2115,62 @@ class CollisView extends ItemView {
     });
   }
 
-  // 归入模块：笔记写 module 字段，所有文件都移到模块文件夹。
+  /* 归入模块（与文件树一致）：
+   *   - 文件直接移动到模块文件夹，归入后自然出现在该模块页；
+   *   - 笔记顺手写 module 字段（只是元数据，模块归属仍以文件夹为准）；
+   *   - 素材在归属表里留一条记录，兼容后续切回 unassigned 收件箱策略。 */
   async assignToModule(files, mod) {
     if (!files || !files.length) return;
-    const value = String(mod.module || mod.id || mod.name);
+    const rawId = moduleIdOf(mod);
+    const value = String(rawId).startsWith("dir:") ? mod.name : rawId;
     const dir = this.moduleTargetFolder(mod);
     try {
-      if (dir) await this.ensureFolder(dir);
+      if (dir) await ensureVaultFolder(this.app, dir);
     } catch (e) {
       new Notice("无法创建模块文件夹「" + dir + "」：" + (e.message || e));
       return;
     }
     let done = 0;
     let moved = 0;
+    let failed = 0;
+    let firstError = "";
+    const assigned = this.ownershipMap();
     for (const file of files) {
       try {
+        const oldPath = file.path;
+        const isNote = String(file.extension || "").toLowerCase() === "md";
         // 媒体文件没有 frontmatter，只有 Markdown 需要写归属字段。
-        if (String(file.extension || "").toLowerCase() === "md") {
+        if (isNote) {
           await this.app.fileManager.processFrontMatter(file, (fm) => {
             fm.module = value;
           });
           await this.waitForMetadata(file);
         }
         const target = this.uniqueFilePath(dir, file);
-        if (target && file.path !== target) {
+        if (target && oldPath !== target) {
           await this.app.fileManager.renameFile(file, target);
           moved += 1;
+          // 附件靠这份记录离开收件箱；旧路径的记录一并清掉
+          if (!isNote) {
+            delete assigned[oldPath];
+            assigned[target] = value;
+          }
+        } else if (!isNote) {
+          assigned[oldPath] = value;
         }
         done += 1;
       } catch (e) {
-        // 单个文件失败不阻塞其余文件
+        // 单个文件失败不阻塞其余文件，但要把原因带出来，避免"看起来没反应"
+        failed += 1;
+        if (!firstError) firstError = (e && e.message) || String(e);
       }
     }
+    await this.plugin.saveSettings();
     this._ownership = null;
     this._inboxSel = new Set();
     new Notice(
-      "已归入「" + mod.name + "」：" + done + " 项" + (moved ? "（移动 " + moved + " 项）" : "")
+      "已归入「" + mod.name + "」：" + done + " 项" + (moved ? "（移动 " + moved + " 项）" : "") +
+        (failed ? "；失败 " + failed + " 项：" + firstError : "")
     );
     this.render();
   }
@@ -1512,26 +2199,23 @@ class CollisView extends ItemView {
 
   // 一次性采纳收集箱里的全部归属建议
   async applyAllSuggestions(files) {
-    let total = 0;
+    // 与文件树一致：归入 = 真正把文件移进模块文件夹，而不是只写 frontmatter。
+    const groups = new Map();
     for (const file of files) {
       if (file.extension !== "md") continue;
       const mod = this.suggestModuleFor(file);
       if (!mod) continue;
-      const value = String(mod.module || mod.id);
-      try {
-        await this.app.fileManager.processFrontMatter(file, (fm) => {
-          fm.module = value;
-        });
-        await this.waitForMetadata(file);
-        total += 1;
-      } catch (e) {
-        // 单个失败不影响其余
-      }
+      const key = moduleIdOf(mod);
+      if (!groups.has(key)) groups.set(key, { mod, files: [] });
+      groups.get(key).files.push(file);
     }
-    this._ownership = null;
-    this._inboxSel = new Set();
-    new Notice(total ? "按建议归入 " + total + " 篇" : "没有可归入的笔记");
-    this.render();
+    if (!groups.size) {
+      new Notice("没有可归入的笔记");
+      return;
+    }
+    for (const group of groups.values()) {
+      await this.assignToModule(group.files, group.mod);
+    }
   }
 
   // 删除收集箱条目：笔记和附件都移入系统回收站，可随时恢复
@@ -1548,10 +2232,14 @@ class CollisView extends ItemView {
           }
           done += 1;
           if (this._inboxSel) this._inboxSel.delete(file.path);
+          if (this.plugin.settings.inboxAssigned) {
+            delete this.plugin.settings.inboxAssigned[file.path];
+          }
         } catch (e) {
           // 单个文件失败不阻塞其余
         }
       }
+      await this.plugin.saveSettings();
       this._ownership = null;
       new Notice("已删除 " + done + " 个文件，可在回收站恢复");
       if (typeof onDone === "function") onDone(done);
@@ -1649,7 +2337,21 @@ class CollisView extends ItemView {
   go(id) {
     if (this.active === "canvas" && id !== "canvas") this.destroyGallery();
     if (this.active === "notes" && id !== "notes") this.destroyNotes();
-    this.active = id;
+    const mod = this.moduleById(id);
+    const builtin = ["home", "inbox", "canvas", "notes"].includes(id);
+    if (!mod && !builtin) {
+      // 文件夹被删除 / 改名后，原 id 失效，回首页而不是停在空白页
+      this.active = "home";
+    } else {
+      this.active = id;
+      // 只在“进入模块”时展开祖先链路（不含自身）：自身是否展开由点击行为决定，
+      // 这样父模块点击第二次才能折叠（否则这里会把自身又塞回展开集合）。
+      if (mod) {
+        this.modulePath(mod)
+          .slice(0, -1)
+          .forEach((node) => this._navExpanded.add(moduleIdOf(node)));
+      }
+    }
     this.render();
   }
 
@@ -1810,7 +2512,6 @@ class CollisView extends ItemView {
   render() {
     this._mdFiles = this.app.vault.getMarkdownFiles();
     this._contentFiles = this._mdFiles.filter(isContentFile);
-    this.buildOwnership(this.vaultFiles());
     if (this.active !== "canvas") this.destroyGallery();
     if (this.active !== "notes") this.destroyNotes();
     this.contentEl.empty();
@@ -1838,7 +2539,7 @@ class CollisView extends ItemView {
     } else if (this.active === "home") {
       this.renderHome(scroll);
     } else {
-      const mod = this.getModules().find((m) => m.id === this.active);
+      const mod = this.moduleById(this.active);
       if (mod) this.renderModule(scroll, mod);
       else this.renderHome(scroll);
     }
@@ -1874,11 +2575,23 @@ class CollisView extends ItemView {
     };
 
     // 统一的行工厂：count 为 0 时不渲染数字，避免像文件树那样一列 0。
-    const addItem = (parent, { label, icon, tile, color, active, count, onClick }) => {
+    // chevron / depth 用来画模块层级（父模块 → 子模块），其他入口不传即可。
+    const addItem = (parent, { label, icon, tile, color, active, count, onClick, onContextMenu, depth = 0, chevron = false, hasChildren = false, expanded = false, onToggle }) => {
       const item = parent.createDiv({
-        cls: "cl-navitem" + (active ? " is-active" : "")
+        cls: "cl-navitem" + (active ? " is-active" : "") + (depth > 0 ? " is-sub" : "")
       });
       item.setAttribute("aria-label", label);
+      if (depth > 0) item.style.paddingLeft = 9 + depth * 14 + "px";
+      if (chevron) {
+        const chev = item.createDiv({ cls: "cl-navchev" + (hasChildren ? "" : " is-blank") });
+        if (hasChildren) {
+          setIcon(chev, expanded ? "chevron-down" : "chevron-right");
+          chev.onclick = (event) => {
+            event.stopPropagation();
+            if (onToggle) onToggle();
+          };
+        }
+      }
       const iconEl = item.createDiv({
         cls: "cl-navicon" + (tile ? " cl-navtile " + tile : "")
       });
@@ -1888,6 +2601,13 @@ class CollisView extends ItemView {
       item.createDiv({ cls: "cl-navlabel", text: label });
       if (count > 0) item.createDiv({ cls: "cl-navcount", text: String(count) });
       item.onclick = onClick;
+      if (onContextMenu) {
+        item.oncontextmenu = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onContextMenu(event);
+        };
+      }
       return item;
     };
 
@@ -1922,21 +2642,48 @@ class CollisView extends ItemView {
     setIcon(manageModule, "more-horizontal");
     manageModule.onclick = () => this.openModuleManager();
 
-    this.getModules().forEach((mod, index) => {
+    const allModules = this.getModules();
+    // 顶层 = 没有被别的模块文件夹包住的模块；下面完全镜像真实子文件夹。
+    // 默认全部收起，只有用户点击模块行或箭头时才展开。
+    const roots = this.rootModules();
+    const drawModule = (mod, depth) => {
+      const key = moduleIdOf(mod);
+      const children = this.submodulesOf(mod);
+      const expanded = this._navExpanded.has(key);
+      const index = allModules.indexOf(mod);
       addItem(modules, {
         label: mod.name,
-        icon: mod.icon || "file",
-        tile: "cl-tint-" + (index % 5),
+        icon: mod.icon || (children.length ? "folder" : "file-text"),
+        tile: "cl-tint-" + (index >= 0 ? index % 5 : depth % 5),
         color: mod.color,
-        active: this.active === mod.id,
-        count: this.moduleFiles(mod).length,
-        onClick: () => this.go(mod.id)
+        active: this.active === key,
+        count: this.moduleNoteFiles(mod).length,
+        depth,
+        chevron: true,
+        hasChildren: children.length > 0,
+        expanded,
+        onContextMenu: (event) => this.showModuleMenu(mod, event),
+        onToggle: () => {
+          if (expanded) this._navExpanded.delete(key);
+          else this._navExpanded.add(key);
+          this.render();
+        },
+        // 与文件树一致：有子模块时，点击模块名本身就展开/折叠；没有子模块则只做导航
+        onClick: () => {
+          if (children.length) {
+            if (expanded) this._navExpanded.delete(key);
+            else this._navExpanded.add(key);
+          }
+          this.go(key);
+        }
       });
-    });
+      if (expanded) children.forEach((child) => drawModule(child, depth + 1));
+    };
+    roots.forEach((mod) => drawModule(mod, 0));
 
     const workspace = group("WORKSPACE");
     addItem(workspace, {
-      label: "白板",
+      label: "画布",
       icon: "presentation",
       active: this.active === "canvas",
       count: this.getBoardFiles().length,
@@ -1966,8 +2713,6 @@ class CollisView extends ItemView {
     setIcon(settingsIcon, "settings");
     settingsBtn.createDiv({ cls: "cl-navlabel", text: "设置" });
     settingsBtn.onclick = () => this.openSettings();
-
-    foot.createDiv({ cls: "cl-navversion", text: "v" + this.plugin.manifest.version });
   }
 
   renderHome(el) {
@@ -2214,10 +2959,7 @@ class CollisView extends ItemView {
 
     for (const file of recentFiles) {
       const isBoard = file.extension === "collis";
-      const ownId = this._ownership ? this._ownership.get(file.path) : null;
-      const mod = ownId
-        ? modules.find((m) => String(m.id || m.module || m.name || "") === ownId)
-        : null;
+      const mod = isBoard ? null : this.moduleForFile(file);
       const color = isBoard ? "#9b8cff" : (mod && mod.color) || "#3f7fd1";
       const fm = isBoard ? {} : getFm(this.app, file);
       const typeText = isBoard
@@ -2256,7 +2998,7 @@ class CollisView extends ItemView {
     const modGrid = modCard.createDiv({ cls: "cl-hm-mods" });
     const ranked = modules
       .map((mod) => {
-        const files = this.filesFor(mod);
+        const files = this.moduleNoteFiles(mod);
         const active = files.filter((f) =>
           ACTIVE_STATUSES.includes(String(getFm(this.app, f).status || "").toLowerCase())
         ).length;
@@ -2560,7 +3302,7 @@ class CollisView extends ItemView {
     }
     headMain.createDiv({
       cls: "cl-inbox-sub",
-      text: "散落在库里的笔记和素材，归入模块后自动离开"
+      text: "只显示散落在库根目录、还没进任何文件夹的文件；归入模块后自动离开"
     });
     const headActions = head.createDiv({ cls: "cl-inbox-head-actions" });
     const refreshBtn = headActions.createEl("button", { cls: "cl-inbox-refresh" });
@@ -2573,7 +3315,7 @@ class CollisView extends ItemView {
     ).length;
     const stats = page.createDiv({ cls: "cl-inbox-stats" });
     [
-      ["待归属", files.length],
+      ["根目录待处理", files.length],
       ["有归属建议", suggestions.size],
       ["本周新增", weekCount]
     ].forEach(([label, value]) => {
@@ -2660,6 +3402,7 @@ class CollisView extends ItemView {
     };
 
     const banners = page.createDiv({ cls: "cl-inbox-banners" });
+    banners.hidden = true;
 
     const bulk = page.createDiv({ cls: "cl-inbox-bulk" });
     bulk.hidden = true;
@@ -2682,9 +3425,9 @@ class CollisView extends ItemView {
     const foot = page.createDiv({ cls: "cl-inbox-foot" });
     foot.createSpan({
       text:
-        "全库扫描 " +
-        (this.vaultFiles().length + this.vaultAttachments().length) +
-        " 个文件 · 自动排除白板、卡片笔记与技术目录"
+        this.inboxPolicy() === "root"
+          ? "库根目录 " + this.rootFiles().length + " 个文件 · 文件夹内的文件不进入收件箱"
+          : "全库扫描 " + (this.vaultFiles().length + this.vaultAttachments().length) + " 个文件"
     });
     foot.createSpan({
       cls: "cl-inbox-footright",
@@ -2704,7 +3447,6 @@ class CollisView extends ItemView {
       paint();
     };
 
-    this.renderUnknownBanners(banners);
     if (!files.length) bulk.remove();
 
     const typeInfo = (file) => {
@@ -3010,29 +3752,26 @@ class CollisView extends ItemView {
   }
 
   renderModule(el, mod) {
-    const files = this.moduleFiles(mod).sort((a, b) => b.stat.mtime - a.stat.mtime);
-    const dir = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
-    const tintPalette = ["#b394af", "#e9c77e", "#ce7379", "#7fa9b6", "#5d86a4"];
+    const allNotes = this.moduleNoteFiles(mod).sort((a, b) => b.stat.mtime - a.stat.mtime);
+    const children = this.submodulesOf(mod);
     const mods = this.getModules();
+    const tintPalette = ["#b394af", "#e9c77e", "#ce7379", "#7fa9b6", "#5d86a4"];
     const modIndex = mods.findIndex((m) => m.id === mod.id);
     const tint = mod.color || tintPalette[(modIndex < 0 ? 0 : modIndex) % tintPalette.length];
+    const childHue = (child, index) =>
+      child.color || tintPalette[(Math.max(modIndex, 0) + 1 + index) % tintPalette.length];
 
-    const TYPE_LABELS = {
-      pdf: "PDF", doc: "Word", docx: "Word", xls: "表格", xlsx: "表格", csv: "表格",
-      ppt: "演示", pptx: "演示", epub: "电子书", txt: "文本", rtf: "文本",
-      zip: "压缩包", rar: "压缩包", "7z": "压缩包", tar: "压缩包", gz: "压缩包",
-      bz2: "压缩包", xz: "压缩包"
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTs = today.getTime();
+    const weekTs = todayTs - 6 * 86400000;
+    const groupOf = (ts) => (ts >= todayTs ? "今天" : ts >= weekTs ? "本周" : "更早");
+    const pad2 = (n) => String(n).padStart(2, "0");
+    const fmtDate = (ts) => {
+      const d = new Date(ts);
+      if (ts >= todayTs) return pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+      return d.getMonth() + 1 + "-" + pad2(d.getDate());
     };
-
-    const kindOf = (file) => fileKind(file);
-    const labelOf = (file) => {
-      const ext = String(file.extension || "").toLowerCase();
-      if (TYPE_LABELS[ext]) return TYPE_LABELS[ext];
-      return THUMB_KIND_LABELS[kindOf(file)];
-    };
-    const iconOf = (kind) => ({
-      note: "file-text", image: "image", video: "video", audio: "music", doc: "file-text", other: "file"
-    }[kind] || "file");
     const fmtSize = (bytes) => {
       const n = Number(bytes || 0);
       if (!n) return "—";
@@ -3042,21 +3781,16 @@ class CollisView extends ItemView {
       let i = 0;
       while (value >= 1024 && i < units.length - 1) {
         value /= 1024;
-        i++;
+        i += 1;
       }
       return (value >= 10 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, "")) + " " + units[i];
     };
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTs = today.getTime();
-    const weekTs = todayTs - 6 * 86400000;
-    const groupOf = (ts) => (ts >= todayTs ? "今天" : ts >= weekTs ? "本周" : "更早");
-
     let mode = mod.view === "grid" ? "grid" : "list";
-    let filter = "all";
-    let sort = "recent";
     let query = "";
+    let searching = false;
+    const liveToday = allNotes.some((file) => file.stat.mtime >= todayTs);
+
     // 多选状态挂到视图上：打开笔记再切回来时仍然保留；换模块自动清空
     if (this._mdSelModule !== mod.id) {
       this._mdSelModule = mod.id;
@@ -3072,41 +3806,80 @@ class CollisView extends ItemView {
 
     el.empty();
     el.addClass("cl-md-scroll");
-    const page = el.createDiv({ cls: "cl-md-page" });
+    const page = el.createDiv({ cls: "cl-md-page cl-mdv" });
+
+    /* ---------- 面包屑 ---------- */
+    const crumbs = page.createDiv({ cls: "cl-mdv-crumbs" });
+    const homeChip = crumbs.createSpan({
+      cls: "cl-mdv-chip",
+      text: this.plugin.settings.workspaceName || "工作台"
+    });
+    homeChip.onclick = () => this.go("home");
+    const chain = this.modulePath(mod);
+    chain.forEach((node, index) => {
+      crumbs.createSpan({ cls: "cl-mdv-csep", text: "/" });
+      if (index === chain.length - 1) {
+        crumbs.createEl("b", { text: node.name });
+      } else {
+        const chip = crumbs.createSpan({ cls: "cl-mdv-chip", text: node.name });
+        chip.onclick = () => this.go(node.id);
+      }
+    });
 
     /* ---------- 标题区 ---------- */
-    const head = page.createDiv({ cls: "cl-md-head" });
-    const headMain = head.createDiv({ cls: "cl-md-head-main" });
-    const titleRow = headMain.createDiv({ cls: "cl-md-title-row" });
-    const modtile = titleRow.createDiv({ cls: "cl-md-modtile" });
-    modtile.style.setProperty("--tint", tint);
-    setIcon(modtile, mod.icon || "file-text");
+    const head = page.createDiv({ cls: "cl-mdv-head" });
+    const headMain = head.createDiv({ cls: "cl-mdv-headmain" });
+    const titleRow = headMain.createDiv({ cls: "cl-mdv-title" });
     titleRow.createEl("h1", { text: mod.name });
-    const countPill = titleRow.createSpan({ cls: "cl-md-count" });
-    headMain.createEl("p", {
-      cls: "cl-md-desc",
-      text: dir
-        ? dir + " · 笔记按 frontmatter 聚合，图片 / 视频 / 文档等按文件夹收录"
-        : "尚未设置保存文件夹 · 新建笔记时会先选择位置"
-    });
-    const headActs = head.createDiv({ cls: "cl-md-head-actions" });
-    const addBtn = headActs.createEl("button", { cls: "cl-md-btn cl-md-btn-primary" });
-    setIcon(addBtn, "plus");
-    addBtn.appendText("新建笔记");
-    addBtn.onclick = () => this.createModuleNote(mod);
+    titleRow.createSpan({ cls: "cl-mdv-num", text: "本层 " + allNotes.length + " 篇" });
+    if (liveToday) {
+      const live = titleRow.createSpan({ cls: "cl-mdv-live" });
+      live.createEl("i");
+      live.appendText("今天有更新");
+    }
 
-    // 更多：编辑模块 + 多选删除
-    const moreBtn = headActs.createEl("button", { cls: "cl-md-btn cl-md-more", attr: { "aria-label": "更多操作" } });
+    const treeNotes = children.length ? this.moduleTreeNoteFiles(mod).length : allNotes.length;
+    const newest = allNotes.length
+      ? allNotes.reduce((max, file) => Math.max(max, file.stat.mtime), 0)
+      : 0;
+    const meta = headMain.createDiv({ cls: "cl-mdv-meta" });
+    const metaPart = (text) => meta.createSpan({ text });
+    const metaDot = () => meta.createSpan({ cls: "cl-mdv-dotsep", text: "·" });
+    metaPart(children.length + " 个子模块");
+    if (children.length) {
+      metaDot();
+      metaPart("含子模块 " + treeNotes + " 篇");
+    } else if (newest) {
+      metaDot();
+      metaPart("最后活动 " + fmtDate(newest));
+    }
+
+    const acts = head.createDiv({ cls: "cl-mdv-acts" });
+    const searchBtn = acts.createDiv({
+      cls: "cl-mdv-ibtn" + (searching ? " is-on" : ""),
+      attr: { "aria-label": "筛选笔记", role: "button" }
+    });
+    setIcon(searchBtn, "search");
+
+    const moreBtn = acts.createDiv({
+      cls: "cl-mdv-ibtn",
+      attr: { "aria-label": "更多操作", role: "button" }
+    });
     setIcon(moreBtn, "more-horizontal");
-    moreBtn.appendText("更多");
-    moreBtn.onclick = (event) => {
+    moreBtn.onclick = () => {
       const menu = new Menu();
       menu.addItem((item) =>
-        item
-          .setTitle("编辑模块")
-          .setIcon("settings")
-          .onClick(() => this.openModuleEditor(mod))
+        item.setTitle("编辑模块").setIcon("settings").onClick(() => this.openModuleEditor(mod))
       );
+      menu.addItem((item) =>
+        item.setTitle("重命名模块…").setIcon("pencil").onClick(() => this.renameModule(mod))
+      );
+      menu.addItem((item) =>
+        item.setTitle("删除模块…").setIcon("trash").onClick(() => {
+          void this.dissolveModule(mod);
+        })
+      );
+      menu.addSeparator();
       menu.addItem((item) =>
         item
           .setTitle(this._mdMulti ? "退出多选" : "多选删除")
@@ -3118,58 +3891,120 @@ class CollisView extends ItemView {
             draw();
           })
       );
+      menu.addItem((item) =>
+        item.setTitle("管理模块").setIcon("folder-cog").onClick(() => this.openModuleManager())
+      );
       anchorMenuBelow(menu, moreBtn);
     };
 
-    /* ---------- 统计条 ---------- */
-    const stats = page.createDiv({ cls: "cl-md-stats" });
-    const addStat = (num, label) => {
-      const cell = stats.createDiv({ cls: "cl-md-stat" });
-      cell.createSpan({ cls: "cl-md-stat-num", text: String(num) });
-      cell.createSpan({ cls: "cl-md-stat-label", text: label });
+    const newBtn = acts.createEl("button", { cls: "cl-mdv-btn is-primary" });
+    setIcon(newBtn.createSpan({ cls: "cl-mdv-btnico" }), "plus");
+    newBtn.appendText("新建");
+    setIcon(newBtn.createSpan({ cls: "cl-mdv-caret" }), "chevron-down");
+    newBtn.onclick = () => {
+      const menu = new Menu();
+      menu.addItem((item) =>
+        item.setTitle("新建笔记").setIcon("file-plus").onClick(() => this.createModuleNote(mod))
+      );
+      menu.addItem((item) =>
+        item.setTitle("新建子模块").setIcon("folder-plus").onClick(() => this.promptSubmodule(mod))
+      );
+      menu.addSeparator();
+      menu.addItem((item) =>
+        item.setTitle("归入文件").setIcon("download").onClick(() => this.addFilesToModule(mod))
+      );
+      anchorMenuBelow(menu, newBtn);
     };
-    const noteCount = files.filter((file) => kindOf(file) === "note").length;
-    addStat(files.length, "全部文件");
-    addStat(noteCount, "笔记");
-    addStat(files.length - noteCount, "素材（图片 / 视频 / 音频 / 文档）");
 
-    /* ---------- 控制栏 ---------- */
-    const controls = page.createDiv({ cls: "cl-md-controls" });
-    const search = controls.createDiv({ cls: "cl-md-search" });
-    const searchIcon = search.createSpan({ cls: "cl-md-searchico" });
-    setIcon(searchIcon, "search");
-    const input = search.createEl("input", {
-      cls: "cl-md-query",
-      attr: { placeholder: "筛选标题或路径", type: "text" }
+    /* 搜索条：默认收起，点放大镜才出现 */
+    const searchWrap = page.createDiv({ cls: "cl-mdv-search" + (searching ? " is-on" : "") });
+    const queryInput = searchWrap.createEl("input", {
+      cls: "cl-mdv-searchinput",
+      attr: { type: "text", placeholder: "筛选本层笔记…" }
     });
-
-    const typeSeg = controls.createDiv({ cls: "cl-md-seg" });
-    [
-      ["all", "全部"], ["note", "笔记"], ["image", "图片"], ["video", "视频"],
-      ["doc", "文档"], ["audio", "音频"], ["other", "其他"]
-    ].forEach(([key, label]) => {
-      const btn = typeSeg.createEl("button", { cls: "cl-md-segbtn", text: label });
-      btn.dataset.kind = key;
-      if (key === filter) btn.addClass("is-active");
+    queryInput.addEventListener("input", () => {
+      query = queryInput.value;
+      draw();
     });
+    searchBtn.onclick = () => {
+      searching = !searching;
+      searchWrap.classList.toggle("is-on", searching);
+      searchBtn.classList.toggle("is-on", searching);
+      if (searching) queryInput.focus();
+    };
 
-    const viewSeg = controls.createDiv({ cls: "cl-md-viewseg" });
-    const listBtn = viewSeg.createEl("button", { cls: "cl-md-segbtn", text: "列表" });
-    listBtn.dataset.view = "list";
-    const gridBtn = viewSeg.createEl("button", { cls: "cl-md-segbtn", text: "网格" });
-    gridBtn.dataset.view = "grid";
+    /* ---------- 子模块 ---------- */
+    const subSec = page.createDiv({ cls: "cl-mdv-sec" });
+    subSec.createEl("h3", { text: "子模块" });
+    subSec.createSpan({ cls: "cl-mdv-count", text: String(children.length) });
+    subSec.createSpan({ cls: "cl-mdv-line" });
+    if (children.length) {
+      const manage = subSec.createSpan({ cls: "cl-mdv-secact", text: "管理" });
+      manage.onclick = () => this.openModuleManager();
+    }
 
-    const sortWrap = controls.createDiv({ cls: "cl-md-sort" });
-    const sortBtn = sortWrap.createEl("button", { cls: "cl-md-sortbtn" });
-    const sortText = sortBtn.createSpan({ text: "最近更新" });
-    const sortIcon = sortBtn.createSpan({ cls: "cl-md-sortico" });
-    setIcon(sortIcon, "chevron-down");
+    if (children.length) {
+      const grid = page.createDiv({ cls: "cl-mdv-mods" });
+      children.forEach((child, index) => {
+        const childTree = this.moduleTreeNoteFiles(child);
+        const childNewest = childTree.length
+          ? childTree.reduce((max, file) => Math.max(max, file.stat.mtime), 0)
+          : 0;
+        const card = grid.createDiv({ cls: "cl-mdv-modcard" });
+        card.style.setProperty("--hue", childHue(child, index));
+        card.createDiv({ cls: "cl-mdv-wash" });
+        card.createDiv({ cls: "cl-mdv-hair" });
+        const top = card.createDiv({ cls: "cl-mdv-mctop" });
+        top.createSpan({ cls: "cl-mdv-huedot" });
+        top.createSpan({ cls: "cl-mdv-mcname", text: child.name });
+        const num = card.createDiv({ cls: "cl-mdv-mcnum" });
+        num.appendText(String(this.moduleNoteFiles(child).length));
+        num.createSpan({ text: "篇" });
+        card.createDiv({
+          cls: "cl-mdv-mcmeta",
+          text: childNewest ? "最近 " + fmtDate(childNewest) : "暂无笔记"
+        });
+        card.onclick = () => this.go(child.id);
+        card.oncontextmenu = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.showModuleMenu(child, event);
+        };
+      });
+      const addCard = grid.createDiv({ cls: "cl-mdv-modcard is-add" });
+      const addInner = addCard.createDiv({ cls: "cl-mdv-addinner" });
+      setIcon(addInner.createSpan({ cls: "cl-mdv-addicon" }), "plus");
+      addInner.appendText("新建子模块");
+      addCard.onclick = () => this.promptSubmodule(mod);
+    } else {
+      const shelf = page.createDiv({ cls: "cl-mdv-shelf" });
+      const shelfIcon = shelf.createDiv({ cls: "cl-mdv-shelf-icon" });
+      setIcon(shelfIcon, "folder-plus");
+      const shelfText = shelf.createDiv({ cls: "cl-mdv-shelf-text" });
+      shelfText.createDiv({ cls: "cl-mdv-shelf-title", text: "还没有子模块" });
+      shelfText.createDiv({
+        cls: "cl-mdv-shelf-sub",
+        text: "子模块就是文件夹，用来继续分层。也可以不建，直接在这一层写笔记。"
+      });
+      const shelfBtn = shelf.createEl("button", { cls: "cl-mdv-shelf-btn" });
+      setIcon(shelfBtn.createSpan({ cls: "cl-mdv-addicon" }), "plus");
+      shelfBtn.appendText("新建子模块");
+      shelfBtn.onclick = () => this.promptSubmodule(mod);
+    }
 
-    /* ---------- 列表 / 网格 / 页脚 ---------- */
-    const body = page.createDiv({ cls: "cl-md-body" });
+    /* ---------- 本层笔记 ---------- */
+    const noteSec = page.createDiv({ cls: "cl-mdv-sec" });
+    noteSec.createEl("h3", { text: "本层笔记" });
+    const noteCount = noteSec.createSpan({ cls: "cl-mdv-count", text: String(allNotes.length) });
+    noteSec.createSpan({ cls: "cl-mdv-line" });
+    const viewSw = noteSec.createSpan({ cls: "cl-mdv-viewsw" });
+    const listBtn = viewSw.createSpan({ text: "列表" });
+    const gridBtn = viewSw.createSpan({ text: "卡片" });
 
-    // 多选悬浮条：勾选后固定在页面底部，删除前由 DeleteFilesModal 弹窗确认
-    const selBar = page.createDiv({ cls: "cl-md-selbar" });
+    const body = page.createDiv({ cls: "cl-md-body cl-mdv-body" });
+
+    /* 多选悬浮条：挂到滚动容器上，absolute 固定在面板底部，不随笔记滚动 */
+    const selBar = el.createDiv({ cls: "cl-md-selbar" });
     const selCount = selBar.createSpan({ cls: "cl-md-selcount" });
     const selCancel = selBar.createEl("button", { cls: "cl-md-btn", text: "取消" });
     selCancel.onclick = () => {
@@ -3179,7 +4014,7 @@ class CollisView extends ItemView {
     };
     const selDelete = selBar.createEl("button", { cls: "cl-md-btn cl-md-btn-danger", text: "删除所选" });
     selDelete.onclick = () => {
-      const chosen = files.filter((file) => this._mdSel.has(file.path));
+      const chosen = allNotes.filter((file) => this._mdSel.has(file.path));
       if (!chosen.length) return;
       this.deleteFiles(chosen, () => {
         this._mdMulti = false;
@@ -3188,216 +4023,131 @@ class CollisView extends ItemView {
       });
     };
 
-    const foot = page.createDiv({ cls: "cl-md-foot" });
-    const footLeft = foot.createSpan();
-    const footRight = foot.createSpan({ cls: "cl-md-footright" });
-
-    const sortItems = (items) => {
-      if (sort === "name") {
-        items.sort((a, b) => a.file.basename.localeCompare(b.file.basename, "zh"));
-      } else if (sort === "size") {
-        items.sort((a, b) => (b.file.stat.size || 0) - (a.file.stat.size || 0));
-      } else {
-        items.sort((a, b) => b.file.stat.mtime - a.file.stat.mtime);
-      }
-    };
-
-    const renderList = (parent, items) => {
+    const renderList = (items) => {
       const groups = new Map([["今天", []], ["本周", []], ["更早", []]]);
-      items.forEach((item) => {
-        groups.get(groupOf(item.file.stat.mtime)).push(item);
-      });
+      items.forEach((file) => groups.get(groupOf(file.stat.mtime)).push(file));
       groups.forEach((list, name) => {
         if (!list.length) return;
-        const section = parent.createDiv({ cls: "cl-md-group" });
-        const groupHead = section.createDiv({ cls: "cl-md-group-head" });
-        groupHead.createSpan({ cls: "cl-md-group-name", text: name });
-        groupHead.createSpan({ cls: "cl-md-group-count", text: String(list.length) });
-        groupHead.createSpan({ cls: "cl-md-group-line" });
-
-        list.forEach((item) => {
-          const picked = this._mdSel.has(item.file.path);
-          const card = section.createDiv({ cls: "cl-md-card cl-md-kind-" + item.kind });
+        body.createDiv({ cls: "cl-mdv-glabel", text: name });
+        list.forEach((file) => {
+          const picked = this._mdSel.has(file.path);
+          const row = body.createDiv({
+            cls: "cl-mdv-row" + (this._mdMulti && picked ? " is-selected" : "")
+          });
+          row.style.setProperty("--hue", tint);
+          const glyph = row.createDiv({ cls: "cl-mdv-glyph" });
           if (this._mdMulti) {
-            card.addClass("is-multi");
-            if (picked) card.addClass("is-selected");
-            const check = card.createDiv({ cls: "cl-md-check" });
-            const box = check.createEl("input", {
-              attr: { type: "checkbox", "aria-label": "选择 " + item.file.basename }
+            const box = glyph.createEl("input", {
+              attr: { type: "checkbox", "aria-label": "选择 " + file.basename }
             });
             box.checked = picked;
             box.onclick = (event) => {
               event.stopPropagation();
-              toggleSelect(item.file.path);
+              toggleSelect(file.path);
             };
+          } else {
+            setIcon(glyph, "file-text");
           }
-          const type = card.createDiv({ cls: "cl-md-type" });
-          setIcon(type, item.icon);
-          const main = card.createDiv({ cls: "cl-md-main" });
-          main.createDiv({ cls: "cl-md-name", text: item.file.basename });
-          main.createDiv({ cls: "cl-md-path", text: item.file.path });
-          const meta = card.createDiv({ cls: "cl-md-meta" });
-          meta.createEl("b", { text: item.label });
-          meta.createSpan({ cls: "cl-md-metadot" });
-          meta.createSpan({ cls: "cl-md-size", text: fmtSize(item.file.stat.size) });
-          card.createDiv({ cls: "cl-md-time", text: formatTime(item.file.stat.mtime) });
+          const main = row.createDiv({ cls: "cl-mdv-rowmain" });
+          main.createDiv({ cls: "cl-mdv-rowtitle", text: file.basename });
+          main.createDiv({ cls: "cl-mdv-rowsub", text: file.path });
+          row.createDiv({ cls: "cl-mdv-tag", text: mod.name });
+          row.createDiv({ cls: "cl-mdv-date", text: fmtDate(file.stat.mtime) });
           if (!this._mdMulti) {
-            const acts = card.createDiv({ cls: "cl-md-actions" });
-            const openBtn = acts.createEl("button", { cls: "cl-md-act" });
-            openBtn.setAttribute("aria-label", "打开");
-            setIcon(openBtn, "external-link");
-            openBtn.onclick = (event) => {
+            const del = row.createDiv({
+              cls: "cl-mdv-del",
+              attr: { "aria-label": "删除 " + file.basename, role: "button" }
+            });
+            setIcon(del, "trash-2");
+            del.onclick = (event) => {
               event.stopPropagation();
-              this.openFile(item.file);
-            };
-            const delBtn = acts.createEl("button", { cls: "cl-md-act is-danger" });
-            delBtn.setAttribute("aria-label", "删除");
-            setIcon(delBtn, "trash-2");
-            delBtn.onclick = (event) => {
-              event.stopPropagation();
-              this.deleteFiles([item.file]);
+              this.deleteFiles([file]);
             };
           }
-          card.onclick = () => {
-            if (this._mdMulti) toggleSelect(item.file.path);
-            else this.openFile(item.file);
+          row.onclick = () => {
+            if (this._mdMulti) toggleSelect(file.path);
+            else this.openFile(file);
           };
         });
       });
     };
 
-    /* ---------- 网格缩略图 ---------- */
-    // 缩略图规则由 paintNoteThumb / paintMediaThumb 统一提供：
-    // 图片铺图、视频首帧、笔记正文片段或内嵌媒体；音频 / 文档 / 其他用类型图标。
-    const renderGrid = (parent, items) => {
-      const grid = parent.createDiv({ cls: "cl-md-grid" });
-      items.forEach((item) => {
-        const picked = this._mdSel.has(item.file.path);
+    /* 网格视图：沿用原有 .cl-md-grid / .cl-md-tile，外观保持不变 */
+    const renderGrid = (items) => {
+      const grid = body.createDiv({ cls: "cl-md-grid" });
+      items.forEach((file) => {
+        const picked = this._mdSel.has(file.path);
         const tile = grid.createDiv({
-          cls: "cl-md-tile cl-md-kind-" + item.kind + (this._mdMulti && picked ? " is-selected" : "")
+          cls: "cl-md-tile cl-md-kind-note" + (this._mdMulti && picked ? " is-selected" : "")
         });
         const thumb = tile.createDiv({ cls: "cl-md-thumb" });
-
-        if (item.kind === "note") {
-          paintNoteThumb(this.app, thumb, item.file);
-        } else if (item.kind === "image" || item.kind === "video") {
-          paintMediaThumb(this.app, thumb, item.file, item.kind);
-        } else {
-          setIcon(thumb, item.icon);
-        }
-
+        paintNoteThumb(this.app, thumb, file);
         if (this._mdMulti) {
           const check = tile.createDiv({ cls: "cl-md-tilecheck" });
           const box = check.createEl("input", {
-            attr: { type: "checkbox", "aria-label": "选择 " + item.file.basename }
+            attr: { type: "checkbox", "aria-label": "选择 " + file.basename }
           });
           box.checked = picked;
           box.onclick = (event) => {
             event.stopPropagation();
-            toggleSelect(item.file.path);
+            toggleSelect(file.path);
           };
         }
-
-        tile.createDiv({ cls: "cl-md-tilename", text: item.file.basename });
+        tile.createDiv({ cls: "cl-md-tilename", text: file.basename });
         const tileMeta = tile.createDiv({ cls: "cl-md-tilemeta" });
-        tileMeta.createSpan({ text: item.label });
-        tileMeta.createSpan({ text: fmtSize(item.file.stat.size) });
+        tileMeta.createSpan({ text: "笔记" });
+        tileMeta.createSpan({ text: fmtSize(file.stat.size) });
         if (!this._mdMulti) {
           const del = tile.createEl("button", {
             cls: "cl-md-tiledel",
-            attr: { "aria-label": "删除 " + item.file.basename }
+            attr: { "aria-label": "删除 " + file.basename }
           });
           setIcon(del, "trash-2");
           del.onclick = (event) => {
             event.stopPropagation();
-            this.deleteFiles([item.file]);
+            this.deleteFiles([file]);
           };
         }
         tile.onclick = () => {
-          if (this._mdMulti) toggleSelect(item.file.path);
-          else this.openFile(item.file);
+          if (this._mdMulti) toggleSelect(file.path);
+          else this.openFile(file);
         };
       });
     };
 
-    const updateFoot = () => {
-      footLeft.setText("共 " + files.length + " 个文件 · 笔记按 frontmatter 聚合，素材按模块文件夹收录");
-      if (!files.length) {
-        footRight.setText("");
-        return;
-      }
-      const newest = files.reduce((max, file) => Math.max(max, file.stat.mtime), 0);
-      footRight.setText("最近更新 " + formatTime(newest));
-    };
-
-    const renderEmpty = () => {
-      stats.style.display = "none";
-      controls.style.display = "none";
-      foot.style.display = "none";
-      const empty = body.createDiv({ cls: "cl-md-empty" });
-      empty.style.setProperty("--tint", tint);
-      const art = empty.createDiv({ cls: "cl-md-emptyart" });
-      setIcon(art, "file-text");
-      empty.createEl("h2", { text: "这个模块还没有文件" });
-      empty.createEl("p", {
-        cls: "cl-md-emptysub",
-        text:
-          "点「新建笔记」会在这里生成第一篇笔记；图片、视频、PDF、音频放进模块文件夹后，也会自动出现在这一页。"
-      });
-      const acts = empty.createDiv({ cls: "cl-md-emptyacts" });
-      const newBtn = acts.createEl("button", { cls: "cl-md-btn cl-md-btn-primary" });
-      setIcon(newBtn, "plus");
-      newBtn.appendText("新建笔记");
-      newBtn.onclick = () => this.createModuleNote(mod);
-      if (dir) {
-        empty.createDiv({ cls: "cl-md-emptymeta", text: "保存位置 " + dir });
-      }
-    };
-
     const draw = () => {
-      listBtn.classList.toggle("is-active", mode === "list");
-      gridBtn.classList.toggle("is-active", mode === "grid");
-      const segBtns = typeSeg.querySelectorAll("[data-kind]");
-      for (let i = 0; i < segBtns.length; i++) {
-        segBtns[i].classList.toggle("is-active", segBtns[i].dataset.kind === filter);
-      }
-      sortText.setText(sort === "name" ? "名称" : sort === "size" ? "大小" : "最近更新");
-      selBar.classList.toggle("is-on", !!this._mdMulti && files.length > 0);
+      listBtn.classList.toggle("is-on", mode === "list");
+      gridBtn.classList.toggle("is-on", mode === "grid");
+      selBar.classList.toggle("is-on", !!this._mdMulti && allNotes.length > 0);
       selCount.setText("已选 " + selected.size + " 项");
       selDelete.disabled = selected.size === 0;
+      noteCount.setText(String(allNotes.length));
 
       const q = query.trim().toLowerCase();
-      const items = files
-        .filter((file) => (filter === "all" || kindOf(file) === filter))
-        .filter((file) => !q || file.path.toLowerCase().includes(q))
-        .map((file) => ({ file, kind: kindOf(file), label: labelOf(file), icon: iconOf(kindOf(file)) }));
-      sortItems(items);
-
-      countPill.setText(files.length + " 个文件");
+      const items = allNotes.filter((file) => !q || file.path.toLowerCase().includes(q));
       body.empty();
-      if (!files.length) {
-        renderEmpty();
+      if (!allNotes.length) {
+        const blank = body.createDiv({ cls: "cl-mdv-blank" });
+        const blankIcon = blank.createDiv({ cls: "cl-mdv-blank-icon" });
+        setIcon(blankIcon, "file-text");
+        const blankText = blank.createDiv({ cls: "cl-mdv-blank-text" });
+        blankText.createDiv({ cls: "cl-mdv-blank-title", text: "这一层还没有笔记" });
+        blankText.createDiv({
+          cls: "cl-mdv-blank-sub",
+          text: "直接在父模块写可以；也可以点上面的子模块继续分层。"
+        });
+        const blankBtn = blank.createEl("button", { cls: "cl-mdv-blank-btn", text: "新建笔记" });
+        blankBtn.onclick = () => this.createModuleNote(mod);
         return;
       }
-      stats.style.display = "";
-      controls.style.display = "";
-      foot.style.display = "";
       if (!items.length) {
-        body.createDiv({ cls: "cl-md-nomatch", text: "没有匹配的文件" });
-      } else if (mode === "grid") {
-        renderGrid(body, items);
-      } else {
-        renderList(body, items);
+        body.createDiv({ cls: "cl-mdv-nomatch", text: "没有匹配的笔记" });
+        return;
       }
-      updateFoot();
+      if (mode === "grid") renderGrid(items);
+      else renderList(items);
     };
 
-    typeSeg.querySelectorAll("[data-kind]").forEach((btn) => {
-      btn.onclick = () => {
-        filter = btn.dataset.kind;
-        draw();
-      };
-    });
     listBtn.onclick = () => {
       mode = "list";
       mod.view = "list";
@@ -3410,44 +4160,22 @@ class CollisView extends ItemView {
       this.plugin.persistSettings();
       draw();
     };
-    input.addEventListener("input", () => {
-      query = input.value;
-      draw();
-    });
-    sortBtn.onclick = (event) => {
-      const menu = new Menu();
-      [
-        ["recent", "最近更新"],
-        ["name", "名称"],
-        ["size", "大小"]
-      ].forEach(([key, label]) => {
-        menu.addItem((item) => {
-          item.setTitle(label)
-            .setChecked(sort === key)
-            .onClick(() => {
-              sort = key;
-              draw();
-            });
-        });
-      });
-      anchorMenuBelow(menu, sortBtn);
-    };
 
     draw();
   }
 
-
-  // 在模块里新建笔记：用模块的保存文件夹；没设置就先让用户挑。
-  // 不再自动创建目录，避免又冒出一个和已有文件夹编号不同的副本。
-  createModuleNote(mod) {
-    const dir = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
+  // 在模块里新建笔记：用模块的文件夹，不存在就补建。
+  async createModuleNote(mod) {
+    // 模块 = 文件夹：文件夹不存在就直接补建，避免“模块还在、文件没地方放”
+    const dir = this.moduleTargetFolder(mod);
     if (!dir) {
       this.pickModuleFolder(mod);
       return;
     }
-    if (!this.app.vault.getAbstractFileByPath(dir)) {
-      new Notice("模块的保存文件夹「" + dir + "」不存在，请重新选择");
-      this.pickModuleFolder(mod);
+    try {
+      await ensureVaultFolder(this.app, dir);
+    } catch (error) {
+      new Notice("创建模块文件夹失败：" + (error && error.message ? error.message : error));
       return;
     }
     this.createNoteInFolder(mod, dir);
@@ -3484,7 +4212,7 @@ class CollisView extends ItemView {
       n += 1;
     }
 
-    const moduleValue = mod.id || mod.name;
+    const moduleValue = String(mod.id || "").startsWith("dir:") ? mod.name : mod.id || mod.name;
     const content =
       "---\nmodule: " +
       moduleValue +
@@ -3554,11 +4282,13 @@ class CollisSettingTab extends PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Collis 设置" });
+
+    // ---- 常规 ----
+    new Setting(containerEl).setName("常规").setHeading();
 
     new Setting(containerEl)
       .setName("工作台名称")
-      .setDesc("显示在左侧导航顶部的名字，留空则用「个人工作台」。")
+      .setDesc("显示在左侧导航顶部的名称。留空则使用「个人工作台」。")
       .addText((text) =>
         text
           .setPlaceholder("个人工作台")
@@ -3566,7 +4296,7 @@ class CollisSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.workspaceName = value.trim() || "个人工作台";
             await this.plugin.persistSettings();
-            // 名称直接影响导航，必须整页重建；命名不是高频操作，逐字重建可以接受
+            // 名称直接影响导航，需要重建视图
             this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach((leaf) => {
               if (leaf.view && leaf.view.render) leaf.view.render();
             });
@@ -3574,8 +4304,8 @@ class CollisSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("打开 Collis 时进入专注模式")
-      .setDesc("隐藏左侧栏、标签栏和状态栏；右侧栏保留，方便同时使用 Collis 和 Claudian。")
+      .setName("打开时进入专注模式")
+      .setDesc("隐藏左侧栏、标签栏和状态栏，保留右侧栏，方便同时使用 Collis 和其他面板。")
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.focusOnOpen).onChange(async (value) => {
           this.plugin.settings.focusOnOpen = value;
@@ -3583,57 +4313,187 @@ class CollisSettingTab extends PluginSettingTab {
         })
       );
 
-    containerEl.createEl("p", {
-      cls: "cl-settings-hint",
-      text:
-        "模块配置是 JSON 数组。每项支持 id、name、icon、color、module、types、folder、keywords。也可以在导航里点「新建模块」用图形界面添加。"
-    });
+    // ---- 模块 ----
+    new Setting(containerEl).setName("模块").setHeading();
 
-    const textarea = containerEl.createEl("textarea", { cls: "cl-settings-json" });
-    textarea.value = JSON.stringify(this.plugin.settings.modules, null, 2);
+    new Setting(containerEl)
+      .setName("模块与文件树")
+      .setDesc(
+        "模块与文件夹一一对应：模块页只显示该文件夹下直接存放的笔记，子文件夹会自动成为子模块。新建模块时会同步创建同名文件夹。"
+      );
 
-    new Setting(containerEl).addButton((button) =>
-      button
-        .setButtonText("保存模块配置")
-        .setCta()
-        .onClick(async () => {
-          try {
-            const parsed = JSON.parse(textarea.value);
-            if (!Array.isArray(parsed)) {
-              throw new Error("必须是一个数组");
-            }
-            if (parsed.some((m) => !m || !m.id || !m.name)) {
-              throw new Error("每个模块必须有 id 和 name");
-            }
-            this.plugin.settings.modules = parsed;
-            await this.plugin.saveSettings();
-            new Notice("模块配置已保存");
-          } catch (e) {
-            new Notice("JSON 错误：" + e.message, 6000);
+    new Setting(containerEl)
+      .setName("管理模块")
+      .setDesc("新建、编辑、删除模块，或查看模块对应的文件树层级。")
+      .addButton((button) =>
+        button.setButtonText("打开模块管理").onClick(() => {
+          const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+          if (leaf && leaf.view && leaf.view.openModuleManager) {
+            leaf.view.openModuleManager();
+          } else {
+            new Notice("请先打开 Collis 工作台，再管理模块。");
           }
         })
-    );
+      );
+
+    // ---- 收件箱 ----
+    new Setting(containerEl).setName("收件箱").setHeading();
+
+    new Setting(containerEl)
+      .setName("收录范围")
+      .setDesc("决定收件箱显示哪些文件。默认只显示库根目录中散落的文件。")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("root", "仅库根目录（推荐）")
+          .addOption("unassigned", "旧版未归属笔记（兼容）")
+          .addOption("all", "全库所有文件（谨慎）")
+          .setValue(this.plugin.settings.inboxPolicy || "root")
+          .onChange(async (value) => {
+            this.plugin.settings.inboxPolicy = value;
+            await this.plugin.saveSettings();
+          })
+      );
 
     containerEl.createEl("p", {
       cls: "cl-settings-hint",
-      text:
-        "匹配顺序：module 字段（中英文都认）→ type → folder 前缀 → 标签关键词。一篇笔记只归一个模块，按导航顺序先命中先得；都不命中会进收集箱的待处理队列。"
+      text: "文件移入模块文件夹后会自动离开收件箱。该策略保留为可切换接口，后续规则可以继续扩展。"
     });
+
+    // ---- 卡片笔记 ----
+    new Setting(containerEl).setName("卡片笔记").setHeading();
+
+    new Setting(containerEl)
+      .setName("卡片存放位置")
+      .setDesc(
+        "所有卡片和从画布转换的卡片都写入这个文件夹。固定路径可以避免卡片散落、被算进模块，或在不同设备上分成两处。"
+      )
+      .addText((text) => text.setValue(CARD_FOLDER).setDisabled(true));
+
+    containerEl.createEl("p", {
+      cls: "cl-settings-hint",
+      text: "该目录不会出现在模块导航里，也不会进入收件箱。把卡片文件移出这个目录，它就会变成普通笔记。"
+    });
+
+    // ---- 画布 ----
+    new Setting(containerEl).setName("画布").setHeading();
+
+    const board =
+      this.plugin.childPlugins && this.plugin.childPlugins["collis-board"];
+    if (!board) {
+      containerEl.createEl("p", {
+        cls: "cl-settings-hint",
+        text: "画布组件未加载，暂时无法配置画布和 AI。请重载插件后再试。"
+      });
+      return;
+    }
+
+    let boardFolderTimer = null;
+    new Setting(containerEl)
+      .setName("画布文件夹")
+      .setDesc("新建画布时保存到这个文件夹，默认「画布」。修改后该文件夹不会作为模块出现。")
+      .addText((text) =>
+        text
+          .setPlaceholder("画布")
+          .setValue((board.settings.collis && board.settings.collis.boardFolder) || "")
+          .onChange((value) => {
+            if (boardFolderTimer) window.clearTimeout(boardFolderTimer);
+            boardFolderTimer = window.setTimeout(async () => {
+              board.settings.collis = board.settings.collis || {};
+              board.settings.collis.boardFolder = value.trim();
+              await board.saveSettings();
+              if (this.plugin.syncModulesFromVault()) {
+                await this.plugin.persistSettings();
+              }
+              this.plugin.refreshAll();
+            }, 600);
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("节点角标")
+      .setDesc("在画布卡片节点上显示日期角标，只影响画布显示，不改动卡片正文。")
+      .addToggle((toggle) =>
+        toggle.setValue(!!board.settings.showBadge).onChange(async (value) => {
+          board.settings.showBadge = value;
+          await board.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("角标内容")
+      .setDesc("精简只显示日期；完整显示标签、日期和时间。")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("date", "精简（11-11）")
+          .addOption("full", "完整（#标签 11-11 11:08）")
+          .setValue(board.settings.badgeFormat === "full" ? "full" : "date")
+          .onChange(async (value) => {
+            board.settings.badgeFormat = value === "full" ? "full" : "date";
+            await board.saveSettings();
+          })
+      );
+
+    // AI 配置沿用画布组件原有的设置界面（启用、思考模式、模型配置、内容分配）
+    const boardTab = board._settingTab;
+    if (boardTab && typeof boardTab.renderAI === "function") {
+      boardTab.renderAI(containerEl);
+    } else {
+      containerEl.createEl("p", {
+        cls: "cl-settings-hint",
+        text: "AI 设置界面未就绪，请重载插件后再试。"
+      });
+    }
   }
 }
 
 module.exports = class CollisPlugin extends Plugin {
   async onload() {
     const saved = await this.readHostData();
+    // 全新安装：从文件树同步模块，不预置占位模块
+    const firstRun = !saved || !Array.isArray(saved.modules);
     this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
+    let settingsDirty = false;
     if (!Array.isArray(this.settings.modules)) {
-      this.settings.modules = DEFAULT_MODULES;
+      this.settings.modules = [];
     } else {
       this.settings.modules = this.settings.modules.map((mod) => {
         const base = DEFAULT_MODULES.find((d) => d.id === mod.id);
-        return Object.assign({}, base || {}, mod);
+        const merged = Object.assign({}, base || {}, mod);
+        // 老配置只有 name、没有 folder：补成同名目录，保证模块与文件树的映射完整
+        if (!merged.folder) merged.folder = sanitizeFolderName(merged.name);
+        return merged;
       });
+      // 清理上一版自动同步进来的工具/AI 目录（id 以 dir: 开头的是自动生成的模块）
+      const kept = this.settings.modules.filter(
+        (mod) => !(String(mod.id || "").startsWith("dir:") && isToolFolder(mod.folder))
+      );
+      if (kept.length !== this.settings.modules.length) {
+        this.settings.modules = kept;
+        settingsDirty = true;
+      }
+      // 同一个文件夹只保留一条模块配置，避免导航里出现重复入口
+      const seenFolders = new Set();
+      const deduped = this.settings.modules.filter((mod) => {
+        const key = String(mod.folder || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+        if (!key) return true;
+        if (seenFolders.has(key)) return false;
+        seenFolders.add(key);
+        return true;
+      });
+      if (deduped.length !== this.settings.modules.length) {
+        this.settings.modules = deduped;
+        settingsDirty = true;
+      }
     }
+
+    // 每次启动都补齐文件树里新增的文件夹；已删除的模块靠 hiddenModuleFolders 保持隐藏
+    if (this.syncModulesFromVault()) settingsDirty = true;
+    // 库里没有任何可用文件夹时，给一组默认入口
+    if (firstRun && !this.settings.modules.length) {
+      this.settings.modules = DEFAULT_MODULES;
+      settingsDirty = true;
+    }
+    if (settingsDirty) await this.persistSettings();
 
     this.requestRefresh = debounce(() => this.refreshAll(), 700, true);
 
@@ -3711,6 +4571,9 @@ module.exports = class CollisPlugin extends Plugin {
 
     await this.loadBundledPlugins();
 
+    // 画布子插件加载后才能读到自定义画布目录，再同步一次，避免它被当成模块
+    if (this.syncModulesFromVault()) await this.persistSettings();
+
     // 提示框去重：监听本插件视图里 title 属性的增改与节点插入，统一转成
     // aria-label，去掉浏览器原生的白色提示框，只留 Obsidian 的黑色提示框。
     this._ttObserver = new MutationObserver((mutations) => {
@@ -3755,9 +4618,38 @@ module.exports = class CollisPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => this.restoreCollisSidebar());
 
     this.registerEvent(this.app.vault.on("modify", () => this.requestRefresh()));
-    this.registerEvent(this.app.vault.on("create", () => this.requestRefresh()));
-    this.registerEvent(this.app.vault.on("delete", () => this.requestRefresh()));
-    this.registerEvent(this.app.vault.on("rename", () => this.requestRefresh()));
+    this.registerEvent(
+      this.app.vault.on("create", (file) => {
+        this.requestRefresh();
+        const path = String((file && file.path) || "");
+        // 文件树里新建顶层文件夹时，同步成模块，不用重启插件
+        if (file && Array.isArray(file.children) && path && path.indexOf("/") === -1) {
+          // 重建了以前删过的同名文件夹：解除隐藏，让它重新成为模块
+          const hidden = this.settings.hiddenModuleFolders || [];
+          if (hidden.includes(path)) {
+            this.settings.hiddenModuleFolders = hidden.filter((item) => item !== path);
+          }
+          if (this.syncModulesFromVault()) this.persistSettings();
+        }
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on("delete", (file) => {
+        this.dropOwnership(file.path);
+        // 删掉文件夹时，对应的自动模块一起收掉
+        if (file && Array.isArray(file.children) && this.pruneMissingAutoModules()) {
+          this.persistSettings();
+        }
+        this.requestRefresh();
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) => {
+        this.remapOwnership(oldPath, file.path);
+        this.remapModuleFolder(oldPath, file.path);
+        this.requestRefresh();
+      })
+    );
     this.registerEvent(this.app.metadataCache.on("resolved", () => this.requestRefresh()));
 
     this.registerEvent(
@@ -3770,6 +4662,54 @@ module.exports = class CollisPlugin extends Plugin {
         }
       })
     );
+  }
+
+  // 素材归属表跟着文件改名 / 删除走，避免记录指向不存在的旧路径。
+  remapOwnership(oldPath, newPath) {
+    const map = this.settings && this.settings.inboxAssigned;
+    if (!map || !oldPath || !newPath || oldPath === newPath) return;
+    if (!(oldPath in map)) return;
+    map[newPath] = map[oldPath];
+    delete map[oldPath];
+    this.saveSettings();
+  }
+
+  dropOwnership(path) {
+    const map = this.settings && this.settings.inboxAssigned;
+    if (!map || !path || !(path in map)) return;
+    delete map[path];
+    this.saveSettings();
+  }
+
+  // 模块的保存文件夹被整体改名 / 移动时，同步更新配置里的路径。
+  remapModuleFolder(oldPath, newPath) {
+    const modules = (this.settings && this.settings.modules) || [];
+    if (!oldPath || !newPath || oldPath === newPath) return;
+    let changed = false;
+    for (const mod of modules) {
+      const folder = String(mod.folder || "");
+      if (!folder) continue;
+      if (folder === oldPath) {
+        mod.folder = newPath;
+        changed = true;
+      } else if (folder.indexOf(oldPath + "/") === 0) {
+        mod.folder = newPath + folder.slice(oldPath.length);
+        changed = true;
+      }
+    }
+    // 隐藏列表也按同样的路径规则迁移，否则改名后旧目录会被当成新模块冒出来
+    const hidden = (this.settings && this.settings.hiddenModuleFolders) || [];
+    const nextHidden = hidden.map((path) => {
+      const value = String(path || "");
+      if (value === oldPath) return newPath;
+      if (value.indexOf(oldPath + "/") === 0) return newPath + value.slice(oldPath.length);
+      return value;
+    });
+    if (nextHidden.join("\n") !== hidden.join("\n")) {
+      this.settings.hiddenModuleFolders = nextHidden;
+      changed = true;
+    }
+    if (changed) this.saveSettings();
   }
 
   onunload() {
@@ -3965,11 +4905,14 @@ module.exports = class CollisPlugin extends Plugin {
       const child = new PluginClass(this.app, manifest);
       this.attachChildSettings(child, spec.id);
       // 内置子插件只作为功能模块存在，不再单独出现在界面上：
-      // 不挂 ribbon 图标、状态栏，也不注册独立的设置页。
+      // 不挂 ribbon 图标、状态栏；设置页不单独注册，但保留实例，
+      // 由 Collis 设置页复用画布组件原有的 AI 配置界面。
       const noElement = () => document.createElement("div");
       child.addRibbonIcon = noElement;
       child.addStatusBarItem = noElement;
-      child.addSettingTab = () => {};
+      child.addSettingTab = (tab) => {
+        child._settingTab = tab;
+      };
       // 手动托管的组件不会走 Obsidian 的启用流程，先标记录入状态，
       // 这样 onunload 时 Component.unload() 才能正确清理事件与视图。
       child._loaded = true;
@@ -3996,6 +4939,73 @@ module.exports = class CollisPlugin extends Plugin {
     }
   }
 
+  /* 画布文件夹路径：跟随画布子插件的设置，未加载时按默认「画布」。 */
+  canvasFolderPath() {
+    const board = this.childPlugins && this.childPlugins["collis-board"];
+    const folder = String((board && board.collisFolder) || "画布").replace(/^\/+|\/+$/g, "");
+    return folder || "画布";
+  }
+
+  /* 启动同步：把库根目录下已有的文件夹同步成模块入口。
+   * 只跳过工具/AI/构建目录（vault-scripts、node_modules、.claude …）和画布目录；
+   * 附件、媒体文件等普通文件夹同样同步。子文件夹由模块页按文件树自动生成，
+   * 用户手动删除的模块记录在 hiddenModuleFolders 里，不会被重新加回。 */
+  syncModulesFromVault() {
+    const root = this.app.vault.getRoot && this.app.vault.getRoot();
+    if (!root || !Array.isArray(root.children)) return false;
+    const normalize = (value) => String(value || "").replace(/^\/+|\/+$/g, "");
+    // 路径比较统一忽略大小写，兼容 Windows 上大小写不一致的旧配置
+    const keyOf = (value) => normalize(value).toLowerCase();
+    // 画布文件夹归白板工作区，任何情况下都不作为模块；顺手清掉历史自动配置
+    const canvasKey = keyOf(this.canvasFolderPath());
+    const beforeCount = (this.settings.modules || []).length;
+    this.settings.modules = (this.settings.modules || []).filter(
+      (mod) => keyOf(mod.folder) !== canvasKey
+    );
+    let changed = this.settings.modules.length !== beforeCount;
+    const hidden = new Set((this.settings.hiddenModuleFolders || []).map(keyOf));
+    const configured = new Set(
+      (this.settings.modules || []).map((mod) => keyOf(mod.folder)).filter(Boolean)
+    );
+    root.children
+      .filter((child) => child && Array.isArray(child.children))
+      .filter((child) => {
+        const path = String(child.path || "");
+        if (!path || path.split("/").some((part) => part.startsWith("."))) return false;
+        if (keyOf(path) === canvasKey) return false;
+        return !isToolFolder(path);
+      })
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), "zh"))
+      .forEach((folder) => {
+        const path = normalize(folder.path);
+        const key = keyOf(path);
+        if (!path || configured.has(key) || hidden.has(key)) return;
+        this.settings.modules.push({
+          id: "dir:" + path,
+          name: folder.name,
+          icon: "folder",
+          folder: path
+        });
+        configured.add(key);
+        changed = true;
+      });
+    return changed;
+  }
+
+  /* 文件树里的文件夹被删掉后，清掉对应的自动模块；
+   * 手动创建的模块保留配置，等文件夹恢复后还能继续用。 */
+  pruneMissingAutoModules() {
+    const before = (this.settings.modules || []).length;
+    this.settings.modules = (this.settings.modules || []).filter((mod) => {
+      const id = String(mod.id || "");
+      if (!id.startsWith("dir:")) return true;
+      const folder = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
+      if (!folder) return true;
+      return Boolean(this.app.vault.getAbstractFileByPath(folder));
+    });
+    return this.settings.modules.length !== before;
+  }
+
   async persistSettings() {
     const data = await this.readHostData();
     data.modules = this.settings.modules;
@@ -4004,6 +5014,9 @@ module.exports = class CollisPlugin extends Plugin {
     data.navCollapsed = !!this.settings.navCollapsed;
     data.collisSidebarOpen = !!this.settings.collisSidebarOpen;
     data.ignoredModuleValues = this.settings.ignoredModuleValues || [];
+    data.inboxAssigned = this.settings.inboxAssigned || {};
+    data.inboxPolicy = this.settings.inboxPolicy || "root";
+    data.hiddenModuleFolders = this.settings.hiddenModuleFolders || [];
     await this.writeHostData();
   }
 
