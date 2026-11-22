@@ -35,7 +35,7 @@ fs.writeFileSync(path.join(dist, "styles.css"), parts.join("\n\n"), "utf8");
 const manifest = {
   id: "collis",
   name: "Collis",
-  version: "0.4.1",
+  version: "0.4.2",
   minAppVersion: "1.13.0",
   description: "本地工作台：模块视图、速记卡片与画布集合并为一个插件.",
   author: "Lak",

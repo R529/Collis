@@ -19948,7 +19948,7 @@ var ModulePickerModal = class extends Modal {
     contentEl.createEl("h2", { text: "\u5F52\u5165\u6A21\u5757" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "\u53EA\u4F1A\u5199\u5165 module \u5B57\u6BB5\uFF0C\u6587\u4EF6\u4F4D\u7F6E\u4E0D\u53D8\u3002"
+      text: "\u9009\u4E2D\u7684\u7B14\u8BB0\u548C\u7D20\u6750\u4F1A\u79FB\u5230\u8BE5\u6A21\u5757\u7684\u6587\u4EF6\u5939\uFF1B\u7B14\u8BB0\u4F1A\u540C\u65F6\u5199\u5165 module \u5B57\u6BB5\u3002"
     });
     const list = contentEl.createDiv({ cls: "cl-picklist" });
     this.modules.forEach((mod) => {
@@ -20246,6 +20246,24 @@ var CollisView = class extends ItemView {
    *   - 模块保存文件夹里的图片、视频、PDF、音频等素材附件。
    * 附件没有 frontmatter，只能按文件夹认领；导航计数仍只统计笔记，
    * 不影响首页和收集箱的现有口径。 */
+  // 模块没有单独设置文件夹时，用模块名建一个同名目录。
+  moduleTargetFolder(mod) {
+    const raw = String(mod && (mod.folder || mod.name || mod.id || mod.module) || "").trim();
+    return raw.replace(/^\/+|\/+$/g, "").replace(/[\\:*?"<>|]/g, "_");
+  }
+  // 目标同名时加 -1 / -2，避免覆盖模块目录里已有的文件。
+  uniqueFilePath(dir, file) {
+    const ext = file.extension ? "." + file.extension : "";
+    const name = file.basename || file.name || "\u672A\u547D\u540D";
+    const prefix = dir ? dir + "/" : "";
+    let path = prefix + name + ext;
+    let n = 1;
+    while (this.app.vault.getAbstractFileByPath(path)) {
+      path = prefix + name + "-" + n + ext;
+      n += 1;
+    }
+    return path;
+  }
   moduleFiles(mod) {
     const notes = this.filesFor(mod);
     const seen = new Set(notes.map((file) => file.path));
@@ -20425,23 +20443,43 @@ var CollisView = class extends ItemView {
       setTimeout(finish, timeout);
     });
   }
-  // 归入模块 = 只写 module 字段，不移动文件。
+  // 归入模块：笔记写 module 字段，所有文件都移到模块文件夹。
   async assignToModule(files, mod) {
-    const value = String(mod.module || mod.id);
+    if (!files || !files.length)
+      return;
+    const value = String(mod.module || mod.id || mod.name);
+    const dir = this.moduleTargetFolder(mod);
+    try {
+      if (dir)
+        await this.ensureFolder(dir);
+    } catch (e) {
+      new Notice("\u65E0\u6CD5\u521B\u5EFA\u6A21\u5757\u6587\u4EF6\u5939\u300C" + dir + "\u300D\uFF1A" + (e.message || e));
+      return;
+    }
     let done = 0;
+    let moved = 0;
     for (const file of files) {
       try {
-        await this.app.fileManager.processFrontMatter(file, (fm) => {
-          fm.module = value;
-        });
-        await this.waitForMetadata(file);
+        if (String(file.extension || "").toLowerCase() === "md") {
+          await this.app.fileManager.processFrontMatter(file, (fm) => {
+            fm.module = value;
+          });
+          await this.waitForMetadata(file);
+        }
+        const target = this.uniqueFilePath(dir, file);
+        if (target && file.path !== target) {
+          await this.app.fileManager.renameFile(file, target);
+          moved += 1;
+        }
         done += 1;
       } catch (e) {
       }
     }
     this._ownership = null;
     this._inboxSel = /* @__PURE__ */ new Set();
-    new Notice("\u5DF2\u5F52\u5165\u300C" + mod.name + "\u300D\uFF1A" + done + " \u7BC7");
+    new Notice(
+      "\u5DF2\u5F52\u5165\u300C" + mod.name + "\u300D\uFF1A" + done + " \u9879" + (moved ? "\uFF08\u79FB\u52A8 " + moved + " \u9879\uFF09" : "")
+    );
     this.render();
   }
   // 按标签 / 文件夹名 / 文件名给未归类笔记猜一个模块，只做建议，不自动改文件
@@ -21504,9 +21542,8 @@ var CollisView = class extends ItemView {
       text: "\u5171 " + files.length + " \u6761\u5F85\u5904\u7406"
     });
     const selectedFiles = () => files.filter((f) => this._inboxSel.has(f.path));
-    const selectedNotes = () => selectedFiles().filter((f) => f.extension === "md");
     bulkAssign.onclick = () => {
-      const chosen = selectedNotes();
+      const chosen = selectedFiles();
       if (chosen.length)
         this.openModulePicker(chosen);
     };
@@ -21556,7 +21593,7 @@ var CollisView = class extends ItemView {
       const n = this._inboxSel.size;
       bulk.hidden = n === 0;
       bulkNum.setText(String(n));
-      bulkAssign.disabled = selectedNotes().length === 0;
+      bulkAssign.disabled = n === 0;
       bulkDelete.disabled = n === 0;
     };
     const renderGrid = (parent, items) => {

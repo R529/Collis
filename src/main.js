@@ -907,7 +907,7 @@ class FolderPickerModal extends Modal {
   }
 }
 
-/* 归入模块：选一个模块，把选中笔记的 module 字段写过去。 */
+/* 归入模块：选一个模块，把选中的笔记和素材一起移到该模块的目录。 */
 class ModulePickerModal extends Modal {
   constructor(app, modules, onPick, onCreate) {
     super(app);
@@ -922,7 +922,7 @@ class ModulePickerModal extends Modal {
     contentEl.createEl("h2", { text: "归入模块" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "只会写入 module 字段，文件位置不变。"
+      text: "选中的笔记和素材会移到该模块的文件夹；笔记会同时写入 module 字段。"
     });
 
     const list = contentEl.createDiv({ cls: "cl-picklist" });
@@ -1251,6 +1251,26 @@ class CollisView extends ItemView {
    *   - 模块保存文件夹里的图片、视频、PDF、音频等素材附件。
    * 附件没有 frontmatter，只能按文件夹认领；导航计数仍只统计笔记，
    * 不影响首页和收集箱的现有口径。 */
+  // 模块没有单独设置文件夹时，用模块名建一个同名目录。
+  moduleTargetFolder(mod) {
+    const raw = String((mod && (mod.folder || mod.name || mod.id || mod.module)) || "").trim();
+    return raw.replace(/^\/+|\/+$/g, "").replace(/[\\:*?"<>|]/g, "_");
+  }
+
+  // 目标同名时加 -1 / -2，避免覆盖模块目录里已有的文件。
+  uniqueFilePath(dir, file) {
+    const ext = file.extension ? "." + file.extension : "";
+    const name = file.basename || file.name || "未命名";
+    const prefix = dir ? dir + "/" : "";
+    let path = prefix + name + ext;
+    let n = 1;
+    while (this.app.vault.getAbstractFileByPath(path)) {
+      path = prefix + name + "-" + n + ext;
+      n += 1;
+    }
+    return path;
+  }
+
   moduleFiles(mod) {
     const notes = this.filesFor(mod);
     const seen = new Set(notes.map((file) => file.path));
@@ -1428,16 +1448,33 @@ class CollisView extends ItemView {
     });
   }
 
-  // 归入模块 = 只写 module 字段，不移动文件。
+  // 归入模块：笔记写 module 字段，所有文件都移到模块文件夹。
   async assignToModule(files, mod) {
-    const value = String(mod.module || mod.id);
+    if (!files || !files.length) return;
+    const value = String(mod.module || mod.id || mod.name);
+    const dir = this.moduleTargetFolder(mod);
+    try {
+      if (dir) await this.ensureFolder(dir);
+    } catch (e) {
+      new Notice("无法创建模块文件夹「" + dir + "」：" + (e.message || e));
+      return;
+    }
     let done = 0;
+    let moved = 0;
     for (const file of files) {
       try {
-        await this.app.fileManager.processFrontMatter(file, (fm) => {
-          fm.module = value;
-        });
-        await this.waitForMetadata(file);
+        // 媒体文件没有 frontmatter，只有 Markdown 需要写归属字段。
+        if (String(file.extension || "").toLowerCase() === "md") {
+          await this.app.fileManager.processFrontMatter(file, (fm) => {
+            fm.module = value;
+          });
+          await this.waitForMetadata(file);
+        }
+        const target = this.uniqueFilePath(dir, file);
+        if (target && file.path !== target) {
+          await this.app.fileManager.renameFile(file, target);
+          moved += 1;
+        }
         done += 1;
       } catch (e) {
         // 单个文件失败不阻塞其余文件
@@ -1445,7 +1482,9 @@ class CollisView extends ItemView {
     }
     this._ownership = null;
     this._inboxSel = new Set();
-    new Notice("已归入「" + mod.name + "」：" + done + " 篇");
+    new Notice(
+      "已归入「" + mod.name + "」：" + done + " 项" + (moved ? "（移动 " + moved + " 项）" : "")
+    );
     this.render();
   }
 
@@ -2653,10 +2692,10 @@ class CollisView extends ItemView {
     });
 
     const selectedFiles = () => files.filter((f) => this._inboxSel.has(f.path));
-    const selectedNotes = () => selectedFiles().filter((f) => f.extension === "md");
 
     bulkAssign.onclick = () => {
-      const chosen = selectedNotes();
+      // 笔记和素材都允许批量归入：素材没有 frontmatter，归入时移到模块文件夹。
+      const chosen = selectedFiles();
       if (chosen.length) this.openModulePicker(chosen);
     };
     bulkDelete.onclick = () => this.deleteFiles(selectedFiles());
@@ -2704,7 +2743,7 @@ class CollisView extends ItemView {
       const n = this._inboxSel.size;
       bulk.hidden = n === 0;
       bulkNum.setText(String(n));
-      bulkAssign.disabled = selectedNotes().length === 0;
+      bulkAssign.disabled = n === 0;
       bulkDelete.disabled = n === 0;
     };
 
