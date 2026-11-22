@@ -1,7 +1,6 @@
 # Collis
 
-> 一个插件，三样东西：**工作台模块视图**、**速记卡片**、**画布集**。
-> 原来的 `collis`（速记卡片）和 `volis`（画布集）两个插件已合并进 Collis，启用这一个就够了。
+> 一个插件，三样东西：**工作台模块视图**、**速记卡片**、**画布集**。启用这一个就够了。
 
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7c6df2)](https://obsidian.md)
 [![Version](https://img.shields.io/badge/version-0.4.1-blue)](https://github.com/R529/Collis/releases)
