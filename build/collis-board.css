@@ -1,0 +1,3771 @@
+.collis-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  font-size: 10px;
+  line-height: 1.2;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--background-primary);
+  color: var(--text-faint);
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+  z-index: 50;
+  white-space: nowrap;
+  transition: opacity 120ms ease;
+}
+
+.canvas-node:hover .collis-badge {
+  opacity: 0.95;
+  color: var(--text-muted);
+}
+
+.collis-badge.is-stale {
+  color: var(--text-error);
+  opacity: 0.9;
+}
+
+.collis-editor-modal .collis-editor-meta {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.collis-editor-modal textarea.collis-editor-input {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  font-family: var(--font-text);
+  font-size: var(--font-text-size);
+  line-height: var(--line-height-normal);
+}
+
+.collis-editor-modal .collis-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.collis-preview {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+}
+
+.collis-inline {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--canvas-background, var(--background-primary));
+  border: none;
+  border-radius: inherit;
+  box-shadow: none;
+}
+
+.collis-inline-input,
+.collis-inline-input:focus,
+.collis-inline-input:focus-visible {  flex: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: var(--text-normal);
+  font-family: var(--font-text);
+  font-size: var(--font-text-size);
+  line-height: var(--line-height-normal);
+  overflow: auto;
+  resize: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* Keep the selected look while editing: the canvas swaps the node into an
+   editing state whose border is thinner and paler than the selected one. */
+.canvas-node.collis-editing .canvas-node-container {
+  border-width: 2px !important;
+  border-color: var(--interactive-accent) !important;
+}
+
+.canvas-node.collis-editing {
+  --canvas-node-border-width: 2px;
+  --canvas-node-border-color: var(--interactive-accent);
+}
+/* ── Card board view ─────────────────────────────────── */
+
+.collis-board-host {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.collis-board {
+  --collis-bg: var(--collis-board-bg, #f7f6f2);
+  --collis-dot: var(--collis-board-dot, #d9d5cc);
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--collis-bg);
+  background-image: radial-gradient(circle, var(--collis-dot) 1px, transparent 1px);
+  background-size: 24px 24px;
+  cursor: default;
+  touch-action: none;
+}
+
+.collis-board.is-panning {
+  cursor: grabbing;
+}
+
+.collis-board.is-dragging-node {
+  cursor: grabbing;
+}
+
+.collis-board.is-drop-target::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 1px dashed var(--interactive-accent);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.collis-world.is-loading {
+  visibility: hidden;
+}
+
+.collis-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.collis-bnode {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 46px;
+  padding: 8px 10px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+  color: var(--text-normal);
+  font-size: var(--font-text-size);
+  line-height: var(--line-height-normal);
+  z-index: 2;
+  cursor: grab;
+  user-select: none;
+}
+
+.collis-bnode:hover {
+  border-color: var(--background-modifier-border-hover);
+}
+
+.collis-bnode.is-selected {
+  border-color: var(--interactive-accent);
+  /* border-box keeps the node size fixed when the border thickens. */
+  border-width: 2.5px;
+  box-shadow: 0 0 0 1px var(--interactive-accent), 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.collis-bnode.is-file {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.collis-bnode-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.collis-bnode-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.collis-bnode-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.collis-bnode-body::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-clip: padding-box;
+  background-color: var(--background-modifier-border-hover);
+}
+
+.collis-bnode-body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-faint);
+}
+
+.collis-bnode-body .markdown-rendered {
+  background: transparent;
+  padding: 0;
+}
+
+.collis-bnode-body p:first-child {
+  margin-top: 0;
+}
+
+.collis-bnode-body p:last-child {
+  margin-bottom: 0;
+}
+
+.collis-bnode-meta {
+  flex: 0 0 auto;
+  margin: 2px 0 -5px;
+  color: var(--text-faint);
+  font-size: 9px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}
+
+.collis-bnode-placeholder {
+  color: var(--text-faint);
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+.collis-bnode-media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: none;
+  pointer-events: none;
+}
+
+.collis-bnode.is-doc {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 90px;
+}
+
+.collis-bnode-doc-icon {
+  color: var(--text-faint);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.collis-bnode-doc-name {
+  font-size: 13px;
+  color: var(--text-normal);
+  word-break: break-all;
+}
+
+.collis-board-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-primary);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.collis-board-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.collis-board-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.collis-board-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.collis-board-btn:disabled:hover {
+  background: var(--background-primary);
+  color: var(--text-muted);
+}
+
+.collis-board-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.collis-board-sep {
+  height: 1px;
+  margin: 2px 5px;
+  background: var(--background-modifier-border);
+}
+
+.collis-board-zoom {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  z-index: 5;
+  color: var(--text-faint);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.collis-board-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  color: var(--text-faint);
+  font-size: 13px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.collis-board-hint.is-hidden {
+  display: none;
+}
+
+/* ── Board extras ────────────────────────────────────── */
+
+.collis-select-box {
+  position: absolute;
+  z-index: 4;
+  border: 1px solid var(--interactive-accent);
+  border-radius: 2px;
+  background: rgba(120, 130, 140, 0.1);
+  pointer-events: none;
+}
+
+.collis-board.is-space {
+  cursor: grab;
+}
+
+.collis-board.is-space.is-panning {
+  cursor: grabbing;
+}
+
+.collis-board-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  padding: 18px 26px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  background: var(--background-primary);
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.06);
+}
+
+.collis-hint-title {
+  margin-bottom: 6px;
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.collis-hint-sub {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.collis-bnode.is-file.is-doc-text {
+  padding: 14px 16px;
+  overflow: hidden;
+  background: var(--background-primary);
+}
+
+.collis-media-modal {
+  width: min(90vw, 1100px);
+  height: min(85vh, 820px);
+}
+
+.collis-media-modal .modal-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(100% - 46px);
+}
+
+.collis-media-image,
+.collis-media-video,
+.collis-media-pdf {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border: none;
+}
+
+.collis-media-pdf {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Selection frame & media extras ──────────────────── */
+
+.collis-selection-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  border: 2px solid var(--interactive-accent);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.collis-selection-frame::before,
+.collis-selection-frame::after {
+  content: "";
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--interactive-accent);
+  border-radius: 50%;
+  background: var(--background-primary);
+}
+
+.collis-selection-frame::before {
+  left: -6px;
+  top: -6px;
+}
+
+.collis-selection-frame::after {
+  right: -6px;
+  bottom: -6px;
+}
+
+.collis-selection-frame.is-hidden {
+  display: none;
+}
+
+.collis-bnode.is-doc-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.collis-bnode-doc-head {
+  flex: 0 0 auto;
+  margin-bottom: 6px;
+  color: var(--inline-title-color, var(--text-normal));
+  font-family: var(--inline-title-font, var(--font-text));
+  font-size: var(--inline-title-size, 1.15em);
+  font-weight: var(--inline-title-weight, 700);
+  line-height: 1.25;
+}
+
+.collis-bnode-doc-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  font-size: var(--font-text-size, 16px);
+  line-height: var(--line-height-normal, 1.6);
+}
+
+.collis-bnode-doc-body h1 {
+  margin: 0.3em 0 0.4em;
+  font-size: 1.45em;
+  line-height: 1.25;
+}
+
+.collis-bnode-doc-body h2 {
+  margin: 0.3em 0 0.4em;
+  font-size: 1.3em;
+  line-height: 1.25;
+}
+
+.collis-bnode-doc-body h3 {
+  margin: 0.3em 0 0.4em;
+  font-size: 1.15em;
+  line-height: 1.3;
+}
+
+.collis-bnode-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.collis-bnode-play::before {
+  content: "";
+  margin-left: 4px;
+  border-left: 13px solid #fff;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+}
+
+
+.collis-bnode.is-playing {
+  cursor: default;
+}
+
+.collis-bnode.is-playing .collis-bnode-media {
+  pointer-events: auto;
+}
+
+.collis-bnode-play.is-hidden {
+  display: none;
+}
+
+.collis-inline-host {
+  position: relative;
+}
+
+.collis-md-editor {
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.collis-md-title {
+  flex: 0 0 auto;
+  width: 100%;
+  margin: 0 !important;
+  padding: 0;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.collis-md-title.inline-title {
+  color: var(--inline-title-color, var(--h1-color, var(--text-normal)));
+  font-family: var(--inline-title-font, var(--font-text));
+  font-size: var(--inline-title-size, var(--h1-size, 1.8em));
+  font-weight: var(--inline-title-weight, var(--h1-weight, 700));
+  line-height: var(--inline-title-line-height, 1.2);
+}
+
+.collis-md-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 !important;
+  font-family: var(--font-text) !important;
+  font-size: var(--font-text-size) !important;
+  line-height: var(--line-height-normal) !important;
+}
+
+.collis-bnode-media {
+  transition: opacity 140ms ease;
+}
+
+.collis-bnode-media.is-loading {
+  opacity: 0;
+}
+
+/* ── Node toolbar ────────────────────────────────────── */
+
+.collis-node-toolbar {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+}
+
+.collis-node-toolbar.is-hidden {
+  display: none;
+}
+
+.collis-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.collis-tool-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.collis-tool-btn.is-danger:hover {
+  background: rgba(214, 78, 78, 0.12);
+  color: var(--text-error);
+}
+
+.collis-tool-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.collis-tool-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.collis-tool-btn:disabled:hover {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+/* The header bar of a board tab uses the same paper colour as the canvas,
+   without touching any of its borders or controls. */
+.collis-board-leaf {
+  --collis-board-bg: #f7f6f2;
+  --collis-board-dot: #d9d5cc;
+}
+
+.theme-dark .collis-board-leaf {
+  /* Same source as the canvas, otherwise the header shows a seam. */
+  --collis-board-bg: var(--background-secondary, #232628);
+  --collis-board-dot: var(--background-modifier-border, #3c4046);
+}
+
+.collis-board-leaf,
+.collis-board-leaf .view-header,
+.collis-board-leaf .view-header-title-container,
+.collis-board-leaf .view-header-nav-buttons,
+.collis-board-leaf .view-content {
+  background-color: var(--collis-board-bg) !important;
+}
+
+
+/* ── Resize handle ───────────────────────────────────── */
+
+.collis-resize-handle {
+  position: absolute;
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.collis-bnode.is-selected .collis-resize-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* corners: visible dots */
+.collis-resize-handle[data-dir="nw"],
+.collis-resize-handle[data-dir="ne"],
+.collis-resize-handle[data-dir="sw"],
+.collis-resize-handle[data-dir="se"] {
+  width: 12px;
+  height: 12px;
+  border: none;
+  background: transparent;
+}
+
+.collis-resize-handle[data-dir="nw"] {
+  left: 1px;
+  top: 1px;
+  cursor: nwse-resize;
+}
+
+.collis-resize-handle[data-dir="ne"] {
+  right: 1px;
+  top: 1px;
+  cursor: nesw-resize;
+}
+
+.collis-resize-handle[data-dir="sw"] {
+  left: 1px;
+  bottom: 1px;
+  cursor: nesw-resize;
+}
+
+.collis-resize-handle[data-dir="se"] {
+  right: 1px;
+  bottom: 1px;
+  cursor: nwse-resize;
+}
+
+/* edges: invisible hit strips */
+.collis-resize-handle[data-dir="n"],
+.collis-resize-handle[data-dir="s"] {
+  left: 12px;
+  right: 12px;
+  height: 7px;
+  cursor: ns-resize;
+}
+
+.collis-resize-handle[data-dir="n"] {
+  top: 0;
+}
+
+.collis-resize-handle[data-dir="s"] {
+  bottom: 0;
+}
+
+.collis-resize-handle[data-dir="w"],
+.collis-resize-handle[data-dir="e"] {
+  top: 12px;
+  bottom: 12px;
+  width: 7px;
+  cursor: ew-resize;
+}
+
+.collis-resize-handle[data-dir="w"] {
+  left: 0;
+}
+
+.collis-resize-handle[data-dir="e"] {
+  right: 0;
+}
+
+.collis-board.is-resizing,
+.collis-board.is-resizing .collis-bnode {
+  cursor: default;
+}
+
+/* ── Connections ─────────────────────────────────────── */
+
+.collis-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.collis-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 18px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.collis-edge {
+  fill: none;
+  stroke: var(--text-faint);
+  stroke-width: 2.6px;
+  pointer-events: none;
+}
+
+.collis-edge-group:hover .collis-edge {
+  stroke: var(--text-muted);
+}
+
+.collis-edge-group.is-selected .collis-edge {
+  stroke: var(--interactive-accent);
+  stroke-width: 3.6px;
+}
+
+.collis-edge.is-preview {
+  stroke: var(--interactive-accent);
+  stroke-dasharray: 5 4;
+  pointer-events: none;
+}
+
+/* Label chip on the line's midpoint. A plate in the card colour with a hairline
+   border, so the stroke reads as interrupted behind the text instead of cutting
+   through it, and the chip reads as a chip on the canvas in either theme. Size
+   and radius are set as attributes from the text metrics in BoardView.ts. */
+.collis-edge-label-bg {
+  fill: var(--background-primary);
+  stroke: var(--background-modifier-border);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: all;
+  cursor: pointer;
+  transition: stroke 120ms ease;
+}
+
+/* Font comes from BoardView.ts (inline `font`), because the chip width is
+   measured from that exact spec; only paint lives here. */
+.collis-edge-label {
+  fill: var(--text-muted);
+  pointer-events: all;
+  cursor: pointer;
+  user-select: none;
+  transition: fill 120ms ease;
+}
+
+.collis-edge-label.is-relation {
+  fill: var(--text-faint);
+}
+
+.collis-edge-group:hover .collis-edge-label-bg,
+.collis-edge-group.is-selected .collis-edge-label-bg {
+  stroke: var(--interactive-accent);
+}
+
+.collis-edge-group:hover .collis-edge-label,
+.collis-edge-group.is-selected .collis-edge-label {
+  fill: var(--text-normal);
+}
+
+/* Inline label input, anchored in world space on the line itself. BoardView
+   owns the transform (it cancels the board zoom so the field stays readable). */
+.collis-edge-label-editor {
+  position: absolute;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transform: translate(-50%, -50%);
+}
+
+.collis-edge-relation-select {
+  box-sizing: border-box;
+  width: 220px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 9px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-family: var(--font-interface);
+  font-size: 13px;
+  outline: none;
+}
+
+.collis-edge-relation-select:focus {
+  border-color: var(--interactive-accent);
+}
+
+.collis-edge-label-input {
+  box-sizing: border-box;
+  width: 220px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--interactive-accent);
+  border-radius: 10px;
+  background: var(--background-primary);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  color: var(--text-normal);
+  font-family: var(--font-interface);
+  font-size: 14px;
+  text-align: center;
+  outline: none;
+}
+
+.collis-edge-label-input::placeholder {
+  color: var(--text-faint);
+}
+
+.collis-port {
+  position: absolute;
+  z-index: 5;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--background-primary);
+  border-radius: 50%;
+  background: var(--interactive-accent);
+  opacity: 0;
+  cursor: crosshair;
+  transform: translate(-50%, -50%);
+  transition: opacity 100ms ease;
+}
+
+.collis-port.is-top {
+  left: 50%;
+  top: 0;
+}
+
+.collis-port.is-bottom {
+  left: 50%;
+  top: 100%;
+}
+
+.collis-port.is-left {
+  left: 0;
+  top: 50%;
+}
+
+.collis-port.is-right {
+  left: 100%;
+  top: 50%;
+}
+
+.collis-bnode:hover .collis-port,
+.collis-bnode.is-link-target .collis-port {
+  opacity: 1;
+}
+
+.collis-board.is-linking {
+  cursor: crosshair;
+}
+
+/* Larger grab area around each connection dot, invisibly. */
+.collis-port::before {
+  content: "";
+  position: absolute;
+  inset: -11px;
+  border-radius: 50%;
+}
+
+/* ── Insert panel ────────────────────────────────────── */
+
+.collis-insert-panel {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: 328px;
+  max-height: 340px;
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  background: var(--background-primary);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+}
+
+.collis-insert-head {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.collis-insert-head-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--text-faint);
+}
+
+.collis-insert-head-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.collis-insert-input {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 22px;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-normal);
+  font-size: 13.5px;
+  outline: none !important;
+}
+
+.collis-insert-input:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.collis-insert-input::placeholder {
+  color: var(--text-faint);
+}
+
+.collis-insert-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.collis-insert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.collis-insert-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.collis-insert-item.is-active {
+  background: var(--background-modifier-hover);
+  box-shadow: inset 2px 0 0 var(--interactive-accent);
+}
+
+.collis-insert-item-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 18px;
+  color: var(--text-faint);
+}
+
+.collis-insert-item.is-active .collis-insert-item-icon {
+  color: var(--interactive-accent);
+}
+
+.collis-insert-item-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.collis-insert-item-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.collis-insert-title {
+  overflow: hidden;
+  color: var(--text-normal);
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collis-insert-sub {
+  margin-top: 1px;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collis-insert-foot {
+  flex: 0 0 auto;
+  padding: 6px 12px 8px;
+  border-top: 1px solid var(--background-modifier-border);
+  color: var(--text-faint);
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+}
+
+/* ── Colour swatches ─────────────────────────────────── */
+
+.collis-color-pop {
+  position: absolute;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 9px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 9px;
+  background: var(--background-primary);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+}
+
+.collis-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 50%;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.collis-swatch[data-color="red"] {
+  background: #d9534f;
+}
+
+.collis-swatch[data-color="orange"] {
+  background: #e08a2e;
+}
+
+.collis-swatch[data-color="yellow"] {
+  background: #c9a227;
+}
+
+.collis-swatch[data-color="green"] {
+  background: #639922;
+}
+
+.collis-swatch[data-color="teal"] {
+  background: #1d9e75;
+}
+
+.collis-swatch[data-color="blue"] {
+  background: #378add;
+}
+
+.collis-swatch[data-color="purple"] {
+  background: #7f77dd;
+}
+
+.collis-swatch:hover {
+  transform: scale(1.12);
+}
+
+.collis-swatch.is-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-faint);
+}
+
+.collis-swatch.is-clear svg {
+  width: 12px;
+  height: 12px;
+}
+
+.collis-swatch.is-custom {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-color: var(--background-modifier-border);
+  background: conic-gradient(
+    from 90deg,
+    #f87171,
+    #fbbf24,
+    #a3e635,
+    #34d399,
+    #38bdf8,
+    #818cf8,
+    #c084fc,
+    #f87171
+  );
+  cursor: pointer;
+}
+
+.collis-swatch.is-custom:hover {
+  transform: scale(1.12);
+}
+
+.collis-swatch.is-custom input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ── Edge toolbar ────────────────────────────────────── */
+
+.collis-edge-toolbar {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 7px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-primary);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.collis-edge-toolbar.is-hidden {
+  display: none;
+}
+
+.collis-edge-dot {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 50%;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.collis-edge-dot:hover {
+  transform: scale(1.12);
+}
+
+.collis-edge-dot.is-custom {
+  overflow: hidden;
+  border-color: var(--background-modifier-border);
+  background: conic-gradient(
+    from 90deg,
+    #f87171,
+    #fbbf24,
+    #a3e635,
+    #34d399,
+    #38bdf8,
+    #818cf8,
+    #c084fc,
+    #f87171
+  );
+}
+
+.collis-edge-dot.is-custom input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.collis-edge-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: var(--background-modifier-border);
+}
+
+.collis-rename-input {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+/* ── Groups ──────────────────────────────────────────── */
+
+.collis-bnode.is-group {
+  z-index: 0;
+  padding: 0;
+  background: rgba(120, 130, 140, 0.05);
+  border: 1.5px dashed var(--background-modifier-border-hover);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.collis-bnode.is-group:hover {
+  border-color: var(--text-faint);
+}
+
+.collis-bnode.is-group.is-selected {
+  border-color: var(--interactive-accent);
+}
+
+.collis-group-label {
+  position: absolute;
+  top: -21px;
+  left: 10px;
+  box-sizing: border-box;
+  width: 176px;
+  max-width: calc(100% - 20px);
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--collis-board-bg, var(--background-primary));
+  box-shadow: none;
+  color: var(--group-tint, var(--text-muted));
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 32px;
+  outline: none;
+  cursor: text;
+}
+
+.collis-group-label:hover {
+  border-color: var(--background-modifier-border);
+}
+
+.collis-group-label:focus {
+  border-color: var(--interactive-accent);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.collis-bnode.is-dimmed {
+  opacity: 0.25;
+  transition: opacity 220ms ease;
+}
+
+.collis-board.is-focusing .collis-edges {
+  opacity: 0.2;
+  transition: opacity 220ms ease;
+}
+
+.collis-bnode.is-flash {
+  z-index: 4;
+  animation: collis-flash 700ms ease-in-out 2;
+}
+
+@keyframes collis-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--interactive-accent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px var(--interactive-accent),
+      0 0 22px var(--interactive-accent);
+  }
+}
+
+.collis-insert-empty {
+  padding: 18px 12px;
+  color: var(--text-faint);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ── Align palette ───────────────────────────────────── */
+
+.collis-align-pop {
+  position: absolute;
+  z-index: 15;
+  display: grid;
+  grid-template-columns: repeat(4, 30px);
+  gap: 3px;
+  padding: 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 9px;
+  background: var(--background-primary);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+}
+
+.collis-guide {
+  stroke: var(--interactive-accent);
+  stroke-width: 1.8px;
+  stroke-dasharray: 5 4;
+  opacity: 1;
+  pointer-events: none;
+  /* Keep the line one and a half screen pixels at every zoom level. */
+  vector-effect: non-scaling-stroke;
+}
+
+/* ── Minimap ─────────────────────────────────────────── */
+
+.collis-minimap {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 6;
+  box-sizing: border-box;
+  width: 152px;
+  height: 102px;
+  padding: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 9px;
+  background: var(--background-primary);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+}
+
+.collis-minimap.is-hidden {
+  display: none;
+}
+
+.collis-minimap-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+}
+
+.collis-mini-node {
+  fill: var(--background-modifier-border);
+  stroke: none;
+}
+
+.collis-mini-node.is-card {
+  fill: #b9b4a8;
+}
+
+.collis-mini-node.is-text {
+  fill: #c9c4b8;
+}
+
+.collis-mini-node.is-file {
+  fill: #a8a49a;
+}
+
+.collis-mini-node.is-group {
+  fill: transparent;
+  stroke: var(--background-modifier-border-hover);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.collis-mini-view {
+  fill: var(--interactive-accent);
+  fill-opacity: 0.12;
+  stroke: var(--interactive-accent);
+  stroke-width: 2;
+}
+
+/* ── AI panel ────────────────────────────────────────── */
+
+.collis-ai-panel {
+  position: absolute;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: 580px;
+  height: 540px;
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  background: var(--background-primary);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
+}
+
+.collis-ai-panel.is-expanded {
+  left: 10% !important;
+  top: 7% !important;
+  width: 80%;
+  height: 86%;
+}
+
+.collis-ai-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 10px 14px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.collis-ai-head-icon {
+  display: flex;
+  align-items: center;
+  color: var(--interactive-accent);
+}
+
+.collis-ai-head-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.collis-ai-head-title {
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.collis-ai-head-model {
+  overflow: hidden;
+  max-width: 130px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collis-ai-head-spacer {
+  flex: 1 1 auto;
+}
+
+.collis-ai-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.collis-ai-chip:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.collis-ai-head-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.collis-ai-head-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.collis-ai-head-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.collis-ai-stream {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 14px 6px;
+}
+
+.collis-ai-msg {
+  display: flex;
+  margin-bottom: 12px;
+}
+
+.collis-ai-msg.is-user {
+  justify-content: flex-end;
+}
+
+.collis-ai-msg.is-ai {
+  justify-content: flex-start;
+}
+
+.collis-ai-bubble {
+  max-width: 90%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.is-user .collis-ai-bubble {
+  border-bottom-right-radius: 3px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.is-ai .collis-ai-bubble {
+  border: 1px solid var(--background-modifier-border);
+  border-bottom-left-radius: 3px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+
+.collis-ai-bubble.is-md {
+  white-space: normal;
+}
+
+.collis-ai-bubble.is-md p {
+  margin: 0 0 0.5em;
+}
+
+.collis-ai-bubble.is-md p:last-child {
+  margin-bottom: 0;
+}
+
+.collis-ai-bubble.is-md h1,
+.collis-ai-bubble.is-md h2,
+.collis-ai-bubble.is-md h3 {
+  margin: 0.5em 0 0.35em;
+  color: var(--text-normal);
+  font-size: 1.05em;
+  font-weight: 600;
+}
+
+.collis-ai-bubble.is-md ul,
+.collis-ai-bubble.is-md ol {
+  margin: 0.3em 0;
+  padding-left: 1.3em;
+}
+
+.collis-ai-bubble.is-error {
+  border-color: var(--background-modifier-error);
+  background: var(--background-modifier-error);
+  color: var(--text-error);
+}
+
+.collis-ai-bubble.is-pending {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.collis-ai-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  animation: collis-ai-blink 1.2s ease-in-out infinite;
+}
+
+.collis-ai-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.collis-ai-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes collis-ai-blink {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+.collis-ai-empty-hint {
+  padding: 8px 4px;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.collis-ai-compose {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.collis-ai-input {
+  flex: 1 1 auto;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--background-modifier-border) !important;
+  border-radius: 8px;
+  background: var(--background-secondary) !important;
+  box-shadow: none !important;
+  color: var(--text-normal);
+  font-size: 13px;
+  outline: none !important;
+}
+
+.collis-ai-input:focus {
+  border-color: var(--interactive-accent) !important;
+}
+
+.collis-ai-send {
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--interactive-accent);
+  box-shadow: none;
+  color: var(--text-on-accent);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.collis-ai-send:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.collis-ai-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.collis-ai-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 12px;
+}
+
+.collis-ai-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.collis-ai-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.collis-ai-btn.is-primary {
+  border-color: transparent;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.collis-ai-btn.is-primary:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.collis-ai-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.collis-ai-btn.is-hidden {
+  display: none;
+}
+
+/* ── AI config cards ─────────────────────────────────── */
+
+.collis-ai-cards {
+  margin: 10px 0 6px;
+}
+
+.collis-ai-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-primary);
+  transition: border-color 140ms ease;
+}
+
+.collis-ai-card.is-active {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+.collis-ai-avatar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.collis-ai-card.is-active .collis-ai-avatar {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.collis-ai-card-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.collis-ai-card-name {
+  overflow: hidden;
+  color: var(--text-normal);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collis-ai-card-url {
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--text-accent);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collis-ai-card-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.collis-ai-use {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--interactive-accent);
+  box-shadow: none;
+  color: var(--text-on-accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.collis-ai-use:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.collis-ai-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.collis-ai-icon:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.collis-ai-icon.is-danger:hover {
+  background: var(--background-modifier-error);
+  color: var(--text-on-accent);
+}
+
+.collis-ai-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.collis-ai-empty {
+  padding: 14px 2px;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.collis-ai-modal .setting-item {
+  border-top: none;
+}
+
+/* Picking one answer among several */
+.collis-ai-msg.is-ai {
+  cursor: pointer;
+}
+
+.collis-ai-msg.is-ai .collis-ai-bubble {
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.collis-ai-msg.is-ai:hover .collis-ai-bubble {
+  border-color: var(--background-modifier-border-hover);
+}
+
+.collis-ai-msg.is-picked .collis-ai-bubble {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+.collis-confirm-text {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Pending dots and error rows are not pickable answers */
+.collis-ai-msg.is-status {
+  justify-content: flex-start;
+}
+
+/* Round send / stop button */
+.collis-ai-send {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--interactive-accent);
+  box-shadow: none;
+  color: var(--text-on-accent);
+  cursor: pointer;
+  transition: background 140ms ease, transform 120ms ease;
+}
+
+.collis-ai-send:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.collis-ai-send svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.2;
+}
+
+.collis-ai-send.is-stop svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+  stroke-width: 0;
+}
+
+.collis-ai-thinking {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.collis-ai-head {
+  cursor: grab;
+  user-select: none;
+}
+
+.collis-ai-panel.is-dragging .collis-ai-head {
+  cursor: grabbing;
+}
+
+/* ── Conversation history pop ────────────────────────── */
+
+.collis-ai-history {
+  position: absolute;
+  z-index: 70;
+  width: 300px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 11px;
+  background: var(--background-primary);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+}
+
+.collis-ai-history-head {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px 8px;
+}
+
+.collis-ai-history-heading {
+  flex: 1 1 auto;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.collis-ai-history-clear {
+  padding: 2px 8px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.collis-ai-history-clear:hover {
+  background: var(--background-modifier-error);
+  color: var(--text-on-accent);
+}
+
+.collis-ai-history-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.collis-ai-history-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.collis-ai-history-item.is-current {
+  box-shadow: inset 2px 0 0 var(--interactive-accent);
+}
+
+.collis-ai-history-icon {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+
+.collis-ai-history-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.collis-ai-history-item.is-current .collis-ai-history-icon {
+  color: var(--interactive-accent);
+}
+
+.collis-ai-history-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.collis-ai-history-name {
+  overflow: hidden;
+  color: var(--text-normal);
+  font-size: 12.5px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collis-ai-history-time {
+  margin-top: 1px;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.collis-ai-history-del {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.collis-ai-history-item:hover .collis-ai-history-del {
+  opacity: 1;
+}
+
+.collis-ai-history-del:hover {
+  background: var(--background-modifier-error);
+  color: var(--text-on-accent);
+}
+
+.collis-ai-history-del svg {
+  width: 13px;
+  height: 13px;
+}
+
+.collis-ai-history-empty {
+  padding: 14px 8px 16px;
+  color: var(--text-faint);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Dark theme: solid surfaces one step above the canvas, so the grid never
+   shows through and the toolbar reads as a raised panel rather than a hole. */
+.theme-dark .collis-board-toolbar {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #2f3634;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+}
+
+.theme-dark .collis-board-btn {
+  border-color: transparent;
+  background: #3d4644;
+  box-shadow: none;
+  color: var(--text-muted);
+}
+
+.theme-dark .collis-board-btn:hover {
+  background: #4a5451;
+  color: var(--text-normal);
+}
+
+.theme-dark .collis-board-btn:disabled {
+  background: #343b39;
+  color: var(--text-faint);
+}
+
+/* ── Type badge on the node border ───────────────────── */
+
+.collis-type-badge {
+  position: absolute;
+  top: -9px;
+  right: 10px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+  /* Never steal a click: the badge is decoration, not a control. */
+  pointer-events: none;
+}
+
+.collis-type-badge svg {
+  width: 13px;
+  height: 13px;
+  stroke: #ffffff;
+  stroke-width: 2.2;
+  fill: none;
+}
+
+/* These two types clip their content to keep rounded image corners, which would
+   slice a badge sitting across the border. They keep it just inside instead. */
+.collis-bnode.is-file .collis-type-badge,
+.collis-bnode.is-doc-text .collis-type-badge {
+  top: 2px;
+  right: 4px;
+}
+
+.collis-type-badge[data-kind="card"] {
+  background: #c9a227;
+}
+
+.collis-type-badge[data-kind="note"] {
+  background: #378add;
+}
+
+.collis-type-badge[data-kind="text"] {
+  background: #8a8880;
+}
+
+.collis-type-badge[data-kind="image"] {
+  background: #1d9e75;
+}
+
+.collis-type-badge[data-kind="video"] {
+  background: #d9534f;
+}
+
+.collis-type-badge[data-kind="file"] {
+  background: #8a8880;
+}
+
+.theme-dark .collis-type-badge {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.theme-dark .collis-type-badge[data-kind="card"] {
+  background: #b8912a;
+}
+
+.theme-dark .collis-type-badge[data-kind="note"] {
+  background: #2f76bf;
+}
+
+.theme-dark .collis-type-badge[data-kind="text"] {
+  background: #6f6e68;
+}
+
+.theme-dark .collis-type-badge[data-kind="image"] {
+  background: #1a8c68;
+}
+
+.theme-dark .collis-type-badge[data-kind="video"] {
+  background: #bf4a46;
+}
+
+/* ── Sticky notes ────────────────────────────────────── */
+
+.collis-bnode.is-sticky {
+  background: #fdf3cf;
+  border-color: #e3cf8d;
+}
+
+.theme-dark .collis-bnode.is-sticky {
+  background: #4a4127;
+  border-color: #796b3d;
+}
+
+.collis-bnode.is-sticky.is-selected {
+  border-color: var(--interactive-accent);
+}
+
+.collis-type-badge[data-kind="sticky"] {
+  background: #c9a227;
+}
+
+.theme-dark .collis-type-badge[data-kind="sticky"] {
+  background: #b8912a;
+}
+
+.collis-insert-head {
+  cursor: grab;
+  user-select: none;
+}
+
+.collis-insert-panel.is-dragging .collis-insert-head {
+  cursor: grabbing;
+}
+
+.collis-ai-hint {
+  margin: 6px 0 12px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--interactive-accent);
+  border-radius: 4px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.collis-ai-advanced {
+  margin: 8px 0 16px;
+}
+
+.collis-ai-advanced > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Settings page: clear section breaks and quieter model metadata. */
+.collis-settings h3 {
+  margin-top: 4px;
+}
+
+.collis-settings-divider {
+  height: 1px;
+  margin: 22px 0 18px;
+  border-radius: 1px;
+  background: var(--background-modifier-border);
+}
+
+.collis-ai-hint {
+  margin: 4px 0 14px;
+  padding: 7px 10px;
+}
+
+.collis-ai-card-meta {
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collis-ai-card-url {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+/* ── Conversation: chat-like, no boxes around the assistant ───── */
+
+.collis-ai-panel {
+  overflow: hidden;
+}
+
+.collis-ai-stream {
+  padding: 20px 28px 116px;
+}
+
+.collis-ai-msg {
+  margin-bottom: 18px;
+}
+
+.collis-ai-msg.is-user {
+  justify-content: flex-end;
+}
+
+.collis-ai-msg.is-user .collis-ai-bubble {
+  max-width: 72%;
+  padding: 9px 13px;
+  border: none;
+  border-radius: 12px 12px 4px 12px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.collis-ai-msg.is-ai {
+  display: block;
+  cursor: default;
+}
+
+.collis-ai-msg.is-ai:hover {
+  cursor: default;
+}
+
+.collis-ai-reply {
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.collis-ai-reply p {
+  margin: 0 0 0.7em;
+}
+
+.collis-ai-reply p:last-child {
+  margin-bottom: 0;
+}
+
+.collis-ai-reply h1,
+.collis-ai-reply h2,
+.collis-ai-reply h3 {
+  margin: 0.8em 0 0.4em;
+  font-size: 1.05em;
+  font-weight: 500;
+}
+
+.collis-ai-reply ul,
+.collis-ai-reply ol {
+  margin: 0.4em 0;
+  padding-left: 1.35em;
+}
+
+/* Selected answer: a faint tint that stays inside the text column. */
+.collis-ai-msg.is-ai.is-picked .collis-ai-reply {
+  background: var(--background-modifier-hover);
+  box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 5px 0;
+  margin: -5px 0 0;
+}
+
+.collis-ai-reply-bar {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  min-height: 20px;
+}
+
+.collis-ai-reply-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.collis-ai-reply-icon:hover {
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+
+.collis-ai-reply-icon.is-done {
+  color: var(--interactive-accent);
+}
+
+.collis-ai-reply-icon svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.8;
+}
+
+
+.collis-ai-context {
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.collis-ai-context > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+  width: fit-content;
+  padding: 2px 0;
+  color: var(--text-muted);
+}
+
+.collis-ai-context > summary::-webkit-details-marker {
+  display: none;
+}
+
+.collis-ai-context > summary::before {
+  content: "▸";
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.collis-ai-context[open] > summary::before {
+  content: "▾";
+}
+
+.collis-ai-context-count {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.collis-ai-context-body {
+  margin: 4px 0 2px 14px;
+  line-height: 1.7;
+}
+
+.collis-ai-context-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.collis-ai-context-tag {
+  min-width: 26px;
+  color: var(--text-faint);
+}
+
+.collis-ai-context-name {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.collis-ai-context-size {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.collis-ai-context-flag,
+.collis-ai-context-note {
+  color: var(--text-warning);
+}
+
+.collis-ai-pending {
+  padding: 2px 0;
+}
+
+.collis-ai-msg.is-error .collis-ai-error {
+  padding: 2px 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.collis-ai-error-title {
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.collis-ai-error-summary {
+  margin-top: 4px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.collis-ai-error-detail {
+  margin-top: 6px;
+  font-size: 11.5px;
+}
+
+.collis-ai-error-detail > summary {
+  list-style: none;
+  cursor: pointer;
+  width: fit-content;
+  color: var(--text-faint);
+}
+
+.collis-ai-error-detail > summary::-webkit-details-marker {
+  display: none;
+}
+
+.collis-ai-error-detail > summary::before {
+  content: "▸ ";
+}
+
+.collis-ai-error-detail[open] > summary::before {
+  content: "▾ ";
+}
+
+.collis-ai-error-detail pre {
+  margin: 6px 0 0;
+  padding: 0 0 0 12px;
+  border-left: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.collis-ai-error-hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+}
+
+/* Floating composer, no dividing rule. */
+.collis-ai-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 28px 12px;
+  background: linear-gradient(to top, var(--background-primary) 72%, transparent);
+}
+
+.collis-ai-dock .collis-ai-compose {
+  padding: 0;
+  border-top: none;
+  gap: 8px;
+}
+
+.collis-ai-dock .collis-ai-input {
+  height: 46px;
+  padding: 0 16px;
+  border: none !important;
+  border-radius: 14px;
+  background: var(--background-secondary) !important;
+  font-size: 13px;
+}
+
+.collis-ai-dock .collis-ai-input:focus {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.collis-ai-dock .collis-ai-send {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+
+.collis-ai-dock .collis-ai-actions {
+  padding: 10px 2px 0;
+}
+
+/* Keep the original button look; only lift it above the floating dock. */
+.collis-ai-dock .collis-ai-btn {
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.collis-ai-dock .collis-ai-btn.is-primary {
+  border-color: transparent;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* Temporary node numbers, top-left, mirrored from the type badge. */
+.collis-ai-node-number {
+  position: absolute;
+  top: -9px;
+  left: 10px;
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+}
+
+/* Clickable N1 references inside an answer.
+   A translucent tint reads as a chip on either theme; the dark value only
+   lifts a little so it stays quiet next to running text. */
+.collis-ai-reply {
+  --collis-nref-bg: rgba(0, 0, 0, 0.045);
+  --collis-nref-bg-hover: rgba(0, 0, 0, 0.09);
+}
+
+.theme-dark .collis-ai-reply {
+  --collis-nref-bg: rgba(255, 255, 255, 0.065);
+  --collis-nref-bg-hover: rgba(255, 255, 255, 0.12);
+}
+
+/* The app's own button defaults outrank a plain class selector, so the
+   background is forced here — everything else stays inherited. */
+.collis-ai-reply .collis-ai-nref {
+  display: inline;
+  padding: 0 3px;
+  border: none;
+  border-radius: 4px;
+  background: var(--collis-nref-bg) !important;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.collis-ai-reply .collis-ai-nref:hover {
+  background: var(--collis-nref-bg-hover) !important;
+  text-decoration: underline;
+}
+
+/* ── Board doctor ──────────────────────────────────────── */
+
+/* Width is also set inline on .modal-el so it beats the theme's own rule. */
+.collis-doctor-modal {
+  width: 620px;
+  max-width: 92vw;
+  max-height: 74vh;
+  overflow: hidden;
+}
+
+.collis-doctor-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.collis-doctor-drag {
+  cursor: move;
+  user-select: none;
+}
+
+.collis-doctor-summary {
+  flex: none;
+  margin: 4px 0 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Only the findings scroll; summary and footer stay in view. */
+.collis-doctor-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 46vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.collis-doctor-empty {
+  padding: 28px 0 12px;
+  color: var(--text-faint);
+  font-size: 13px;
+  text-align: center;
+}
+
+.collis-doctor-group {
+  margin-top: 14px;
+}
+
+.collis-doctor-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.collis-doctor-group-note {
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.collis-doctor-count {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.collis-doctor-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-width: 0;
+  overflow: hidden;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--background-modifier-hover);
+}
+
+.collis-doctor-row:last-child {
+  border-bottom: none;
+}
+
+.collis-doctor-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.collis-doctor-dot.is-error { background: var(--text-error); }
+.collis-doctor-dot.is-warning { background: var(--text-warning); }
+.collis-doctor-dot.is-hint { background: var(--interactive-accent); }
+
+.collis-doctor-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.collis-doctor-title {
+  color: var(--text-normal);
+  font-size: 13px;
+}
+
+.collis-doctor-detail {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.collis-doctor-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.collis-doctor-btn {
+  padding: 3px 9px;
+  font-size: 12px;
+}
+
+.collis-doctor-btn.is-danger {
+  color: var(--text-error);
+}
+
+.collis-doctor-foot {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.collis-doctor-footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+/* ── In-board shortcut help ────────────────────────────── */
+
+.collis-help-modal {
+  width: 580px;
+  max-width: 92vw;
+  max-height: 76vh;
+  overflow: hidden;
+}
+
+.collis-help-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.collis-help-scope {
+  flex: none;
+  margin: 2px 0 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.collis-help-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 54vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.collis-help-group {
+  margin-top: 12px;
+}
+
+.collis-help-group-title {
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.collis-help-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--background-modifier-hover);
+}
+
+.collis-help-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-normal);
+  font-size: 13px;
+}
+
+.collis-help-keys {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.collis-help-key {
+  padding: 2px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.collis-help-foot {
+  flex: none;
+  margin-top: 12px;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* ── Outline panel ───────────────────────────────────── */
+
+.collis-outline-panel {
+  position: absolute;
+  z-index: 58;
+  display: flex;
+  flex-direction: column;
+  width: 400px;
+  max-width: calc(100% - 32px);
+  max-height: min(80%, 760px);
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  background: var(--background-primary);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.16);
+}
+
+.collis-outline-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px 9px 13px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  cursor: grab;
+  user-select: none;
+}
+
+.collis-outline-panel.is-dragging .collis-outline-head {
+  cursor: grabbing;
+}
+
+.collis-outline-head-icon {
+  display: flex;
+  align-items: center;
+  color: var(--interactive-accent);
+}
+
+.collis-outline-head-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.collis-outline-head-title {
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.collis-outline-head-meta {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.collis-outline-head-spacer {
+  flex: 1 1 auto;
+}
+
+.collis-outline-head .collis-outline-head-btn {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.collis-outline-head .collis-outline-head-btn:hover {
+  background: var(--background-modifier-hover);
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.collis-outline-head-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.collis-outline-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 4px 0 8px;
+}
+
+.collis-outline-body > .collis-outline-row {
+  margin-top: 6px;
+}
+
+.collis-outline-body > .collis-outline-row:first-child {
+  margin-top: 0;
+}
+
+.collis-outline-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.collis-outline-children {
+  margin: 2px 0 0 15px;
+  padding-left: 4px;
+  border-left: 1px solid var(--background-modifier-border);
+}
+
+.collis-outline-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.collis-outline-row.is-active {
+  background: var(--background-modifier-active-hover, var(--background-modifier-hover));
+}
+
+.collis-outline-toggle {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 18px;
+  margin-top: 1px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.collis-outline-toggle:hover {
+  color: var(--text-normal);
+  background: transparent;
+}
+
+.collis-outline-toggle svg {
+  width: 13px;
+  height: 13px;
+}
+
+.collis-outline-toggle.is-empty {
+  visibility: hidden;
+}
+
+.collis-outline-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.collis-outline-title-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.collis-outline-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-normal);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.collis-outline-row.is-root .collis-outline-title {
+  font-weight: 600;
+}
+
+.collis-outline-row.is-group .collis-outline-title {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.collis-outline-relation {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.collis-outline-relation.is-derives {
+  background: rgba(59, 130, 246, 0.14);
+  color: #3b82f6;
+}
+
+.collis-outline-relation.is-causes {
+  background: rgba(249, 115, 22, 0.14);
+  color: #f97316;
+}
+
+.collis-outline-badges {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.collis-outline-badge {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.collis-outline-badge.is-supports {
+  background: rgba(34, 197, 94, 0.14);
+  color: #22c55e;
+}
+
+.collis-outline-badge.is-refutes {
+  background: rgba(239, 68, 68, 0.14);
+  color: #ef4444;
+}
+
+.collis-outline-badge.is-source {
+  background: rgba(168, 85, 247, 0.14);
+  color: #a855f7;
+}
+
+.collis-outline-snippet {
+  margin-top: 1px;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.collis-outline-empty {
+  padding: 22px 18px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.collis-outline-note {
+  margin: 8px 10px 2px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+/* ── Markdown export ───────────────────────────────────── */
+
+.collis-export-modal {
+  width: 680px;
+  max-width: 94vw;
+  max-height: 84vh;
+  overflow: hidden;
+}
+
+.collis-export-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.collis-export-sub {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.collis-export-tabs {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.collis-export-tab {
+  padding: 4px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.collis-export-tab.is-active {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.collis-export-preview {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 46vh;
+  min-height: 260px;
+  padding: 12px 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre;
+  resize: none;
+}
+
+.collis-export-footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.collis-export-foot {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.collis-export-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.collis-export-btn {
+  padding: 5px 14px;
+  font-size: 12.5px;
+}
+
+.collis-export-drag {
+  cursor: move;
+  user-select: none;
+}
+
+/* ===== Board gallery (view, cards, covers) ===== */
+/* This view only: Obsidian's own header row is trimmed to a thin bar, and the
+   wall is pinned to the leaf so its frame sits right under the tabs and right
+   above the bottom of the pane. */
+.workspace-leaf:has(.wb-root),
+.workspace-leaf:has(.wb-root) .workspace-leaf-content { position: relative; }
+/* Only trim Obsidian's header when the gallery is its own leaf. Inside Workbench
+   the wall lives under .workbench-view; trimming that view's header makes the
+   whole workbench jump upward as soon as 白板 is opened. */
+.workspace-leaf:has(.wb-root):not(:has(.workbench-view)) .view-header {
+  box-sizing: border-box;
+  height: 24px;
+  min-height: 24px;
+  padding: 0 8px;
+}
+.workspace-leaf:has(.wb-root):not(:has(.workbench-view)) .view-header .view-header-nav-buttons,
+.workspace-leaf:has(.wb-root):not(:has(.workbench-view)) .view-header .view-actions { height: 24px; }
+
+.wb-root {
+  --vw-line: var(--background-modifier-border, var(--background-modifier-hover));
+  --vw-soft: var(--background-modifier-hover);
+  --vw-tint: var(--background-secondary-alt, var(--background-secondary));
+  --vw-shadow: 0 14px 30px -20px rgba(0, 0, 0, .6);
+  /* 画布卡片沿用模块页卡片的表面 / 阴影，保证两处观感一致 */
+  --vw-card-bg: var(--background-primary-alt, var(--background-primary));
+  --vw-card-bg-hover: var(--background-primary);
+  --vw-card-shadow: 0 2px 6px rgba(28, 34, 30, .05);
+
+  position: absolute;
+  top: 24px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  overflow: hidden;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-family: inherit;
+  -webkit-font-smoothing: antialiased;
+}
+
+.theme-light .wb-root {
+  --vw-card-bg: #f9f8f5;
+  --vw-card-bg-hover: #fdfcfa;
+}
+
+.theme-dark .wb-root {
+  --vw-card-bg: #434e4c;
+  --vw-card-bg-hover: #475250;
+  --vw-card-shadow: 0 2px 7px rgba(0, 0, 0, .18);
+}
+
+/* ---------- Frame: the whole page sits on one bordered layer ---------- */
+.wb-root .vw-frame {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid var(--vw-line);
+  border-radius: 12px;
+  background: var(--background-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+}
+.wb-root .vw-toolbar {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  margin: 10px 20px 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--vw-line);
+  border-radius: 10px;
+  background: var(--background-primary);
+  box-shadow: 0 3px 10px -6px rgba(0, 0, 0, .32);
+}
+.wb-root .vw-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 24px 14px;
+}
+
+/* ---------- Header ---------- */
+.wb-root .vw-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  padding: 0;
+  flex-wrap: wrap;
+}
+.wb-root .vw-intro { min-width: 0; }
+.wb-root .vw-title { display: flex; align-items: baseline; gap: 10px; }
+.wb-root .vw-title h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.12;
+  font-weight: 650;
+  letter-spacing: -.032em;
+  color: var(--text-normal);
+}
+.wb-root .vw-count {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  background: var(--vw-soft);
+  border-radius: 20px;
+  padding: 3px 9px;
+  transform: translateY(-2px);
+}
+
+/* ---------- Toolbar ---------- */
+.wb-root .vw-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.wb-root .vw-ico { display: inline-flex; align-items: center; }
+.wb-root .vw-ico svg { width: 14px; height: 14px; }
+
+/* ---------- Search ---------- */
+.wb-root .vw-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--vw-line);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  color: var(--text-faint);
+  transition: border-color .14s ease;
+}
+.wb-root .vw-search:focus-within {
+  border-color: var(--background-modifier-border-hover, var(--text-faint));
+}
+.wb-root .vw-search-input {
+  all: unset;
+  display: block;
+  width: 116px;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-normal);
+  background: transparent;
+  cursor: text;
+}
+.wb-root .vw-search-input::placeholder { color: var(--text-faint); opacity: 1; }
+.wb-root .vw-search-input::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+.wb-root .vw-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  transition: color .14s ease, background .14s ease, border-color .14s ease;
+}
+.wb-root .vw-sort:hover {
+  color: var(--text-normal);
+  background: var(--vw-soft);
+  border-color: var(--vw-line);
+}
+.wb-root .vw-caret { opacity: .6; margin-left: -1px; }
+.wb-root .vw-caret svg { width: 12px; height: 12px; }
+
+.wb-root .vw-primary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 15px;
+  border: 1px solid var(--vw-line);
+  border-radius: 9px;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -.005em;
+  cursor: pointer;
+  transition: opacity .14s ease, transform .14s ease;
+}
+.wb-root .vw-ghost {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--vw-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-normal);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.wb-root .vw-ghost:hover { background: var(--vw-soft); }
+.wb-root .vw-ghost:disabled, .wb-root .vw-primary:disabled { opacity: .45; cursor: default; }
+.wb-root .vw-multi-count {
+  margin-right: auto;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.wb-root .vw-danger {
+  background: var(--color-red, var(--text-normal));
+  color: var(--background-primary);
+  border-color: transparent;
+}
+.wb-root .vw-more { padding: 0 8px; }
+.wb-root .vw-more .vw-ico svg { width: 16px; height: 16px; }
+.wb-root .vw-primary:hover {
+  background: var(--background-modifier-border-hover, var(--vw-soft));
+}
+.wb-root .vw-primary:active { transform: scale(.985); }
+.wb-root .vw-primary.is-large {
+  height: 36px;
+  padding: 0 18px;
+  font-size: 13px;
+  margin-top: 20px;
+}
+
+/* ---------- Grid: 与模块页网格同一套栅格 ---------- */
+.wb-root .vw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 12px;
+  align-content: start;
+  justify-content: start;
+}
+
+.wb-root .vw-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--vw-line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--vw-card-bg);
+  cursor: pointer;
+  box-shadow: none;
+  animation: vw-rise .3s cubic-bezier(.22, .61, .36, 1) both;
+  transition: background-color .14s ease, border-color .14s ease,
+    transform .14s ease, box-shadow .14s ease;
+}
+.wb-root .vw-card.is-selected {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 32%, transparent), var(--vw-card-shadow);
+}
+.wb-root .vw-card-del {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--background-primary) 88%, transparent);
+  color: var(--text-muted);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity .15s ease, color .15s ease;
+}
+.wb-root .vw-card:hover .vw-card-del,
+.wb-root .vw-card-del:focus { opacity: 1; }
+.wb-root .vw-card-del:hover {
+  color: var(--color-red, var(--text-normal));
+}
+.wb-root .vw-card-del svg { width: 13px; height: 13px; }
+.wb-root .vw-check {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 3;
+  display: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, var(--background-primary));
+}
+.wb-root .vw-card.is-selected .vw-check { display: grid; }
+.wb-root .vw-check svg { width: 12px; height: 12px; }
+.wb-root .vw-card:nth-child(2) { animation-delay: .035s; }
+.wb-root .vw-card:nth-child(3) { animation-delay: .07s; }
+.wb-root .vw-card:nth-child(4) { animation-delay: .105s; }
+.wb-root .vw-card:nth-child(5) { animation-delay: .14s; }
+.wb-root .vw-card:nth-child(n+6) { animation-delay: .18s; }
+.wb-root .vw-card:hover {
+  background: var(--vw-card-bg-hover);
+  transform: translateY(-1px);
+  border-color: var(--background-modifier-border-hover, var(--text-faint));
+  box-shadow: var(--vw-card-shadow);
+}
+/* Hover must not mask the selection ring: same specificity as :hover, but
+   declared later, so a selected card keeps its outline while pointed at. */
+.wb-root .vw-card.is-selected:hover {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 32%, transparent), var(--vw-card-shadow);
+}
+@keyframes vw-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- Cover: 画布微缩图，尺寸和模块卡片的缩略图一致 ---------- */
+.wb-root .vw-cover {
+  position: relative;
+  height: 92px;
+  overflow: hidden;
+  border-radius: 7px;
+  background-color: var(--vw-tint);
+  background-image: radial-gradient(var(--vw-line) 1px, transparent 1px);
+  background-size: 14px 14px;
+  background-position: 6px 6px;
+}
+.wb-root .vw-cover.is-blank {
+  display: grid;
+  place-items: center;
+}
+.wb-root .vw-cover-ghost {
+  display: inline-flex;
+  color: var(--text-faint);
+  opacity: .55;
+}
+.wb-root .vw-cover-ghost svg { width: 24px; height: 24px; }
+/* An empty board still shows a canvas: a dashed artboard inside the cover. */
+.wb-root .vw-cover.is-blank::after {
+  content: "";
+  position: absolute;
+  inset: 15%;
+  border: 1px dashed var(--vw-line);
+  border-radius: 5px;
+  opacity: .8;
+  pointer-events: none;
+}
+
+.wb-root .vw-cover-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.wb-root .vw-cover-lines line {
+  stroke: var(--text-faint);
+  stroke-width: 1;
+  opacity: .45;
+  vector-effect: non-scaling-stroke;
+}
+
+.wb-root .vw-chip {
+  position: absolute;
+  display: block;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--background-primary);
+  box-shadow: inset 0 0 0 1px var(--vw-line);
+  transition: box-shadow .18s ease;
+}
+.wb-root .vw-chip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--tn, var(--text-muted));
+  opacity: .18;
+}
+.wb-root .vw-chip[data-kind="text"]::before { opacity: .26; }
+.wb-root .vw-chip[data-kind="group"]::before { opacity: .1; }
+.wb-root .vw-card:hover .vw-chip { box-shadow: inset 0 0 0 1px var(--text-faint); }
+.wb-root .vw-chip-text {
+  position: relative;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  padding: 2px 3px;
+  font-size: 7px;
+  line-height: 1.4;
+  letter-spacing: 0;
+  color: var(--text-normal);
+  opacity: .92;
+  word-break: break-word;
+}
+.wb-root .vw-chip[data-tone="orange"] { --tn: var(--color-orange); }
+.wb-root .vw-chip[data-tone="red"] { --tn: var(--color-red); }
+.wb-root .vw-chip[data-tone="yellow"] { --tn: var(--color-yellow); }
+.wb-root .vw-chip[data-tone="green"] { --tn: var(--color-green); }
+.wb-root .vw-chip[data-tone="cyan"] { --tn: var(--color-cyan); }
+.wb-root .vw-chip[data-tone="blue"] { --tn: var(--color-blue); }
+.wb-root .vw-chip[data-tone="purple"] { --tn: var(--color-purple); }
+.wb-root .vw-chip[data-tone="pink"] { --tn: var(--color-pink); }
+
+/* ---------- Card body: 标题 + 一行元信息，对齐模块页卡片 ---------- */
+.wb-root .vw-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 0 0;
+}
+.wb-root .vw-card-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-normal);
+}
+.wb-root .vw-card-meta {
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.wb-root .vw-card-count,
+.wb-root .vw-card-date {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Confirmation modal ---------- */
+.collis-delete-modal .vw-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+}
+.collis-delete-modal button { font: inherit; }
+.collis-rename-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+/* ---------- Empty ---------- */
+.wb-root .vw-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 38px 24px 44px;
+  animation: vw-rise .32s ease both;
+}
+.wb-root .vw-empty-art {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 74px;
+  border-radius: 20px;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  border: 1px solid var(--vw-line);
+  box-shadow: var(--vw-shadow);
+}
+.wb-root .vw-empty-art svg { width: 32px; height: 32px; }
+.wb-root .vw-empty-title {
+  margin-top: 18px;
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: var(--text-normal);
+}
+.wb-root .vw-empty-hint {
+  margin: 7px 0 0;
+  max-width: 320px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* ---------- Error ---------- */
+.wb-root .vw-error {
+  margin: 30px 0;
+  padding: 18px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--color-red, var(--vw-line));
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+.wb-root .vw-error strong { display: block; font-size: 13.5px; margin-bottom: 6px; }
+.wb-root .vw-error p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+@media (max-width: 780px) {
+  .wb-root { padding: 4px 6px; }
+  .wb-root .vw-scroll { padding: 0 14px 12px; }
+  .wb-root .vw-grid { gap: 12px; }
+  .wb-root .vw-actions { margin-left: 0; }
+}

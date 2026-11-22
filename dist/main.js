@@ -1,0 +1,22713 @@
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __commonJS = (cb, mod) => function __require() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+};
+
+// vendor/collis-core.js
+var require_collis_core = __commonJS({
+  "vendor/collis-core.js"(exports2, module2) {
+    "use strict";
+    var {
+      Plugin: Plugin2,
+      ItemView: ItemView2,
+      Modal: Modal2,
+      MarkdownView,
+      SuggestModal,
+      Notice: Notice2,
+      PluginSettingTab: PluginSettingTab2,
+      Setting: Setting2,
+      TFile,
+      TFolder,
+      Menu: Menu2,
+      addIcon: addIcon2,
+      setIcon: setIcon2,
+      moment
+    } = require("obsidian");
+    var VIEW_TYPE_QM = "qm-cards-view";
+    var QM_TREE_H = 252;
+    var QM_ICONS = {
+      // 搜索：放大镜
+      search: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>',
+      // 回看：带回环的钟
+      review: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4.3l2.8 1.7"/></svg>',
+      // 筛选：三条渐短的横线
+      filter: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h16"/><path d="M7 12h10"/><path d="M10 17h4"/></svg>',
+      // 更多：三个点
+      more: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
+      // 返回
+      back: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>'
+    };
+    function qmMenuPlace(anchor, root, w, h) {
+      const rootW = root.width || 0;
+      const rootH = root.height || 0;
+      let left = anchor.right - root.left - w;
+      const maxLeft = rootW ? Math.max(6, rootW - w - 6) : left;
+      left = Math.max(6, Math.min(left, maxLeft));
+      let top = anchor.bottom - root.top + 6;
+      if (rootH && top + h > rootH - 6) {
+        const above = anchor.top - root.top - h - 6;
+        top = above >= 6 ? above : Math.max(6, rootH - h - 6);
+      }
+      return { left: Math.round(left), top: Math.round(top) };
+    }
+    function qmSelbarGap(viewBottom, statusTop, base) {
+      const fallback = typeof base === "number" ? base : 10;
+      if (typeof viewBottom !== "number" || typeof statusTop !== "number")
+        return fallback;
+      const overlap = Math.round(viewBottom - statusTop);
+      if (overlap <= 0)
+        return fallback;
+      return overlap + 6;
+    }
+    function qmStatusCover(viewBottom, statusTop) {
+      if (typeof viewBottom !== "number" || typeof statusTop !== "number")
+        return 0;
+      const overlap = Math.round(viewBottom - statusTop);
+      return overlap > 0 ? overlap : 0;
+    }
+    function qmHasBlockRef(text, id) {
+      if (!text || !id)
+        return false;
+      try {
+        const esc = String(id).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return new RegExp("\\^" + esc + "(?![A-Za-z0-9-])").test(String(text));
+      } catch (e) {
+        return false;
+      }
+    }
+    var QM_REVIEW_N = 5;
+    function qmShuffle(list) {
+      const a = (list || []).slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = a[i];
+        a[i] = a[j];
+        a[j] = t;
+      }
+      return a;
+    }
+    function qmIcon(parent, name) {
+      if (!parent || !QM_ICONS[name])
+        return;
+      parent.innerHTML = QM_ICONS[name];
+    }
+    var ICON_ID = "collis-mark";
+    var ICON_MARK = /* @__PURE__ */ (() => {
+      return '<g transform="scale(4.1667)" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="19" height="17" rx="5" stroke-dasharray="3 2.6"/><path d="M6 15.5C8.2 10.5 11 10.2 11.8 12.4C12.6 14.6 15.4 14.8 17.6 10.2"/><circle cx="18.6" cy="6.6" r="1.5" fill="currentColor" stroke="none"/></g>';
+    })();
+    var DEFAULT_SETTINGS2 = {
+      folderPath: "00-Inbox/\u901F\u8BB0",
+      quickTags: [],
+      maxCards: 500,
+      trash: [],
+      autoPruneEmptyDates: true,
+      blockRefEmbed: false,
+      collapsedDates: [],
+      strictCardId: true,
+      // 没提交完的手稿：{ text, at }。只存本机，不写进任何笔记文件
+      draft: { text: "", at: 0 }
+    };
+    var DRAFT_TTL = 7 * 24 * 60 * 60 * 1e3;
+    var DRAFT_MAX = 5e3;
+    var MONTH_FILE_RE = /^\d{4}-\d{2}\.md$/;
+    function genId() {
+      let s = "";
+      const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+      for (let i = 0; i < 6; i++)
+        s += chars[Math.floor(Math.random() * chars.length)];
+      return s;
+    }
+    function padTime(t) {
+      const m = String(t).match(/^(\d{1,2}):(\d{2})$/);
+      if (!m)
+        return String(t);
+      return (m[1].length === 1 ? "0" + m[1] : m[1]) + ":" + m[2];
+    }
+    function baseOf(path) {
+      const name = String(path || "").split("/").pop() || "";
+      return name.replace(/\.md$/i, "");
+    }
+    var QM_CARD_RE = /^[-*][ \t]+(\d{1,2}:\d{2})[ \t]+(.*)$/;
+    var QM_CONT_INDENT = "  ";
+    function qmBodyLines(text) {
+      const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n").map((l) => l.replace(/[ \t]+$/, ""));
+      while (lines.length && !lines[0].trim())
+        lines.shift();
+      while (lines.length && !lines[lines.length - 1].trim())
+        lines.pop();
+      return lines;
+    }
+    function qmFormatEntry(time, bodyLines, id) {
+      const src = bodyLines && bodyLines.length ? bodyLines : [""];
+      const out = src.map((l, i) => {
+        const prefix = i === 0 ? "- " + time + " " : QM_CONT_INDENT;
+        const hardBreak = i < src.length - 1 && l.trim() ? "  " : "";
+        return prefix + l + hardBreak;
+      });
+      const last = out.length - 1;
+      if (id)
+        out[last] = out[last].replace(/[ \t]+$/, "") + " ^" + id;
+      return out;
+    }
+    function qmCardBlockEnd(lines, start) {
+      let end = start;
+      for (let i = start + 1; i < lines.length; i++) {
+        if (!/^[ \t]/.test(lines[i]))
+          break;
+        end = i;
+      }
+      if (end > start) {
+        for (let i = end; i >= start; i--) {
+          if (/[ \t]\^[A-Za-z0-9-]{4,}[ \t]*$/.test(lines[i])) {
+            end = i;
+            break;
+          }
+        }
+      }
+      while (end > start && lines[end].trim() === "")
+        end--;
+      return end;
+    }
+    var QM_APPEND_RE = /^〔追加[ \t]+([^〕]+)〕$/;
+    function qmCardSections(body) {
+      const lines = String(body == null ? "" : body).replace(/\r\n?/g, "\n").split("\n");
+      const original = [];
+      const appends = [];
+      let cur = null;
+      for (const raw of lines) {
+        const line = String(raw == null ? "" : raw).replace(/[ \t]+$/, "");
+        const m = line.trim().match(QM_APPEND_RE);
+        if (m) {
+          cur = { label: m[1].trim(), lines: [] };
+          appends.push(cur);
+          continue;
+        }
+        (cur ? cur.lines : original).push(line);
+      }
+      const tidy = (arr) => {
+        while (arr.length && !arr[0].trim())
+          arr.shift();
+        while (arr.length && !arr[arr.length - 1].trim())
+          arr.pop();
+        return arr.join("\n");
+      };
+      return {
+        original: tidy(original),
+        appends: appends.map((a) => ({ label: a.label, text: tidy(a.lines) }))
+      };
+    }
+    function qmComposeBody(original, appends) {
+      const out = qmBodyLines(original || "");
+      for (const a of appends || []) {
+        out.push("\u3014\u8FFD\u52A0 " + a.label + "\u3015");
+        for (const l of qmBodyLines(a.text || ""))
+          out.push(l);
+      }
+      return out.join("\n");
+    }
+    function qmBlockBody(lines, hit) {
+      const out = [];
+      for (let i = hit.lineIndex; i <= hit.lineEnd; i++) {
+        let s = String(lines[i] == null ? "" : lines[i]);
+        if (i === hit.lineIndex)
+          s = s.replace(/^[-*][ \t]+(\d{1,2}:\d{2})[ \t]+/, "");
+        else
+          s = s.replace(/^ {2}|^\t/, "");
+        s = s.replace(/[ \t]*\^[A-Za-z0-9-]+[ \t]*$/, "");
+        out.push(s.replace(/[ \t]+$/, ""));
+      }
+      return out.join("\n");
+    }
+    function qmReplaceBlock(lines, hit, bodyText, id) {
+      const entry = qmFormatEntry(hit.time, qmBodyLines(bodyText), id);
+      lines.splice(hit.lineIndex, hit.lineEnd - hit.lineIndex + 1, ...entry);
+      return lines.join("\n");
+    }
+    function qmCollectIds(content) {
+      const ids = /* @__PURE__ */ new Set();
+      const re = /[ \t]\^([A-Za-z0-9-]+)[ \t]*$/gm;
+      let m;
+      while ((m = re.exec(String(content || ""))) !== null)
+        ids.add(m[1]);
+      return ids;
+    }
+    function qmLooksLikeCardFile(content) {
+      const lines = String(content || "").replace(/\r\n?/g, "\n").split("\n");
+      let inDate = false;
+      for (const line of lines) {
+        if (!line.trim())
+          continue;
+        if (/^##[ \t]+\d{4}-\d{2}-\d{2}[ \t]*$/.test(line)) {
+          inDate = true;
+          continue;
+        }
+        if (!inDate)
+          return false;
+        if (/^##?[ \t]/.test(line))
+          return false;
+        if (QM_CARD_RE.test(line))
+          continue;
+        if (/^[ \t]/.test(line))
+          continue;
+        return false;
+      }
+      return true;
+    }
+    function qmInsertCardLines(content, date, entryLines) {
+      const raw = String(content || "").replace(/\r\n?/g, "\n");
+      const lines = raw.split("\n");
+      const headerRe = new RegExp("^##[ \\t]+" + escapeRe(date) + "[ \\t]*$");
+      let hi = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (headerRe.test(lines[i])) {
+          hi = i;
+          break;
+        }
+      }
+      if (hi === -1) {
+        let body = raw.replace(/\s+$/, "");
+        if (body)
+          body += "\n\n";
+        return body + "## " + date + "\n\n" + entryLines.join("\n") + "\n";
+      }
+      let last = -1;
+      for (let i = hi + 1; i < lines.length; i++) {
+        if (/^##[ \t]/.test(lines[i]))
+          break;
+        if (lines[i].trim())
+          last = i;
+      }
+      if (last >= 0) {
+        lines.splice(last + 1, 0, ...entryLines);
+        return lines.join("\n");
+      }
+      const tail = lines[hi + 1];
+      if (tail !== void 0 && tail.trim() === "") {
+        lines.splice(hi + 2, 0, ...entryLines);
+      } else {
+        lines.splice(hi + 1, 0, "", ...entryLines);
+      }
+      return lines.join("\n");
+    }
+    function qmPruneEmptyDateSections(content, onlyDate) {
+      const lines = String(content || "").replace(/\r\n?/g, "\n").split("\n");
+      const headerRe = /^##[ \t]+(\d{4}-\d{2}-\d{2})[ \t]*$/;
+      const out = [];
+      for (let i = 0; i < lines.length; i++) {
+        const hm = lines[i].match(headerRe);
+        if (!hm) {
+          out.push(lines[i]);
+          continue;
+        }
+        let j = i + 1;
+        let hasContent = false;
+        while (j < lines.length && !headerRe.test(lines[j])) {
+          if (lines[j].trim()) {
+            hasContent = true;
+            break;
+          }
+          j++;
+        }
+        if (hasContent || onlyDate && hm[1] !== onlyDate) {
+          out.push(lines[i]);
+          continue;
+        }
+        i = j - 1;
+        while (out.length && !out[out.length - 1].trim())
+          out.pop();
+        if (out.length)
+          out.push("");
+      }
+      while (out.length && !out[out.length - 1].trim())
+        out.pop();
+      return out.length ? out.join("\n") + "\n" : "";
+    }
+    function qmStripEmptyDateSections(content, skipDates) {
+      const lines = String(content || "").replace(/\r\n?/g, "\n").split("\n");
+      const headerRe = /^##[ \t]+(\d{4}-\d{2}-\d{2})[ \t]*$/;
+      const skip = skipDates instanceof Set ? skipDates : new Set(skipDates || []);
+      const out = [];
+      const removed = [];
+      for (let i = 0; i < lines.length; i++) {
+        const hm = lines[i].match(headerRe);
+        if (!hm || skip.has(hm[1])) {
+          out.push(lines[i]);
+          continue;
+        }
+        let j = i + 1;
+        let hasContent = false;
+        while (j < lines.length) {
+          if (headerRe.test(lines[j]))
+            break;
+          if (lines[j].trim()) {
+            hasContent = true;
+            break;
+          }
+          j++;
+        }
+        if (hasContent) {
+          out.push(lines[i]);
+          continue;
+        }
+        removed.push(hm[1]);
+        i = j - 1;
+        while (out.length && !out[out.length - 1].trim())
+          out.pop();
+        if (out.length)
+          out.push("");
+      }
+      while (out.length && !out[out.length - 1].trim())
+        out.pop();
+      return { text: out.length ? out.join("\n") + "\n" : "", removed };
+    }
+    function qmInsertRestoredCard(content, date, time, entryLines) {
+      const raw = String(content || "").replace(/\r\n?/g, "\n");
+      const lines = raw.split("\n");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) {
+        while (lines.length && !lines[lines.length - 1].trim())
+          lines.pop();
+        const out = lines.concat(lines.length ? [""] : [], entryLines);
+        return out.join("\n").replace(/\n+$/, "") + "\n";
+      }
+      const hRe = /^##[ \t]+(\d{4}-\d{2}-\d{2})[ \t]*$/;
+      let hi = -1;
+      for (let i = 0; i < lines.length; i++) {
+        const m = lines[i].match(hRe);
+        if (m && m[1] === date) {
+          hi = i;
+          break;
+        }
+      }
+      if (hi === -1) {
+        let at2 = lines.length;
+        for (let i = 0; i < lines.length; i++) {
+          const m = lines[i].match(hRe);
+          if (m && m[1] > date) {
+            at2 = i;
+            break;
+          }
+        }
+        const head = lines.slice(0, at2);
+        const tail = lines.slice(at2);
+        while (head.length && !head[head.length - 1].trim())
+          head.pop();
+        while (tail.length && !tail[0].trim())
+          tail.shift();
+        const out = head.concat(head.length ? [""] : [], ["## " + date, ""], entryLines);
+        if (tail.length)
+          out.push("", ...tail);
+        return out.join("\n").replace(/\n+$/, "") + "\n";
+      }
+      let at = hi + 1;
+      for (let i = hi + 1; i < lines.length; i++) {
+        if (/^##[ \t]/.test(lines[i]))
+          break;
+        const cm = lines[i].match(QM_CARD_RE);
+        if (!cm)
+          continue;
+        const end = qmCardBlockEnd(lines, i);
+        if (padTime(cm[1]) <= time)
+          at = end + 1;
+        i = end;
+      }
+      if (at === hi + 1) {
+        if (lines[at] !== void 0 && !lines[at].trim())
+          lines.splice(at + 1, 0, ...entryLines);
+        else
+          lines.splice(at, 0, "", ...entryLines);
+      } else {
+        lines.splice(at, 0, ...entryLines);
+      }
+      return lines.join("\n");
+    }
+    function qmPasteText(body) {
+      const lines = String(body || "").replace(/\r\n?/g, "\n").split("\n");
+      return lines.map((l, i) => i < lines.length - 1 && l.trim() ? l + "  " : l).join("\n");
+    }
+    function qmFirstLine(body, max) {
+      const limit = typeof max === "number" ? max : 18;
+      const line = String(body || "").replace(/\r\n?/g, "\n").split("\n").map((s) => s.trim()).filter(Boolean)[0] || "";
+      const flat = line.replace(/\s+/g, " ");
+      return flat.length > limit ? flat.slice(0, limit) + "\u2026" : flat;
+    }
+    function qmBaseName(p) {
+      return String(p || "").split("/").pop().replace(/\.md$/i, "").toLowerCase();
+    }
+    function qmParseBlockRef(raw) {
+      const s = String(raw || "");
+      const at = s.indexOf("#^");
+      if (at < 0)
+        return null;
+      let target = s.slice(0, at).replace(/^!?\[\[/, "").replace(/\]\]$/, "").trim();
+      let id = s.slice(at + 2);
+      const cut = id.search(/[|\]\s]/);
+      if (cut >= 0)
+        id = id.slice(0, cut);
+      id = id.trim().toLowerCase();
+      if (!id)
+        return null;
+      return { target, id };
+    }
+    function qmRefFolder(path) {
+      const parts = String(path == null ? "" : path).split("/");
+      if (parts.length < 2)
+        return "";
+      return parts.slice(0, -1).join("/");
+    }
+    function qmBigrams(text) {
+      const t = String(text == null ? "" : text).toLowerCase().replace(/\s+/g, "");
+      const out = /* @__PURE__ */ new Set();
+      for (let i = 0; i < t.length - 1; i++)
+        out.add(t.slice(i, i + 2));
+      return out;
+    }
+    function qmBigramScore(a, b) {
+      const A = qmBigrams(a);
+      const B = qmBigrams(b);
+      if (!A.size || !B.size)
+        return 0;
+      let hit = 0;
+      for (const g of A)
+        if (B.has(g))
+          hit++;
+      return hit / A.size;
+    }
+    function qmAppendHits(parent, text, words) {
+      const src = String(text == null ? "" : text);
+      const low = src.toLowerCase();
+      const marks = [];
+      for (const w of words || []) {
+        const needle = String(w || "").toLowerCase();
+        if (!needle)
+          continue;
+        let i = low.indexOf(needle);
+        while (i !== -1 && marks.length < 64) {
+          marks.push([i, i + needle.length]);
+          i = low.indexOf(needle, i + needle.length);
+        }
+      }
+      if (!marks.length) {
+        parent.createSpan({ text: src });
+        return;
+      }
+      marks.sort((x, y) => x[0] - y[0]);
+      const merged = [];
+      for (const m of marks) {
+        const last = merged[merged.length - 1];
+        if (last && m[0] <= last[1])
+          last[1] = Math.max(last[1], m[1]);
+        else
+          merged.push([m[0], m[1]]);
+      }
+      let at = 0;
+      for (const span of merged) {
+        if (span[0] > at)
+          parent.createSpan({ text: src.slice(at, span[0]) });
+        parent.createSpan({ text: src.slice(span[0], span[1]), cls: "qm-hit" });
+        at = span[1];
+      }
+      if (at < src.length)
+        parent.createSpan({ text: src.slice(at) });
+    }
+    function qmLinkLine(link) {
+      try {
+        const pos = link && link.position;
+        const start = pos && pos.start;
+        const n = start && start.line;
+        return typeof n === "number" && n >= 0 ? n : -1;
+      } catch (e) {
+        return -1;
+      }
+    }
+    function qmAggregateRefs(items) {
+      const out = /* @__PURE__ */ new Map();
+      for (const it of items || []) {
+        if (!it || !it.destPath || !it.id)
+          continue;
+        const key = it.destPath + "#^" + String(it.id).toLowerCase();
+        let e = out.get(key);
+        if (!e)
+          out.set(key, e = { notes: /* @__PURE__ */ new Set(), places: 0, ambiguous: false, by: /* @__PURE__ */ new Map() });
+        e.places += 1;
+        if (it.sourcePath) {
+          e.notes.add(it.sourcePath);
+          const line = typeof it.line === "number" && it.line >= 0 ? it.line : -1;
+          const lines = e.by.get(it.sourcePath);
+          if (lines) {
+            if (line >= 0)
+              lines.push(line);
+          } else {
+            e.by.set(it.sourcePath, line >= 0 ? [line] : []);
+          }
+        }
+        if (it.ambiguous)
+          e.ambiguous = true;
+      }
+      return out;
+    }
+    function qmBodySegments(body) {
+      const text = String(body == null ? "" : body);
+      const out = [];
+      if (!text)
+        return out;
+      const re = /#([^\s#\[\]()]+)|\bhttps?:\/\/[^\s<>"'，。；：！？、（）【】《》]+/g;
+      const pushText = (s) => {
+        if (s)
+          out.push({ kind: "text", text: s });
+      };
+      let last = 0;
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        const raw = m[0];
+        const at = m.index;
+        if (at > last)
+          pushText(text.slice(last, at));
+        if (raw.charAt(0) === "#") {
+          out.push({ kind: "tag", text: raw, value: m[1] });
+          last = at + raw.length;
+          continue;
+        }
+        const trimmed = raw.replace(/[.,;:!?)\]}]+$/, "");
+        out.push({ kind: "url", text: trimmed });
+        last = at + trimmed.length;
+        re.lastIndex = last;
+      }
+      if (last < text.length)
+        pushText(text.slice(last));
+      return out;
+    }
+    function parseCards(content, filePath, opts) {
+      const strict = !!(opts && opts.strict);
+      const lines = String(content || "").replace(/\r\n?/g, "\n").split("\n");
+      const cards = [];
+      let curDate = "";
+      const fileBase = baseOf(filePath);
+      const dupSeen = /* @__PURE__ */ new Map();
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const hm = line.match(/^##[ \t]+(\d{4}-\d{2}-\d{2})[ \t]*$/);
+        if (hm) {
+          curDate = hm[1];
+          continue;
+        }
+        const cm = line.match(QM_CARD_RE);
+        if (!cm)
+          continue;
+        const end = qmCardBlockEnd(lines, i);
+        const parts = [cm[2] || ""];
+        for (let j = i + 1; j <= end; j++) {
+          parts.push(lines[j].replace(/^ {2}|^\t/, ""));
+        }
+        const lastPart = String(parts[parts.length - 1] || "").replace(/[ \t]+$/, "");
+        const endId = lastPart.match(/[ \t]\^([A-Za-z0-9-]+)[ \t]*$/);
+        if (strict && !endId) {
+          let hasAnyId = false;
+          for (let j = i; j <= end; j++) {
+            if (/[ \t]\^[A-Za-z0-9-]{4,}[ \t]*$/.test(lines[j])) {
+              hasAnyId = true;
+              break;
+            }
+          }
+          if (!hasAnyId) {
+            i = end;
+            continue;
+          }
+        }
+        let body = parts.map((p) => p.replace(/[ \t]+$/, "")).join("\n").replace(/^\n+|\n+$/g, "");
+        const ids = [];
+        body = body.replace(/[ \t]\^([A-Za-z0-9-]+)[ \t]*(?=$|\n)/gm, (m, p1) => {
+          ids.push(p1);
+          return "";
+        });
+        body = body.replace(/[ \t]+$/gm, "");
+        const id = endId ? endId[1] : ids[ids.length - 1] || "";
+        const idOnLastLine = !!endId;
+        const tags = [];
+        const tagRe = /#([^\s#\[\]()]+)/g;
+        let tm;
+        while ((tm = tagRe.exec(body)) !== null)
+          tags.push(tm[1]);
+        const dupKey = (curDate || "") + "\0" + line;
+        const dupIndex = dupSeen.get(dupKey) || 0;
+        dupSeen.set(dupKey, dupIndex + 1);
+        cards.push({
+          date: curDate || "\u672A\u5206\u7EC4",
+          time: padTime(cm[1]),
+          body,
+          // 搜索时每次都 toLowerCase() 会产生大量临时字符串，这里预存一份
+          bodyLower: body.toLowerCase(),
+          tags,
+          lineIndex: i,
+          lineEnd: end,
+          id,
+          idOnLastLine,
+          dupIndex,
+          raw: line,
+          filePath,
+          fileBase
+        });
+        i = end;
+      }
+      return cards;
+    }
+    function qmFindOrphans(content, filePath, opts) {
+      const lines = String(content || "").replace(/\r\n?/g, "\n").split("\n");
+      const strict = !(opts && opts.strict === false);
+      const visible = parseCards(content, filePath, { strict });
+      const covered = /* @__PURE__ */ new Set();
+      for (const c of visible)
+        for (let i = c.lineIndex; i <= c.lineEnd; i++)
+          covered.add(i);
+      const headerRe = /^##[ \t]+\d{4}-\d{2}-\d{2}[ \t]*$/;
+      const itemRe = /^[-*][ \t]+/;
+      const idRe = /[ \t]\^([A-Za-z0-9-]{4,})[ \t]*$/;
+      const timeRe = /^[-*][ \t]+\d{1,2}:\d{1,2}[ \t]/;
+      const out = [];
+      for (let start = 0; start < lines.length; start++) {
+        if (!itemRe.test(lines[start]) || covered.has(start))
+          continue;
+        let end = start;
+        for (let j = start + 1; j < lines.length; j++) {
+          if (headerRe.test(lines[j]) || itemRe.test(lines[j]))
+            break;
+          if (lines[j].trim())
+            end = j;
+        }
+        let overlap = false;
+        for (let j = start; j <= end; j++) {
+          if (covered.has(j)) {
+            overlap = true;
+            break;
+          }
+        }
+        if (overlap) {
+          start = end;
+          continue;
+        }
+        let mainId = "";
+        for (let j = start; j <= end; j++) {
+          const mm = lines[j].match(idRe);
+          if (mm)
+            mainId = mm[1];
+        }
+        let date = "";
+        for (let j = start; j >= 0; j--) {
+          const hm = lines[j].match(/^##[ \t]+(\d{4}-\d{2}-\d{2})[ \t]*$/);
+          if (hm) {
+            date = hm[1];
+            break;
+          }
+        }
+        const slice = lines.slice(start, end + 1);
+        out.push({
+          filePath,
+          date,
+          id: mainId,
+          lineStart: start,
+          lineEnd: end,
+          // HAS_TIME_NO_ID：首行有时间但仍不显示（缺 ID / 时间格式不合规）
+          // NO_TIME：首行没有 HH:mm（含完全手写的条目）
+          reason: timeRe.test(lines[start]) ? "HAS_TIME_NO_ID" : "NO_TIME",
+          lines: slice,
+          preview: slice.join(" ").replace(idRe, "").replace(/[ \t]+/g, " ").trim().slice(0, 64)
+        });
+        start = end;
+      }
+      return out;
+    }
+    function qmOrphanFingerprint(o) {
+      const first = o && Array.isArray(o.lines) && o.lines.length ? String(o.lines[0] || "") : "";
+      return first.replace(/^[-*][ \t]+/, "").replace(/^\d{1,2}:\d{1,2}[ \t]+/, "").replace(/[ \t]*\^([A-Za-z0-9-]{4,})[ \t]*$/, "").replace(/[ \t]+$/, "").trim();
+    }
+    function qmMatchOrphan(list, item) {
+      if (!Array.isArray(list) || !item)
+        return null;
+      if (item.id) {
+        const byId = list.filter((o) => o.id === item.id);
+        if (byId.length === 1)
+          return byId[0];
+        if (byId.length > 1) {
+          const fp2 = qmOrphanFingerprint(item);
+          const same = byId.filter((o) => qmOrphanFingerprint(o) === fp2);
+          if (same.length)
+            return typeof item.lineStart === "number" ? same.sort((a, b) => Math.abs(a.lineStart - item.lineStart) - Math.abs(b.lineStart - item.lineStart))[0] : same[0];
+        }
+      }
+      const fp = qmOrphanFingerprint(item);
+      if (fp) {
+        const byBody = list.filter((o) => qmOrphanFingerprint(o) === fp);
+        if (byBody.length === 1)
+          return byBody[0];
+        if (byBody.length > 1 && typeof item.lineStart === "number") {
+          return byBody.sort((a, b) => Math.abs(a.lineStart - item.lineStart) - Math.abs(b.lineStart - item.lineStart))[0];
+        }
+      }
+      return null;
+    }
+    function qmSuggestOrphanTime(content, filePath, orphan, opts) {
+      const want = String(opts && opts.time || "").trim();
+      const wm = want.match(/^(\d{1,2}):(\d{1,2})$/);
+      if (wm)
+        return wm[1].padStart(2, "0") + ":" + wm[2].padStart(2, "0");
+      const cards = parseCards(content, filePath, { strict: false }).filter((c) => !orphan.date || c.date === orphan.date);
+      const times = cards.map((c) => c.time).filter((t) => /^\d{2}:\d{2}$/.test(t)).sort();
+      if (!times.length)
+        return "00:00";
+      const p = times[times.length - 1].split(":").map(Number);
+      let h = p[0], m = p[1] + 1;
+      if (m >= 60) {
+        m = 0;
+        h = (h + 1) % 24;
+      }
+      return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+    }
+    function qmRebuildOrphanLines(orphan, time, newId) {
+      const src = Array.isArray(orphan && orphan.lines) ? orphan.lines.slice() : [];
+      const ids = [];
+      const body = src.map((l, idx) => {
+        let s = String(l == null ? "" : l);
+        s = s.replace(/[ \t]*\^([A-Za-z0-9-]{4,})[ \t]*$/, (mm, id2) => {
+          ids.push(id2);
+          return "";
+        });
+        s = idx === 0 ? s.replace(/^[-*][ \t]+/, "") : s.replace(/^ {2}|^\t/, "");
+        if (idx === 0)
+          s = s.replace(/^\d{1,2}:\d{1,2}[ \t]+/, "");
+        return s.replace(/[ \t]+$/, "");
+      });
+      while (body.length && !body[0].trim())
+        body.shift();
+      while (body.length && !body[body.length - 1].trim())
+        body.pop();
+      if (!body.length)
+        return null;
+      const t = /^\d{1,2}:\d{2}$/.test(String(time || "")) ? padTime(time) : "00:00";
+      const id = String(newId || "") || (ids.length ? ids[ids.length - 1] : "");
+      return qmFormatEntry(t, body, id);
+    }
+    function qmLocateCard(content, card, opts) {
+      if (!card || !card.filePath)
+        return null;
+      const cards = parseCards(content, card.filePath, opts);
+      if (card.id) {
+        const hits = cards.filter((c) => c.id === card.id);
+        if (hits.length === 1)
+          return hits[0];
+        if (hits.length > 1) {
+          const exact = hits.filter((c) => c.time === card.time && c.body === card.body);
+          return exact.length === 1 ? exact[0] : null;
+        }
+        return null;
+      }
+      const same = cards.filter((c) => c.date === card.date && c.raw === card.raw);
+      if (!same.length)
+        return null;
+      const i = typeof card.dupIndex === "number" ? card.dupIndex : 0;
+      if (same[i] && same[i].body === card.body)
+        return same[i];
+      const byBody = same.filter((c) => c.body === card.body);
+      return byBody.length === 1 ? byBody[0] : null;
+    }
+    function qmParseQuery(input) {
+      const raw = String(input || "").trim();
+      if (!raw)
+        return [];
+      const out = [];
+      const re = /"([^"]+)"|(\S+)/g;
+      let m;
+      while ((m = re.exec(raw)) !== null) {
+        const phrase = m[1];
+        const tok = phrase !== void 0 ? phrase : m[2];
+        if (!tok)
+          continue;
+        if (phrase !== void 0) {
+          out.push({ kind: "text", value: tok.toLowerCase() });
+          continue;
+        }
+        if (tok.charAt(0) === "#" && tok.length > 1) {
+          out.push({ kind: "tag", value: tok.slice(1) });
+          continue;
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(tok)) {
+          out.push({ kind: "date", value: tok });
+          continue;
+        }
+        if (/^\d{4}-\d{2}$/.test(tok)) {
+          out.push({ kind: "month", value: tok });
+          continue;
+        }
+        if (/^\d{2}-\d{2}$/.test(tok)) {
+          out.push({ kind: "md", value: tok });
+          continue;
+        }
+        if (/^\d{1,2}:\d{2}$/.test(tok)) {
+          out.push({ kind: "time", value: padTime(tok) });
+          continue;
+        }
+        out.push({ kind: "text", value: tok.toLowerCase() });
+      }
+      return out;
+    }
+    function qmCardMatches(card, conds) {
+      if (!conds || !conds.length)
+        return true;
+      const date = String(card && card.date || "");
+      const time = String(card && card.time || "");
+      const text = card && typeof card.bodyLower === "string" ? card.bodyLower : String(card && card.body || "").toLowerCase();
+      for (const c of conds) {
+        if (c.kind === "tag") {
+          if (!qmCardHasPath(card, c.value))
+            return false;
+        } else if (c.kind === "date") {
+          if (date !== c.value)
+            return false;
+        } else if (c.kind === "month") {
+          if (date.slice(0, 7) !== c.value)
+            return false;
+        } else if (c.kind === "md") {
+          if (date.slice(5) !== c.value)
+            return false;
+        } else if (c.kind === "time") {
+          if (time !== c.value)
+            return false;
+        } else if (text.indexOf(c.value) === -1) {
+          return false;
+        }
+      }
+      return true;
+    }
+    function sortCards(cards) {
+      cards.sort((a, b) => {
+        if (a.date !== b.date)
+          return a.date < b.date ? 1 : -1;
+        if (a.time !== b.time)
+          return a.time < b.time ? 1 : -1;
+        if (a.filePath !== b.filePath)
+          return a.filePath < b.filePath ? 1 : -1;
+        return b.lineIndex - a.lineIndex;
+      });
+      return cards;
+    }
+    function escapeRe(s) {
+      return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+    function collectAllTags(cards, quickTags) {
+      const count = /* @__PURE__ */ new Map();
+      for (const c of cards || []) {
+        for (const t of c.tags || []) {
+          const tag = String(t || "").trim();
+          if (!tag)
+            continue;
+          count.set(tag, (count.get(tag) || 0) + 1);
+        }
+      }
+      const prefer = /* @__PURE__ */ new Map();
+      for (const t of quickTags || []) {
+        const tag = String(t || "").replace(/^#/, "").trim();
+        if (tag && count.has(tag))
+          prefer.set(tag, 1);
+      }
+      return Array.from(count.entries()).sort((a, b) => {
+        const pa = prefer.has(a[0]) ? 1 : 0;
+        const pb = prefer.has(b[0]) ? 1 : 0;
+        if (pa !== pb)
+          return pb - pa;
+        if (b[1] !== a[1])
+          return b[1] - a[1];
+        return a[0] < b[0] ? -1 : 1;
+      }).map((x) => x[0]);
+    }
+    var TagSuggest = class {
+      constructor(textarea, container, getTags2) {
+        this.ta = textarea;
+        this.container = container;
+        this.getTags = getTags2;
+        this.el = null;
+        this.items = [];
+        this.index = 0;
+        this.active = false;
+        this.q = null;
+        this.seq = 0;
+        this.navigated = false;
+        this._onInput = () => this.update();
+        this._onKey = (e) => this.onKey(e);
+        this._onBlur = () => window.setTimeout(() => this.hide(), 160);
+        this._onClick = () => this.update();
+        this._onKeyup = (e) => {
+          if (["ArrowLeft", "ArrowRight", "Home", "End"].indexOf(e.key) !== -1)
+            this.update();
+        };
+        textarea.addEventListener("input", this._onInput);
+        textarea.addEventListener("keydown", this._onKey, true);
+        textarea.addEventListener("blur", this._onBlur);
+        textarea.addEventListener("click", this._onClick);
+        textarea.addEventListener("keyup", this._onKeyup);
+      }
+      destroy() {
+        this.hide();
+        this.ta.removeEventListener("input", this._onInput);
+        this.ta.removeEventListener("keydown", this._onKey, true);
+        this.ta.removeEventListener("blur", this._onBlur);
+        this.ta.removeEventListener("click", this._onClick);
+        this.ta.removeEventListener("keyup", this._onKeyup);
+      }
+      /** 取光标前正在输入的 #片段 */
+      query() {
+        const pos = this.ta.selectionStart;
+        if (pos === null || pos === void 0)
+          return null;
+        const before = String(this.ta.value || "").slice(0, pos);
+        const m = before.match(/#([^\s#\[\]()]*)$/);
+        if (!m)
+          return null;
+        const start = pos - m[0].length;
+        if (start > 0 && !/[\s]/.test(before.charAt(start - 1)))
+          return null;
+        return { start, end: pos, partial: m[1] };
+      }
+      update() {
+        const q = this.query();
+        if (!q) {
+          this.hide();
+          return;
+        }
+        const mySeq = ++this.seq;
+        Promise.resolve().then(() => this.getTags()).then((all) => {
+          if (mySeq !== this.seq)
+            return;
+          this.applyQuery(q, Array.isArray(all) ? all : []);
+        }).catch(() => {
+        });
+      }
+      applyQuery(q, all) {
+        const p = String(q.partial || "").toLowerCase();
+        const matched = all.filter((t) => String(t).toLowerCase().indexOf(p) !== -1).slice(0, 20);
+        const exact = all.some((t) => String(t).toLowerCase() === p);
+        const items = matched.map((t) => ({ tag: t, create: false }));
+        if (p && !exact)
+          items.push({ tag: q.partial, create: true });
+        if (!items.length) {
+          this.hide();
+          return;
+        }
+        this.q = q;
+        this.items = items;
+        this.index = 0;
+        this.render();
+      }
+      render() {
+        this.navigated = false;
+        if (!this.el) {
+          this.el = this.container.createDiv({ cls: "qm-suggest" });
+        }
+        this.el.empty();
+        this.items.forEach((it, i) => {
+          const row = this.el.createDiv({
+            cls: "qm-suggest-item" + (i === this.index ? " is-active" : "") + (it.create ? " is-create" : "")
+          });
+          row.setText(it.create ? "\u65B0\u5EFA #" + it.tag : "#" + it.tag);
+          row.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            this.pick(i);
+          });
+          row.addEventListener("mouseenter", () => {
+            this.index = i;
+            this.navigated = true;
+            this.highlight();
+          });
+        });
+        const top = this.ta.offsetTop + this.ta.offsetHeight + 4;
+        const left = this.ta.offsetLeft;
+        const width = Math.max(140, Math.min(this.ta.offsetWidth || 200, 280));
+        this.el.style.top = top + "px";
+        this.el.style.left = left + "px";
+        this.el.style.width = width + "px";
+        this.active = true;
+      }
+      highlight() {
+        if (!this.el)
+          return;
+        Array.from(this.el.children).forEach((r, i) => {
+          if (i === this.index)
+            r.addClass("is-active");
+          else
+            r.removeClass("is-active");
+        });
+      }
+      hide() {
+        this.seq++;
+        this.active = false;
+        this.q = null;
+        this.items = [];
+        if (this.el) {
+          this.el.remove();
+          this.el = null;
+        }
+      }
+      onKey(e) {
+        if (!this.active || !this.items.length)
+          return;
+        const n = this.items.length;
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          e.stopPropagation();
+          this.navigated = true;
+          this.index = (this.index + 1) % n;
+          this.highlight();
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          e.stopPropagation();
+          this.navigated = true;
+          this.index = (this.index - 1 + n) % n;
+          this.highlight();
+        } else if (e.key === "Enter" || e.key === "Tab") {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter")
+            return;
+          if (e.key === "Enter" && !this.navigated) {
+            this.hide();
+            return;
+          }
+          e.preventDefault();
+          e.stopPropagation();
+          this.pick(this.index);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          this.hide();
+        }
+      }
+      pick(i) {
+        const it = this.items[i];
+        if (!it || !this.q)
+          return;
+        const v = String(this.ta.value || "");
+        const q = this.q;
+        const head = v.slice(0, q.start);
+        const tail = v.slice(q.end);
+        const insert = "#" + it.tag + (/^[\s]/.test(tail) ? "" : " ");
+        const next = head + insert + tail;
+        this.ta.value = next;
+        const caret = head.length + insert.length;
+        try {
+          this.ta.setSelectionRange(caret, caret);
+        } catch (err) {
+        }
+        this.hide();
+        this.ta.focus();
+      }
+    };
+    var ConfirmModal = class extends Modal2 {
+      constructor(app, text, onConfirm, detail, confirmText) {
+        super(app);
+        this.text = text;
+        this.onConfirm = onConfirm;
+        this.detail = detail || "";
+        this.confirmText = confirmText || "\u5220\u9664";
+      }
+      onOpen() {
+        const { contentEl, modalEl } = this;
+        contentEl.empty();
+        if (modalEl && modalEl.addClass)
+          modalEl.addClass("qm-modal");
+        contentEl.createEl("div", { text: this.text, cls: "qm-confirm-text" });
+        if (this.detail) {
+          contentEl.createEl("div", { text: this.detail, cls: "qm-confirm-detail" });
+        }
+        const bar = contentEl.createDiv({ cls: "qm-edit-bar" });
+        const cancel = bar.createEl("button", { text: "\u53D6\u6D88", cls: "qm-mini-btn" });
+        cancel.onclick = () => this.close();
+        const ok = bar.createEl("button", { text: this.confirmText, cls: "qm-mini-btn is-primary" });
+        ok.onclick = () => {
+          this.close();
+          this.onConfirm();
+        };
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
+    var DraftSwitchModal = class extends Modal2 {
+      constructor(app, opts) {
+        super(app);
+        this.opts = opts || {};
+      }
+      onOpen() {
+        const { contentEl, modalEl } = this;
+        contentEl.empty();
+        if (modalEl && modalEl.addClass)
+          modalEl.addClass("qm-modal");
+        contentEl.createEl("div", { text: "\u53E6\u4E00\u6761\u5361\u7247\u8FD8\u6CA1\u4FDD\u5B58", cls: "qm-confirm-text" });
+        contentEl.createEl("div", {
+          text: "\u300C" + String(this.opts.preview || "") + "\u300D\u6539\u8FC7\u4F46\u6CA1\u4FDD\u5B58\u3002\u8981\u5148\u5B58\u4E0B\u6765\uFF0C\u518D\u7F16\u8F91\u8FD9\u6761\u5417\uFF1F",
+          cls: "qm-confirm-detail"
+        });
+        const bar = contentEl.createDiv({ cls: "qm-edit-bar" });
+        const stay = bar.createEl("button", { text: "\u7559\u5728\u8FD9\u6761", cls: "qm-mini-btn" });
+        stay.onclick = () => this.close();
+        const drop = bar.createEl("button", { text: "\u653E\u5F03\u4FEE\u6539", cls: "qm-mini-btn" });
+        drop.onclick = () => {
+          this.close();
+          if (typeof this.opts.onDiscard === "function")
+            this.opts.onDiscard();
+        };
+        const save = bar.createEl("button", { text: "\u4FDD\u5B58\u5E76\u7EE7\u7EED", cls: "qm-mini-btn is-primary" });
+        save.onclick = async () => {
+          if (typeof this.opts.onSave !== "function") {
+            this.close();
+            return;
+          }
+          const okSaved = await this.opts.onSave();
+          if (okSaved !== false)
+            this.close();
+        };
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
+    var CardPickerModal = class extends SuggestModal {
+      constructor(app, plugin, opts) {
+        super(app);
+        this.plugin = plugin;
+        this.opts = opts || {};
+        this.limit = 30;
+        this.setPlaceholder("\u641C\u7D22\u5361\u7247\uFF1A\u5173\u952E\u8BCD \xB7 #\u6807\u7B7E \xB7 2026-11");
+        this.emptyStateText = "\u6CA1\u6709\u5339\u914D\u7684\u5361\u7247";
+      }
+      // 每次敲字都会调一次；数据没预热过就现读，不再依赖启动时的预热
+      async getSuggestions(query) {
+        const rows = await this.plugin.suggestCardsAsync(query);
+        this._rows = rows;
+        if (this.modalEl) {
+          const recent = !String(query || "").trim() && rows.length > 0;
+          if (recent)
+            this.modalEl.addClass("is-recent");
+          else
+            this.modalEl.removeClass("is-recent");
+        }
+        return rows;
+      }
+      renderSuggestion(item, el) {
+        this.plugin.renderSuggestRow(item, el);
+      }
+      /**
+       * 当前高亮的那条候选。
+       * 原生把 suggestions / selectedSuggestion 留在内部字段里（没进 d.ts），
+       * 所以先判存在再用；取不到就退回列表里标了 is-selected 的那一行。
+       */
+      currentRow() {
+        const list = this.suggestions;
+        if (Array.isArray(list) && list.length) {
+          let i = this.selectedSuggestion;
+          if (typeof i !== "number" || i < 0 || i >= list.length)
+            i = 0;
+          if (list[i])
+            return list[i];
+        }
+        const rows = this._rows || [];
+        const root = this.resultContainerEl || this.modalEl;
+        if (!rows.length || !root || typeof root.querySelectorAll !== "function")
+          return null;
+        const items = root.querySelectorAll(".suggestion-item");
+        let at = 0;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].classList && items[i].classList.contains("is-selected")) {
+            at = i;
+            break;
+          }
+        }
+        return rows[at] || rows[0] || null;
+      }
+      onChooseSuggestion(item, evt) {
+        if (this._chosen)
+          return;
+        this._chosen = true;
+        const plain = !!(evt && evt.shiftKey);
+        const ed = this.opts.editor || this.plugin.currentEditor();
+        if (!ed) {
+          void this.plugin.insertIntoCurrentNote(item.card, plain);
+          return;
+        }
+        this.plugin.insertCardRef(item.card, ed, this.opts.from, this.opts.to, plain);
+      }
+      onOpen() {
+        super.onOpen();
+        if (this.modalEl)
+          this.modalEl.addClass("qm-picker-modal");
+        if (this.modalEl)
+          this.modalEl.removeClass("is-recent");
+        if (typeof this.setInstructions === "function") {
+          this.setInstructions([
+            { command: "\u2191\u2193", purpose: "\u9009\u62E9" },
+            { command: "\u56DE\u8F66", purpose: "\u63D2\u5165\u5F15\u7528" },
+            { command: "Shift+\u56DE\u8F66", purpose: "\u63D2\u5165\u7EAF\u6587\u672C" }
+          ]);
+        }
+        this._shiftEnter = (e) => {
+          if (!e || e.key !== "Enter" || !e.shiftKey || e.isComposing)
+            return;
+          if (!this.inputEl || e.target !== this.inputEl)
+            return;
+          const item = this.currentRow();
+          if (!item)
+            return;
+          e.preventDefault();
+          e.stopPropagation();
+          this.onChooseSuggestion(item, { shiftKey: true });
+          this.close();
+        };
+        if (typeof document !== "undefined" && document.addEventListener) {
+          document.addEventListener("keydown", this._shiftEnter, true);
+        }
+      }
+      onClose() {
+        if (this._shiftEnter && typeof document !== "undefined" && document.removeEventListener) {
+          document.removeEventListener("keydown", this._shiftEnter, true);
+        }
+        this._shiftEnter = null;
+        super.onClose();
+      }
+    };
+    var RefListModal = class extends Modal2 {
+      constructor(app, info, onPick) {
+        super(app);
+        this.info = info || { notes: 0, places: 0, list: [] };
+        this.onPick = onPick;
+      }
+      onOpen() {
+        const { contentEl, modalEl } = this;
+        contentEl.empty();
+        contentEl.addClass("qm-refpanel");
+        if (modalEl)
+          modalEl.addClass("qm-modal-wide");
+        const n = this.info.notes || 0;
+        const places = this.info.places || n;
+        contentEl.createEl("div", { text: "\u88AB " + n + " \u7BC7\u7B14\u8BB0\u5F15\u7528", cls: "qm-refpanel-title" });
+        contentEl.createEl("div", {
+          text: places > n ? "\u5171 " + places + " \u5904 \xB7 \u70B9\u51FB\u8DF3\u5230\u5F15\u7528\u6240\u5728\u4F4D\u7F6E" : "\u70B9\u51FB\u8DF3\u5230\u5F15\u7528\u6240\u5728\u4F4D\u7F6E",
+          cls: "qm-refpanel-sub"
+        });
+        const box = contentEl.createDiv({ cls: "qm-reflist" });
+        for (const r of this.info.list || []) {
+          const row = box.createDiv({ cls: "qm-reflist-row" });
+          row.setAttr("tabindex", "0");
+          const main = row.createDiv({ cls: "qm-reflist-main" });
+          main.createEl("span", { text: r.name, cls: "qm-reflist-name" });
+          const folder = qmRefFolder(r.path);
+          if (folder)
+            main.createEl("span", { text: folder, cls: "qm-reflist-path" });
+          if (r.places > 1)
+            row.createEl("span", { text: r.places + " \u5904", cls: "qm-reflist-n" });
+          const go = () => {
+            this.close();
+            if (typeof this.onPick === "function")
+              this.onPick(r);
+          };
+          row.onclick = go;
+          row.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              go();
+            }
+          });
+        }
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
+    var TrashModal = class extends Modal2 {
+      constructor(app, plugin) {
+        super(app);
+        this.plugin = plugin;
+      }
+      onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+        if (this.modalEl && this.modalEl.addClass)
+          this.modalEl.addClass("qm-trash-modal");
+        contentEl.createEl("div", { text: "\u6700\u8FD1\u5220\u9664", cls: "qm-modal-title" });
+        const list = Array.isArray(this.plugin.settings.trash) ? this.plugin.settings.trash : [];
+        if (!list.length) {
+          contentEl.createEl("div", { text: "\u6700\u8FD1\u6CA1\u6709\u5220\u9664\u8FC7\u5361\u7247\u3002", cls: "qm-hint" });
+        } else {
+          contentEl.createEl("div", {
+            text: "\u4FDD\u7559\u6700\u8FD1 50 \u6761\u3002\u6062\u590D\u4F1A\u6309\u539F\u65E5\u671F\u63D2\u56DE\uFF1B\u5220\u9664\u662F\u5F7B\u5E95\u5220\u6389\uFF0C\u4E0D\u80FD\u64A4\u9500\u3002",
+            cls: "qm-hint"
+          });
+          const wrap = contentEl.createDiv({ cls: "qm-trash-list" });
+          for (const it of list) {
+            const row = wrap.createDiv({ cls: "qm-trash-item" });
+            const main = row.createDiv({ cls: "qm-trash-main" });
+            const txt = String(it.body || "").replace(/\s*\n\s*/g, " \u23CE ");
+            main.createDiv({ cls: "qm-trash-body", text: txt || "\uFF08\u7A7A\uFF09" });
+            main.createDiv({
+              cls: "qm-trash-meta",
+              text: (it.date || "\u672A\u5206\u7EC4") + " " + (it.time || "")
+            });
+            const acts = row.createDiv({ cls: "qm-trash-acts" });
+            const undo = acts.createEl("button", { text: "\u6062\u590D", cls: "qm-mini-btn is-primary" });
+            undo.onclick = async () => {
+              await this.plugin.restoreTrash(it.uid);
+              this.onOpen();
+            };
+            const drop = acts.createEl("button", {
+              text: "\u5220\u9664",
+              cls: "qm-mini-btn qm-mini-btn-danger"
+            });
+            drop.setAttr("title", "\u5F7B\u5E95\u5220\u9664\u8FD9\u4E00\u6761");
+            drop.onclick = () => {
+              new ConfirmModal(
+                this.app,
+                "\u5F7B\u5E95\u5220\u9664\u8FD9\u4E00\u6761\uFF1F",
+                async () => {
+                  await this.plugin.dropTrash(it.uid);
+                  this.onOpen();
+                },
+                "\u5220\u9664\u540E\u5C31\u771F\u7684\u6CA1\u4E86\uFF0C\u4E0D\u80FD\u6062\u590D\u3002",
+                "\u5220\u9664"
+              ).open();
+            };
+          }
+        }
+        const bar = contentEl.createDiv({ cls: "qm-trash-bar" });
+        if (list.length) {
+          const clear = bar.createEl("button", {
+            text: "\u6E05\u7A7A\u5168\u90E8 " + list.length + " \u6761",
+            cls: "qm-mini-btn qm-mini-btn-danger qm-trash-clear"
+          });
+          clear.onclick = () => {
+            new ConfirmModal(
+              this.app,
+              "\u6E05\u7A7A\u6700\u8FD1\u5220\u9664\u91CC\u7684 " + list.length + " \u6761\uFF1F",
+              async () => {
+                await this.plugin.clearTrash();
+                this.onOpen();
+              },
+              "\u6E05\u7A7A\u540E\u8FD9\u4E9B\u5185\u5BB9\u5C31\u771F\u7684\u6CA1\u4E86\uFF0C\u4E0D\u80FD\u6062\u590D\u3002",
+              "\u6E05\u7A7A"
+            ).open();
+          };
+        }
+        const close = bar.createEl("button", { text: "\u5173\u95ED", cls: "qm-mini-btn" });
+        close.onclick = () => this.close();
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
+    var OrphanModal = class extends Modal2 {
+      constructor(app, plugin) {
+        super(app);
+        this.plugin = plugin;
+        this.items = [];
+        this._fresh = false;
+      }
+      /** 重新扫描：强制重读速记文件，再把整窗重画一次 */
+      async rescan() {
+        this._fresh = true;
+        await this.onOpen();
+      }
+      async onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+        if (this.modalEl && this.modalEl.addClass)
+          this.modalEl.addClass("qm-orphan-modal");
+        contentEl.createEl("div", { text: "\u68C0\u67E5\u5B64\u513F\u5361\u7247", cls: "qm-modal-title" });
+        contentEl.createEl("div", {
+          text: "\u300C\u6062\u590D\u5361\u7247\u300D\u4F1A\u628A\u5B83\u53D8\u6210\u6B63\u5E38\u5361\u7247\u5E76\u4FDD\u7559\u539F\u6765\u7684\u5F15\u7528\uFF1B\u300C\u5220\u9664\u300D\u4F1A\u79FB\u5165\u300C\u6700\u8FD1\u5220\u9664\u300D\uFF0C\u53EF\u4EE5\u6062\u590D\u3002",
+          cls: "qm-hint"
+        });
+        const list = contentEl.createDiv({ cls: "qm-orphan-list" });
+        this.items = await this.plugin.findOrphans(this._fresh);
+        if (!this.items.length) {
+          list.createEl("div", { text: "\u6CA1\u6709\u53D1\u73B0\u5B64\u513F\u5361\u7247\u3002", cls: "qm-hint" });
+        } else {
+          for (const it of this.items) {
+            const row = list.createDiv({ cls: "qm-orphan-item" });
+            const main = row.createDiv({ cls: "qm-orphan-main" });
+            main.createDiv({ cls: "qm-orphan-body", text: it.preview || "\uFF08\u7A7A\uFF09" });
+            main.createDiv({
+              cls: "qm-orphan-meta",
+              text: (it.date || "\u672A\u5206\u7EC4") + " \xB7 \u7B2C " + (it.lineStart + 1) + " \u884C \xB7 " + (it.id ? "^" + it.id : "\u65E0\u5757 ID")
+            });
+            const acts = row.createDiv({ cls: "qm-orphan-acts" });
+            const restore = acts.createEl("button", { text: "\u6062\u590D\u5361\u7247", cls: "qm-mini-btn is-primary" });
+            restore.setAttr("title", "\u6309\u5F53\u524D\u89C4\u5219\u6539\u6210\u6807\u51C6\u5361\u7247\u5E76\u663E\u793A\u5728\u5217\u8868\u91CC");
+            restore.onclick = async () => {
+              const ok = await this.plugin.restoreOrphan(it);
+              if (ok)
+                this.onOpen();
+            };
+            const drop = acts.createEl("button", { text: "\u5220\u9664", cls: "qm-mini-btn qm-mini-btn-danger" });
+            drop.setAttr("title", "\u5F7B\u5E95\u6E05\u7406\u8FD9\u4E00\u6BB5\uFF08\u53EF\u5728\u6700\u8FD1\u5220\u9664\u91CC\u6062\u590D\uFF09");
+            drop.onclick = () => {
+              new ConfirmModal(
+                this.app,
+                "\u5220\u9664\u8FD9\u6BB5\u5B64\u513F\u5361\u7247\uFF1F",
+                async () => {
+                  const ok = await this.plugin.deleteOrphan(it);
+                  if (ok)
+                    this.onOpen();
+                },
+                "\u8FD9\u4E00\u6BB5\u4F1A\u4ECE\u901F\u8BB0\u6587\u4EF6\u91CC\u79FB\u9664\uFF0C\u4F46\u53EF\u4EE5\u5728\u300C\u6700\u8FD1\u5220\u9664\u300D\u91CC\u6062\u590D\u3002",
+                "\u5220\u9664"
+              ).open();
+            };
+          }
+        }
+        const bar = contentEl.createDiv({ cls: "qm-trash-bar" });
+        const allCls = "qm-mini-btn qm-mini-btn-danger qm-trash-clear" + (this.items.length ? "" : " is-disabled");
+        const all = bar.createEl("button", { text: "\u5168\u90E8\u5220\u9664", cls: allCls });
+        all.setAttr("title", this.items.length ? "\u5220\u9664\u4E0A\u9762\u5217\u51FA\u7684\u5168\u90E8\u5B64\u513F\u5361\u7247\uFF0C\u53EF\u4ECE\u300C\u6700\u8FD1\u5220\u9664\u300D\u9010\u6761\u6062\u590D" : "\u5F53\u524D\u6CA1\u6709\u53EF\u5220\u9664\u7684\u5B64\u513F\u5361\u7247");
+        if (this.items.length) {
+          all.onclick = () => {
+            new ConfirmModal(
+              this.app,
+              "\u5220\u9664\u5168\u90E8\u5B64\u513F\u5361\u7247\uFF1F",
+              async () => {
+                const res = await this.plugin.deleteOrphans(this.items);
+                new Notice2("\u5DF2\u6E05\u7406 " + res.deleted + " \u6761" + (res.failed ? "\uFF0C" + res.failed + " \u6761\u672A\u627E\u5230\u5DF2\u8DF3\u8FC7" : "") + "\uFF0C\u53EF\u5728\u300C\u6700\u8FD1\u5220\u9664\u300D\u6062\u590D", 8e3);
+                this.onOpen();
+              },
+              "\u8FD9 " + this.items.length + " \u6BB5\u4F1A\u4ECE\u901F\u8BB0\u6587\u4EF6\u91CC\u79FB\u9664\uFF0C\u4E4B\u540E\u4ECD\u53EF\u5728\u300C\u6700\u8FD1\u5220\u9664\u300D\u91CC\u9010\u6761\u6062\u590D\u3002",
+              "\u5168\u90E8\u5220\u9664"
+            ).open();
+          };
+        }
+        const rescan = bar.createEl("button", { text: "\u91CD\u65B0\u626B\u63CF", cls: "qm-mini-btn" });
+        rescan.setAttr("title", "\u91CD\u65B0\u8BFB\u53D6\u901F\u8BB0\u6587\u4EF6\u5E76\u68C0\u67E5\u5B64\u513F\u5361\u7247");
+        rescan.onclick = () => this.rescan();
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
+    var CaptureModal = class extends Modal2 {
+      constructor(app, plugin) {
+        super(app);
+        this.plugin = plugin;
+      }
+      onOpen() {
+        const { contentEl, modalEl } = this;
+        contentEl.empty();
+        if (modalEl && modalEl.addClass)
+          modalEl.addClass("qm-modal");
+        contentEl.createEl("div", { text: "\u8BB0\u4E00\u6761", cls: "qm-modal-title" });
+        const taWrap = contentEl.createDiv({ cls: "qm-modal-wrap" });
+        const ta = taWrap.createEl("textarea", { cls: "qm-input qm-modal-input" });
+        ta.setAttr("placeholder", "\u60F3\u5230\u4EC0\u4E48\u5C31\u5199\u4EC0\u4E48\uFF0C\u4E0D\u9700\u8981\u6807\u9898\u2026\uFF08\u8F93\u5165 # \u9009\u62E9\u6807\u7B7E\uFF09");
+        ta.rows = 5;
+        this._ta = ta;
+        this._closingBySubmit = false;
+        this._draftHintEl = null;
+        this._draftRestored = false;
+        const draft = this.plugin.draftAlive();
+        if (draft) {
+          ta.value = draft;
+          this._draftRestored = true;
+          this._draftHintEl = taWrap.createDiv({
+            cls: "qm-draft-hint",
+            text: "\u5DF2\u6062\u590D\u4E0A\u6B21\u6CA1\u8BB0\u5B8C\u7684\u5185\u5BB9"
+          });
+        }
+        ta.addEventListener("input", () => {
+          this.dismissDraftHint();
+          this.plugin.queueDraft(ta.value);
+        });
+        const tagList = [];
+        const suggest = new TagSuggest(ta, taWrap, () => tagList);
+        this._suggest = suggest;
+        (async () => {
+          let tags = [];
+          try {
+            const cards = await this.plugin.cardsForSuggest();
+            tags = collectAllTags(cards, this.plugin.settings.quickTags);
+          } catch (e) {
+            tags = [];
+          }
+          if (!tags.length)
+            return;
+          tagList.push(...tags);
+          suggest.update();
+          const bar = contentEl.createDiv({ cls: "qm-quick-tags" });
+          for (const t of tags.slice(0, 8)) {
+            const chip = bar.createSpan({ text: "#" + t, cls: "qm-quick-tag" });
+            chip.onclick = () => {
+              const cur = ta.value;
+              ta.value = cur.replace(/\s+$/, "") + (cur.trim() ? " " : "") + "#" + t + " ";
+              this.dismissDraftHint();
+              ta.focus();
+            };
+          }
+        })();
+        contentEl.createEl("div", {
+          cls: "qm-hint",
+          text: "Enter \u6362\u884C \xB7 Ctrl+Enter \u4FDD\u5B58 \xB7 Esc \u53D6\u6D88"
+        });
+        ta.addEventListener("keydown", (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            this.submit(ta.value);
+          }
+        });
+        const bar2 = contentEl.createDiv({ cls: "qm-edit-bar" });
+        const cancel = bar2.createEl("button", { text: "\u53D6\u6D88", cls: "qm-mini-btn" });
+        cancel.onclick = () => this.close();
+        const ok = bar2.createEl("button", { text: "\u4FDD\u5B58", cls: "qm-mini-btn is-primary" });
+        ok.onclick = () => this.submit(ta.value);
+        window.setTimeout(() => ta.focus(), 30);
+      }
+      /** 开始改动就把「已恢复上次没记完的内容」收掉，不再一直显示 */
+      dismissDraftHint() {
+        if (!this._draftHintEl)
+          return;
+        this._draftHintEl.remove();
+        this._draftHintEl = null;
+      }
+      async submit(value) {
+        const text = String(value || "").trim();
+        this._closingBySubmit = true;
+        if (!text) {
+          this.close();
+          await this.plugin.clearDraft();
+          return;
+        }
+        this.close();
+        if (await this.plugin.appendCard(text)) {
+          this._draftRestored = false;
+          await this.plugin.clearDraft();
+        } else {
+          await this.plugin.saveDraft(text);
+        }
+      }
+      onClose() {
+        if (!this._closingBySubmit && this._ta) {
+          const v = String(this._ta.value || "");
+          if (v.trim())
+            void this.plugin.saveDraft(v);
+          else if (this._draftRestored)
+            void this.plugin.clearDraft();
+        }
+        this._draftHintEl = null;
+        if (this._suggest) {
+          this._suggest.destroy();
+          this._suggest = null;
+        }
+        this.contentEl.empty();
+      }
+    };
+    var QM_TAG_SEP = "/";
+    function qmSegs(tag) {
+      if (typeof tag !== "string")
+        return [];
+      const out = [];
+      for (const raw of tag.split(QM_TAG_SEP)) {
+        const s = raw.trim();
+        if (s)
+          out.push(s);
+      }
+      return out;
+    }
+    function qmLowerPath(path) {
+      return qmSegs(path).map((s) => s.toLowerCase()).join(QM_TAG_SEP);
+    }
+    function qmPickLabel(freq) {
+      let best = "";
+      let bestN = -1;
+      for (const [label, n] of freq) {
+        if (n > bestN) {
+          best = label;
+          bestN = n;
+        } else if (n === bestN && label < best) {
+          best = label;
+        }
+      }
+      return best;
+    }
+    function qmBuildTagForest(cards) {
+      const index = /* @__PURE__ */ new Map();
+      const list = cards || [];
+      let untagged = 0;
+      for (let i = 0; i < list.length; i++) {
+        const card = list[i] || {};
+        const seen = /* @__PURE__ */ new Set();
+        let hasTag = false;
+        for (const t of card.tags || []) {
+          const segs = qmSegs(t);
+          if (!segs.length)
+            continue;
+          hasTag = true;
+          for (let d = 1; d <= segs.length; d++) {
+            const part = segs.slice(0, d);
+            const key = part.map((x) => x.toLowerCase()).join(QM_TAG_SEP);
+            let node = index.get(key);
+            if (!node) {
+              node = { key, labelFreq: /* @__PURE__ */ new Map(), cards: /* @__PURE__ */ new Set() };
+              index.set(key, node);
+            }
+            const label = part.join(QM_TAG_SEP);
+            node.labelFreq.set(label, (node.labelFreq.get(label) || 0) + 1);
+            if (!seen.has(key)) {
+              node.cards.add(i);
+              seen.add(key);
+            }
+          }
+        }
+        if (!hasTag)
+          untagged++;
+      }
+      const nodes = /* @__PURE__ */ new Map();
+      for (const [key, n] of index) {
+        const path = qmPickLabel(n.labelFreq);
+        nodes.set(key, {
+          key,
+          path,
+          label: qmSegs(path).slice(-1)[0] || path,
+          count: n.cards.size,
+          children: []
+        });
+      }
+      const roots = [];
+      for (const [key, node] of nodes) {
+        const cut = key.lastIndexOf(QM_TAG_SEP);
+        const parent = cut < 0 ? null : nodes.get(key.slice(0, cut));
+        if (parent)
+          parent.children.push(node);
+        else
+          roots.push(node);
+      }
+      const sortNodes = (arr) => {
+        arr.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "zh"));
+        for (const n of arr)
+          sortNodes(n.children);
+      };
+      sortNodes(roots);
+      return { tree: roots, untagged };
+    }
+    function qmCountTagDescendants(node) {
+      let n = 0;
+      for (const ch of node && node.children || []) {
+        n += 1 + qmCountTagDescendants(ch);
+      }
+      return n;
+    }
+    function qmDaysAgo(date) {
+      const m = String(date || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!m)
+        return 0;
+      const today = /* @__PURE__ */ new Date();
+      today.setHours(0, 0, 0, 0);
+      const then = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      then.setHours(0, 0, 0, 0);
+      return Math.max(0, Math.round((today - then) / 864e5));
+    }
+    function qmCardHasPath(card, pathLower) {
+      const want = qmSegs(pathLower).map((s) => s.toLowerCase());
+      if (!want.length)
+        return false;
+      for (const t of card && card.tags || []) {
+        const segs = qmSegs(t).map((x) => x.toLowerCase());
+        if (segs.length < want.length)
+          continue;
+        let ok = true;
+        for (let i = 0; i < want.length; i++) {
+          if (segs[i] !== want[i]) {
+            ok = false;
+            break;
+          }
+        }
+        if (ok)
+          return true;
+      }
+      return false;
+    }
+    function qmCardIsUntagged(card) {
+      for (const t of card && card.tags || []) {
+        if (qmSegs(t).length)
+          return false;
+      }
+      return true;
+    }
+    var CardsView = class extends ItemView2 {
+      constructor(leaf, plugin) {
+        super(leaf);
+        this.plugin = plugin;
+        this.state = {
+          search: "",
+          // 标签筛选：多选，取并集（存完整路径，保留原始大小写）
+          tags: [],
+          // 「无标签」筛选：与标签多选互斥
+          untagged: false,
+          // 引用筛选：'' 全部 / 'has' 只看已引用 / 'none' 只看未引用
+          refFilter: "",
+          // 筛选浮层是否展开
+          filterOpen: false,
+          // 标签树的展开状态（按小写路径记）
+          expanded: {},
+          editingKey: null,
+          // 正在编辑但还没保存的文本：列表被重画时用它恢复，避免白打一遍
+          editingDraft: null,
+          cards: [],
+          // 折叠的日期（只影响渲染，不改文件）
+          collapsed: new Set(plugin.settings && plugin.settings.collapsedDates || []),
+          // 多选删除
+          selectMode: false,
+          selected: /* @__PURE__ */ new Set(),
+          // 回看：覆盖式视图，只在内存里
+          reviewOpen: false,
+          review: [],
+          // 目标笔记里已有的块 ID：「已插入」以笔记内容为准，不是「这一轮点过没有」
+          insertedIds: /* @__PURE__ */ new Set(),
+          // 这一轮展示过哪些卡：换一批时尽量不重样
+          reviewShown: /* @__PURE__ */ new Set(),
+          // 只给没有块 ID 的老卡用（没法从内容判断，只能记这一轮）
+          reviewDone: {},
+          // 追加区：展开过的卡片、正在写的追加、正在改的某条追加
+          appendOpen: /* @__PURE__ */ new Set(),
+          appendDraft: null,
+          appendEdit: null
+        };
+        this._lastDown = 0;
+        this._dblRisk = false;
+        this._noIdHint = false;
+        this._refBadges = /* @__PURE__ */ new Map();
+      }
+      getViewType() {
+        return VIEW_TYPE_QM;
+      }
+      getDisplayText() {
+        return "Collis";
+      }
+      getIcon() {
+        return ICON_ID;
+      }
+      async onOpen() {
+        const root = this.contentEl;
+        root.empty();
+        root.addClass("qm-view");
+        const wrap = root.createDiv({ cls: "qm-root" });
+        this.wrapEl = wrap;
+        const composer = wrap.createDiv({ cls: "qm-composer" });
+        this.inputEl = composer.createEl("textarea", { cls: "qm-input" });
+        this.inputEl.setAttr("placeholder", "\u8BB0\u5F55\u4E00\u4E0B\u2026");
+        this.inputEl.rows = 2;
+        this._manualH = false;
+        this.autoGrow = () => {
+          if (this._manualH)
+            return;
+          const el = this.inputEl;
+          el.style.height = "auto";
+          el.style.height = Math.min(160, el.scrollHeight) + "px";
+        };
+        this.draftHintEl = null;
+        this._draftRestored = false;
+        const draft = this.plugin.draftAlive();
+        if (draft) {
+          this.inputEl.value = draft;
+          this._draftRestored = true;
+          this.autoGrow();
+          this.draftHintEl = composer.createDiv({
+            cls: "qm-draft-hint",
+            text: "\u5DF2\u6062\u590D\u4E0A\u6B21\u6CA1\u8BB0\u5B8C\u7684\u5185\u5BB9"
+          });
+        }
+        const compFoot = composer.createDiv({ cls: "qm-composer-foot" });
+        compFoot.createSpan({ cls: "qm-kbd-hint", text: "Ctrl+Enter \u8BB0\u4E0B" });
+        this.saveBtnEl = compFoot.createEl("button", { cls: "qm-save", text: "\u8BB0\u4E0B" });
+        this.saveBtnEl.onclick = () => this.saveInput();
+        const grip = composer.createDiv({ cls: "qm-grip" });
+        grip.setAttr("title", "\u4E0A\u4E0B\u62D6\u52A8\uFF0C\u8C03\u6574\u8F93\u5165\u6846\u9AD8\u5EA6\uFF08\u53CC\u51FB\u8FD8\u539F\uFF09");
+        grip.setAttr("aria-label", "\u8C03\u6574\u8F93\u5165\u6846\u9AD8\u5EA6");
+        grip.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M10 3 3 10"/><path d="M10 6.4 6.4 10"/></svg>';
+        grip.addEventListener("pointerdown", (e) => {
+          if (e.pointerType === "mouse" && e.button !== 0)
+            return;
+          e.preventDefault();
+          e.stopPropagation();
+          this._manualH = true;
+          const startY = e.clientY;
+          const startH = this.inputEl.offsetHeight || 38;
+          const doc = this.inputEl.ownerDocument || document;
+          try {
+            if (grip.setPointerCapture && e.pointerId != null)
+              grip.setPointerCapture(e.pointerId);
+          } catch (err) {
+          }
+          const onMove = (ev) => {
+            const h = Math.max(38, Math.min(400, startH + (ev.clientY - startY)));
+            this.inputEl.style.height = h + "px";
+          };
+          const stop = () => {
+            doc.removeEventListener("pointermove", onMove);
+            doc.removeEventListener("pointerup", stop);
+            doc.removeEventListener("pointercancel", stop);
+            try {
+              if (grip.releasePointerCapture && e.pointerId != null)
+                grip.releasePointerCapture(e.pointerId);
+            } catch (err) {
+            }
+          };
+          doc.addEventListener("pointermove", onMove);
+          doc.addEventListener("pointerup", stop);
+          doc.addEventListener("pointercancel", stop);
+        });
+        grip.addEventListener("dblclick", (e) => {
+          e.preventDefault();
+          this._manualH = false;
+          this.inputEl.style.height = "";
+          this.autoGrow();
+        });
+        this.syncSaveBtn = () => {
+          if (!this.saveBtnEl)
+            return;
+          const empty = !String(this.inputEl.value || "").trim();
+          this.saveBtnEl.disabled = empty;
+          this.saveBtnEl.toggleClass("is-disabled", empty);
+        };
+        this.syncSaveBtn();
+        this.inputEl.addEventListener("input", () => {
+          this.autoGrow();
+          this.dismissDraftHint();
+          this.syncSaveBtn();
+          this.plugin.queueDraft(this.inputEl.value);
+        });
+        this.tagSuggest = new TagSuggest(this.inputEl, composer, () => this.tagPool());
+        this.inputEl.addEventListener("keydown", (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            this.saveInput();
+          }
+        });
+        const toolrow = wrap.createDiv({ cls: "qm-toolrow" });
+        this.toolRowEl = toolrow;
+        const searchbox = toolrow.createDiv({ cls: "qm-searchbox" });
+        const sIco = searchbox.createSpan({ cls: "qm-search-ico" });
+        qmIcon(sIco, "search");
+        this.searchEl = searchbox.createEl("input", { cls: "qm-search" });
+        this.searchEl.setAttr("type", "text");
+        this.searchEl.setAttr("placeholder", "\u641C\u7D22\u5361\u7247\u3001#\u6807\u7B7E\u3001\u65E5\u671F");
+        this.syncSearchClear = () => {
+          if (!this.searchClearEl)
+            return;
+          this.searchClearEl.toggleClass("is-visible", !!String(this.searchEl.value || "").trim());
+        };
+        this.searchEl.addEventListener("input", () => {
+          this.syncSearchClear();
+          if (this._searchTimer)
+            clearTimeout(this._searchTimer);
+          this._searchTimer = setTimeout(() => {
+            this._searchTimer = null;
+            this.state.search = this.searchEl.value.trim();
+            if (this.state.selectMode)
+              this.state.selected.clear();
+            this.renderChips();
+            this.renderFilterBtnState();
+            this.renderList();
+          }, 120);
+        });
+        this.searchClearEl = searchbox.createEl("button", {
+          cls: "qm-search-clear",
+          text: "\xD7"
+        });
+        this.searchClearEl.setAttr("aria-label", "\u6E05\u7A7A\u641C\u7D22");
+        this.searchClearEl.onclick = () => {
+          this.searchEl.value = "";
+          this.state.search = "";
+          this.syncSearchClear();
+          if (this.state.selectMode)
+            this.state.selected.clear();
+          this.renderChips();
+          this.renderFilterBtnState();
+          this.renderList();
+          this.searchEl.focus();
+        };
+        const reviewBtn = toolrow.createEl("button", { cls: "qm-icon-btn" });
+        reviewBtn.setAttr("type", "button");
+        reviewBtn.setAttr("aria-label", "\u56DE\u770B");
+        reviewBtn.setAttr("title", "\u56DE\u770B\uFF08\u7FFB\u51E0\u5F20\u65E7\u5361\u7247\uFF09");
+        qmIcon(reviewBtn, "review");
+        reviewBtn.onclick = (e) => {
+          if (e && e.stopPropagation)
+            e.stopPropagation();
+          this.openReview();
+        };
+        this.filterBtnEl = toolrow.createEl("button", { cls: "qm-icon-btn" });
+        this.filterBtnEl.setAttr("type", "button");
+        this.filterBtnEl.setAttr("aria-label", "\u7B5B\u9009");
+        this.filterBtnEl.setAttr("title", "\u7B5B\u9009");
+        qmIcon(this.filterBtnEl, "filter");
+        this.filterDotEl = this.filterBtnEl.createSpan({ cls: "qm-filter-dot is-hidden" });
+        this.filterBtnEl.onclick = (e) => {
+          if (e && e.stopPropagation)
+            e.stopPropagation();
+          this.toggleFilterPanel();
+        };
+        this.moreBtnEl = toolrow.createEl("button", { cls: "qm-icon-btn" });
+        this.moreBtnEl.setAttr("type", "button");
+        this.moreBtnEl.setAttr("aria-label", "\u66F4\u591A");
+        this.moreBtnEl.setAttr("title", "\u66F4\u591A");
+        qmIcon(this.moreBtnEl, "more");
+        this.moreBtnEl.onclick = (e) => {
+          if (e && e.stopPropagation)
+            e.stopPropagation();
+          this.openMoreMenu(e);
+        };
+        this.popEl = wrap.createDiv({ cls: "qm-pop" });
+        this.chipsEl = wrap.createDiv({ cls: "qm-chips" });
+        this.listEl = wrap.createDiv({ cls: "qm-list" });
+        this.selectBarEl = wrap.createDiv({ cls: "qm-selbar" });
+        this.reviewEl = wrap.createDiv({ cls: "qm-review" });
+        this._onDocDown = (e) => {
+          if (!this.state || !this.state.filterOpen)
+            return;
+          const t = e.target;
+          if (t && t.isConnected === false)
+            return;
+          if (t && typeof t.closest === "function" && t.closest(".qm-pop"))
+            return;
+          if (t && this.filterBtnEl && typeof this.filterBtnEl.contains === "function") {
+            if (t === this.filterBtnEl || this.filterBtnEl.contains(t))
+              return;
+          }
+          this.closeFilterPanel();
+        };
+        document.addEventListener("mousedown", this._onDocDown, true);
+        this.registerDomEvent(window, "resize", () => {
+          this.syncSelbarGap();
+        });
+        try {
+          if (typeof ResizeObserver === "function" && this.wrapEl) {
+            const ro = new ResizeObserver(() => this.syncSelbarGap());
+            ro.observe(this.wrapEl);
+            this.register(() => ro.disconnect());
+          }
+        } catch (e) {
+        }
+        const onChange = async (f, oldPath) => {
+          if (!(f instanceof TFile))
+            return;
+          const inFolder = this.plugin.isCardFilePath(f.path) || oldPath && this.plugin.isCardFilePath(oldPath);
+          if (!inFolder)
+            return;
+          if (await this.plugin.isOwnWrite(f))
+            return;
+          this.scheduleRefresh();
+        };
+        this.registerEvent(this.app.vault.on("modify", onChange));
+        this.registerEvent(this.app.vault.on("create", onChange));
+        this.registerEvent(this.app.vault.on("delete", onChange));
+        this.registerEvent(this.app.vault.on("rename", onChange));
+        await this.refresh();
+        this.syncSelbarGap();
+      }
+      async onClose() {
+        try {
+          this.closeMenu();
+        } catch (e) {
+        }
+        if (this._onDocDown) {
+          document.removeEventListener("mousedown", this._onDocDown, true);
+          this._onDocDown = null;
+        }
+        if (this.inputEl) {
+          const v = String(this.inputEl.value || "");
+          if (v.trim())
+            void this.plugin.saveDraft(v);
+          else if (this._draftRestored)
+            void this.plugin.clearDraft();
+        }
+        if (this._searchTimer) {
+          clearTimeout(this._searchTimer);
+          this._searchTimer = null;
+        }
+        if (this._reloadTimer) {
+          clearTimeout(this._reloadTimer);
+          this._reloadTimer = null;
+        }
+        if (this.tagSuggest) {
+          this.tagSuggest.destroy();
+          this.tagSuggest = null;
+        }
+        this.contentEl.empty();
+      }
+      /** 标签候选池：卡片数据没换就直接复用，避免每敲一个字重算一遍 */
+      tagPool() {
+        const cards = this.state ? this.state.cards : [];
+        if (!this._tagCache || this._tagCache.ref !== cards) {
+          this._tagCache = {
+            ref: cards,
+            list: collectAllTags(cards, this.plugin.settings.quickTags)
+          };
+        }
+        return this._tagCache.list;
+      }
+      /**
+       * 外部改动（编辑器手改、同步、别处写入）触发的重读。
+       * 编辑器里连续敲字会连发很多次 modify，合并成一次，别每敲一下重建整个列表。
+       */
+      scheduleRefresh() {
+        if (this._reloadTimer)
+          clearTimeout(this._reloadTimer);
+        this._reloadTimer = setTimeout(() => {
+          this._reloadTimer = null;
+          this.refresh();
+        }, 150);
+      }
+      /** 开始改动就把「已恢复上次没记完的内容」收掉，不再一直显示 */
+      dismissDraftHint() {
+        if (!this.draftHintEl)
+          return;
+        this.draftHintEl.remove();
+        this.draftHintEl = null;
+      }
+      insertTag(tag) {
+        const cur = this.inputEl.value;
+        const add = "#" + tag + " ";
+        const needsSpace = cur.length > 0 && !/\s$/.test(cur);
+        this.inputEl.value = cur + (needsSpace ? " " : "") + add;
+        this.dismissDraftHint();
+        this.inputEl.focus();
+      }
+      async saveInput() {
+        const text = String(this.inputEl.value || "").trim();
+        if (!text) {
+          new Notice2("\u5199\u70B9\u4EC0\u4E48\u518D\u8BB0\u4E0B\u5427");
+          return;
+        }
+        const ok = await this.plugin.appendCard(text);
+        if (!ok)
+          return;
+        this.inputEl.value = "";
+        this._manualH = false;
+        if (this.inputEl.style)
+          this.inputEl.style.height = "";
+        if (this.autoGrow)
+          this.autoGrow();
+        if (this.syncSaveBtn)
+          this.syncSaveBtn();
+        this.dismissDraftHint();
+        this._draftRestored = false;
+        await this.plugin.clearDraft();
+        this.inputEl.focus();
+      }
+      async refresh() {
+        if (this._refreshing) {
+          this._dirty = true;
+          return;
+        }
+        this._refreshing = true;
+        try {
+          const cards = await this.plugin.readAllCards();
+          if (!this.state)
+            return;
+          this.state.cards = cards;
+          this._loadedOnce = true;
+          this.plugin.refreshRefs();
+          this.renderFilters();
+          this.renderList();
+          if (this.state.reviewOpen) {
+            this.syncReview();
+            this.renderReview();
+          }
+        } finally {
+          this._refreshing = false;
+          if (this._dirty) {
+            this._dirty = false;
+            this.refresh();
+          }
+        }
+      }
+      /**
+       * 插件自己写完一个文件后的定向更新：只重解析这一个文件，
+       * 换掉它在列表里的那部分，其它月份不重读。省掉一次整文件夹重读。
+       */
+      applyFileCards(path, content) {
+        if (!this.state)
+          return;
+        if (!this._loadedOnce) {
+          this.refresh();
+          return;
+        }
+        const next = parseCards(content, path, {
+          strict: this.plugin.settings.strictCardId !== false
+        });
+        const rest = this.state.cards.filter((c) => c.filePath !== path);
+        this.state.cards = sortCards(rest.concat(next));
+        if (this.state.selected && this.state.selected.size) {
+          const alive = new Set(this.state.cards.map((c) => this.cardKey(c)));
+          for (const k of Array.from(this.state.selected)) {
+            if (!alive.has(k))
+              this.state.selected.delete(k);
+          }
+        }
+        this.renderFilters();
+        this.renderList({ keepScroll: true });
+        if (this.state.reviewOpen) {
+          this.syncReview();
+          this.renderReview();
+        }
+        if (this._refreshing)
+          this._dirty = true;
+      }
+      /** 数据没变、只是要更新一下界面文字（比如「最近删除」条数） */
+      rerender() {
+        if (!this.state || !this._loadedOnce)
+          return;
+        this.renderFilters();
+        this.renderList();
+        if (this.state.reviewOpen) {
+          this.syncReview();
+          this.renderReview();
+        }
+      }
+      /**
+       * 回看是内存里的一批旧对象：卡片被改 / 删之后要把它们换成本轮的新对象，
+       * 否则展开追加、编辑时改的还是旧内容。找不到的就从这一批里移除。
+       */
+      syncReview() {
+        if (!Array.isArray(this.state.review))
+          return;
+        const cards = this.state.cards || [];
+        const used = /* @__PURE__ */ new Set();
+        const next = [];
+        for (const old of this.state.review) {
+          const ok = this.cardKey(old);
+          let hit = cards.find((c) => !used.has(this.cardKey(c)) && this.cardKey(c) === ok);
+          if (!hit) {
+            hit = cards.find(
+              (c) => !used.has(this.cardKey(c)) && c.filePath === old.filePath && c.date === old.date && c.time === old.time
+            );
+          }
+          if (!hit)
+            continue;
+          used.add(this.cardKey(hit));
+          next.push(hit);
+        }
+        this.state.review = next;
+      }
+      /** 引用筛选的实际生效值：索引没建好时一律按「全部」，免得把卡片全判成未引用 */
+      effectiveRefFilter() {
+        const v = this.state.refFilter;
+        if (!v)
+          return "";
+        if (!this.plugin.refsReady())
+          return "";
+        return v;
+      }
+      setRefFilter(v) {
+        this.state.refFilter = v || "";
+        if (this.state.selectMode)
+          this.state.selected.clear();
+        this.renderFilters();
+        this.renderList();
+      }
+      /** 现在有几项筛选在生效（引用算一项，标签每个算一项，无标签算一项） */
+      /** 生效条件数：搜索词也算一条，跟 chips 上看到的一致 */
+      activeFilterCount() {
+        return (String(this.state.search || "").trim() ? 1 : 0) + (this.state.refFilter ? 1 : 0) + (this.state.tags || []).length + (this.state.untagged ? 1 : 0);
+      }
+      /** 筛选按钮的「亮着」与右下小圆点：有生效条件才亮 */
+      renderFilterBtnState() {
+        if (!this.filterBtnEl)
+          return;
+        const n = this.activeFilterCount();
+        this.filterBtnEl.toggleClass("is-active", n > 0);
+        if (this.filterDotEl)
+          this.filterDotEl.toggleClass("is-hidden", !n);
+      }
+      /** chips / 面板 / 按钮一次性对齐；数据没变（比如只改了引用索引）时也能安全调用 */
+      renderFilters() {
+        this.renderChips();
+        this.renderFilterBtnState();
+        if (this.state.filterOpen) {
+          this.renderFilterPanel();
+          this.positionPop();
+          this.fitPopHeight();
+          this.updateTreeMore();
+        }
+        this.syncListGap();
+      }
+      /* ---------------- 标签：父子树 + 多选 ---------------- */
+      /** 标签森林按 cards 引用缓存：同一批卡片不为每次重画重算一遍 */
+      tagForest() {
+        const cards = this.state.cards;
+        if (!this._forest || this._forest.ref !== cards) {
+          const f = qmBuildTagForest(cards);
+          this._forest = { ref: cards, tree: f.tree, untagged: f.untagged };
+        }
+        return this._forest;
+      }
+      isTagSelected(keyLower) {
+        return (this.state.tags || []).some((t) => qmLowerPath(t) === keyLower);
+      }
+      /** 最近的、已被选中的祖先：用于「已包含在 #写作 里」的提示 */
+      selectedAncestorPath(keyLower) {
+        const parts = String(keyLower || "").split(QM_TAG_SEP);
+        for (let i = parts.length - 1; i >= 1; i--) {
+          const p = parts.slice(0, i).join(QM_TAG_SEP);
+          const hit = (this.state.tags || []).find((t) => qmLowerPath(t) === p);
+          if (hit)
+            return hit;
+        }
+        return "";
+      }
+      /** 这个节点的后代里有没有被选中的（用于半选状态） */
+      hasSelectedBelow(node) {
+        for (const ch of node.children || []) {
+          if (this.isTagSelected(ch.key) || this.hasSelectedBelow(ch))
+            return true;
+        }
+        return false;
+      }
+      /** 勾一个标签：被祖先覆盖时忽略；已选则取消；未选则加入，并把它下面已选的子标签合并掉 */
+      toggleTagFilter(path) {
+        const key = qmLowerPath(path);
+        if (!key)
+          return;
+        const anc = this.selectedAncestorPath(key);
+        if (anc) {
+          new Notice2("\u5DF2\u5305\u542B\u5728 #" + anc + " \u91CC");
+          return;
+        }
+        const cur = (this.state.tags || []).slice();
+        const at = cur.findIndex((t) => qmLowerPath(t) === key);
+        if (at >= 0) {
+          cur.splice(at, 1);
+        } else {
+          const rest = cur.filter((t) => qmLowerPath(t).indexOf(key + QM_TAG_SEP) !== 0);
+          cur.length = 0;
+          for (const t of rest)
+            cur.push(t);
+          cur.push(path);
+          this.state.expanded[key] = true;
+        }
+        this.state.untagged = false;
+        this.state.tags = cur;
+        if (this.state.selectMode)
+          this.state.selected.clear();
+        this.renderFilters();
+        this.renderList();
+      }
+      setFilterTags(list) {
+        this.state.tags = (list || []).filter(Boolean);
+        if (this.state.tags.length)
+          this.state.untagged = false;
+        if (this.state.selectMode)
+          this.state.selected.clear();
+        this.renderFilters();
+        this.renderList();
+      }
+      clearFilters() {
+        this.state.refFilter = "";
+        this.state.tags = [];
+        this.state.untagged = false;
+        this.state.search = "";
+        if (this.searchEl)
+          this.searchEl.value = "";
+        if (this.syncSearchClear)
+          this.syncSearchClear();
+        if (this.state.selectMode)
+          this.state.selected.clear();
+        this.renderFilters();
+        this.renderList();
+      }
+      /* ---------------- 生效条件 chips ---------------- */
+      chipParts() {
+        const parts = [];
+        const kw = String(this.state.search || "").trim();
+        if (kw) {
+          parts.push({
+            text: "\u201C" + kw + "\u201D",
+            sub: "",
+            clear: () => {
+              this.state.search = "";
+              if (this.searchEl)
+                this.searchEl.value = "";
+              if (this.syncSearchClear)
+                this.syncSearchClear();
+              if (this.state.selectMode)
+                this.state.selected.clear();
+              this.renderFilters();
+              this.renderList();
+            }
+          });
+        }
+        const rf = this.state.refFilter;
+        if (rf) {
+          parts.push({
+            text: rf === "has" ? "\u5DF2\u5F15\u7528" : "\u672A\u5F15\u7528",
+            sub: "",
+            clear: () => this.setRefFilter("")
+          });
+        }
+        if (this.state.untagged) {
+          parts.push({
+            text: "\u65E0\u6807\u7B7E",
+            sub: "",
+            clear: () => {
+              this.state.untagged = false;
+              this.renderFilters();
+              this.renderList();
+            }
+          });
+        }
+        const forest = this.tagForest();
+        const index = /* @__PURE__ */ new Map();
+        const walk = (arr) => {
+          for (const n of arr) {
+            index.set(n.key, n);
+            walk(n.children);
+          }
+        };
+        walk(forest.tree);
+        for (const t of this.state.tags || []) {
+          const node = index.get(qmLowerPath(t));
+          const kids = node ? qmCountTagDescendants(node) : 0;
+          parts.push({
+            text: "#" + t,
+            sub: kids ? "\u542B " + kids : "",
+            clear: () => this.setFilterTags((this.state.tags || []).filter((x) => x !== t))
+          });
+        }
+        return parts;
+      }
+      renderChips() {
+        const el = this.chipsEl;
+        if (!el)
+          return;
+        el.empty();
+        const parts = this.chipParts();
+        if (!parts.length) {
+          el.removeClass("show");
+          return;
+        }
+        el.addClass("show");
+        const MAX = 3;
+        const shown = parts.slice(0, MAX);
+        for (const p of shown) {
+          const chip = el.createSpan({ cls: "qm-chip" });
+          chip.createSpan({ text: p.text });
+          if (p.sub)
+            chip.createEl("em", { text: p.sub });
+          const x = chip.createEl("button", { text: "\xD7" });
+          x.setAttr("aria-label", "\u6E05\u9664");
+          x.onclick = (e) => {
+            if (e && e.stopPropagation)
+              e.stopPropagation();
+            p.clear();
+          };
+        }
+        const rest = parts.length - shown.length;
+        if (rest > 0) {
+          const more = el.createSpan({ cls: "qm-chip qm-chip-more", text: "+" + rest });
+          more.setAttr("title", "\u8FD8\u6709 " + rest + " \u4E2A\u6761\u4EF6");
+          more.onclick = (e) => {
+            if (e && e.stopPropagation)
+              e.stopPropagation();
+            this.openFilterPanel();
+          };
+        }
+        if (this.state && this.state.filterOpen)
+          this.positionPop();
+      }
+      /* ---------------- 筛选浮层 ---------------- */
+      toggleFilterPanel() {
+        if (this.state.filterOpen)
+          this.closeFilterPanel();
+        else
+          this.openFilterPanel();
+      }
+      openFilterPanel() {
+        this.state.filterOpen = true;
+        this.renderChips();
+        this.renderFilterPanel();
+        this.positionPop();
+        if (this.popEl)
+          this.popEl.addClass("show");
+        this.fitPopHeight();
+        this.updateTreeMore();
+        this.syncListGap();
+      }
+      closeFilterPanel() {
+        this.state.filterOpen = false;
+        if (this.popEl)
+          this.popEl.removeClass("show");
+        this.syncListGap();
+      }
+      /** 浮层跟着工具行（和 chips）走：面板不参与布局，位置只能自己算 */
+      positionPop() {
+        const pop = this.popEl;
+        const bar = this.toolRowEl;
+        if (!pop || !bar)
+          return;
+        let top = 0;
+        if (typeof bar.offsetTop === "number") {
+          top = bar.offsetTop + bar.offsetHeight + 6;
+        } else if (typeof bar.getBoundingClientRect === "function" && this.wrapEl) {
+          const wr = this.wrapEl.getBoundingClientRect();
+          const tr = bar.getBoundingClientRect();
+          top = tr.bottom - wr.top + 6;
+        }
+        if (this.chipParts().length && this.chipsEl && typeof this.chipsEl.offsetHeight === "number") {
+          top += this.chipsEl.offsetHeight + 7;
+        }
+        pop.style.top = Math.max(0, Math.round(top)) + "px";
+      }
+      /**
+       * 侧栏不高的时候，面板底部会顶出可视区（外面 overflow:hidden 会把它切掉）。
+       * 这时把标签窗口收一点，保证「清除筛选」和最后几行永远能看到。
+       */
+      fitPopHeight() {
+        const pop = this.popEl;
+        const wrap = this.wrapEl;
+        const tree = this.treeEl;
+        if (!pop || !wrap || !tree)
+          return;
+        if (!wrap.clientHeight)
+          return;
+        tree.style.height = "";
+        const top = parseFloat(pop.style.top || "0") || 0;
+        const avail = wrap.clientHeight - top - 10;
+        const need = pop.offsetHeight;
+        if (need > avail) {
+          const h = Math.max(88, QM_TREE_H - (need - avail));
+          tree.style.height = h + "px";
+        }
+      }
+      /**
+       * 面板是覆盖式浮层（和截图一致）：打开时卡片区不位移、不被挤压，
+       * 面板像菜单一样浮在列表上面。关掉就恢复原样。
+       * 早期版本往列表上补过一段 padding（怕结果被面板挡住），那会让卡片整体下跳，已去掉。
+       */
+      syncListGap() {
+        const list = this.listEl;
+        if (!list)
+          return;
+        if (list.style.paddingTop)
+          list.style.paddingTop = "";
+      }
+      renderFilterPanel() {
+        const el = this.popEl;
+        if (!el)
+          return;
+        const keepTop = this.treeEl ? this.treeEl.scrollTop || 0 : 0;
+        el.empty();
+        el.createDiv({ cls: "qm-pop-title", text: "\u7B5B\u9009" });
+        el.createDiv({ cls: "qm-pop-label", text: "\u5F15\u7528\u60C5\u51B5" });
+        const seg = el.createDiv({ cls: "qm-seg" });
+        const refOpts = [["", "\u5168\u90E8"], ["has", "\u5DF2\u5F15\u7528"], ["none", "\u672A\u5F15\u7528"]];
+        for (const [v, label] of refOpts) {
+          const b = seg.createEl("button", {
+            text: label,
+            cls: this.state.refFilter === v ? "on" : ""
+          });
+          b.onclick = (e) => {
+            if (e && e.stopPropagation)
+              e.stopPropagation();
+            this.setRefFilter(v);
+          };
+        }
+        const lab = el.createDiv({ cls: "qm-pop-label" });
+        lab.createSpan({ text: "\u6807\u7B7E" });
+        if ((this.state.tags || []).length) {
+          lab.createSpan({ cls: "qm-pop-sel", text: "\u5DF2\u9009 " + this.state.tags.length });
+        }
+        const treeWrap = el.createDiv({ cls: "qm-tree-wrap" });
+        const tree = treeWrap.createDiv({ cls: "qm-tagtree" });
+        this.treeEl = tree;
+        tree.addEventListener("scroll", () => this.updateTreeMore());
+        const forest = this.tagForest();
+        const un = tree.createDiv({
+          cls: "qm-tnode qm-tnode-untagged" + (this.state.untagged ? " is-on" : "")
+        });
+        un.setAttr("title", "\u53EA\u770B\u6CA1\u6709\u5199\u6807\u7B7E\u7684\u5361\u7247");
+        un.createSpan({ cls: "qm-caret is-blank" });
+        un.createSpan({ cls: "qm-tname", text: "\u65E0\u6807\u7B7E" });
+        un.createSpan({ cls: "qm-tcount", text: String(forest.untagged) });
+        un.createSpan({ cls: "qm-tmark", text: "\u2713" });
+        un.onclick = () => {
+          this.state.untagged = !this.state.untagged;
+          if (this.state.untagged)
+            this.state.tags = [];
+          if (this.state.selectMode)
+            this.state.selected.clear();
+          this.renderFilters();
+          this.renderList();
+        };
+        for (const node of forest.tree)
+          this.renderTagNode(tree, node, 0);
+        const foot = el.createDiv({ cls: "qm-pop-foot" });
+        const clear = foot.createEl("button", { cls: "qm-link-btn", text: "\u6E05\u9664\u7B5B\u9009" });
+        clear.onclick = (e) => {
+          if (e && e.stopPropagation)
+            e.stopPropagation();
+          this.clearFilters();
+        };
+        const n = this.activeFilterCount();
+        foot.createSpan({
+          cls: "qm-pop-note",
+          text: n ? "\u5DF2\u751F\u6548 " + n + " \u9879" : "\u6CA1\u6709\u751F\u6548\u7684\u7B5B\u9009"
+        });
+        this.updateTreeMore();
+        if (keepTop && tree.scrollTop !== keepTop)
+          tree.scrollTop = keepTop;
+      }
+      /**
+       * 标签树的一行：折叠三角 / 名字 / 命中数 / 勾选框。
+       * 三种状态互斥：自己选中 → 后代选中（半选）→ 祖先已选、被覆盖（淡色勾，不可点）。
+       */
+      renderTagNode(parent, node, depth) {
+        const key = node.key;
+        const sel = this.isTagSelected(key);
+        const covered = !sel && !!this.selectedAncestorPath(key);
+        const some = !sel && !covered && this.hasSelectedBelow(node);
+        const open = !!this.state.expanded[key];
+        const kids = node.children.length > 0;
+        const row = parent.createDiv({
+          cls: "qm-tnode" + (sel ? " is-on" : "") + (some ? " is-some" : "") + (covered ? " is-inherit" : "") + (depth ? " is-child" : "")
+        });
+        row.setAttr("title", "#" + node.path + " \xB7 " + node.count + " \u6761");
+        const caret = row.createSpan({
+          cls: "qm-caret" + (kids ? "" : " is-blank"),
+          text: kids ? open ? "\u25BE" : "\u25B8" : ""
+        });
+        caret.onclick = (e) => {
+          if (e && e.stopPropagation)
+            e.stopPropagation();
+          if (!kids)
+            return;
+          if (this.state.expanded[key])
+            delete this.state.expanded[key];
+          else
+            this.state.expanded[key] = true;
+          this.renderFilterPanel();
+          this.syncListGap();
+        };
+        row.createSpan({ cls: "qm-tname", text: (depth ? "" : "#") + node.label });
+        row.createSpan({ cls: "qm-tcount", text: String(node.count) });
+        row.createSpan({ cls: "qm-tmark", text: "\u2713" });
+        row.onclick = () => this.toggleTagFilter(node.path);
+        if (kids && open) {
+          const box = parent.createDiv({ cls: "qm-tchildren" });
+          for (const ch of node.children)
+            this.renderTagNode(box, ch, depth + 1);
+        }
+      }
+      /** 标签窗口还有内容没露出来时，底部渐隐提示「还能往下翻」 */
+      updateTreeMore() {
+        const tree = this.treeEl;
+        const wrap = tree && (tree.parentNode || tree.parent);
+        if (!tree || !wrap)
+          return;
+        const rest = (tree.scrollHeight || 0) - (tree.scrollTop || 0) - (tree.clientHeight || 0);
+        wrap.toggleClass("more", rest > 0.5);
+      }
+      /* ---------------- 下拉菜单（自绘，贴着按钮） ---------------- */
+      /**
+       * 原来用 Obsidian 原生 Menu：它固定在鼠标点、宽度也不受控，侧栏里总是偏一块。
+       * 这里自己画一个：贴着触发按钮、右边缘对齐，放不下就翻到上方。
+       * 返回的 items 是普通对象数组（每项带 click()），调用方只认这个。
+       */
+      showMenu(items, anchor) {
+        for (const it of items) {
+          if (!it.click) {
+            it.click = () => {
+              if (!it.disabled && it.onClick)
+                it.onClick();
+            };
+          }
+        }
+        this.menuItems = items;
+        if (this.menuOpen && anchor && this.menuAnchor === anchor) {
+          this.closeMenu();
+          return { items };
+        }
+        this.closeMenu();
+        const root = this.wrapEl;
+        const canPaint = typeof document !== "undefined" && !!document.body && !!anchor && typeof anchor.getBoundingClientRect === "function" && !!root && typeof root.getBoundingClientRect === "function" && typeof root.createDiv === "function";
+        if (!canPaint)
+          return { items };
+        if (this.state && this.state.filterOpen)
+          this.closeFilterPanel();
+        const menu = root.createDiv({ cls: "qm-menu" });
+        for (const it of items) {
+          if (it.separator) {
+            menu.createDiv({ cls: "qm-menu-sep" });
+            continue;
+          }
+          const row = menu.createDiv({
+            cls: "qm-menu-item" + (it.disabled ? " is-disabled" : "") + (it.danger ? " is-danger" : "")
+          });
+          const ico = row.createSpan({ cls: "qm-menu-ico" });
+          if (it.icon)
+            setIcon2(ico, it.icon);
+          row.createSpan({ cls: "qm-menu-label", text: it.title });
+          if (!it.disabled) {
+            row.onclick = (e) => {
+              if (e && e.stopPropagation)
+                e.stopPropagation();
+              const fn = it.onClick;
+              this.closeMenu();
+              if (fn)
+                fn();
+            };
+          }
+        }
+        const ar = anchor.getBoundingClientRect();
+        const rr = root.getBoundingClientRect();
+        const pos = qmMenuPlace(ar, rr, menu.offsetWidth || 200, menu.offsetHeight || 0);
+        menu.style.left = pos.left + "px";
+        menu.style.top = pos.top + "px";
+        this.menuEl = menu;
+        this.menuAnchor = anchor;
+        this.menuOpen = true;
+        const onDown = (e) => {
+          const t = e.target;
+          if (t && menu.contains && menu.contains(t))
+            return;
+          if (t && anchor.contains && anchor.contains(t))
+            return;
+          this.closeMenu();
+        };
+        const onKey = (e) => {
+          if (e.key === "Escape")
+            this.closeMenu();
+        };
+        const onScroll = () => this.closeMenu();
+        document.addEventListener("mousedown", onDown, true);
+        document.addEventListener("keydown", onKey, true);
+        if (this.listEl && this.listEl.addEventListener) {
+          this.listEl.addEventListener("scroll", onScroll, { passive: true });
+        }
+        this._menuOff = () => {
+          document.removeEventListener("mousedown", onDown, true);
+          document.removeEventListener("keydown", onKey, true);
+          if (this.listEl && this.listEl.removeEventListener) {
+            this.listEl.removeEventListener("scroll", onScroll);
+          }
+        };
+        return { items };
+      }
+      closeMenu() {
+        if (this._menuOff) {
+          this._menuOff();
+          this._menuOff = null;
+        }
+        if (this.menuEl) {
+          this.menuEl.remove();
+          this.menuEl = null;
+        }
+        this.menuAnchor = null;
+        this.menuOpen = false;
+      }
+      openMoreMenu(evt) {
+        const anchor = this.moreBtnEl || evt && evt.currentTarget || null;
+        const hit = this.filtered().length;
+        const total = this.state.cards.length;
+        const cap = this.plugin.settings.maxCards;
+        const capNote = cap > 0 && hit > cap ? " \xB7 \u663E\u793A\u6700\u8FD1 " + cap : "";
+        const countLine = (hit === total ? "\u5171 " + total + " \u6761\u5361\u7247" : "\u5171 " + total + " \u6761 \xB7 \u547D\u4E2D " + hit + " \u6761") + capNote;
+        const n = (this.plugin.settings.trash || []).length;
+        const items = [
+          { title: countLine, icon: "arrow-right", disabled: true },
+          { separator: true },
+          {
+            title: this.state.selectMode ? "\u9000\u51FA\u591A\u9009" : "\u591A\u9009",
+            icon: "list-checks",
+            onClick: () => this.toggleSelectMode()
+          },
+          {
+            title: n ? "\u6700\u8FD1\u5220\u9664 " + n : "\u6700\u8FD1\u5220\u9664",
+            icon: "trash-2",
+            onClick: () => new TrashModal(this.app, this.plugin).open()
+          },
+          {
+            title: "\u6253\u5F00\u672C\u6708\u6587\u4EF6",
+            icon: "file-text",
+            onClick: () => this.plugin.openCurrentMonthFile()
+          },
+          {
+            title: "\u68C0\u67E5\u5B64\u513F\u5361\u7247",
+            icon: "search-check",
+            onClick: () => new OrphanModal(this.app, this.plugin).open()
+          }
+        ];
+        return this.showMenu(items, anchor);
+      }
+      /* ---------------- 回看 ---------------- */
+      openReview() {
+        if (this.state.selectMode) {
+          new Notice2("\u5148\u9000\u51FA\u591A\u9009\uFF0C\u518D\u770B\u56DE\u770B");
+          return;
+        }
+        if (this.state.filterOpen)
+          this.closeFilterPanel();
+        this.state.reviewOpen = true;
+        this.state.reviewDone = {};
+        this.state.insertedIds = /* @__PURE__ */ new Set();
+        this.state.reviewShown = /* @__PURE__ */ new Set();
+        this.pickReview();
+        this.renderReview();
+        void this.scanInserted();
+      }
+      /**
+       * 抽这一轮的卡片。
+       * 旧卡优先（回看的意义是翻旧的）；旧卡不够一屏时用今天的补，
+       * 否则刚记的卡永远进不来——库里只有四张旧卡时就会一直翻那四张。
+       */
+      pickReview() {
+        const today = moment().format("YYYY-MM-DD");
+        const cards = this.state.cards || [];
+        const older = cards.filter((c) => c.date !== today);
+        const fresh = cards.filter((c) => c.date === today);
+        let pool = qmShuffle(older).concat(qmShuffle(fresh));
+        const shown = this.state.reviewShown;
+        if (shown && shown.size) {
+          const rest = pool.filter((c) => !shown.has(this.cardKey(c)));
+          if (rest.length >= QM_REVIEW_N)
+            pool = rest;
+        }
+        this.state.review = pool.slice(0, QM_REVIEW_N);
+        if (shown)
+          for (const c of this.state.review)
+            shown.add(this.cardKey(c));
+      }
+      /** 扫当前笔记里已有的块引用，用于判断「这张已经插过了」 */
+      async scanInserted() {
+        const token = this._scanToken = (this._scanToken || 0) + 1;
+        const ids = /* @__PURE__ */ new Set();
+        let file = null;
+        try {
+          file = this.plugin.currentNoteFile();
+          const isNote = !!file && (file.extension === "md" || /\.md$/i.test(String(file.path || "")));
+          if (isNote) {
+            const text = String(await this.app.vault.cachedRead(file));
+            const re = /#\^([A-Za-z0-9][A-Za-z0-9-]*)/g;
+            let m = re.exec(text);
+            while (m) {
+              ids.add(m[1]);
+              m = re.exec(text);
+            }
+          }
+        } catch (e) {
+        }
+        if (token !== this._scanToken)
+          return;
+        if (!this.state.insertedIds)
+          this.state.insertedIds = /* @__PURE__ */ new Set();
+        for (const id of ids)
+          this.state.insertedIds.add(id);
+        if (this.state.reviewOpen)
+          this.syncReviewInsertButtons();
+      }
+      /** 换了目标笔记：旧的「已插入」全部作废，按新笔记重扫 */
+      rescanInserted() {
+        this.state.insertedIds = /* @__PURE__ */ new Set();
+        this.syncReviewInsertButtons();
+        void this.scanInserted();
+      }
+      /** 按当前笔记内容刷新回看里所有「插入」按钮（不重画 DOM，滚动位置不动） */
+      syncReviewInsertButtons() {
+        const list = this._insertBtns || [];
+        for (const it of list)
+          this.paintInsertBtn(it.card, it.btn);
+      }
+      /** 一张卡的插入按钮该长什么样：已插入 / 插入全文（无块 ID）/ 插入到这篇 */
+      paintInsertBtn(card, btn) {
+        if (!card || !btn)
+          return;
+        const done = this.isInserted(card);
+        const noId = !card.id;
+        btn.setText(done ? "\u5DF2\u63D2\u5165" : noId ? "\u63D2\u5165\u5168\u6587" : "\u63D2\u5165\u5230\u8FD9\u7BC7");
+        if (done)
+          btn.addClass("is-done");
+        else
+          btn.removeClass("is-done");
+      }
+      /** 这张卡在这篇里了吗？有块 ID 就看笔记内容，没有就退回本轮标记 */
+      isInserted(card) {
+        if (!card)
+          return false;
+        if (card.id)
+          return !!(this.state.insertedIds && this.state.insertedIds.has(card.id));
+        return !!(this.state.reviewDone && this.state.reviewDone[this.cardKey(card)]);
+      }
+      closeReview() {
+        this.state.reviewOpen = false;
+        this._insertBtns = [];
+        if (this.reviewEl) {
+          this.reviewEl.removeClass("show");
+          this.reviewEl.empty();
+        }
+        this.renderList({ keepScroll: true });
+      }
+      renderReview() {
+        const el = this.reviewEl;
+        if (!el)
+          return;
+        el.empty();
+        this._insertBtns = [];
+        if (!this.state.reviewOpen) {
+          el.removeClass("show");
+          return;
+        }
+        el.addClass("show");
+        const head = el.createDiv({ cls: "qm-review-head" });
+        const back = head.createEl("button", { cls: "qm-review-back" });
+        back.setAttr("aria-label", "\u8FD4\u56DE\u5361\u7247");
+        back.setAttr("title", "\u8FD4\u56DE\u5361\u7247");
+        qmIcon(back, "back");
+        back.onclick = () => this.closeReview();
+        head.createSpan({ cls: "qm-review-title", text: "\u56DE\u770B" });
+        const sh = head.createEl("button", { cls: "qm-review-shuffle", text: "\u6362\u4E00\u6279" });
+        sh.onclick = () => {
+          this.pickReview();
+          this.renderReview();
+        };
+        el.createDiv({
+          cls: "qm-review-sub",
+          text: this.state.review.length ? "\u968F\u673A\u7FFB " + this.state.review.length + " \u5F20 \xB7 \u60F3\u653E\u8FDB\u6B63\u5728\u5199\u7684\u7B14\u8BB0\u5C31\u70B9\u300C\u63D2\u5165\u5230\u8FD9\u7BC7\u300D" : "\u5361\u7247\u8FD8\u4E0D\u591F\uFF0C\u5148\u53BB\u8BB0\u51E0\u6761\u5427"
+        });
+        const list = el.createDiv({ cls: "qm-review-list" });
+        for (const card of this.state.review) {
+          const key = this.cardKey(card);
+          const sections = qmCardSections(card.body);
+          const box = list.createDiv({ cls: "qm-rv-card" });
+          const rhead = box.createDiv({ cls: "qm-rv-head" });
+          const meta = rhead.createDiv({ cls: "qm-rv-meta" });
+          meta.createSpan({ text: String(card.date || "").slice(5) + " " + card.time });
+          meta.createSpan({ cls: "qm-rv-sep", text: "\xB7" });
+          meta.createSpan({ text: qmDaysAgo(card.date) + " \u5929\u524D" });
+          const nRef = this.plugin.refCount(card);
+          if (nRef) {
+            meta.createSpan({ cls: "qm-rv-sep", text: "\xB7" });
+            meta.createSpan({ text: "\u88AB " + nRef + " \u7BC7\u5F15\u7528" });
+          }
+          this.mountAppendBadge(rhead, card, sections);
+          const more = rhead.createEl("button", { cls: "qm-rv-more" });
+          more.setAttr("type", "button");
+          more.setAttr("aria-label", "\u66F4\u591A\u64CD\u4F5C");
+          qmIcon(more, "more");
+          more.onclick = (e) => {
+            e.stopPropagation();
+            this.openCardMenu(card, e);
+          };
+          box.addEventListener("dblclick", (e) => {
+            const t = e.target;
+            if (t && typeof t.closest === "function" && t.closest("a, .qm-tag, .qm-more, .qm-rv-more, button, .qm-append-badge, textarea")) {
+              return;
+            }
+            if (e.preventDefault)
+              e.preventDefault();
+            this.requestEdit(card);
+          });
+          if (this.state.editingKey === key) {
+            this.renderEditor(box, card, key);
+            continue;
+          }
+          const body = box.createDiv({ cls: "qm-rv-body" });
+          for (const seg of qmBodySegments(sections.original)) {
+            if (seg.kind === "text") {
+              body.appendChild(document.createTextNode(seg.text));
+            } else if (seg.kind === "tag") {
+              const tag = body.createSpan({ cls: "qm-tag", text: seg.text });
+              tag.onclick = (e) => {
+                if (e && e.stopPropagation)
+                  e.stopPropagation();
+                this.closeReview();
+                this.state.search = "";
+                if (this.searchEl)
+                  this.searchEl.value = "";
+                if (this.syncSearchClear)
+                  this.syncSearchClear();
+                this.setFilterTags([seg.value]);
+              };
+            } else {
+              body.createSpan({ cls: "qm-rv-url", text: seg.text });
+            }
+          }
+          this.renderAppendArea(box, card, sections);
+          const foot = box.createDiv({ cls: "qm-rv-foot" });
+          const noId = !card.id;
+          const btn = foot.createEl("button", { cls: "qm-rv-insert" });
+          if (noId)
+            btn.setAttr("title", "\u8FD9\u5F20\u5361\u7247\u6CA1\u6709\u5757 ID\uFF0C\u53EA\u80FD\u63D2\u6B63\u6587\uFF0C\u6CA1\u6CD5\u5224\u65AD\u662F\u5426\u63D2\u8FC7");
+          this.paintInsertBtn(card, btn);
+          if (this._insertBtns)
+            this._insertBtns.push({ card, btn });
+          btn.onclick = async () => {
+            if (this.isInserted(card)) {
+              new Notice2("\u8FD9\u5F20\u5361\u7247\u5DF2\u7ECF\u5728\u8FD9\u7BC7\u7B14\u8BB0\u91CC\u4E86");
+              return;
+            }
+            const okInserted = await this.plugin.insertIntoCurrentNote(card, false);
+            if (!okInserted)
+              return;
+            if (card.id) {
+              if (!this.state.insertedIds)
+                this.state.insertedIds = /* @__PURE__ */ new Set();
+              this.state.insertedIds.add(card.id);
+            } else {
+              this.state.reviewDone[key] = true;
+            }
+            this.paintInsertBtn(card, btn);
+          };
+        }
+      }
+      /* ---------------- 多选删除 ---------------- */
+      /**
+       * 给 Obsidian 自己的状态栏（反链数 / 字数）让位。
+       * 状态栏是盖在工作区底部的浮层，视图底边在它下面，浮条不抬就会和那串字叠住。
+       * 量不到（弹窗 / 卸载了状态栏 / 测试桩）就退回默认 10px。
+       */
+      syncSelbarGap() {
+        const root = this.wrapEl;
+        let gap = 10;
+        let cover = 0;
+        try {
+          const bar = document.querySelector(".status-bar");
+          if (root && bar && typeof root.getBoundingClientRect === "function") {
+            const r = root.getBoundingClientRect();
+            const b = bar.getBoundingClientRect();
+            gap = qmSelbarGap(r.bottom, b.top, 10);
+            cover = qmStatusCover(r.bottom, b.top);
+          }
+        } catch (e) {
+          gap = 10;
+          cover = 0;
+        }
+        try {
+          if (root && root.style && typeof root.style.setProperty === "function") {
+            root.style.setProperty("--qm-selbar-gap", gap + "px");
+            root.style.setProperty("--qm-status-h", cover + "px");
+          }
+        } catch (e) {
+        }
+      }
+      /** 底部浮条：跟着多选状态出现/消失，不占常态布局 */
+      renderSelectBar() {
+        const el = this.selectBarEl;
+        if (!el)
+          return;
+        el.empty();
+        if (!this.state.selectMode) {
+          el.removeClass("show");
+          if (this.listEl)
+            this.listEl.removeClass("has-selbar");
+          this._selInfoEl = null;
+          this._selDelEl = null;
+          return;
+        }
+        el.addClass("show");
+        if (this.listEl)
+          this.listEl.addClass("has-selbar");
+        this.syncSelbarGap();
+        const n = this.state.selected.size;
+        this._selInfoEl = el.createSpan({ cls: "qm-selbar-info", text: "\u5DF2\u9009 " + n + " \u6761" });
+        const acts = el.createDiv({ cls: "qm-selbar-acts" });
+        const cancel = acts.createEl("button", { text: "\u53D6\u6D88" });
+        cancel.onclick = (e) => {
+          if (e && e.stopPropagation)
+            e.stopPropagation();
+          this.toggleSelectMode(false);
+        };
+        const del = acts.createEl("button", {
+          cls: "is-danger",
+          text: n ? "\u5220\u9664\u6240\u9009 " + n : "\u5220\u9664\u6240\u9009"
+        });
+        del.disabled = !n;
+        del.onclick = (e) => {
+          if (e && e.stopPropagation)
+            e.stopPropagation();
+          if (!this.state.selected.size)
+            return;
+          this.deleteSelected();
+        };
+        this._selDelEl = del;
+      }
+      toggleSelectMode(force) {
+        const next = typeof force === "boolean" ? force : !this.state.selectMode;
+        if (next && this.state.editingKey) {
+          new Notice2("\u5148\u4FDD\u5B58\u6216\u53D6\u6D88\u6B63\u5728\u7F16\u8F91\u7684\u5361\u7247");
+          return;
+        }
+        this.state.selectMode = next;
+        this.state.selected.clear();
+        this.renderList({ keepScroll: true });
+      }
+      toggleSelected(card) {
+        const key = this.cardKey(card);
+        const on = !this.state.selected.has(key);
+        if (on)
+          this.state.selected.add(key);
+        else
+          this.state.selected.delete(key);
+        this.paintSelected(key, on);
+        this.updateSelectBarCount();
+      }
+      /**
+       * 切换某张卡的选中外观，不重画列表。
+       * 找不到这个元素（列表刚好被别的原因重画过）才退回整列重画，且保滚动位置。
+       */
+      paintSelected(key, on) {
+        const box = this._cardEls ? this._cardEls.get(key) : null;
+        if (!box) {
+          this.renderList({ keepScroll: true });
+          return;
+        }
+        if (on)
+          box.addClass("is-picked");
+        else
+          box.removeClass("is-picked");
+      }
+      /** 只改浮条上的计数文字，不重画浮条：重画会让鼠标下的按钮闪一下 */
+      updateSelectBarCount() {
+        const n = this.state.selected.size;
+        if (this._selInfoEl)
+          this._selInfoEl.setText("\u5DF2\u9009 " + n + " \u6761");
+        if (this._selDelEl) {
+          this._selDelEl.setText(n ? "\u5220\u9664\u6240\u9009 " + n : "\u5220\u9664\u6240\u9009");
+          this._selDelEl.disabled = !n;
+        }
+      }
+      deleteSelected() {
+        const picked = this.state.cards.filter((c) => this.state.selected.has(this.cardKey(c)));
+        if (!picked.length) {
+          new Notice2("\u8FD8\u6CA1\u6709\u9009\u4E2D\u5361\u7247");
+          return;
+        }
+        const detail = this.refDeleteDetail(picked);
+        new ConfirmModal(this.app, "\u5220\u9664\u9009\u4E2D\u7684 " + picked.length + " \u6761\u5361\u7247\uFF1F", async () => {
+          const res = await this.plugin.deleteCards(picked);
+          this.state.selectMode = false;
+          this.state.selected.clear();
+          this.renderList();
+          if (res.deleted && res.failed) {
+            new Notice2("\u5DF2\u5220\u9664 " + res.deleted + " \u6761\uFF0C" + res.failed + " \u6761\u6CA1\u627E\u5230\u5DF2\u8DF3\u8FC7", 9e3);
+          } else if (res.deleted) {
+            new Notice2("\u5DF2\u5220\u9664 " + res.deleted + " \u6761\uFF0C\u53EF\u5728\u300C\u6700\u8FD1\u5220\u9664\u300D\u6062\u590D", 9e3);
+          } else {
+            new Notice2("\u6CA1\u6709\u5220\u9664\uFF1A\u5361\u7247\u4F4D\u7F6E\u5DF2\u53D8\u5316\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5", 9e3);
+          }
+        }, detail).open();
+      }
+      /* ---------------- 日期折叠 ---------------- */
+      toggleDay(date) {
+        if (String(this.state.search || "").trim()) {
+          new Notice2("\u641C\u7D22\u65F6\u65E5\u671F\u4F1A\u81EA\u52A8\u5C55\u5F00");
+          return;
+        }
+        if (this.state.collapsed.has(date))
+          this.state.collapsed.delete(date);
+        else
+          this.state.collapsed.add(date);
+        this.saveCollapsed();
+        this.renderList();
+      }
+      saveCollapsed() {
+        if (!this.state.collapsed)
+          return;
+        this.plugin.settings.collapsedDates = Array.from(this.state.collapsed).slice(-60);
+        this.plugin.saveData(this.plugin.settings);
+      }
+      filtered() {
+        const conds = qmParseQuery(this.state.search);
+        const tags = this.state.tags || [];
+        const untagged = !!this.state.untagged;
+        const rf = this.effectiveRefFilter();
+        return this.state.cards.filter((c) => {
+          if (untagged) {
+            if (!qmCardIsUntagged(c))
+              return false;
+          } else if (tags.length) {
+            let hit = false;
+            for (const t of tags) {
+              if (qmCardHasPath(c, t)) {
+                hit = true;
+                break;
+              }
+            }
+            if (!hit)
+              return false;
+          }
+          if (rf === "has" && this.plugin.refCount(c) === 0)
+            return false;
+          if (rf === "none" && this.plugin.refCount(c) > 0)
+            return false;
+          return qmCardMatches(c, conds);
+        });
+      }
+      renderList(opts) {
+        const el = this.listEl;
+        if (!el)
+          return;
+        if (this.menuOpen)
+          this.closeMenu();
+        const keepScroll = opts && opts.keepScroll ? el.scrollTop || 0 : 0;
+        el.empty();
+        this._refBadges = /* @__PURE__ */ new Map();
+        this._cardEls = /* @__PURE__ */ new Map();
+        const matched = this.filtered();
+        const cap = this.plugin.settings.maxCards;
+        const list = cap > 0 ? matched.slice(0, cap) : matched;
+        this.renderSelectBar();
+        if (!list.length) {
+          const empty = el.createDiv({ cls: "qm-empty" });
+          if (this.state.cards.length === 0) {
+            empty.createDiv({ text: "\u8FD8\u6CA1\u6709\u5361\u7247\u3002" });
+            empty.createDiv({ text: "\u5728\u4E0A\u9762\u5199\u4E00\u53E5\uFF0CCtrl+Enter \u8BB0\u4E0B\u3002" });
+          } else {
+            empty.createDiv({ text: "\u6CA1\u6709\u5339\u914D\u7684\u5361\u7247\u3002" });
+            empty.createDiv({ text: "\u6362\u4E2A\u8BCD\uFF0C\u6216\u8005\u6E05\u9664\u7B5B\u9009\u3002" });
+          }
+          el.scrollTop = keepScroll;
+          return;
+        }
+        const searching = !!String(this.state.search || "").trim();
+        const groups = [];
+        for (const card of list) {
+          const last = groups[groups.length - 1];
+          if (last && last.date === card.date)
+            last.cards.push(card);
+          else
+            groups.push({ date: card.date, cards: [card] });
+        }
+        for (const g of groups) {
+          const collapsed = !searching && this.state.collapsed.has(g.date);
+          const editingHere = g.cards.some((c) => this.cardKey(c) === this.state.editingKey);
+          const day = el.createDiv({
+            cls: "qm-day" + (collapsed ? " is-collapsed" : "") + (editingHere ? " is-locked" : "")
+          });
+          day.createSpan({ cls: "qm-day-arrow", text: collapsed ? "\u25B6" : "\u25BC" });
+          day.createSpan({ cls: "qm-day-text", text: g.date });
+          day.createSpan({ cls: "qm-day-count", text: String(g.cards.length) });
+          day.onclick = () => {
+            if (editingHere) {
+              new Notice2("\u8FD9\u4E00\u5929\u6709\u5361\u7247\u6B63\u5728\u7F16\u8F91\uFF0C\u5148\u4FDD\u5B58\u6216\u53D6\u6D88");
+              return;
+            }
+            this.toggleDay(g.date);
+          };
+          if (collapsed)
+            continue;
+          for (const card of g.cards)
+            this.renderCard(el, card);
+        }
+        el.scrollTop = keepScroll;
+      }
+      /**
+       * 时间后面的小圆点：只表示「这张卡被笔记引用过」，不显示次数、不响应点击。
+       * 次数与来源都在「···」菜单里看。0 次时元素存在但不显示，方便就地更新。
+       */
+      mountRefDot(parent, card, key) {
+        const el = parent.createSpan({ cls: "qm-ref" });
+        if (this._refBadges)
+          this._refBadges.set(key, { el, card });
+        this.paintRefDot(el, card);
+        return el;
+      }
+      paintRefDot(el, card) {
+        if (!el)
+          return;
+        const info = this.plugin.refSummary(card);
+        const n = info ? info.notes : 0;
+        if (!n) {
+          el.addClass("is-hidden");
+          el.setAttr("title", "");
+          return;
+        }
+        el.removeClass("is-hidden");
+        const lines = ["\u88AB " + n + " \u7BC7\u7B14\u8BB0\u5F15\u7528" + (info.places > n ? " \xB7 \u5171 " + info.places + " \u5904" : "")];
+        for (const nm of info.names.slice(0, 8))
+          lines.push("\xB7 " + nm);
+        if (info.names.length > 8)
+          lines.push("\xB7 \u2026\u8FD8\u6709 " + (info.names.length - 8) + " \u7BC7");
+        if (info.ambiguous)
+          lines.push("\uFF08\u6709\u540C\u540D\u6587\u4EF6\uFF0C\u94FE\u63A5\u53EF\u80FD\u6307\u9519\uFF0C\u6CE8\u610F\uFF09");
+        el.setAttr("title", lines.join("\n"));
+      }
+      /**
+       * 引用数字变了。默认只改文字，不重画整列（否则你正在写文章时侧栏会一直跳）。
+       * 只有「只看已引用 / 只看未引用」开着时结果集会变，才重画一次并保留滚动位置。
+       */
+      updateRefs() {
+        if (!this.state)
+          return;
+        if (this.effectiveRefFilter()) {
+          this.renderList({ keepScroll: true });
+          return;
+        }
+        if (!this._refBadges || !this._refBadges.size)
+          return;
+        for (const { el, card } of this._refBadges.values())
+          this.paintRefDot(el, card);
+      }
+      cardKey(card) {
+        if (card.id)
+          return (card.filePath || "") + "|" + card.id;
+        return (card.filePath || "") + "|" + card.date + "|" + card.time + "|" + (typeof card.dupIndex === "number" ? card.dupIndex : 0) + "|" + card.body;
+      }
+      /** 删除前的提醒：这些卡片还被哪些笔记引用着（没被引用就返回空串） */
+      refDeleteDetail(cards) {
+        const list = Array.isArray(cards) ? cards : [cards];
+        const hits = list.filter((c) => this.plugin.refCount(c) > 0);
+        if (!hits.length)
+          return "";
+        const names = [];
+        for (const c of hits) {
+          const info = this.plugin.refSummary(c);
+          if (!info)
+            continue;
+          for (const n of info.names) {
+            if (names.indexOf(n) === -1)
+              names.push(n);
+          }
+        }
+        if (!names.length)
+          return "";
+        const shown = names.slice(0, 3).join("\u3001") + (names.length > 3 ? " \u7B49" : "");
+        const head = list.length === 1 ? "\u8FD9\u5F20\u5361\u7247\u88AB " + this.plugin.refCount(hits[0]) + " \u7BC7\u7B14\u8BB0\u5F15\u7528\u7740" : "\u5176\u4E2D " + hits.length + " \u6761\u88AB\u7B14\u8BB0\u5F15\u7528\uFF0C\u6D89\u53CA " + names.length + " \u7BC7\u7B14\u8BB0";
+        return head + "\uFF1A" + shown + "\u3002\u5220\u9664\u540E\u8FD9\u4E9B\u5730\u65B9\u7684\u94FE\u63A5\u4F1A\u5931\u6548\uFF08\u663E\u793A\u4E3A\u300C\u627E\u4E0D\u5230\u8BE5\u5757\u300D\uFF09\u3002";
+      }
+      /** 把一段文字塞进卡片正文，命中的搜索词用 <mark> 标出来（跟原型一致） */
+      appendHighlighted(parent, text, kw) {
+        const src = String(text == null ? "" : text);
+        const q = String(kw == null ? "" : kw).trim();
+        if (!q || !src) {
+          parent.appendChild(document.createTextNode(src));
+          return;
+        }
+        const hay = src.toLowerCase();
+        const needle = q.toLowerCase();
+        let i = 0;
+        for (; ; ) {
+          const at = hay.indexOf(needle, i);
+          if (at < 0) {
+            if (i < src.length)
+              parent.appendChild(document.createTextNode(src.slice(i)));
+            return;
+          }
+          if (at > i)
+            parent.appendChild(document.createTextNode(src.slice(i, at)));
+          parent.createEl("mark", { text: src.slice(at, at + q.length) });
+          i = at + q.length;
+        }
+      }
+      renderCard(parent, card) {
+        const key = this.cardKey(card);
+        const picked = this.state.selectMode && this.state.selected.has(key);
+        const box = parent.createDiv({ cls: "qm-card" + (picked ? " is-picked" : "") });
+        if (this._cardEls)
+          this._cardEls.set(key, box);
+        if (this.state.selectMode) {
+          box.addClass("is-selectable");
+          box.onclick = (e) => {
+            e.stopPropagation();
+            this.toggleSelected(card);
+          };
+        }
+        const head = box.createDiv({ cls: "qm-card-head" });
+        if (this.state.selectMode) {
+          head.createSpan({ cls: "qm-tick", text: "\u2713" });
+        }
+        head.createSpan({ cls: "qm-time", text: card.time });
+        this.mountRefDot(head, card, key);
+        const sections = qmCardSections(card.body);
+        this.mountAppendBadge(head, card, sections);
+        if (this.state.editingKey === key) {
+          this.renderEditor(box, card, key);
+          return;
+        }
+        const body = box.createDiv({ cls: "qm-body" });
+        const kw = String(this.state.search || "").trim();
+        for (const seg of qmBodySegments(sections.original)) {
+          if (seg.kind === "text") {
+            this.appendHighlighted(body, seg.text, kw);
+            continue;
+          }
+          if (seg.kind === "tag") {
+            const tag = body.createSpan({ cls: "qm-tag", text: seg.text });
+            tag.onclick = (e) => {
+              e.stopPropagation();
+              if (this.state.selectMode) {
+                this.toggleSelected(card);
+                return;
+              }
+              this.setFilterTags([seg.value]);
+            };
+            continue;
+          }
+          const link = body.createEl("a", { cls: "qm-url", text: seg.text });
+          link.setAttr("href", seg.text);
+          link.setAttr("rel", "noopener");
+          link.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (this.state.selectMode) {
+              this.toggleSelected(card);
+              return;
+            }
+            try {
+              window.open(seg.text, "_blank");
+            } catch (err) {
+              new Notice2("\u6253\u4E0D\u5F00\u8FD9\u4E2A\u94FE\u63A5");
+            }
+          };
+        }
+        this.renderAppendArea(box, card, sections);
+        if (this.state.selectMode)
+          return;
+        this.mountCardMenuButton(head, card);
+        this.bindCardEdit(box, card);
+        this.bindCardDrag(box, card);
+      }
+      /* ---------------- 卡片上的交互 ---------------- */
+      mountCardMenuButton(head, card) {
+        const more = head.createEl("button", { cls: "qm-more" });
+        more.setAttr("type", "button");
+        more.setAttr("aria-label", "\u66F4\u591A\u64CD\u4F5C");
+        more.setAttr("title", "\u66F4\u591A\u64CD\u4F5C");
+        qmIcon(more, "more");
+        more.addEventListener("mousedown", (e) => e.stopPropagation());
+        more.onclick = (e) => {
+          e.stopPropagation();
+          this.openCardMenu(card, e);
+        };
+        return more;
+      }
+      openCardMenu(card, evt) {
+        const anchor = evt && evt.currentTarget || null;
+        const info = this.plugin.refSummary(card);
+        const n = info ? info.notes : 0;
+        const items = [
+          {
+            title: "\u590D\u5236\u5168\u6587",
+            icon: "copy",
+            onClick: async () => {
+              await this.plugin.copy(qmPasteText(card.body));
+              new Notice2("\u5DF2\u590D\u5236\u5361\u7247\u5168\u6587");
+            }
+          },
+          { title: "\u590D\u5236\u94FE\u63A5", icon: "link", onClick: () => this.copyRef(card) },
+          { title: "\u7F16\u8F91", icon: "pencil", onClick: () => this.requestEdit(card) },
+          { title: "\u8FFD\u52A0", icon: "plus", onClick: () => this.beginAppend(card) },
+          { separator: true }
+        ];
+        if (!this.plugin.refsReady()) {
+          items.push({ title: "\u5F15\u7528\u7EDF\u8BA1\u51C6\u5907\u4E2D\u2026", icon: "corner-down-right", disabled: true });
+        } else if (n) {
+          items.push({
+            title: "\u88AB " + n + " \u7BC7\u7B14\u8BB0\u5F15\u7528\u2026",
+            icon: "corner-down-right",
+            onClick: () => new RefListModal(this.app, info, (r) => this.openRef(r.path, r.line)).open()
+          });
+        } else {
+          items.push({ title: "\u8FD8\u6CA1\u6709\u7B14\u8BB0\u5F15\u7528\u8FD9\u5F20\u5361\u7247", icon: "corner-down-right", disabled: true });
+        }
+        items.push({
+          title: "\u5728\u6587\u4EF6\u4E2D\u5B9A\u4F4D",
+          icon: "file-search",
+          onClick: () => this.locateCard(card)
+        });
+        items.push({ separator: true });
+        items.push({
+          title: "\u5220\u9664",
+          icon: "trash-2",
+          danger: true,
+          onClick: () => this.confirmDelete(card)
+        });
+        return this.showMenu(items, anchor);
+      }
+      /**
+       * 跳到引用这张卡片的那篇笔记。
+       * 行号来自 Obsidian 自己的链接缓存；取不到就只打开文件，不猜位置。
+       * 用新标签页打开：你正在看的东西不该被顶掉。
+       */
+      async openRef(path, line) {
+        const file = this.app.vault.getAbstractFileByPath(String(path || ""));
+        if (!(file instanceof TFile)) {
+          new Notice2("\u8FD9\u7BC7\u7B14\u8BB0\u627E\u4E0D\u5230\u4E86\uFF0C\u53EF\u80FD\u5DF2\u5220\u9664\u6216\u6539\u540D");
+          return;
+        }
+        try {
+          const leaf = this.app.workspace.getLeaf("tab");
+          const opts = typeof line === "number" && line >= 0 ? { eState: { line } } : void 0;
+          await leaf.openFile(file, opts);
+        } catch (e) {
+          new Notice2("\u6253\u4E0D\u5F00\u8FD9\u7BC7\u7B14\u8BB0\uFF1A" + (e && e.message ? e.message : "\u672A\u77E5\u539F\u56E0"));
+        }
+      }
+      /** 复制块链接：与 1.6 以来一致，跟随「嵌入」开关 */
+      async copyRef(card) {
+        const hadId = !!card.id && card.idOnLastLine;
+        const id = await this.plugin.ensureId(card);
+        if (!id) {
+          new Notice2("\u6CA1\u627E\u5230\u8FD9\u5F20\u5361\u7247\uFF0C\u8BF7\u6539\u7528\u300C\u590D\u5236\u5168\u6587\u300D");
+          return;
+        }
+        const bang = this.plugin.settings.blockRefEmbed ? "!" : "";
+        const ref = bang + "[[" + this.plugin.linkTarget(card) + "#^" + id + "]]";
+        await this.plugin.copy(ref);
+        new Notice2((hadId ? "\u5DF2\u590D\u5236\uFF1A" : "\u5DF2\u4E3A\u8FD9\u6761\u5361\u7247\u8865\u4E0A\u5757 ID\uFF0C\u5DF2\u590D\u5236\uFF1A") + ref, 7e3);
+      }
+      confirmDelete(card) {
+        new ConfirmModal(
+          this.app,
+          "\u5220\u9664\u8FD9\u6761\u5361\u7247\uFF1F",
+          async () => {
+            await this.plugin.deleteCard(card);
+          },
+          this.refDeleteDetail(card)
+        ).open();
+      }
+      /**
+       * 在月份文件里打开这张卡所在的那一行。
+       * 写入前先按块 ID 重新定位，定位不到就不跳（宁可不跳，也别跳到错的地方）。
+       */
+      async locateCard(card) {
+        const file = this.app.vault.getAbstractFileByPath(card.filePath);
+        if (!(file instanceof TFile)) {
+          new Notice2("\u8FD9\u5F20\u5361\u7247\u6240\u5728\u7684\u6587\u4EF6\u627E\u4E0D\u5230\u4E86");
+          return;
+        }
+        let hit = null;
+        try {
+          const text = String(await this.app.vault.read(file) || "").replace(/\r\n?/g, "\n");
+          hit = qmLocateCard(text, card, { strict: this.plugin.settings.strictCardId !== false });
+        } catch (e) {
+          hit = null;
+        }
+        if (!hit) {
+          new Notice2("\u5361\u7247\u4F4D\u7F6E\u5DF2\u53D8\u5316\uFF0C\u5237\u65B0\u540E\u518D\u8BD5");
+          return;
+        }
+        const leaf = this.app.workspace.getLeaf(false);
+        if (!leaf || typeof leaf.openFile !== "function") {
+          new Notice2("\u6253\u4E0D\u5F00\u8FD9\u4E2A\u6587\u4EF6");
+          return;
+        }
+        await leaf.openFile(file, { eState: { line: hit.lineIndex } });
+        const view = leaf.view;
+        if (view && view.editor) {
+          const from = { line: hit.lineIndex, ch: 0 };
+          const to = { line: hit.lineEnd, ch: 0 };
+          view.editor.setCursor(from);
+          view.editor.scrollIntoView({ from, to }, true);
+        }
+      }
+      /**
+       * 进入编辑态的唯一入口（双击与菜单都走这里）。
+       * 同时只允许一处编辑：另一条有未保存的改动时，让用户自己选怎么处理。
+       */
+      requestEdit(card) {
+        const key = this.cardKey(card);
+        const cur = this.state.editingKey;
+        if (cur === key)
+          return;
+        if (!cur) {
+          this.beginEdit(key);
+          return;
+        }
+        const prev = this.state.cards.find((c) => this.cardKey(c) === cur);
+        const draft = this.state.editingDraft;
+        const dirty = !!prev && !!draft && draft.key === cur && String(draft.text) !== String(qmCardSections(prev.body).original);
+        if (!dirty) {
+          this.beginEdit(key);
+          return;
+        }
+        new DraftSwitchModal(this.app, {
+          preview: prev.time + " " + qmFirstLine(prev.body),
+          onDiscard: () => this.beginEdit(key),
+          onSave: async () => {
+            if (!String(draft.text || "").trim()) {
+              new Notice2("\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A");
+              return false;
+            }
+            this.state.editingKey = null;
+            this.state.editingDraft = null;
+            const saved = await this.plugin.updateCard(prev, draft.text);
+            if (!saved) {
+              this.state.editingKey = cur;
+              this.state.editingDraft = draft;
+              this.renderList();
+              return false;
+            }
+            this.beginEdit(key);
+            return true;
+          }
+        }).open();
+      }
+      beginEdit(key) {
+        this.state.editingKey = key;
+        this.state.editingDraft = null;
+        this.refreshLists();
+      }
+      /** 列表与回看共用一次刷新：回看打开时两个都要重画 */
+      refreshLists(opts) {
+        this.renderList(opts);
+        if (this.state.reviewOpen)
+          this.renderReview();
+      }
+      /** 编辑原始内容区的输入框：列表和回看共用一套 */
+      renderEditor(box, card, key) {
+        const ta = box.createEl("textarea", { cls: "qm-edit" });
+        const draft = this.state.editingDraft;
+        ta.value = draft && draft.key === key ? draft.text : qmCardSections(card.body).original;
+        ta.rows = Math.min(12, Math.max(2, String(ta.value).split("\n").length + 1));
+        ta.addEventListener("input", () => {
+          this.state.editingDraft = { key, text: String(ta.value) };
+        });
+        window.setTimeout(() => {
+          ta.focus();
+          ta.setSelectionRange(ta.value.length, ta.value.length);
+        }, 20);
+        const cancel = () => {
+          this.state.editingKey = null;
+          this.state.editingDraft = null;
+          this.refreshLists({ keepScroll: true });
+        };
+        const bar = box.createDiv({ cls: "qm-edit-bar" });
+        const cancelBtn = bar.createEl("button", { text: "\u53D6\u6D88", cls: "qm-mini-btn" });
+        cancelBtn.onclick = cancel;
+        const ok = bar.createEl("button", { text: "\u4FDD\u5B58", cls: "qm-mini-btn is-primary" });
+        ok.onclick = async () => {
+          const v = String(ta.value || "").trim();
+          if (!v) {
+            new Notice2("\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A");
+            return;
+          }
+          const saved = await this.plugin.updateCard(card, v);
+          if (!saved)
+            return;
+          this.state.editingKey = null;
+          this.state.editingDraft = null;
+          this.refreshLists({ keepScroll: true });
+        };
+        ta.addEventListener("keydown", (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            ok.onclick();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            cancel();
+          }
+        });
+      }
+      /* ---------------- 追加区（列表 / 回看共用） ---------------- */
+      /** 时间后面的「追加 N」徽标：只有存在追加时才出现，点一下展开 / 收起 */
+      mountAppendBadge(head, card, sections) {
+        if (!sections.appends.length)
+          return null;
+        const key = this.cardKey(card);
+        const badge = head.createSpan({ cls: "qm-append-badge", text: "\u8FFD\u52A0 " + sections.appends.length });
+        badge.onclick = (e) => {
+          e.stopPropagation();
+          if (this.state.appendOpen.has(key))
+            this.state.appendOpen.delete(key);
+          else
+            this.state.appendOpen.add(key);
+          this.refreshLists({ keepScroll: true });
+        };
+        return badge;
+      }
+      renderAppendArea(box, card, sections) {
+        const key = this.cardKey(card);
+        if (sections.appends.length && this.state.appendOpen.has(key)) {
+          const list = box.createDiv({ cls: "qm-append-list" });
+          sections.appends.forEach((item, index) => {
+            this.renderAppendItem(list, card, item, index, key);
+          });
+        }
+        const draft = this.state.appendDraft;
+        if (draft && draft.key === key)
+          this.renderAppendComposer(box, card, key);
+      }
+      renderAppendItem(list, card, item, index, key) {
+        const row = list.createDiv({ cls: "qm-append-item" });
+        const bar = row.createDiv({ cls: "qm-append-head" });
+        bar.createSpan({ cls: "qm-append-time", text: item.label });
+        const editing = this.state.appendEdit && this.state.appendEdit.key === key && this.state.appendEdit.index === index;
+        if (editing) {
+          const ta = row.createEl("textarea", { cls: "qm-edit qm-append-edit" });
+          ta.value = this.state.appendEdit.text;
+          window.setTimeout(() => {
+            ta.focus();
+            ta.setSelectionRange(ta.value.length, ta.value.length);
+          }, 20);
+          ta.addEventListener("input", () => {
+            if (this.state.appendEdit && this.state.appendEdit.key === key) {
+              this.state.appendEdit.text = String(ta.value);
+            }
+          });
+          const editBar = row.createDiv({ cls: "qm-edit-bar" });
+          const cancel = editBar.createEl("button", { text: "\u53D6\u6D88", cls: "qm-mini-btn" });
+          cancel.onclick = (e) => {
+            e.stopPropagation();
+            this.state.appendEdit = null;
+            this.refreshLists({ keepScroll: true });
+          };
+          const save = editBar.createEl("button", { text: "\u4FDD\u5B58", cls: "qm-mini-btn is-primary" });
+          save.onclick = async (e) => {
+            if (e && e.stopPropagation)
+              e.stopPropagation();
+            const text = this.state.appendEdit && this.state.appendEdit.key === key ? this.state.appendEdit.text : String(ta.value);
+            const ok = await this.plugin.updateAppend(card, index, text);
+            if (!ok)
+              return;
+            this.state.appendEdit = null;
+            this.refreshLists({ keepScroll: true });
+          };
+          return;
+        }
+        const acts = bar.createDiv({ cls: "qm-append-acts" });
+        const edit = acts.createEl("button", { text: "\u7F16\u8F91", cls: "qm-mini-btn" });
+        edit.onclick = (e) => {
+          e.stopPropagation();
+          this.state.appendEdit = { key, index, text: String(item.text || "") };
+          this.state.appendOpen.add(key);
+          this.refreshLists({ keepScroll: true });
+        };
+        const del = acts.createEl("button", { text: "\u5220\u9664", cls: "qm-mini-btn qm-mini-btn-danger" });
+        del.onclick = (e) => {
+          e.stopPropagation();
+          new ConfirmModal(this.app, "\u5220\u9664\u8FD9\u6761\u8FFD\u52A0\uFF1F", async () => {
+            const ok = await this.plugin.deleteAppend(card, index);
+            if (!ok)
+              return;
+            this.state.appendEdit = null;
+            this.refreshLists({ keepScroll: true });
+          }).open();
+        };
+        const textEl = row.createDiv({ cls: "qm-append-text" });
+        this.renderRichText(textEl, item.text, card);
+      }
+      /** 追加文本里的标签 / 网址：与正文同一套点击语义 */
+      renderRichText(el, text, card) {
+        for (const seg of qmBodySegments(text)) {
+          if (seg.kind === "text") {
+            el.appendChild(document.createTextNode(seg.text));
+            continue;
+          }
+          if (seg.kind === "tag") {
+            const tag = el.createSpan({ cls: "qm-tag", text: seg.text });
+            tag.onclick = (e) => {
+              e.stopPropagation();
+              if (this.state.selectMode) {
+                this.toggleSelected(card);
+                return;
+              }
+              this.setFilterTags([seg.value]);
+            };
+            continue;
+          }
+          const link = el.createEl("a", { cls: "qm-url", text: seg.text });
+          link.setAttr("href", seg.text);
+          link.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              window.open(seg.text, "_blank");
+            } catch (err) {
+              new Notice2("\u6253\u4E0D\u5F00\u8FD9\u4E2A\u94FE\u63A5");
+            }
+          };
+        }
+      }
+      renderAppendComposer(box, card, key) {
+        const wrap = box.createDiv({ cls: "qm-append-composer" });
+        const ta = wrap.createEl("textarea", { cls: "qm-input qm-append-input" });
+        ta.rows = 2;
+        ta.setAttr("placeholder", "\u8FFD\u52A0\u4E00\u6BB5\u2026");
+        ta.value = this.state.appendDraft && this.state.appendDraft.key === key ? this.state.appendDraft.text : "";
+        ta.addEventListener("input", () => {
+          if (this.state.appendDraft && this.state.appendDraft.key === key) {
+            this.state.appendDraft.text = String(ta.value);
+          }
+        });
+        window.setTimeout(() => ta.focus(), 20);
+        const bar = wrap.createDiv({ cls: "qm-append-bar" });
+        bar.createDiv({ cls: "qm-kbd-hint", text: "Ctrl+Enter \u8FFD\u52A0" });
+        const cancel = () => {
+          this.state.appendDraft = null;
+          this.refreshLists({ keepScroll: true });
+        };
+        const cancelBtn = bar.createEl("button", { text: "\u53D6\u6D88", cls: "qm-mini-btn" });
+        cancelBtn.onclick = (e) => {
+          e.stopPropagation();
+          cancel();
+        };
+        const save = bar.createEl("button", { text: "\u8FFD\u52A0", cls: "qm-mini-btn is-primary" });
+        save.onclick = async (e) => {
+          if (e && e.stopPropagation)
+            e.stopPropagation();
+          const text = this.state.appendDraft && this.state.appendDraft.key === key ? this.state.appendDraft.text : String(ta.value);
+          const ok = await this.plugin.appendToCard(card, text);
+          if (!ok)
+            return;
+          this.state.appendDraft = null;
+          this.state.appendOpen.add(key);
+          this.refreshLists({ keepScroll: true });
+        };
+        ta.addEventListener("keydown", (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            save.onclick();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            cancel();
+          }
+        });
+      }
+      /** 从「···」进追加：展开这张卡并就地放一个输入框 */
+      beginAppend(card) {
+        const key = this.cardKey(card);
+        this.state.appendDraft = { key, text: "" };
+        this.state.appendOpen.add(key);
+        this.refreshLists({ keepScroll: true });
+      }
+      bindCardEdit(box, card) {
+        box.addEventListener("dblclick", (e) => {
+          if (this.state.selectMode)
+            return;
+          const t = e.target;
+          if (t && typeof t.closest === "function" && t.closest("a, .qm-tag, .qm-more, .qm-ref, .qm-append-badge, button, textarea")) {
+            return;
+          }
+          if (e.preventDefault)
+            e.preventDefault();
+          this.requestEdit(card);
+        });
+      }
+      /**
+       * 整张卡可拖：拖出去的是「指向这张卡的引用」，与复制链接同一份文本。
+       * 只有一处例外——从卡片里的裸网址起手的拖拽交给浏览器，那不是拖卡片。
+       */
+      bindCardDrag(box, card) {
+        box.setAttr("draggable", "true");
+        box.addEventListener("mousedown", () => {
+          const now = Date.now();
+          this._dblRisk = now - (this._lastDown || 0) < 420;
+          this._lastDown = now;
+        });
+        box.addEventListener("dragstart", (e) => {
+          if (this._dblRisk || this.state.selectMode || this.state.editingKey) {
+            if (e.preventDefault)
+              e.preventDefault();
+            return;
+          }
+          const t = e.target;
+          if (t && typeof t.closest === "function" && t.closest("a"))
+            return;
+          if (e.stopPropagation)
+            e.stopPropagation();
+          const text = this.dragPayload(card);
+          if (e.dataTransfer) {
+            try {
+              e.dataTransfer.setData("text/plain", text);
+              e.dataTransfer.effectAllowed = "copy";
+            } catch (err) {
+            }
+          }
+          box.addClass("is-dragging");
+        });
+        box.addEventListener("dragend", () => box.removeClass("is-dragging"));
+      }
+      /**
+       * 拖出去的内容。有块 ID 就是引用（跟随「嵌入」开关，与复制链接完全一致）；
+       * 1.5 时代的老卡片没有块 ID，只能退化成正文全文，并提示一次。
+       */
+      dragPayload(card) {
+        if (card.id) {
+          const bang = this.plugin.settings.blockRefEmbed ? "!" : "";
+          return bang + "[[" + this.plugin.linkTarget(card) + "#^" + card.id + "]]";
+        }
+        if (!this._noIdHint) {
+          this._noIdHint = true;
+          new Notice2("\u8FD9\u6761\u5361\u7247\u8FD8\u6CA1\u6709\u5757 ID\uFF0C\u8FD9\u6B21\u62D6\u51FA\u53BB\u7684\u662F\u6B63\u6587\u5168\u6587");
+        }
+        return qmPasteText(card.body);
+      }
+    };
+    var QuickMemoSettingTab = class extends PluginSettingTab2 {
+      constructor(app, plugin) {
+        super(app, plugin);
+        this.plugin = plugin;
+      }
+      display() {
+        const { containerEl } = this;
+        containerEl.empty();
+        containerEl.createEl("h3", { text: "Collis \u8BBE\u7F6E" });
+        new Setting2(containerEl).setName("\u5361\u7247\u6587\u4EF6\u5939").setDesc(
+          "\u5361\u7247\u6309\u6708\u5B58\u6210 YYYY-MM.md\u3002\u6587\u4EF6\u5939\u4E0D\u5B58\u5728\u4F1A\u81EA\u52A8\u521B\u5EFA\uFF1B\u5207\u6362\u65F6\u4F1A\u5148\u68C0\u67E5\u76EE\u6807\u6587\u4EF6\u5939\u91CC\u5DF2\u6709\u7684\u5E74\u6708\u6587\u4EF6\uFF0C\u53D1\u73B0\u4E0D\u50CF\u5361\u7247\u6587\u4EF6\uFF08\u6BD4\u5982\u65E5\u8BB0\u3001\u526A\u85CF\uFF09\u5C31\u62D2\u7EDD\u5207\u6362\uFF0C\u907F\u514D\u8BEF\u6539\u522B\u7684\u7B14\u8BB0\u3002"
+        ).addText((t) => {
+          t.setValue(this.plugin.settings.folderPath);
+          const apply = async () => {
+            const val = String(t.getValue() || "").trim().replace(/^\/+|\/+$/g, "");
+            if (!val || val === this.plugin.settings.folderPath) {
+              t.setValue(this.plugin.settings.folderPath);
+              return;
+            }
+            const check = await this.plugin.validateFolderTarget(val);
+            if (!check.ok) {
+              new Notice2("\u672A\u5207\u6362\uFF1A" + check.reason, 8e3);
+              t.setValue(this.plugin.settings.folderPath);
+              return;
+            }
+            this.plugin.settings.folderPath = val;
+            await this.plugin.saveSettings();
+            new Notice2("\u5361\u7247\u6587\u4EF6\u5939\u5DF2\u5207\u6362\u5230 " + val);
+          };
+          t.inputEl.addEventListener("blur", () => {
+            apply();
+          });
+          t.inputEl.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              apply();
+              t.inputEl.blur();
+            }
+          });
+        });
+        new Setting2(containerEl).setName("\u5E38\u7528\u6807\u7B7E").setDesc("\u7528\u9017\u53F7\u5206\u9694\uFF0C\u4EC5\u7528\u4E8E\u628A\u5E38\u7528\u6807\u7B7E\u6392\u5728\u5019\u9009\u524D\u9762\uFF1B\u5361\u7247\u91CC\u4E0D\u5B58\u5728\u7684\u6807\u7B7E\u4E0D\u4F1A\u51FA\u73B0\u3002").addText(
+          (t) => t.setValue(this.plugin.settings.quickTags.join(",")).onChange(async (v) => {
+            this.plugin.settings.quickTags = String(v || "").split(/[,，\s]+/).map((s) => s.replace(/^#/, "").trim()).filter(Boolean);
+            await this.plugin.saveSettings();
+          })
+        );
+        new Setting2(containerEl).setName("\u6700\u591A\u6E32\u67D3\u6761\u6570").setDesc("\u4E3A\u4FDD\u8BC1\u6D41\u7545\uFF0C\u5217\u8868\u6700\u591A\u6E32\u67D3\u591A\u5C11\u6761\uFF080 \u8868\u793A\u4E0D\u9650\u5236\uFF09\u3002\u641C\u7D22\u548C\u6807\u7B7E\u7B5B\u9009\u59CB\u7EC8\u8986\u76D6\u5168\u90E8\u5361\u7247\uFF0C\u4E0D\u53D7\u6B64\u9879\u5F71\u54CD\u3002").addText(
+          (t) => t.setValue(String(this.plugin.settings.maxCards)).onChange(async (v) => {
+            const n = parseInt(v, 10);
+            this.plugin.settings.maxCards = isNaN(n) ? 500 : Math.max(0, n);
+            await this.plugin.saveSettings();
+          })
+        );
+        new Setting2(containerEl).setName("\u81EA\u52A8\u6E05\u7406\u7A7A\u65E5\u671F\u6807\u9898").setDesc(
+          "\u67D0\u4E00\u5929\u7684\u5361\u7247\u5168\u90E8\u5220\u6389\u540E\uFF0C\u628A\u8FD9\u4E2A\u53EA\u5269\u7A7A\u767D\u7684 ## \u65E5\u671F \u6807\u9898\u4E5F\u4E00\u5E76\u53BB\u6389\u3002\u5728\u7F16\u8F91\u5668\u91CC\u624B\u52A8\u5220\u5361\u7247\u540C\u6837\u4F1A\u6E05\u7406\uFF1B\u5149\u6807\u505C\u5728\u54EA\u4E2A\u65E5\u671F\u6BB5\u91CC\uFF0C\u54EA\u4E00\u6BB5\u5C31\u6682\u65F6\u4E0D\u52A8\u3002"
+        ).addToggle(
+          (tg) => tg.setValue(this.plugin.settings.autoPruneEmptyDates !== false).onChange(async (v) => {
+            this.plugin.settings.autoPruneEmptyDates = v;
+            await this.plugin.saveSettings();
+          })
+        );
+        new Setting2(containerEl).setName("\u4E25\u683C\u8BC6\u522B\u5361\u7247\uFF08\u63A8\u8350\u5F00\u542F\uFF09").setDesc(
+          "\u53EA\u628A\u5E26\u5757 ID\uFF08\u5F62\u5982 ^abc123\uFF09\u7684\u65F6\u95F4\u6761\u76EE\u5F53\u6210\u5361\u7247\u3002\u63D2\u4EF6\u8BB0\u5F55\u7684\u5361\u7247\u4E00\u5B9A\u5E26\u5757 ID\uFF1B\u4F60\u5728\u901F\u8BB0\u6587\u4EF6\u6B63\u6587\u91CC\u624B\u5199\u7684\u300C- 12:30 \u5F00\u4F1A\u300D\u53EA\u662F\u666E\u901A\u6587\u5B57\uFF0C\u4E0D\u4F1A\u51FA\u73B0\u5728\u9762\u677F\u91CC\uFF0C\u4E5F\u4E0D\u4F1A\u88AB\u8BEF\u5220\u3002\u5173\u6389\u540E\uFF0C\u4EFB\u4F55\u300C- \u65F6\u95F4 \u5185\u5BB9\u300D\u7684\u884C\u90FD\u4F1A\u88AB\u5F53\u6210\u5361\u7247\u3002"
+        ).addToggle(
+          (tg) => tg.setValue(this.plugin.settings.strictCardId !== false).onChange(async (v) => {
+            this.plugin.settings.strictCardId = v;
+            await this.plugin.saveSettings();
+            if (v)
+              this.plugin.checkUnmanagedEntries();
+          })
+        );
+        new Setting2(containerEl).setName("\u5757\u5F15\u7528\u4F7F\u7528\u5D4C\u5165\u5F62\u5F0F").setDesc(
+          "\u5173\u95ED\u65F6\u300C\u590D\u5236\u94FE\u63A5\u300D\u7ED9\u51FA [[\u6587\u4EF6#^id]]\uFF0C\u70B9\u4E00\u4E0B\u8DF3\u5230\u90A3\u6761\u5361\u7247\uFF1B\u6253\u5F00\u540E\u7ED9\u51FA ![[\u6587\u4EF6#^id]]\uFF0C\u7C98\u8D34\u7684\u4F4D\u7F6E\u4F1A\u76F4\u63A5\u5C55\u5F00\u5361\u7247\u5185\u5BB9\u3002"
+        ).addToggle(
+          (tg) => tg.setValue(!!this.plugin.settings.blockRefEmbed).onChange(async (v) => {
+            this.plugin.settings.blockRefEmbed = v;
+            await this.plugin.saveSettings();
+          })
+        );
+      }
+    };
+    var QuickMemoPlugin = class extends Plugin2 {
+      /* ---------------- 引用统计（只读 Obsidian 内存索引，不写任何文件） ---------------- */
+      refsReady() {
+        return !!this._refReady;
+      }
+      /**
+       * 重建「哪张卡被哪些笔记引用」的索引。
+       * 数据全部来自 Obsidian 自己的链接索引（metadataCache），不打开文件、不写入。
+       * 口径：按「篇」统计（同一篇笔记引多次只算 1 篇），同时记下总处数。
+       */
+      buildRefIndex() {
+        const items = [];
+        if (!this.app || !this.app.metadataCache)
+          return /* @__PURE__ */ new Map();
+        let files = [];
+        try {
+          files = this.app.vault.getMarkdownFiles() || [];
+        } catch (e) {
+          return /* @__PURE__ */ new Map();
+        }
+        const nameCount = /* @__PURE__ */ new Map();
+        for (const f of files) {
+          const b = qmBaseName(f.path);
+          nameCount.set(b, (nameCount.get(b) || 0) + 1);
+        }
+        for (const f of files) {
+          if (this.isCardFilePath(f.path))
+            continue;
+          let cache = null;
+          try {
+            cache = this.app.metadataCache.getFileCache(f);
+          } catch (e) {
+            cache = null;
+          }
+          if (!cache)
+            continue;
+          const lists = [cache.links, cache.embeds, cache.frontmatterLinks];
+          for (const arr of lists) {
+            if (!arr || !arr.length)
+              continue;
+            for (const l of arr) {
+              const ref = qmParseBlockRef(l && (l.link || l.original) || "");
+              if (!ref || !ref.target)
+                continue;
+              let dest = null;
+              try {
+                dest = this.app.metadataCache.getFirstLinkpathDest(ref.target, f.path);
+              } catch (e) {
+                dest = null;
+              }
+              if (!dest || !dest.path)
+                continue;
+              if (!this.isCardFilePath(dest.path))
+                continue;
+              const base = qmBaseName(dest.path);
+              items.push({
+                sourcePath: f.path,
+                destPath: dest.path,
+                id: ref.id,
+                ambiguous: (nameCount.get(base) || 0) > 1,
+                line: qmLinkLine(l)
+              });
+            }
+          }
+        }
+        return qmAggregateRefs(items);
+      }
+      /** 立刻重算（同步、只读内存，几毫秒） */
+      refreshRefs() {
+        let idx;
+        try {
+          idx = this.buildRefIndex();
+        } catch (e) {
+          idx = this._refIndex || /* @__PURE__ */ new Map();
+        }
+        this._refIndex = idx;
+        this._refReady = true;
+        return idx;
+      }
+      /** 别处改了文件后合并重算，避免连续敲字触发多次 */
+      queueRefs(delay) {
+        if (this._refTimer)
+          clearTimeout(this._refTimer);
+        this._refTimer = setTimeout(() => {
+          this._refTimer = null;
+          this.refreshRefs();
+          this.notifyRefs();
+        }, typeof delay === "number" ? delay : 800);
+      }
+      refEntry(card) {
+        if (!card || !card.id)
+          return null;
+        if (!this._refIndex)
+          return null;
+        return this._refIndex.get(card.filePath + "#^" + String(card.id).toLowerCase()) || null;
+      }
+      /** 被几篇笔记引用 */
+      refCount(card) {
+        const e = this.refEntry(card);
+        return e ? e.notes.size : 0;
+      }
+      /**
+       * 被引用的总数 + 每一篇的来源（名字、引用行号）。
+       * 名字要能点、能跳，所以这里把路径和行号一起交出去；
+       * 不同文件夹里有同名笔记时补一段父目录，否则菜单上分不清。
+       */
+      refSummary(card) {
+        const e = this.refEntry(card);
+        if (!e)
+          return null;
+        const rows = [];
+        const seen = /* @__PURE__ */ new Map();
+        for (const p of e.notes) {
+          const name = String(p).split("/").pop().replace(/\.md$/i, "");
+          seen.set(name, (seen.get(name) || 0) + 1);
+          const lines = e.by && e.by.get(p) || [];
+          const line = lines.length ? lines.reduce((a, b) => b < a ? b : a, lines[0]) : -1;
+          rows.push({ path: String(p), name, line, places: lines.length });
+        }
+        for (const r of rows) {
+          if ((seen.get(r.name) || 0) > 1) {
+            const parts = r.path.split("/");
+            if (parts.length > 1)
+              r.name = r.name + " \xB7 " + parts[parts.length - 2];
+          }
+        }
+        rows.sort((a, b) => (a.line < 0 ? 1 : 0) - (b.line < 0 ? 1 : 0) || a.line - b.line || a.name.localeCompare(b.name));
+        return {
+          notes: e.notes.size,
+          places: e.places,
+          names: rows.map((r) => r.name),
+          list: rows,
+          ambiguous: e.ambiguous
+        };
+      }
+      /** 通知已打开的面板：只刷新引用数字，不重读文件 */
+      notifyRefs() {
+        for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_QM)) {
+          const v = leaf.view;
+          if (v && typeof v.updateRefs === "function")
+            v.updateRefs();
+        }
+      }
+      /** 换了目标笔记：回看开着就让视图重算「已插入」（按钮状态跟着笔记走） */
+      refreshInsertedForReview() {
+        for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_QM)) {
+          const v = leaf.view;
+          if (v && v.state && v.state.reviewOpen && typeof v.rescanInserted === "function") {
+            v.rescanInserted();
+          }
+        }
+      }
+      async onload() {
+        await this.loadSettings();
+        if (this.settings.draft && this.settings.draft.text && !this.draftAlive()) {
+          this.settings.draft = { text: "", at: 0 };
+          try {
+            await this.saveData(this.settings);
+          } catch (e) {
+          }
+        }
+        this.registerView(VIEW_TYPE_QM, (leaf) => new CardsView(leaf, this));
+        addIcon2(ICON_ID, ICON_MARK);
+        this.addRibbonIcon(ICON_ID, "Collis", async () => {
+          await this.activateView();
+        });
+        this.addCommand({
+          id: "open-cards",
+          name: "\u6253\u5F00\u5361\u7247\u89C6\u56FE",
+          callback: async () => this.activateView()
+        });
+        this.addCommand({
+          id: "capture-selection",
+          name: "\u628A\u9009\u4E2D\u7684\u5185\u5BB9\u5B58\u4E3A\u5361\u7247",
+          // 用 callback 而不是 editorCallback：手机上从工具栏调命令时
+          // 编辑器会短暂失焦，editorCallback 那种「只在编辑器里可用」会点不动
+          hotkeys: [{ modifiers: ["Mod", "Shift"], key: "C" }],
+          callback: () => this.captureSelection(this.currentEditor())
+        });
+        this.addCommand({
+          id: "quick-capture",
+          name: "\u5FEB\u901F\u8BB0\u4E00\u6761",
+          // 'Mod' 由 Obsidian 按平台解析：macOS 是 Cmd，Windows/Linux 是 Ctrl。
+          // 用 J 而不是 K：Mod+K 是核心命令「插入 Markdown 链接」的默认键，
+          // 在编辑器里会同时插入 []() 并弹出速记窗，属于硬冲突。
+          hotkeys: [{ modifiers: ["Mod"], key: "J" }],
+          callback: () => new CaptureModal(this.app, this).open()
+        });
+        this.addCommand({
+          id: "insert-card",
+          name: "\u63D2\u5165\u5361\u7247\uFF08\u5F15\u7528\u6216\u5168\u6587\uFF09",
+          hotkeys: [{ modifiers: ["Mod", "Shift"], key: "K" }],
+          callback: () => this.openCardPicker()
+        });
+        this.addSettingTab(new QuickMemoSettingTab(this.app, this));
+        this.registerEvent(
+          this.app.workspace.on("editor-menu", (menu, editor) => {
+            let sel = "";
+            try {
+              sel = editor.getSelection();
+            } catch (e) {
+              sel = "";
+            }
+            if (!String(sel || "").trim())
+              return;
+            menu.addItem(
+              (i) => i.setTitle("\u5B58\u4E3A\u5361\u7247").setIcon(ICON_ID).onClick(() => this.captureSelection(editor))
+            );
+          })
+        );
+        this._lastMdLeaf = null;
+        this.registerEvent(
+          this.app.workspace.on("active-leaf-change", (leaf) => this.rememberEditorLeaf(leaf))
+        );
+        this.registerEvent(
+          this.app.workspace.on("file-open", () => {
+            let leaf = null;
+            try {
+              const ws = this.app.workspace;
+              leaf = ws.getMostRecentLeaf ? ws.getMostRecentLeaf(ws.rootSplit) : null;
+            } catch (e) {
+              leaf = null;
+            }
+            this.rememberEditorLeaf(leaf);
+            this.refreshInsertedForReview();
+          })
+        );
+        this._lastSelection = "";
+        this._lastSelectionAt = 0;
+        this.registerDomEvent(document, "selectionchange", () => {
+          try {
+            const sel = window.getSelection();
+            if (!sel || sel.isCollapsed)
+              return;
+            const t = String(sel).trim();
+            if (!t)
+              return;
+            this._lastSelection = t;
+            this._lastSelectionAt = Date.now();
+          } catch (e) {
+          }
+        });
+        this.registerEvent(
+          this.app.vault.on("modify", (f) => {
+            this.pruneSoon(f);
+            this.invalidateCards();
+          })
+        );
+        if (this.app.metadataCache) {
+          this.registerEvent(
+            this.app.metadataCache.on("resolved", () => {
+              this.refreshRefs();
+              this.notifyRefs();
+            })
+          );
+          this.registerEvent(this.app.metadataCache.on("changed", () => this.queueRefs()));
+        }
+        const check = () => this.checkUnmanagedEntries();
+        const boot = () => {
+          check();
+          this.warmCards();
+        };
+        if (this.app.workspace.onLayoutReady)
+          this.app.workspace.onLayoutReady(boot);
+        else
+          boot();
+      }
+      onunload() {
+        if (this._pruneTimers) {
+          for (const t of this._pruneTimers.values())
+            clearTimeout(t);
+          this._pruneTimers.clear();
+        }
+        if (this._refTimer) {
+          clearTimeout(this._refTimer);
+          this._refTimer = null;
+        }
+        if (this._cardWarmTimer) {
+          clearTimeout(this._cardWarmTimer);
+          this._cardWarmTimer = null;
+        }
+      }
+      async loadSettings() {
+        const data = await this.loadData();
+        this.settings = Object.assign({}, DEFAULT_SETTINGS2, data || {});
+        if (data && data.filePath && !data.folderPath) {
+          const old = String(data.filePath);
+          const idx = old.lastIndexOf("/");
+          this.settings.folderPath = idx > 0 ? old.slice(0, idx) : DEFAULT_SETTINGS2.folderPath;
+        }
+        if (!Array.isArray(this.settings.quickTags)) {
+          this.settings.quickTags = DEFAULT_SETTINGS2.quickTags.slice();
+        }
+        if (!Array.isArray(this.settings.trash)) {
+          this.settings.trash = [];
+        }
+        if (!Array.isArray(this.settings.collapsedDates)) {
+          this.settings.collapsedDates = [];
+        }
+        if (typeof this.settings.blockRefEmbed !== "boolean") {
+          this.settings.blockRefEmbed = false;
+        }
+        if (typeof this.settings.strictCardId !== "boolean") {
+          this.settings.strictCardId = true;
+        }
+        const d = this.settings.draft;
+        if (!d || typeof d !== "object" || typeof d.text !== "string" || typeof d.at !== "number") {
+          this.settings.draft = { text: "", at: 0 };
+        }
+        const folder = String(this.settings.folderPath || "").replace(/^\/+|\/+$/g, "");
+        this.settings.folderPath = folder && folder !== "." ? folder : DEFAULT_SETTINGS2.folderPath;
+      }
+      /**
+       * 保存设置。reload=true 时让面板重读一遍文件（改文件夹这类必须重读）；
+       * 回收站的增删恢复只需要更新一下条数，用 reload=false 走轻量重绘，不读盘。
+       */
+      async saveSettings(reload = true) {
+        await this.saveData(this.settings);
+        this.notifyViews(reload ? null : { light: true });
+      }
+      /* ---------------- 没提交完的手稿 ----------------
+       * 只存在插件配置里（data.json），不写进任何笔记文件，
+       * 也不会自己变成卡片：它只是把字填回输入框，还得你自己按保存。
+       */
+      /** 还有效的草稿内容；没有、为空白或超过 7 天都返回空串 */
+      draftAlive() {
+        const d = this.settings.draft;
+        if (!d || typeof d.text !== "string")
+          return "";
+        if (!d.text.trim())
+          return "";
+        if (!d.at || Date.now() - d.at > DRAFT_TTL)
+          return "";
+        return d.text;
+      }
+      /** 打字时用这个：停顿 1.5 秒才写盘，不打断输入 */
+      queueDraft(text) {
+        if (this._draftTimer)
+          clearTimeout(this._draftTimer);
+        this._draftTimer = setTimeout(() => {
+          this._draftTimer = null;
+          this.saveDraft(text);
+        }, 1500);
+      }
+      /** 立即落盘（关掉输入框时用；会把防抖里那次一并落地） */
+      async saveDraft(text) {
+        if (this._draftTimer) {
+          clearTimeout(this._draftTimer);
+          this._draftTimer = null;
+        }
+        const raw = String(text == null ? "" : text).slice(0, DRAFT_MAX);
+        if (!raw.trim()) {
+          await this.clearDraft();
+          return;
+        }
+        this.settings.draft = { text: raw, at: Date.now() };
+        try {
+          await this.saveData(this.settings);
+        } catch (e) {
+        }
+      }
+      /** 保存成功后清掉 */
+      async clearDraft() {
+        if (this._draftTimer) {
+          clearTimeout(this._draftTimer);
+          this._draftTimer = null;
+        }
+        const d = this.settings.draft;
+        if (!d || !d.text && !d.at)
+          return;
+        this.settings.draft = { text: "", at: 0 };
+        try {
+          await this.saveData(this.settings);
+        } catch (e) {
+        }
+      }
+      /* ---------------- 路径 ---------------- */
+      folderPathSafe() {
+        const raw = String(this.settings.folderPath || "").replace(/^\/+|\/+$/g, "");
+        return raw === "." ? "" : raw;
+      }
+      monthPath(m) {
+        const folder = this.folderPathSafe();
+        const name = m.format("YYYY-MM") + ".md";
+        return folder ? folder + "/" + name : name;
+      }
+      /**
+       * 写入前的路径断言：只允许改「当前文件夹下、按月命名」的文件，
+       * 卡片日期所在月份还必须与文件名一致。跨月归档、目录被改指时直接拦下。
+       */
+      checkManagedFile(file, cardDate) {
+        const folder = this.folderPathSafe();
+        if (!folder)
+          return { ok: false, reason: "\u8FD8\u6CA1\u6709\u8BBE\u7F6E\u5361\u7247\u6587\u4EF6\u5939" };
+        if (!(file instanceof TFile))
+          return { ok: false, reason: "\u5361\u7247\u6587\u4EF6\u5DF2\u4E0D\u5B58\u5728" };
+        if (!MONTH_FILE_RE.test(file.name))
+          return { ok: false, reason: "\u76EE\u6807\u6587\u4EF6\u4E0D\u662F\u6309\u6708\u5361\u7247\u6587\u4EF6" };
+        const parent = String(file.path).split("/").slice(0, -1).join("/");
+        if (parent !== folder)
+          return { ok: false, reason: "\u5361\u7247\u6587\u4EF6\u4E0D\u5728\u5F53\u524D\u6587\u4EF6\u5939\u91CC" };
+        if (cardDate && /^\d{4}-\d{2}-\d{2}$/.test(cardDate) && cardDate.slice(0, 7) !== baseOf(file.path)) {
+          return { ok: false, reason: "\u5361\u7247\u65E5\u671F\u4E0E\u6587\u4EF6\u6708\u4EFD\u4E0D\u4E00\u81F4" };
+        }
+        return { ok: true };
+      }
+      /** 切换文件夹前的体检：不允许把不像卡片的年月文件接管过来 */
+      async validateFolderTarget(path) {
+        const val = String(path || "").trim().replace(/^\/+|\/+$/g, "");
+        if (!val)
+          return { ok: false, reason: "\u6587\u4EF6\u5939\u4E0D\u80FD\u4E3A\u7A7A" };
+        if (val.indexOf("..") !== -1)
+          return { ok: false, reason: "\u8DEF\u5F84\u91CC\u4E0D\u80FD\u51FA\u73B0 .." };
+        if (val === ".obsidian" || val.indexOf(".obsidian/") === 0) {
+          return { ok: false, reason: "\u4E0D\u80FD\u653E\u5728 .obsidian \u91CC" };
+        }
+        const af = this.app.vault.getAbstractFileByPath(val);
+        if (af && !(af instanceof TFolder))
+          return { ok: false, reason: "\u8FD9\u662F\u4E00\u4E2A\u6587\u4EF6\uFF0C\u4E0D\u662F\u6587\u4EF6\u5939" };
+        if (!(af instanceof TFolder))
+          return { ok: true };
+        const months = af.children.filter((f) => f instanceof TFile && MONTH_FILE_RE.test(f.name));
+        for (const f of months) {
+          let content = "";
+          try {
+            content = await this.app.vault.cachedRead(f);
+          } catch (e) {
+            continue;
+          }
+          if (!qmLooksLikeCardFile(content)) {
+            return { ok: false, reason: f.name + " \u91CC\u6709\u5361\u7247\u4EE5\u5916\u7684\u5185\u5BB9\uFF0C\u50CF\u662F\u522B\u7684\u7B14\u8BB0" };
+          }
+        }
+        return { ok: true };
+      }
+      async ensureFolder(dir) {
+        const parts = String(dir || "").split("/").filter(Boolean);
+        let cur = "";
+        for (const p of parts) {
+          cur = cur ? cur + "/" + p : p;
+          if (!this.app.vault.getAbstractFileByPath(cur)) {
+            try {
+              await this.app.vault.createFolder(cur);
+            } catch (e) {
+            }
+          }
+        }
+      }
+      async ensureFileAt(path) {
+        const exist = this.app.vault.getAbstractFileByPath(path);
+        if (exist instanceof TFile)
+          return exist;
+        const idx = path.lastIndexOf("/");
+        if (idx > 0)
+          await this.ensureFolder(path.slice(0, idx));
+        try {
+          return await this.app.vault.create(path, "");
+        } catch (e) {
+          const again = this.app.vault.getAbstractFileByPath(path);
+          if (again instanceof TFile)
+            return again;
+          throw e;
+        }
+      }
+      /* ---------------- 读取 ---------------- */
+      listCardFiles() {
+        const folder = this.app.vault.getAbstractFileByPath(this.settings.folderPath);
+        if (!(folder instanceof TFolder))
+          return [];
+        return folder.children.filter((f) => f instanceof TFile && MONTH_FILE_RE.test(f.name)).sort((a, b) => a.name < b.name ? -1 : 1);
+      }
+      isCardFilePath(path) {
+        const folder = this.folderPathSafe();
+        if (!folder)
+          return false;
+        const p = String(path || "");
+        if (p.indexOf(folder + "/") !== 0)
+          return false;
+        return MONTH_FILE_RE.test(p.split("/").pop() || "");
+      }
+      async readAllCards() {
+        const files = this.listCardFiles();
+        const opts = { strict: this.settings.strictCardId !== false };
+        const chunks = await Promise.all(
+          files.map(async (f) => {
+            let content = "";
+            try {
+              content = await this.app.vault.cachedRead(f);
+            } catch (e) {
+              try {
+                content = await this.app.vault.read(f);
+              } catch (e2) {
+                content = "";
+              }
+            }
+            return content ? parseCards(content, f.path, opts) : [];
+          })
+        );
+        const all = [];
+        for (const c of chunks)
+          all.push(...c);
+        return sortCards(all);
+      }
+      /** 快速记录弹窗用：面板已加载就直接用内存里的，避免每次开弹窗都读盘 */
+      async cardsForSuggest() {
+        for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_QM)) {
+          const v = leaf.view;
+          if (v && v._loadedOnce && v.state && Array.isArray(v.state.cards))
+            return v.state.cards;
+        }
+        return await this.readAllCards();
+      }
+      /* ---------------- 写入 ---------------- */
+      async mutateFile(path, fn) {
+        const folder = this.folderPathSafe();
+        const name = String(path).split("/").pop();
+        if (!folder || String(path).indexOf(folder + "/") !== 0 || !MONTH_FILE_RE.test(name)) {
+          throw new Error("\u62D2\u7EDD\u5199\u5165\u975E\u5361\u7247\u6587\u4EF6\uFF1A" + path);
+        }
+        const file = await this.ensureFileAt(path);
+        let written = null;
+        await this.app.vault.process(file, (data) => {
+          const res = fn(String(data || ""));
+          const next = typeof res === "string" ? res : data;
+          if (next !== data)
+            written = next;
+          return next;
+        });
+        if (written !== null) {
+          this.rememberWrite(path, written);
+          this.notifyViews({ path, content: written });
+        } else {
+          this.notifyViews({ light: true });
+        }
+      }
+      /**
+       * 针对既有卡片的写入：先按当前文件内容重新定位，定位不到就不写。
+       * 这样即使卡片在别处被改过（编辑器、同步、另一个窗口），也不会误删误改。
+       */
+      async mutateCardFile(card, fn) {
+        const file = this.app.vault.getAbstractFileByPath(card.filePath);
+        const guard = this.checkManagedFile(file, card.date);
+        if (!guard.ok)
+          return guard;
+        let out = { ok: false, reason: "\u6587\u4EF6\u5DF2\u5728\u522B\u5904\u4FEE\u6539\uFF0C\u5DF2\u5237\u65B0" };
+        let written = null;
+        const opts = { strict: this.settings.strictCardId !== false };
+        await this.app.vault.process(file, (data) => {
+          const content = String(data || "").replace(/\r\n?/g, "\n");
+          const hit = qmLocateCard(content, card, opts);
+          if (!hit) {
+            out = { ok: false, reason: "\u8FD9\u6761\u5361\u7247\u5DF2\u7ECF\u4E0D\u5728\u539F\u4F4D\u4E86" };
+            return data;
+          }
+          const res = fn(content.split("\n"), hit);
+          if (typeof res !== "string") {
+            out = { ok: false, reason: "\u8FD9\u6761\u5361\u7247\u5DF2\u7ECF\u4E0D\u5728\u539F\u4F4D\u4E86" };
+            return data;
+          }
+          out = { ok: true, hit };
+          if (res !== data)
+            written = res;
+          return res;
+        });
+        if (written !== null) {
+          this.rememberWrite(card.filePath, written);
+          this.notifyViews({ path: card.filePath, content: written });
+        } else {
+          this.notifyViews({ light: true });
+        }
+        return out;
+      }
+      uniqueIdIn(content) {
+        const ids = qmCollectIds(content);
+        let id = genId();
+        let guard = 0;
+        while (ids.has(id) && guard++ < 50)
+          id = genId();
+        return id;
+      }
+      /**
+       * 通知面板更新。带 {path, content} 的只重解析这一个文件；
+       * {light:true} 只重画界面文字；什么都不带才是老老实实重读全部。
+       */
+      notifyViews(info) {
+        for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_QM)) {
+          const v = leaf.view;
+          if (!v)
+            continue;
+          if (info && info.path && typeof v.applyFileCards === "function") {
+            v.applyFileCards(info.path, info.content);
+          } else if (info && info.light && typeof v.rerender === "function") {
+            v.rerender();
+          } else if (v.refresh) {
+            v.refresh();
+          }
+        }
+      }
+      /* ---------------- 认出「这是我自己刚写的」 ---------------- */
+      rememberWrite(path, content) {
+        if (!this._ownWrites)
+          this._ownWrites = /* @__PURE__ */ new Map();
+        this._ownWrites.set(path, { content, at: Date.now() });
+        while (this._ownWrites.size > 8) {
+          const first = this._ownWrites.keys().next().value;
+          this._ownWrites.delete(first);
+        }
+      }
+      /**
+       * 刚写完触发的 modify 事件，如果磁盘内容和插件刚写的一字不差，
+       * 说明就是自己那次写入，不用再重读一遍。内容变了就当作外部改动。
+       */
+      async isOwnWrite(file) {
+        if (!this._ownWrites || !file)
+          return false;
+        const rec = this._ownWrites.get(file.path);
+        if (!rec)
+          return false;
+        if (Date.now() - rec.at > 3e3) {
+          this._ownWrites.delete(file.path);
+          return false;
+        }
+        let data = "";
+        try {
+          data = await this.app.vault.cachedRead(file);
+        } catch (e) {
+          return false;
+        }
+        if (data === rec.content)
+          return true;
+        this._ownWrites.delete(file.path);
+        return false;
+      }
+      /* ---------------- 无块 ID 条目的体检 ---------------- */
+      /**
+       * 严格识别开着时，没有块 ID 的时间条目不会显示成卡片。
+       * 这里只做一次提示（不改任何文件），防止旧卡片「悄悄消失」却不知道为什么。
+       */
+      async checkUnmanagedEntries() {
+        if (this.settings.strictCardId === false)
+          return;
+        let total = 0;
+        for (const f of this.listCardFiles()) {
+          let content = "";
+          try {
+            content = await this.app.vault.cachedRead(f);
+          } catch (e) {
+            continue;
+          }
+          for (const c of parseCards(content, f.path, { strict: false })) {
+            if (!c.id)
+              total++;
+          }
+        }
+        if (!total) {
+          if (this.settings.strictNoticeCount) {
+            this.settings.strictNoticeCount = 0;
+            try {
+              await this.saveData(this.settings);
+            } catch (e) {
+            }
+          }
+          return;
+        }
+        if (total === this.settings.strictNoticeCount)
+          return;
+        this.settings.strictNoticeCount = total;
+        try {
+          await this.saveData(this.settings);
+        } catch (e) {
+        }
+        new Notice2(
+          "Collis\uFF1A\u6709 " + total + " \u6761\u65F6\u95F4\u6761\u76EE\u6CA1\u6709\u5757 ID\uFF08^xxxx\uFF09\uFF0C\u4E0D\u4F1A\u663E\u793A\u6210\u5361\u7247\u3002\u5982\u679C\u662F\u4EE5\u524D\u7684\u5361\u7247\uFF0C\u5728\u884C\u5C3E\u8865\u4E00\u4E2A ^id \u5C31\u80FD\u7EB3\u5165\uFF1B\u4E5F\u53EF\u4EE5\u5728\u8BBE\u7F6E\u91CC\u5173\u6389\u300C\u4E25\u683C\u8BC6\u522B\u5361\u7247\u300D\u3002",
+          15e3
+        );
+      }
+      /* ---------------- 孤儿卡片：只读扫描 + 有确认的处置 ---------------- */
+      /** 扫描当前托管文件夹里所有「有块 ID 但不显示」的段 */
+      async findOrphans(fresh) {
+        const out = [];
+        const opts = { strict: this.settings.strictCardId !== false };
+        for (const f of this.listCardFiles()) {
+          let content = "";
+          try {
+            content = fresh ? await this.app.vault.read(f) : await this.app.vault.cachedRead(f);
+          } catch (e) {
+            continue;
+          }
+          for (const o of qmFindOrphans(content, f.path, opts))
+            out.push(o);
+        }
+        return out;
+      }
+      /** 写盘前在「刚读到的内容」里重新定位，防止读盘期间文件被改过 */
+      _relocateOrphan(content, item, opts) {
+        const list = qmFindOrphans(content, item.filePath, opts);
+        return qmMatchOrphan(list, item);
+      }
+      /**
+       * 恢复：把孤儿段原地改写成标准卡片格式。
+       * 块 ID 能留就留（笔记里的 [[#^id]] 引用靠它），只有和别处冲突才换新。
+       */
+      async restoreOrphan(item, time) {
+        const opts = { strict: this.settings.strictCardId !== false };
+        let done = false;
+        let written = null;
+        let reason = "";
+        let usedTime = "";
+        const target = await this.ensureFileAt(item.filePath);
+        await this.app.vault.process(target, (data) => {
+          const guard = this.checkManagedFile(this.app.vault.getAbstractFileByPath(item.filePath), item.date);
+          if (!guard.ok) {
+            reason = guard.reason;
+            return data;
+          }
+          const text = String(data || "");
+          const hit = this._relocateOrphan(text, item, opts);
+          if (!hit) {
+            reason = "\u8FD9\u6BB5\u5185\u5BB9\u5DF2\u7ECF\u88AB\u6539\u8FC7\uFF0C\u8BF7\u91CD\u65B0\u68C0\u67E5";
+            return data;
+          }
+          usedTime = qmSuggestOrphanTime(text, item.filePath, hit, { time });
+          const others = /* @__PURE__ */ new Set();
+          const all = text.replace(/\r\n?/g, "\n").split("\n");
+          all.forEach((l, i) => {
+            if (i < hit.lineStart || i > hit.lineEnd) {
+              for (const id of qmCollectIds(l))
+                others.add(id);
+            }
+          });
+          let newId = hit.id || "";
+          if (!newId || others.has(newId)) {
+            let nid = genId();
+            let guardN = 0;
+            while (others.has(nid) && guardN++ < 50)
+              nid = genId();
+            newId = nid;
+          }
+          const lines = qmRebuildOrphanLines(hit, usedTime, newId);
+          if (!lines) {
+            reason = "\u8FD9\u6BB5\u5185\u5BB9\u662F\u7A7A\u7684\uFF0C\u65E0\u6CD5\u6062\u590D";
+            return data;
+          }
+          const arr = all.slice();
+          arr.splice(hit.lineStart, hit.lineEnd - hit.lineStart + 1, ...lines);
+          done = true;
+          written = arr.join("\n");
+          return written;
+        });
+        if (!done) {
+          new Notice2("\u6CA1\u6709\u6062\u590D\uFF1A" + (reason || "\u76EE\u6807\u6587\u4EF6\u4E0D\u53EF\u5199"), 8e3);
+          return false;
+        }
+        this.rememberWrite(item.filePath, written);
+        this.notifyViews({ path: item.filePath, content: written });
+        new Notice2("\u5DF2\u6062\u590D\u4E3A\u5361\u7247\uFF08\u65F6\u95F4 " + usedTime + "\uFF09", 8e3);
+        return true;
+      }
+      /** 删除：整段移除并进「最近删除」，可以恢复；空日期段顺手收掉 */
+      async deleteOrphan(item) {
+        const opts = { strict: this.settings.strictCardId !== false };
+        let done = false;
+        let written = null;
+        let reason = "";
+        const removed = [];
+        const target = await this.ensureFileAt(item.filePath);
+        await this.app.vault.process(target, (data) => {
+          const guard = this.checkManagedFile(this.app.vault.getAbstractFileByPath(item.filePath), item.date);
+          if (!guard.ok) {
+            reason = guard.reason;
+            return data;
+          }
+          const text = String(data || "");
+          const hit = this._relocateOrphan(text, item, opts);
+          if (!hit) {
+            reason = "\u8FD9\u6BB5\u5185\u5BB9\u5DF2\u7ECF\u88AB\u6539\u8FC7\uFF0C\u8BF7\u91CD\u65B0\u68C0\u67E5";
+            return data;
+          }
+          const all = text.replace(/\r\n?/g, "\n").split("\n");
+          removed.push({
+            date: hit.date,
+            time: "",
+            body: hit.preview,
+            lines: hit.lines.slice(),
+            filePath: item.filePath
+          });
+          all.splice(hit.lineStart, hit.lineEnd - hit.lineStart + 1);
+          done = true;
+          written = qmPruneEmptyDateSections(all.join("\n"), hit.date);
+          return written;
+        });
+        if (!done) {
+          new Notice2("\u6CA1\u6709\u5220\u9664\uFF1A" + (reason || "\u76EE\u6807\u6587\u4EF6\u4E0D\u53EF\u5199"), 8e3);
+          return false;
+        }
+        if (removed.length)
+          await this.pushTrashMany(removed);
+        this.rememberWrite(item.filePath, written);
+        this.notifyViews({ path: item.filePath, content: written });
+        new Notice2("\u5DF2\u5220\u9664 \xB7 \u53EF\u5728\u300C\u6700\u8FD1\u5220\u9664\u300D\u6062\u590D", 7e3);
+        return true;
+      }
+      /** 批量删除孤儿卡片：按文件分组，一次 process；写盘前逐条按 ID 重新定位 */
+      async deleteOrphans(items) {
+        const list = Array.isArray(items) ? items.slice() : [];
+        const opts = { strict: this.settings.strictCardId !== false };
+        const saved = [];
+        const failed = [];
+        const byFile = /* @__PURE__ */ new Map();
+        for (const it of list) {
+          const p = String(it && it.filePath || "");
+          if (!p) {
+            failed.push(it);
+            continue;
+          }
+          if (!byFile.has(p))
+            byFile.set(p, []);
+          byFile.get(p).push(it);
+        }
+        const writes = [];
+        for (const [path, group] of byFile) {
+          const file = this.app.vault.getAbstractFileByPath(path);
+          const guard = this.checkManagedFile(file, group[0].date);
+          if (!guard.ok) {
+            failed.push(...group);
+            continue;
+          }
+          try {
+            await this.app.vault.process(file, (data) => {
+              const text = String(data || "");
+              const live = qmFindOrphans(text, path, opts);
+              const ranges = [];
+              const used = /* @__PURE__ */ new Set();
+              for (const it of group) {
+                const hit = qmMatchOrphan(live, it);
+                if (!hit || used.has(hit.lineStart)) {
+                  failed.push(it);
+                  continue;
+                }
+                used.add(hit.lineStart);
+                ranges.push(hit);
+              }
+              if (!ranges.length)
+                return data;
+              const lines = text.replace(/\r\n?/g, "\n").split("\n");
+              ranges.sort((a, b) => b.lineStart - a.lineStart);
+              const removed = [];
+              for (const hit of ranges) {
+                removed.push({
+                  date: hit.date,
+                  time: "",
+                  body: hit.preview,
+                  lines: hit.lines.slice(),
+                  filePath: path
+                });
+                lines.splice(hit.lineStart, hit.lineEnd - hit.lineStart + 1);
+              }
+              let out = lines.join("\n");
+              for (const d of new Set(removed.map((x) => x.date))) {
+                out = qmPruneEmptyDateSections(out, d);
+              }
+              saved.push(...removed);
+              if (out !== data) {
+                this.rememberWrite(path, out);
+                writes.push({ path, content: out });
+              }
+              return out;
+            });
+          } catch (e) {
+            failed.push(...group);
+          }
+        }
+        if (saved.length)
+          await this.pushTrashMany(saved);
+        if (writes.length === 1)
+          this.notifyViews({ path: writes[0].path, content: writes[0].content });
+        else if (writes.length > 1)
+          this.notifyViews();
+        return { deleted: saved.length, failed: failed.length };
+      }
+      /* ---------------- 空日期标题自动清理 ---------------- */
+      /** 光标正停在哪个日期段里：这一段本轮不清理，避免打断正在写的内容 */
+      cursorDatesIn(file) {
+        const dates = /* @__PURE__ */ new Set();
+        const leaves = this.app.workspace.getLeavesOfType("markdown");
+        for (const leaf of leaves) {
+          const view = leaf.view;
+          if (!view || !view.file || view.file.path !== file.path)
+            continue;
+          const editor = view.editor;
+          if (!editor)
+            continue;
+          let lines = [];
+          let line = 0;
+          try {
+            lines = String(editor.getValue() || "").split("\n");
+            line = editor.getCursor("head").line;
+          } catch (e) {
+            continue;
+          }
+          for (let i = Math.min(line, lines.length - 1); i >= 0; i--) {
+            const m = lines[i].match(/^##[ \t]+(\d{4}-\d{2}-\d{2})[ \t]*$/);
+            if (m) {
+              dates.add(m[1]);
+              break;
+            }
+          }
+        }
+        return dates;
+      }
+      /**
+       * 文件被改动后安排一次清理。不管是插件删的、还是你在编辑器里手动删的，
+       * 只要某一天的卡片全没了，这个日期标题就会被收走。
+       */
+      pruneSoon(file) {
+        if (!this.settings.autoPruneEmptyDates)
+          return;
+        if (!(file instanceof TFile))
+          return;
+        if (!this.checkManagedFile(file).ok)
+          return;
+        if (!this._pruneTimers)
+          this._pruneTimers = /* @__PURE__ */ new Map();
+        const old = this._pruneTimers.get(file.path);
+        if (old)
+          clearTimeout(old);
+        const timer = setTimeout(() => {
+          this._pruneTimers.delete(file.path);
+          this.pruneEmptyDates(file);
+        }, 1e3);
+        this._pruneTimers.set(file.path, timer);
+      }
+      async pruneEmptyDates(file) {
+        if (!this.settings.autoPruneEmptyDates)
+          return;
+        const target = this.app.vault.getAbstractFileByPath(file.path);
+        if (!(target instanceof TFile))
+          return;
+        if (!this.checkManagedFile(target).ok)
+          return;
+        if (await this.isOwnWrite(target))
+          return;
+        let content = "";
+        try {
+          content = await this.app.vault.read(target);
+        } catch (e) {
+          return;
+        }
+        if (!content || content.indexOf("##") === -1)
+          return;
+        const skip = this.cursorDatesIn(target);
+        if (!qmStripEmptyDateSections(content, skip).removed.length)
+          return;
+        let changed = null;
+        try {
+          await this.app.vault.process(target, (data) => {
+            const res = qmStripEmptyDateSections(String(data || ""), skip);
+            if (!res.removed.length)
+              return data;
+            changed = res.text;
+            return res.text;
+          });
+        } catch (e) {
+          return;
+        }
+        if (changed !== null) {
+          this.rememberWrite(target.path, changed);
+          this.notifyViews({ path: target.path, content: changed });
+        }
+      }
+      /* ---------------- 增 ---------------- */
+      async appendCard(text, opts) {
+        const now = moment();
+        const date = now.format("YYYY-MM-DD");
+        const time = now.format("HH:mm");
+        const path = this.monthPath(now);
+        const bodyLines = qmBodyLines(text);
+        if (!bodyLines.length) {
+          new Notice2("\u5199\u70B9\u4EC0\u4E48\u518D\u8BB0\u4E0B\u5427");
+          return false;
+        }
+        let madeId = "";
+        try {
+          await this.mutateFile(path, (content) => {
+            const id = this.uniqueIdIn(content);
+            madeId = id;
+            return qmInsertCardLines(content, date, qmFormatEntry(time, bodyLines, id));
+          });
+        } catch (e) {
+          new Notice2("\u6CA1\u8BB0\u4E0B\u6765\uFF1A" + (e && e.message ? e.message : "\u672A\u77E5\u539F\u56E0"), 8e3);
+          return false;
+        }
+        this._lastAppended = { path, date, time, id: madeId, body: bodyLines.join("\n") };
+        if (!(opts && opts.silent))
+          new Notice2("\u5DF2\u8BB0\u4E0B");
+        return true;
+      }
+      /**
+       * 把当前选中的文字存成一张卡片。
+       * 桌面端优先读编辑器选区；读不到（阅读模式、或手机端点了按钮导致编辑器失焦）
+       * 就用最近一次合法选区，超过 60 秒的旧选区不要，免得存进别处的旧内容。
+       */
+      async captureSelection(editor) {
+        let text = "";
+        try {
+          if (editor && typeof editor.getSelection === "function")
+            text = editor.getSelection();
+        } catch (e) {
+          text = "";
+        }
+        if (!String(text || "").trim()) {
+          const fresh = Date.now() - (this._lastSelectionAt || 0) < 6e4;
+          if (fresh)
+            text = this._lastSelection || "";
+        }
+        text = String(text || "").replace(/\r\n?/g, "\n").trim();
+        if (!text) {
+          new Notice2("\u5148\u5728\u6B63\u6587\u91CC\u9009\u4E2D\u4E00\u6BB5\u6587\u5B57");
+          return false;
+        }
+        const ok = await this.appendCard(text, { silent: true });
+        if (!ok)
+          return false;
+        const long = text.length > 300;
+        const msg = long ? "\u5DF2\u5B58\u4E3A\u5361\u7247\uFF08" + text.length + " \u5B57\uFF0C\u504F\u957F\uFF09\xB7 \u70B9\u6B64\u64A4\u9500" : "\u5DF2\u5B58\u4E3A\u5361\u7247 \xB7 \u70B9\u6B64\u64A4\u9500";
+        const n = new Notice2(msg, 8e3);
+        try {
+          if (n && n.noticeEl) {
+            n.noticeEl.addClass("qm-undo-toast");
+            n.noticeEl.addEventListener("click", () => {
+              n.hide();
+              this.undoLastCapture();
+            });
+          }
+        } catch (e) {
+        }
+        return true;
+      }
+      /** 撤销刚存的卡片：走正常删除流程（进回收站），但不弹第二个「已删除·撤销」 */
+      async undoLastCapture() {
+        const made = this._lastAppended;
+        if (!made)
+          return;
+        this._lastAppended = null;
+        await this.deleteCard(
+          { filePath: made.path, date: made.date, time: made.time, body: made.body, id: made.id },
+          { quiet: true }
+        );
+      }
+      /**
+       * 阅读模式下的 MarkdownView 也挂着一个 editor 对象，但它没挂到 DOM 上，
+       * 对它 `replaceRange` 是**静默失败**：不报错、不落盘，按钮却照样变成「已插入」。
+       * 所以取编辑器之前必须把这层排掉——排掉之后「插入到这篇」会改走追加到文件末尾。
+       */
+      isPreviewView(view) {
+        try {
+          if (!view)
+            return false;
+          if (typeof view.getMode === "function" && view.getMode() === "preview")
+            return true;
+          const cm = view.currentMode;
+          if (cm && cm.type === "preview")
+            return true;
+        } catch (e) {
+        }
+        return false;
+      }
+      /**
+       * 当前活动编辑器（手机端工具栏调命令时也能拿到）。
+       *
+       * 坑：点侧栏里的按钮会把活动叶子切成侧栏，`activeEditor` 立刻变 null ——
+       * 中间栏明明开着笔记，「插入到这篇」却报「先打开一篇笔记」，就是死在这一步。
+       * 所以拿不到时顺着「刚才用过的编辑器 → 主编辑区最近叶子 → 遍历 markdown 叶子」
+       * 往下找，全都失败才算真的没有。
+       */
+      currentEditor() {
+        const ws = this.app.workspace;
+        try {
+          const ae = ws.activeEditor;
+          if (ae && ae.editor && !this.isPreviewView(ae))
+            return ae.editor;
+        } catch (e) {
+        }
+        try {
+          const leaf = this._lastMdLeaf;
+          const ed = leaf && leaf.view && leaf.view.editor;
+          if (ed && !this.isPreviewView(leaf.view) && this.leafAlive(leaf))
+            return ed;
+        } catch (e) {
+        }
+        try {
+          const leaf = ws.getMostRecentLeaf ? ws.getMostRecentLeaf(ws.rootSplit) : null;
+          const ed = leaf && leaf.view && leaf.view.editor;
+          if (ed && !this.isPreviewView(leaf.view))
+            return ed;
+        } catch (e) {
+        }
+        try {
+          const leaves = ws.getLeavesOfType ? ws.getLeavesOfType("markdown") : [];
+          let side = null;
+          for (const leaf of leaves) {
+            const ed = leaf && leaf.view && leaf.view.editor;
+            if (!ed)
+              continue;
+            if (this.isPreviewView(leaf.view))
+              continue;
+            const root = leaf.getRoot ? leaf.getRoot() : null;
+            if (!root || !ws.rootSplit || root === ws.rootSplit)
+              return ed;
+            if (!side)
+              side = ed;
+          }
+          if (side)
+            return side;
+        } catch (e) {
+        }
+        try {
+          const view = ws.getActiveViewOfType ? ws.getActiveViewOfType(MarkdownView) : null;
+          if (view && view.editor && !this.isPreviewView(view))
+            return view.editor;
+        } catch (e) {
+        }
+        return null;
+      }
+      /**
+       * 记住最后一个主编辑区里的 markdown 叶子。
+       * 侧栏（本插件自己）被点中后 activeEditor 就是 null，插入卡片全靠这份缓存兜底；
+       * 拖到右侧栏的笔记不算「这篇」，免得插错地方。
+       */
+      rememberEditorLeaf(leaf) {
+        try {
+          const ed = leaf && leaf.view && leaf.view.editor;
+          if (!ed)
+            return;
+          const ws = this.app.workspace;
+          const root = leaf.getRoot ? leaf.getRoot() : null;
+          if (root && ws.rootSplit && root !== ws.rootSplit)
+            return;
+          this._lastMdLeaf = leaf;
+        } catch (e) {
+        }
+      }
+      /** 叶子是否还在工作区里（关掉标签后 leaf.view 还挂着，编辑器却已经废了） */
+      leafAlive(leaf) {
+        try {
+          const ws = this.app.workspace;
+          if (!leaf || !leaf.view)
+            return false;
+          if (typeof ws.getLeavesOfType !== "function")
+            return true;
+          return ws.getLeavesOfType("markdown").indexOf(leaf) >= 0;
+        } catch (e) {
+          return true;
+        }
+      }
+      /** 当前这篇笔记（阅读视图里没有编辑器对象，只能从叶子上取 file） */
+      currentNoteFile() {
+        const ws = this.app.workspace;
+        try {
+          const f = ws.getActiveFile ? ws.getActiveFile() : null;
+          if (f)
+            return f;
+        } catch (e) {
+        }
+        const fromLeaf = (leaf) => {
+          try {
+            return leaf && leaf.view && leaf.view.file || null;
+          } catch (e) {
+            return null;
+          }
+        };
+        const cached = fromLeaf(this._lastMdLeaf);
+        if (cached)
+          return cached;
+        try {
+          const leaf = ws.getMostRecentLeaf ? ws.getMostRecentLeaf(ws.rootSplit) : null;
+          const f = fromLeaf(leaf);
+          if (f)
+            return f;
+        } catch (e) {
+        }
+        try {
+          const leaves = ws.getLeavesOfType ? ws.getLeavesOfType("markdown") : [];
+          for (const leaf of leaves) {
+            const f = fromLeaf(leaf);
+            if (f)
+              return f;
+          }
+        } catch (e) {
+        }
+        return null;
+      }
+      /**
+       * 「插入到这篇」的唯一入口（回看用）。
+       * 有编辑器就插在光标处；没有（阅读视图/焦点在侧栏且编辑器已关）就追加到这篇末尾，
+       * 卡片引用是独立的一行内容，追加不会破坏原文。
+       * 返回 true 表示确实插进去了。
+       */
+      async insertIntoCurrentNote(card, plain) {
+        const ed = this.currentEditor();
+        const file = this.currentNoteFile();
+        if (!plain && card.id) {
+          let text = "";
+          try {
+            text = ed && typeof ed.getValue === "function" ? ed.getValue() : "";
+            if (!text && file)
+              text = String(await this.app.vault.cachedRead(file));
+          } catch (e) {
+            text = "";
+          }
+          if (qmHasBlockRef(text, card.id)) {
+            new Notice2("\u8FD9\u5F20\u5361\u7247\u5DF2\u7ECF\u5728\u8FD9\u7BC7\u7B14\u8BB0\u91CC\u4E86");
+            return true;
+          }
+        }
+        if (ed) {
+          let from = null;
+          let to = null;
+          try {
+            from = ed.getCursor("from");
+            to = ed.getCursor("to");
+          } catch (e) {
+            from = null;
+            to = null;
+          }
+          this.insertCardRef(card, ed, from, to, plain);
+          return true;
+        }
+        const isNote = !!file && (file.extension === "md" || /\.md$/i.test(String(file.path || "")));
+        if (!isNote) {
+          new Notice2("\u5148\u6253\u5F00\u4E00\u7BC7\u7B14\u8BB0\uFF0C\u518D\u63D2\u5165\u5361\u7247");
+          return false;
+        }
+        const insert = this.cardRefText(card, plain);
+        try {
+          await this.app.vault.process(file, (data) => {
+            const text = String(data || "");
+            if (!text)
+              return insert + "\n";
+            const head = text.endsWith("\n") ? text : text + "\n";
+            return head + "\n" + insert + "\n";
+          });
+          new Notice2("\u5DF2\u8FFD\u52A0\u5230\u300C" + String(file.basename || file.name || "\u8FD9\u7BC7") + "\u300D\u672B\u5C3E");
+          return true;
+        } catch (e) {
+          new Notice2("\u63D2\u5165\u5931\u8D25\uFF1A\u5199\u4E0D\u8FDB\u8FD9\u7BC7\u7B14\u8BB0");
+          return false;
+        }
+      }
+      /* ---------------- 卡片候选（;; 与插入面板共用） ---------------- */
+      /**
+       * 改动后延迟重建，不直接把缓存清空：
+       * 清空的话连续敲字会一直重置定时器，缓存可能长期为空，
+       * 打开面板就是一片空白。留着旧数据最多晚 1.2 秒。
+       */
+      invalidateCards() {
+        if (this._cardWarmTimer)
+          clearTimeout(this._cardWarmTimer);
+        this._cardWarmTimer = setTimeout(() => {
+          this._cardWarmTimer = null;
+          this.warmCards();
+        }, 1200);
+      }
+      async warmCards() {
+        try {
+          this._cardCache = await this.readAllCards();
+        } catch (e) {
+          this._cardCache = this._cardCache || [];
+        }
+      }
+      /** 面板打开时用的数据：没预热过就现读一次，绝不给一个空列表 */
+      async suggestCardsAsync(query) {
+        if (!this._cardCache || !this._cardCache.length)
+          await this.warmCards();
+        return this.suggestCards(query);
+      }
+      /**
+       * 打开选卡片面板。记下此刻的光标位置：面板是模态的，
+       * 打开后编辑器会失焦，等选定再读光标可能已经是别处的了。
+       */
+      openCardPicker() {
+        const ed = this.currentEditor();
+        let from = null;
+        let to = null;
+        if (ed) {
+          try {
+            from = ed.getCursor("from");
+            to = ed.getCursor("to");
+          } catch (e) {
+            from = null;
+            to = null;
+          }
+        }
+        new CardPickerModal(this.app, this, { editor: ed, from, to }).open();
+      }
+      /** 当前笔记的标签，用来给候选加权（同一主题的卡片更容易被想起来） */
+      currentNoteTags() {
+        try {
+          const file = this.currentNoteFile();
+          if (!file)
+            return [];
+          const cache = this.app.metadataCache.getFileCache(file);
+          if (!cache)
+            return [];
+          const out = [];
+          for (const t of cache.tags || []) {
+            const v = String(t && t.tag || "").replace(/^#/, "").toLowerCase();
+            if (v)
+              out.push(v);
+          }
+          return out;
+        } catch (e) {
+          return [];
+        }
+      }
+      /** 卡片写了多少天。日期段是现成的，不用额外存 */
+      cardAgeDays(card) {
+        try {
+          const d = moment(String(card && card.date || ""), "YYYY-MM-DD", true);
+          if (!d || typeof d.isValid !== "function" || !d.isValid())
+            return null;
+          return moment().startOf("day").diff(d.clone().startOf("day"), "days");
+        } catch (e) {
+          return null;
+        }
+      }
+      /**
+       * 候选与排序。同步返回，数据来自预热好的缓存（触发时才不去读盘）。
+       * 口径：字面命中为主，不装语义——写卡片和写文章用的是同一批词。
+       */
+      suggestCards(query) {
+        const cards = this._cardCache || [];
+        if (!cards.length)
+          return [];
+        const raw = String(query || "").trim();
+        const conds = qmParseQuery(raw);
+        const words = conds.filter((c) => c.kind === "text").map((c) => c.value);
+        const noteTags = this.currentNoteTags();
+        const rows = [];
+        for (const c of cards) {
+          const strict = qmCardMatches(c, conds);
+          let sim = 0;
+          if (!strict) {
+            if (!raw)
+              continue;
+            sim = qmBigramScore(raw, c.bodyLower || "");
+            const low = raw.toLowerCase();
+            const tagHit = (c.tags || []).some((t) => String(t).toLowerCase().indexOf(low) !== -1);
+            if (sim < 0.28 && !tagHit)
+              continue;
+          }
+          rows.push({
+            card: c,
+            words,
+            score: strict ? this.scoreCard(c, words, raw, noteTags) : sim * 5,
+            fuzzy: !strict
+          });
+        }
+        rows.sort((a, b) => b.score - a.score || String(b.card.date).localeCompare(String(a.card.date)));
+        return rows.slice(0, 12);
+      }
+      scoreCard(card, words, raw, noteTags) {
+        let score = 0;
+        const body = String(card.bodyLower || "");
+        for (const w of words) {
+          if (w && body.indexOf(w) !== -1)
+            score += 3;
+        }
+        if (raw.length >= 4)
+          score += qmBigramScore(raw, body) * 5;
+        score += Math.min(2, this.refCount(card));
+        const tags = card.tags || [];
+        for (const t of tags) {
+          if (noteTags.indexOf(String(t).toLowerCase()) !== -1)
+            score += 2;
+        }
+        const age = this.cardAgeDays(card);
+        if (age !== null && age <= 30)
+          score += 1;
+        return score;
+      }
+      /** 候选行：时间 + 引用点 + 标签 + 首行（命中词高亮），不显示「相似度」 */
+      renderSuggestRow(item, el) {
+        el.empty();
+        el.addClass("qm-picker-row");
+        const head = el.createDiv({ cls: "qm-suggest-head" });
+        head.createSpan({ cls: "qm-suggest-when", text: String(item.card.date).slice(5) + " " + item.card.time });
+        if (item.card.id && this.refCount(item.card))
+          head.createSpan({ cls: "qm-suggest-ref" });
+        const tags = item.card.tags || [];
+        if (tags.length) {
+          head.createSpan({ cls: "qm-suggest-tags", text: tags.slice(0, 3).map((t) => "#" + t).join(" ") });
+        }
+        const body = el.createDiv({ cls: "qm-suggest-body" });
+        qmAppendHits(body, qmFirstLine(item.card.body, 80), item.words || []);
+      }
+      /**
+       * 卡片要插进正文的那段文本（光标插入和追加到末尾共用一份，别两处各写一遍）。
+       * plain=true 时给纯文本（只想抄原话），否则给块引用。
+       * 没有块 ID 的旧卡片退化成纯文本，别造一个跳不过去的链接。
+       */
+      cardRefText(card, plain) {
+        if (plain)
+          return qmPasteText(card.body);
+        if (card.id) {
+          const bang = this.settings.blockRefEmbed ? "!" : "";
+          return bang + "[[" + this.linkTarget(card) + "#^" + card.id + "]]";
+        }
+        new Notice2("\u8FD9\u5F20\u5361\u7247\u6CA1\u6709\u5757 ID\uFF0C\u63D2\u5165\u7684\u662F\u5168\u6587");
+        return qmPasteText(card.body);
+      }
+      /**
+       * 插进正文。plain=true 时插纯文本（只想抄原话），否则插块引用。
+       */
+      insertCardRef(card, editor, start, end, plain) {
+        const insert = this.cardRefText(card, plain);
+        try {
+          const from = start || editor.getCursor("from");
+          const to = end || editor.getCursor("to");
+          editor.replaceRange(insert, from, to);
+        } catch (e) {
+          editor.replaceSelection(insert);
+        }
+        return insert;
+      }
+      /* ---------------- 补块 ID ---------------- */
+      /**
+       * 块引用的目标名：默认用文件名（移动文件夹不会断）。
+       * 只有 vault 里存在同名文件时才补全路径，避免链接指到另一个同名文件。
+       */
+      linkTarget(card) {
+        const name = String(card && card.fileBase || "") + ".md";
+        let files = [];
+        try {
+          files = this.app.vault.getMarkdownFiles ? this.app.vault.getMarkdownFiles() : [];
+        } catch (e) {
+          files = [];
+        }
+        const same = files.filter((f) => f && f.name === name);
+        if (same.length > 1)
+          return String(card.filePath || "").replace(/\.md$/, "");
+        return String(card && card.fileBase || "");
+      }
+      async ensureId(card) {
+        const file = this.app.vault.getAbstractFileByPath(card.filePath);
+        if (!(file instanceof TFile))
+          return "";
+        if (card.id && card.idOnLastLine)
+          return card.id;
+        let result = "";
+        const res = await this.mutateCardFile(card, (lines, hit) => {
+          const onEnd = lines[hit.lineEnd].match(/[ \t]\^([A-Za-z0-9-]+)[ \t]*$/);
+          if (onEnd) {
+            result = onEnd[1];
+            return lines.join("\n");
+          }
+          let oldId = "";
+          for (let j = hit.lineIndex; j < hit.lineEnd; j++) {
+            const m = lines[j].match(/[ \t]\^([A-Za-z0-9-]+)[ \t]*$/);
+            if (!m)
+              continue;
+            if (!oldId)
+              oldId = m[1];
+            lines[j] = lines[j].replace(/[ \t]\^[A-Za-z0-9-]+[ \t]*$/, "");
+          }
+          const id = oldId || card.id || this.uniqueIdIn(lines.join("\n"));
+          lines[hit.lineEnd] = lines[hit.lineEnd].replace(/[ \t]+$/, "") + " ^" + id;
+          result = id;
+          return lines.join("\n");
+        });
+        if (res.ok && result) {
+          card.id = result;
+          card.idOnLastLine = true;
+        }
+        return result;
+      }
+      /* ---------------- 改 ---------------- */
+      /**
+       * 编辑「原始内容区」。追加节由追加区自己维护，这里原样保留：
+       * 以前整块重写 body，有追加的卡片一保存就会被抹掉追加内容。
+       */
+      async updateCard(card, newBody) {
+        const bodyLines = qmBodyLines(newBody);
+        if (!bodyLines.length) {
+          new Notice2("\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A");
+          return false;
+        }
+        const res = await this.mutateCardFile(card, (lines, hit) => {
+          const sections = qmCardSections(qmBlockBody(lines, hit));
+          const id = hit.id || card.id || this.uniqueIdIn(lines.join("\n"));
+          const body = qmComposeBody(bodyLines.join("\n"), sections.appends);
+          return qmReplaceBlock(lines, hit, body, id);
+        });
+        if (res.ok)
+          new Notice2("\u5DF2\u66F4\u65B0");
+        else
+          new Notice2("\u6CA1\u6709\u4FEE\u6539\uFF1A" + res.reason);
+        return !!res.ok;
+      }
+      /* ---------------- 追加 ---------------- */
+      /** 在卡片末尾追加一段；原始内容一个字都不动 */
+      async appendToCard(card, text) {
+        const bodyLines = qmBodyLines(text);
+        if (!bodyLines.length) {
+          new Notice2("\u5199\u70B9\u4EC0\u4E48\u518D\u8FFD\u52A0\u5427");
+          return false;
+        }
+        const label = moment().format("YYYY-MM-DD HH:mm");
+        const res = await this.mutateCardFile(card, (lines, hit) => {
+          const sections = qmCardSections(qmBlockBody(lines, hit));
+          sections.appends.push({ label, text: bodyLines.join("\n") });
+          const id = hit.id || card.id || this.uniqueIdIn(lines.join("\n"));
+          const body = qmComposeBody(sections.original, sections.appends);
+          return qmReplaceBlock(lines, hit, body, id);
+        });
+        if (res.ok)
+          new Notice2("\u5DF2\u8FFD\u52A0");
+        else
+          new Notice2("\u6CA1\u6709\u8FFD\u52A0\uFF1A" + res.reason);
+        return !!res.ok;
+      }
+      /** 改第 index 条追加，其它节不动 */
+      async updateAppend(card, index, text) {
+        const bodyLines = qmBodyLines(text);
+        if (!bodyLines.length) {
+          new Notice2("\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A");
+          return false;
+        }
+        let missing = false;
+        const res = await this.mutateCardFile(card, (lines, hit) => {
+          const sections = qmCardSections(qmBlockBody(lines, hit));
+          if (!sections.appends[index]) {
+            missing = true;
+            return null;
+          }
+          sections.appends[index].text = bodyLines.join("\n");
+          const id = hit.id || card.id || this.uniqueIdIn(lines.join("\n"));
+          const body = qmComposeBody(sections.original, sections.appends);
+          return qmReplaceBlock(lines, hit, body, id);
+        });
+        if (res.ok)
+          new Notice2("\u5DF2\u66F4\u65B0\u8FFD\u52A0");
+        else
+          new Notice2(missing ? "\u8FD9\u6761\u8FFD\u52A0\u5DF2\u7ECF\u4E0D\u5B58\u5728\u4E86\uFF0C\u8BF7\u5237\u65B0" : "\u6CA1\u6709\u4FEE\u6539\uFF1A" + res.reason);
+        return !!res.ok;
+      }
+      /** 删第 index 条追加，原始内容与其它追加不动 */
+      async deleteAppend(card, index) {
+        let missing = false;
+        const res = await this.mutateCardFile(card, (lines, hit) => {
+          const sections = qmCardSections(qmBlockBody(lines, hit));
+          if (!sections.appends[index]) {
+            missing = true;
+            return null;
+          }
+          sections.appends.splice(index, 1);
+          const id = hit.id || card.id || this.uniqueIdIn(lines.join("\n"));
+          const body = qmComposeBody(sections.original, sections.appends);
+          return qmReplaceBlock(lines, hit, body, id);
+        });
+        if (res.ok)
+          new Notice2("\u5DF2\u5220\u9664\u8FD9\u6761\u8FFD\u52A0");
+        else
+          new Notice2(missing ? "\u8FD9\u6761\u8FFD\u52A0\u5DF2\u7ECF\u4E0D\u5B58\u5728\u4E86\uFF0C\u8BF7\u5237\u65B0" : "\u6CA1\u6709\u5220\u9664\uFF1A" + res.reason);
+        return !!res.ok;
+      }
+      /* ---------------- 删 ---------------- */
+      async deleteCard(card, opts) {
+        let removed = null;
+        const res = await this.mutateCardFile(card, (lines, hit) => {
+          removed = lines.slice(hit.lineIndex, hit.lineEnd + 1);
+          lines.splice(hit.lineIndex, hit.lineEnd - hit.lineIndex + 1);
+          return qmPruneEmptyDateSections(lines.join("\n"), hit.date);
+        });
+        if (!res.ok) {
+          new Notice2("\u6CA1\u6709\u5220\u9664\uFF1A" + res.reason);
+          return;
+        }
+        const entry = await this.pushTrash({
+          date: res.hit.date,
+          time: res.hit.time,
+          body: res.hit.body,
+          lines: removed,
+          filePath: card.filePath
+        });
+        if (opts && opts.quiet)
+          return;
+        const n = new Notice2("\u5DF2\u5220\u9664 \xB7 \u70B9\u6B64\u64A4\u9500", 9e3);
+        try {
+          if (n && n.noticeEl) {
+            n.noticeEl.addClass("qm-undo-toast");
+            n.noticeEl.addEventListener("click", () => {
+              n.hide();
+              this.restoreTrash(entry.uid);
+            });
+          }
+        } catch (e) {
+        }
+      }
+      /**
+       * 批量删除：按文件分组，同一文件里的多条合并成一次读写。
+       * 每条仍然走 qmLocateCard 的正文校验，定位不到的跳过（不写坏文件），
+       * 删下来的原始行进回收站，可以逐条恢复。
+       */
+      async deleteCards(cards) {
+        const list = Array.isArray(cards) ? cards.slice() : [];
+        const saved = [];
+        const failed = [];
+        const byFile = /* @__PURE__ */ new Map();
+        for (const c of list) {
+          const p = String(c && c.filePath || "");
+          if (!p) {
+            failed.push(c);
+            continue;
+          }
+          if (!byFile.has(p))
+            byFile.set(p, []);
+          byFile.get(p).push(c);
+        }
+        const writes = [];
+        for (const [path, group] of byFile) {
+          const file = this.app.vault.getAbstractFileByPath(path);
+          const guard = this.checkManagedFile(file, group[0].date);
+          if (!guard.ok) {
+            failed.push(...group);
+            continue;
+          }
+          const removed = [];
+          const opts = { strict: this.settings.strictCardId !== false };
+          try {
+            await this.app.vault.process(file, (data) => {
+              const text = String(data || "");
+              const ranges = [];
+              const used = /* @__PURE__ */ new Set();
+              for (const c of group) {
+                const hit = qmLocateCard(text, c, opts);
+                if (!hit || used.has(hit.lineIndex)) {
+                  failed.push(c);
+                  continue;
+                }
+                used.add(hit.lineIndex);
+                ranges.push(hit);
+              }
+              if (!ranges.length)
+                return data;
+              const lines = text.replace(/\r\n?/g, "\n").split("\n");
+              ranges.sort((a, b) => b.lineIndex - a.lineIndex);
+              for (const hit of ranges) {
+                removed.push({
+                  date: hit.date,
+                  time: hit.time,
+                  body: hit.body,
+                  lines: lines.slice(hit.lineIndex, hit.lineEnd + 1),
+                  filePath: path
+                });
+                lines.splice(hit.lineIndex, hit.lineEnd - hit.lineIndex + 1);
+              }
+              let out = lines.join("\n");
+              for (const d of new Set(removed.map((x) => x.date))) {
+                out = qmPruneEmptyDateSections(out, d);
+              }
+              if (out !== data) {
+                this.rememberWrite(path, out);
+                writes.push({ path, content: out });
+              }
+              return out;
+            });
+          } catch (e) {
+            failed.push(...group);
+            continue;
+          }
+          saved.push(...removed);
+        }
+        if (saved.length)
+          await this.pushTrashMany(saved);
+        if (writes.length === 1)
+          this.notifyViews({ path: writes[0].path, content: writes[0].content });
+        else if (writes.length > 1)
+          this.notifyViews();
+        else
+          this.notifyViews({ light: true });
+        return { deleted: saved.length, failed: failed.length };
+      }
+      /* ---------------- 回收站 ---------------- */
+      async pushTrash(item) {
+        const uid = "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const entry = {
+          uid,
+          date: String(item.date || ""),
+          time: String(item.time || ""),
+          body: String(item.body || "").slice(0, 4e3),
+          lines: Array.isArray(item.lines) ? item.lines.slice() : [],
+          filePath: String(item.filePath || ""),
+          deletedAt: Date.now()
+        };
+        this.settings.trash.unshift(entry);
+        if (this.settings.trash.length > 50)
+          this.settings.trash.length = 50;
+        await this.saveSettings(false);
+        return entry;
+      }
+      /** 批量入回收站：一次写完，避免 N 次读写配置与刷新视图 */
+      async pushTrashMany(items) {
+        if (!items || !items.length)
+          return;
+        const now = Date.now();
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i] || {};
+          this.settings.trash.unshift({
+            uid: "t" + (now + i).toString(36) + Math.random().toString(36).slice(2, 6),
+            date: String(it.date || ""),
+            time: String(it.time || ""),
+            body: String(it.body || "").slice(0, 4e3),
+            lines: Array.isArray(it.lines) ? it.lines.slice() : [],
+            filePath: String(it.filePath || ""),
+            deletedAt: now
+          });
+        }
+        if (this.settings.trash.length > 50)
+          this.settings.trash.length = 50;
+        await this.saveData(this.settings);
+      }
+      async dropTrash(uid) {
+        const i = this.settings.trash.findIndex((t) => t.uid === uid);
+        if (i === -1)
+          return;
+        this.settings.trash.splice(i, 1);
+        await this.saveSettings(false);
+      }
+      async clearTrash() {
+        this.settings.trash = [];
+        await this.saveSettings(false);
+      }
+      async restoreTrash(uid) {
+        const i = this.settings.trash.findIndex((t) => t.uid === uid);
+        if (i === -1) {
+          new Notice2("\u8FD9\u6761\u8BB0\u5F55\u5DF2\u7ECF\u4E0D\u5728\u300C\u6700\u8FD1\u5220\u9664\u300D\u91CC\u4E86");
+          return;
+        }
+        const entry = this.settings.trash[i];
+        if (!entry.filePath) {
+          new Notice2("\u65E0\u6CD5\u6062\u590D\uFF1A\u8FD9\u6761\u8BB0\u5F55\u91CC\u6CA1\u6709\u6587\u4EF6\u8DEF\u5F84");
+          return;
+        }
+        const file = await this.ensureFileAt(entry.filePath);
+        const guard = this.checkManagedFile(file, entry.date);
+        if (!guard.ok) {
+          new Notice2("\u65E0\u6CD5\u6062\u590D\uFF1A" + guard.reason);
+          return;
+        }
+        let done = false;
+        let written = null;
+        await this.app.vault.process(file, (data) => {
+          const content = String(data || "").replace(/\r\n?/g, "\n");
+          const ids = qmCollectIds(content);
+          let lines = (entry.lines || []).slice();
+          if (!lines.length) {
+            lines = qmFormatEntry(entry.time || "00:00", qmBodyLines(entry.body), "");
+          }
+          const last = lines.length - 1;
+          const m = String(lines[last] || "").match(/[ \t]\^([A-Za-z0-9-]+)[ \t]*$/);
+          const needId = !m || ids.has(m[1]);
+          if (needId) {
+            let nid = genId();
+            let guardN = 0;
+            while (ids.has(nid) && guardN++ < 50)
+              nid = genId();
+            const bare = String(lines[last] || "").replace(/[ \t]\^[A-Za-z0-9-]+[ \t]*$/, "");
+            lines[last] = bare.replace(/[ \t]+$/, "") + " ^" + nid;
+          }
+          done = true;
+          const out = qmInsertRestoredCard(content, entry.date, entry.time, lines);
+          if (out !== data)
+            written = out;
+          return out;
+        });
+        if (!done) {
+          new Notice2("\u6062\u590D\u5931\u8D25\uFF1A\u76EE\u6807\u6587\u4EF6\u4E0D\u53EF\u5199");
+          return;
+        }
+        this.settings.trash.splice(i, 1);
+        await this.saveSettings(false);
+        if (written !== null) {
+          this.rememberWrite(entry.filePath, written);
+          this.notifyViews({ path: entry.filePath, content: written });
+        }
+        new Notice2("\u5DF2\u6062\u590D");
+      }
+      /* ---------------- 其他 ---------------- */
+      async copy(text) {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch (e) {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+      }
+      async openCurrentMonthFile() {
+        const path = this.monthPath(moment());
+        const file = await this.ensureFileAt(path);
+        const leaf = this.app.workspace.getLeaf(false);
+        await leaf.openFile(file);
+      }
+      async activateView() {
+        const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_QM);
+        if (existing.length) {
+          this.app.workspace.revealLeaf(existing[0]);
+          return;
+        }
+        const leaf = this.app.workspace.getRightLeaf(false);
+        if (!leaf) {
+          new Notice2("\u65E0\u6CD5\u521B\u5EFA\u4FA7\u8FB9\u680F\u89C6\u56FE");
+          return;
+        }
+        await leaf.setViewState({ type: VIEW_TYPE_QM, active: true });
+        this.app.workspace.revealLeaf(leaf);
+      }
+    };
+    module2.exports = QuickMemoPlugin;
+    module2.exports.ICON_ID = ICON_ID;
+    module2.exports.ICON_MARK = ICON_MARK;
+    module2.exports.CaptureModal = CaptureModal;
+    module2.exports.qmMenuPlace = qmMenuPlace;
+    module2.exports.qmSelbarGap = qmSelbarGap;
+    module2.exports.qmStatusCover = qmStatusCover;
+    module2.exports.qmHasBlockRef = qmHasBlockRef;
+    module2.exports.qmShuffle = qmShuffle;
+    module2.exports.qmFindOrphans = qmFindOrphans;
+    module2.exports.qmMatchOrphan = qmMatchOrphan;
+    module2.exports.qmOrphanFingerprint = qmOrphanFingerprint;
+    module2.exports.qmSuggestOrphanTime = qmSuggestOrphanTime;
+    module2.exports.qmRebuildOrphanLines = qmRebuildOrphanLines;
+    module2.exports.TrashModal = TrashModal;
+    module2.exports.OrphanModal = OrphanModal;
+    module2.exports.ConfirmModal = ConfirmModal;
+    module2.exports.RefListModal = RefListModal;
+    module2.exports.qmPasteText = qmPasteText;
+    module2.exports.qmLocateCard = qmLocateCard;
+    module2.exports.qmCardSections = qmCardSections;
+    module2.exports.qmComposeBody = qmComposeBody;
+  }
+});
+
+// vendor/collis-board-core.js
+var require_collis_board_core = __commonJS({
+  "vendor/collis-board-core.js"(exports2, module2) {
+    var __defProp = Object.defineProperty;
+    var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+    var __getOwnPropNames2 = Object.getOwnPropertyNames;
+    var __hasOwnProp = Object.prototype.hasOwnProperty;
+    var __export = (target, all) => {
+      for (var name in all)
+        __defProp(target, name, { get: all[name], enumerable: true });
+    };
+    var __copyProps = (to, from, except, desc) => {
+      if (from && typeof from === "object" || typeof from === "function") {
+        for (let key of __getOwnPropNames2(from))
+          if (!__hasOwnProp.call(to, key) && key !== except)
+            __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+      }
+      return to;
+    };
+    var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+    var main_exports = {};
+    __export(main_exports, {
+      default: () => CollisBoardPlugin
+    });
+    module2.exports = __toCommonJS(main_exports);
+    var import_obsidian21 = require("obsidian");
+    var import_obsidian = require("obsidian");
+    function sanitizeBaseUrl(raw) {
+      let value = (raw != null ? raw : "").trim().replace(/\s+/g, "");
+      const duplicated = /^(https?:\/\/)+(https?:\/\/.*)$/i.exec(value);
+      if (duplicated)
+        value = duplicated[2];
+      return value.replace(/\/+$/, "");
+    }
+    function hostOf(url) {
+      try {
+        return new URL(url).host || url;
+      } catch (e) {
+        return url;
+      }
+    }
+    function describeNetworkError(error, url) {
+      const message = error instanceof Error ? error.message : String(error);
+      const host = hostOf(url);
+      if (message.includes("ERR_NAME_NOT_RESOLVED")) {
+        return `\u57DF\u540D\u65E0\u6CD5\u89E3\u6790\uFF1A${host}
+\u8BF7\u68C0\u67E5\u300C\u63A5\u53E3\u5730\u5740\u300D\u662F\u5426\u5B8C\u6574\u4E14\u6CA1\u6709\u91CD\u590D\u7684 https://\uFF08\u6B63\u786E\u793A\u4F8B\uFF1Ahttps://api.deepseek.com/v1\uFF09`;
+      }
+      if (message.includes("ERR_CONNECTION_REFUSED")) {
+        return `\u8FDE\u63A5\u88AB\u62D2\u7EDD\uFF1A${host}
+\u5982\u679C\u4F7F\u7528\u672C\u5730\u6A21\u578B\uFF0C\u8BF7\u786E\u8BA4\u670D\u52A1\u5DF2\u7ECF\u542F\u52A8\u3002`;
+      }
+      if (message.includes("ERR_INTERNET_DISCONNECTED")) {
+        return "\u5F53\u524D\u6CA1\u6709\u7F51\u7EDC\u8FDE\u63A5\u3002";
+      }
+      if (message.includes("ERR_CERT") || message.includes("SSL")) {
+        return `HTTPS \u8BC1\u4E66\u6821\u9A8C\u5931\u8D25\uFF1A${host}`;
+      }
+      if (message.toLowerCase().includes("timeout")) {
+        return `\u8BF7\u6C42\u8D85\u65F6\uFF1A${host}`;
+      }
+      return `${message}
+\u8BF7\u6C42\u5730\u5740\uFF1A${url}`;
+    }
+    var CAPABILITY_PRESETS = [
+      { match: /claude|sonnet|opus|haiku/i, label: "Anthropic Claude", contextWindow: 2e5, maxOutput: 32e3 },
+      { match: /gemini/i, label: "Google Gemini", contextWindow: 1e6, maxOutput: 32768 },
+      { match: /gpt-5|gpt-4\.1|gpt-4o|o3|o4-mini/i, label: "OpenAI", contextWindow: 4e5, maxOutput: 32768 },
+      { match: /deepseek/i, label: "DeepSeek", contextWindow: 1e6, maxOutput: 32768 },
+      { match: /kimi|moonshot/i, label: "Moonshot Kimi", contextWindow: 1e6, maxOutput: 32768 },
+      { match: /glm|zhipu|chatglm|智谱/i, label: "\u667A\u8C31 GLM", contextWindow: 1e6, maxOutput: 32768 },
+      { match: /qwen|qwq|tongyi|通义/i, label: "\u901A\u4E49\u5343\u95EE", contextWindow: 1e6, maxOutput: 32768 },
+      { match: /doubao|skylark|seed-oss/i, label: "\u8C46\u5305", contextWindow: 256e3, maxOutput: 16384 },
+      { match: /ernie|wenxin|文心/i, label: "\u6587\u5FC3\u4E00\u8A00", contextWindow: 128e3, maxOutput: 8192 },
+      { match: /minimax|abab/i, label: "MiniMax", contextWindow: 245e3, maxOutput: 16384 },
+      { match: /llama|mistral|ollama|lmstudio|local/i, label: "\u672C\u5730\u6A21\u578B", contextWindow: 32768, maxOutput: 8192 }
+    ];
+    var FALLBACK_CAPABILITY = {
+      contextWindow: 128e3,
+      maxOutput: 8192,
+      source: "fallback"
+    };
+    function inferCapability(model) {
+      const hit = CAPABILITY_PRESETS.find((preset) => preset.match.test(model != null ? model : ""));
+      if (!hit)
+        return { ...FALLBACK_CAPABILITY };
+      return {
+        contextWindow: hit.contextWindow,
+        maxOutput: hit.maxOutput,
+        source: "preset"
+      };
+    }
+    function isCapabilitySane(value) {
+      const cap = value;
+      if (!cap || typeof cap !== "object")
+        return false;
+      const { contextWindow, maxOutput } = cap;
+      if (!isSaneNumber(contextWindow, 1e3, 1e7))
+        return false;
+      if (!isSaneNumber(maxOutput, 64, 1e6))
+        return false;
+      return maxOutput < contextWindow;
+    }
+    function isSaneNumber(value, min, max) {
+      return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
+    }
+    function formatTokens(value) {
+      if (!Number.isFinite(value) || value <= 0)
+        return "?";
+      if (value >= 1e6) {
+        const millions = value / 1e6;
+        return `${Number.isInteger(millions) ? millions : millions.toFixed(1)}M`;
+      }
+      if (value >= 1e3) {
+        const thousands = value / 1e3;
+        return `${Number.isInteger(thousands) ? thousands : thousands.toFixed(1)}K`;
+      }
+      return String(Math.round(value));
+    }
+    function describeCapability(capability) {
+      if (!capability)
+        return "\u672A\u8BBE\u7F6E";
+      return `${formatTokens(capability.contextWindow)} \u7A97\u53E3 \xB7 ${formatTokens(capability.maxOutput)} \u8F93\u51FA`;
+    }
+    function capabilitySourceLabel(source) {
+      if (source === "probe")
+        return "\u63A5\u53E3\u63A2\u6D4B";
+      if (source === "manual")
+        return "\u624B\u52A8\u8BBE\u7F6E";
+      if (source === "preset")
+        return "\u9884\u8BBE\u63A8\u65AD";
+      return "\u4FDD\u5B88\u9ED8\u8BA4";
+    }
+    async function probeCapability(profile) {
+      const notes = [];
+      if (profile.protocol === "openai") {
+        const fromList = await probeOpenAI(profile, notes);
+        if (fromList)
+          return { capability: fromList, notes };
+        notes.push("\u63A5\u53E3\u6CA1\u6709\u8FD4\u56DE\u7A97\u53E3\u4FE1\u606F\uFF0C\u4FDD\u7559\u9884\u8BBE\u503C\uFF1B\u53EF\u624B\u52A8\u586B\u5199\u6821\u6B63\u3002");
+        return { capability: null, notes };
+      }
+      const fromError = await probeAnthropic(profile, notes);
+      if (fromError)
+        return { capability: fromError, notes };
+      notes.push(
+        "Anthropic \u534F\u8BAE\u6CA1\u6709\u6A21\u578B\u5217\u8868\u63A5\u53E3\uFF0C\u8FD9\u4E2A\u7F51\u5173\u4E5F\u6CA1\u6709\u62A5\u51FA\u4E0A\u9650\uFF0C\u4FDD\u7559\u9884\u8BBE\u503C\uFF1B\u53EF\u624B\u52A8\u586B\u5199\u6821\u6B63\u3002"
+      );
+      return { capability: null, notes };
+    }
+    async function probeOpenAI(profile, notes) {
+      var _a, _b, _c;
+      const url = `${sanitizeBaseUrl(profile.baseUrl)}/models`;
+      let body;
+      try {
+        const response = await (0, import_obsidian.requestUrl)({
+          url,
+          method: "GET",
+          headers: { Authorization: `Bearer ${profile.apiKey}` },
+          throw: false
+        });
+        if (response.status >= 400) {
+          notes.push(`\u6A21\u578B\u5217\u8868\u63A5\u53E3\u8FD4\u56DE ${response.status}\uFF0C\u6539\u7528\u624B\u52A8\u503C\u3002`);
+          return null;
+        }
+        body = response.text;
+      } catch (error) {
+        notes.push("\u6A21\u578B\u5217\u8868\u63A5\u53E3\u8FDE\u4E0D\u4E0A\uFF0C\u6539\u7528\u624B\u52A8\u503C\u3002");
+        return null;
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(body);
+      } catch (e) {
+        notes.push("\u6A21\u578B\u5217\u8868\u4E0D\u662F\u5408\u6CD5 JSON\uFF0C\u6539\u7528\u624B\u52A8\u503C\u3002");
+        return null;
+      }
+      const entries = (_a = parsed.data) != null ? _a : [];
+      const modelId = (entry) => typeof entry.id === "string" ? entry.id : "";
+      const target = (_b = entries.find((entry) => modelId(entry) === profile.model)) != null ? _b : entries.find((entry) => modelId(entry).includes(profile.model));
+      if (!target) {
+        notes.push("\u6A21\u578B\u5217\u8868\u91CC\u6CA1\u6709\u8FD9\u4E2A\u6A21\u578B\uFF0C\u6539\u7528\u624B\u52A8\u503C\u3002");
+        return null;
+      }
+      const provider = (_c = target.top_provider) != null ? _c : {};
+      const contextWindow = firstNumber([
+        target.context_length,
+        target.context_window,
+        target.max_context_length,
+        target.max_model_len,
+        provider.context_length
+      ]);
+      const maxOutput = firstNumber([
+        target.max_output_tokens,
+        target.max_completion_tokens,
+        provider.max_completion_tokens
+      ]);
+      if (!contextWindow) {
+        notes.push("\u6A21\u578B\u5217\u8868\u6CA1\u6709\u7ED9\u7A97\u53E3\u5927\u5C0F\uFF0C\u6539\u7528\u624B\u52A8\u503C\u3002");
+        return null;
+      }
+      return {
+        contextWindow: Math.round(contextWindow),
+        maxOutput: Math.round(maxOutput != null ? maxOutput : Math.min(8192, contextWindow / 4)),
+        source: "probe"
+      };
+    }
+    async function probeAnthropic(profile, notes) {
+      var _a, _b, _c, _d;
+      const base = sanitizeBaseUrl(profile.baseUrl);
+      const url = base.endsWith("/v1") ? `${base}/messages` : `${base}/v1/messages`;
+      try {
+        const response = await (0, import_obsidian.requestUrl)({
+          url,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": profile.apiKey,
+            "anthropic-version": "2023-06-01"
+          },
+          // An impossible cap: a strict gateway answers with the real maximum.
+          body: JSON.stringify({
+            model: profile.model,
+            max_tokens: 4e6,
+            messages: [{ role: "user", content: "ping" }]
+          }),
+          throw: false
+        });
+        if (response.status < 400) {
+          notes.push("\u7F51\u5173\u6CA1\u6709\u6821\u9A8C max_tokens \u4E0A\u9650\uFF0C\u65E0\u6CD5\u901A\u8FC7\u62A5\u9519\u63A2\u5230\u771F\u5B9E\u503C\u3002");
+          return null;
+        }
+        const text = (_a = response.text) != null ? _a : "";
+        const hit = (_b = text.match(/(\d{3,7})\s*(?:tokens?|个\s*token)?[^0-9]{0,20}(?:maximum|max|上限)/i)) != null ? _b : text.match(/(?:maximum|max|上限)[^0-9]{0,24}(\d{3,7})/i);
+        if (hit) {
+          const value = Number(hit[1]);
+          if (Number.isFinite(value) && value >= 256 && value <= 1e6) {
+            const contextWindow = (_d = (_c = profile.capability) == null ? void 0 : _c.contextWindow) != null ? _d : 0;
+            if (!isCapabilitySane({ contextWindow, maxOutput: value, source: "probe" })) {
+              notes.push("\u53EA\u63A2\u5230\u8F93\u51FA\u4E0A\u9650\uFF0C\u7F3A\u5C11\u7A97\u53E3\u5927\u5C0F\uFF0C\u8BF7\u624B\u52A8\u8865\u5168\u3002");
+              return null;
+            }
+            return { contextWindow, maxOutput: value, source: "probe" };
+          }
+        }
+        notes.push("\u62A5\u9519\u91CC\u6CA1\u6709\u53EF\u89E3\u6790\u7684\u4E0A\u9650\u6570\u5B57\uFF0C\u4FDD\u7559\u9884\u8BBE\u503C\u3002");
+        return null;
+      } catch (error) {
+        notes.push("\u63A2\u6D4B\u8BF7\u6C42\u5931\u8D25\uFF0C\u4FDD\u7559\u9884\u8BBE\u503C\u3002");
+        return null;
+      }
+    }
+    function firstNumber(values) {
+      for (const value of values) {
+        if (typeof value === "number" && Number.isFinite(value) && value > 0)
+          return value;
+        if (typeof value === "string" && /^\d+$/.test(value))
+          return Number(value);
+      }
+      return null;
+    }
+    var WORKBENCH_FOLDER = "\u753B\u5E03";
+    var DEFAULT_WORKBENCH_SETTINGS = {
+      boardFolder: WORKBENCH_FOLDER
+    };
+    var DEFAULT_CONTEXT_POLICY = {
+      safetyTokens: 1024,
+      ladder: [2e3, 800, 400, 200],
+      noteFloorChars: 700,
+      noteCapChars: 2e4,
+      batchThreshold: 80
+    };
+    var DEFAULT_SETTINGS2 = {
+      showBadge: true,
+      badgeFormat: "date",
+      boardFolder: "",
+      cardFolder: "",
+      ai: {
+        enabled: false,
+        activeId: "",
+        profiles: [],
+        thinking: "auto",
+        onOverflow: "auto",
+        continuations: 3,
+        policy: { ...DEFAULT_CONTEXT_POLICY }
+      },
+      conversations: [],
+      workbench: { ...DEFAULT_WORKBENCH_SETTINGS }
+    };
+    function activeProfile(ai) {
+      var _a, _b;
+      return (_b = (_a = ai.profiles.find((profile) => profile.id === ai.activeId)) != null ? _a : ai.profiles[0]) != null ? _b : null;
+    }
+    function normalizeWorkbenchSettings(raw) {
+      const value = raw != null ? raw : {};
+      const folder = typeof value.boardFolder === "string" ? value.boardFolder.trim() : "";
+      return {
+        boardFolder: folder || DEFAULT_WORKBENCH_SETTINGS.boardFolder
+      };
+    }
+    function normalizeAISettings(raw) {
+      var _a, _b, _c, _d, _e, _f;
+      const value = raw != null ? raw : {};
+      if (Array.isArray(value.profiles)) {
+        const profiles = value.profiles.map((profile2) => normalizeProfile(profile2));
+        const activeId = typeof value.activeId === "string" ? value.activeId : "";
+        const exists = profiles.some((profile2) => profile2.id === activeId);
+        return {
+          enabled: Boolean(value.enabled),
+          activeId: exists ? activeId : (_b = (_a = profiles[0]) == null ? void 0 : _a.id) != null ? _b : "",
+          profiles,
+          thinking: thinkingOr(value.thinking, "auto"),
+          onOverflow: value.onOverflow === "ask" ? "ask" : "auto",
+          continuations: clampNumber(value.continuations, 0, 8, 3),
+          policy: normalizePolicy(value.policy)
+        };
+      }
+      const legacy = value;
+      const hasLegacy = Boolean(legacy.baseUrl || legacy.model || legacy.apiKey);
+      const profile = {
+        id: "default",
+        name: legacy.model || "\u9ED8\u8BA4\u914D\u7F6E",
+        protocol: legacy.protocol === "anthropic" ? "anthropic" : "openai",
+        baseUrl: (_c = legacy.baseUrl) != null ? _c : "",
+        model: (_d = legacy.model) != null ? _d : "",
+        apiKey: (_e = legacy.apiKey) != null ? _e : "",
+        capability: inferCapability((_f = legacy.model) != null ? _f : ""),
+        thinking: "auto",
+        cache: true
+      };
+      return {
+        enabled: Boolean(legacy.enabled),
+        activeId: hasLegacy ? profile.id : "",
+        profiles: hasLegacy ? [profile] : [],
+        thinking: "auto",
+        onOverflow: "auto",
+        continuations: 3,
+        policy: { ...DEFAULT_CONTEXT_POLICY }
+      };
+    }
+    function normalizeProfile(profile) {
+      var _a;
+      const capability = isCapabilitySane(profile.capability) ? profile.capability : inferCapability((_a = profile.model) != null ? _a : "");
+      return {
+        ...profile,
+        capability,
+        thinking: thinkingOr(profile.thinking, "auto"),
+        cache: profile.cache !== false
+      };
+    }
+    function normalizePolicy(raw) {
+      const value = raw != null ? raw : {};
+      const ladder = Array.isArray(value.ladder) ? value.ladder.filter((step) => typeof step === "number" && Number.isFinite(step) && step >= 0).map((step) => Math.round(step)).sort((a, b) => b - a) : [];
+      return {
+        safetyTokens: clampNumber(value.safetyTokens, 0, 32e3, DEFAULT_CONTEXT_POLICY.safetyTokens),
+        ladder: ladder.length > 0 ? ladder : [...DEFAULT_CONTEXT_POLICY.ladder],
+        noteFloorChars: clampNumber(
+          value.noteFloorChars,
+          0,
+          1e4,
+          DEFAULT_CONTEXT_POLICY.noteFloorChars
+        ),
+        noteCapChars: clampNumber(
+          value.noteCapChars,
+          200,
+          2e5,
+          DEFAULT_CONTEXT_POLICY.noteCapChars
+        ),
+        batchThreshold: clampNumber(
+          value.batchThreshold,
+          10,
+          1e3,
+          DEFAULT_CONTEXT_POLICY.batchThreshold
+        )
+      };
+    }
+    function clampNumber(value, min, max, fallback) {
+      if (typeof value !== "number" || !Number.isFinite(value))
+        return fallback;
+      return Math.round(Math.min(max, Math.max(min, value)));
+    }
+    function thinkingOr(value, fallback) {
+      return value === "on" || value === "off" ? value : fallback;
+    }
+    var import_obsidian3 = require("obsidian");
+    var import_obsidian2 = require("obsidian");
+    var BOARD_EXTENSION = "collis";
+    function blankBoardData() {
+      return { version: 1, nodes: [], edges: [] };
+    }
+    async function nextBoardPath(app, folder) {
+      const dir = folder.replace(/^\/+|\/+$/g, "");
+      const adapter = app.vault.adapter;
+      const base = "\u672A\u547D\u540D";
+      let name = `${base}.${BOARD_EXTENSION}`;
+      let index = 1;
+      let path = dir ? `${dir}/${name}` : name;
+      while (await adapter.exists(path)) {
+        name = `${base} ${index}.${BOARD_EXTENSION}`;
+        path = dir ? `${dir}/${name}` : name;
+        index += 1;
+      }
+      return path;
+    }
+    function listBoards(app) {
+      return app.vault.getFiles().filter((file) => file.extension.toLowerCase() === BOARD_EXTENSION).sort((a, b) => b.stat.mtime - a.stat.mtime);
+    }
+    var PAD = 7;
+    var MAX_NODES = 14;
+    var MAX_CARDS = 6;
+    var TEXT_CAP = 96;
+    var blockCache = /* @__PURE__ */ new Map();
+    function clean(text) {
+      return text.replace(/!\[[^\]]*\]\([^)]*\)/g, " ").replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g, "$2").replace(/\[\[([^\]]*)\]\]/g, "$1").replace(/[*_`>#~]/g, "").replace(/\s+/g, " ").trim();
+    }
+    function cut(text, max = TEXT_CAP) {
+      const value = clean(text);
+      return value.length > max ? `${value.slice(0, max)}\u2026` : value;
+    }
+    function baseName(path) {
+      var _a;
+      const name = (_a = path.split("/").pop()) != null ? _a : path;
+      return name.replace(/\.[^.]+$/, "");
+    }
+    function toneOf(node2) {
+      const color = node2.color;
+      if (!color)
+        return "";
+      return color;
+    }
+    async function blockText(app, node2) {
+      if (node2.type !== "card")
+        return "";
+      const card = node2;
+      if (!card.file || !card.blockId)
+        return "";
+      const file = app.vault.getAbstractFileByPath(card.file);
+      if (!(file instanceof import_obsidian2.TFile))
+        return "";
+      const key = `${file.path}@${file.stat.mtime}`;
+      const cached = blockCache.get(key);
+      if (cached !== void 0)
+        return cached;
+      let excerpt = "";
+      try {
+        const content = await app.vault.cachedRead(file);
+        const marker = `^${card.blockId}`;
+        const lines = content.split(/\r?\n/);
+        const at = lines.findIndex((line) => line.includes(marker));
+        if (at >= 0) {
+          const parts = [lines[at].replace(marker, "")];
+          for (let i = at - 1; i >= 0 && parts.length < 4; i--) {
+            const line = lines[i];
+            if (!line.trim() || /^#{1,6}\s/.test(line) || /^(---|\*\*\*)/.test(line))
+              break;
+            parts.unshift(line);
+          }
+          excerpt = cut(parts.join(" "), 140);
+        }
+      } catch (e) {
+        excerpt = "";
+      }
+      if (blockCache.size > 300)
+        blockCache.clear();
+      blockCache.set(key, excerpt);
+      return excerpt;
+    }
+    function labelOf(node2, cardText) {
+      var _a, _b, _c, _d;
+      if (node2.type === "text")
+        return cut((_a = node2.text) != null ? _a : "");
+      if (node2.type === "file")
+        return cut(baseName((_b = node2.file) != null ? _b : ""), 40);
+      if (node2.type === "card")
+        return cardText || cut(baseName((_c = node2.file) != null ? _c : ""), 40);
+      if (node2.type === "group")
+        return cut((_d = node2.label) != null ? _d : "", 28);
+      return "";
+    }
+    function layout(data, labels) {
+      var _a, _b;
+      const nodes = ((_a = data.nodes) != null ? _a : []).filter(
+        (node2) => node2.type !== "group" && Number.isFinite(node2.x) && Number.isFinite(node2.y) && node2.width > 0
+      );
+      if (!nodes.length)
+        return { nodes: [], edges: [] };
+      const minX = Math.min(...nodes.map((n) => n.x));
+      const minY = Math.min(...nodes.map((n) => n.y));
+      const maxX = Math.max(...nodes.map((n) => n.x + n.width));
+      const maxY = Math.max(...nodes.map((n) => {
+        var _a2;
+        return n.y + ((_a2 = n.height) != null ? _a2 : 120);
+      }));
+      const spanX = Math.max(maxX - minX, 1);
+      const spanY = Math.max(maxY - minY, 1);
+      const area = 100 - PAD * 2;
+      const ratio = spanX / spanY;
+      const boxW = ratio >= 1 ? area : area * ratio;
+      const boxH = ratio >= 1 ? area / ratio : area;
+      const offX = PAD + (area - boxW) / 2;
+      const offY = PAD + (area - boxH) / 2;
+      const pick = [...nodes].sort((a, b) => {
+        var _a2, _b2;
+        return b.width * ((_a2 = b.height) != null ? _a2 : 120) - a.width * ((_b2 = a.height) != null ? _b2 : 120);
+      }).slice(0, MAX_NODES);
+      const kept = new Set(pick.map((n) => n.id));
+      const built = pick.map((n) => {
+        var _a2, _b2;
+        return {
+          id: n.id,
+          box: {
+            x: offX + (n.x - minX) / spanX * boxW,
+            y: offY + (n.y - minY) / spanY * boxH,
+            w: Math.max(n.width / spanX * boxW, 6),
+            h: Math.max(((_a2 = n.height) != null ? _a2 : 120) / spanY * boxH, 5),
+            kind: n.type,
+            tone: toneOf(n),
+            text: (_b2 = labels.get(n.id)) != null ? _b2 : ""
+          }
+        };
+      });
+      const center = new Map(built.map((entry) => [entry.id, entry.box]));
+      const mini = built.map((entry) => entry.box).sort((a, b) => a.w * a.h - b.w * b.h);
+      const edges = [];
+      for (const edge of (_b = data.edges) != null ? _b : []) {
+        if (!kept.has(edge.from) || !kept.has(edge.to))
+          continue;
+        const from = center.get(edge.from);
+        const to = center.get(edge.to);
+        if (!from || !to)
+          continue;
+        edges.push({
+          x1: from.x + from.w / 2,
+          y1: from.y + from.h / 2,
+          x2: to.x + to.w / 2,
+          y2: to.y + to.h / 2
+        });
+        if (edges.length >= 24)
+          break;
+      }
+      return { nodes: mini, edges };
+    }
+    function stamp(time) {
+      const d = new Date(time);
+      const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate()
+      ).padStart(2, "0")}`;
+      return `${day} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    }
+    function isBoardPath(path, folder) {
+      if (!path.toLowerCase().endsWith(`.${BOARD_EXTENSION}`))
+        return false;
+      if (!folder)
+        return true;
+      const prefix = folder.replace(/^\/+|\/+$/g, "");
+      return !prefix || path.startsWith(`${prefix}/`);
+    }
+    async function listBoardItems(app, folder) {
+      var _a;
+      const files = app.vault.getFiles().filter((file) => isBoardPath(file.path, folder)).sort((a, b) => b.stat.mtime - a.stat.mtime);
+      const items = [];
+      for (const file of files) {
+        let nodes = 0;
+        let edges = 0;
+        let cover = { nodes: [], edges: [] };
+        try {
+          const data = JSON.parse(await app.vault.read(file));
+          nodes = Array.isArray(data.nodes) ? data.nodes.length : 0;
+          edges = Array.isArray(data.edges) ? data.edges.length : 0;
+          const labels = /* @__PURE__ */ new Map();
+          let cards = 0;
+          for (const node2 of (_a = data.nodes) != null ? _a : []) {
+            if (node2.type === "card") {
+              cards += 1;
+              labels.set(node2.id, cards <= MAX_CARDS ? await blockText(app, node2) : "");
+            } else {
+              labels.set(node2.id, labelOf(node2, ""));
+            }
+          }
+          cover = layout(data, labels);
+        } catch (e) {
+          nodes = 0;
+        }
+        items.push({
+          file,
+          title: file.basename,
+          nodes,
+          edges,
+          updated: stamp(file.stat.mtime),
+          mtime: file.stat.mtime,
+          created: file.stat.ctime,
+          cover
+        });
+      }
+      return items;
+    }
+    async function createBoardItem(app, folder) {
+      const path = await nextBoardPath(app, folder);
+      return app.vault.create(path, JSON.stringify(blankBoardData(), null, 2));
+    }
+    function listSignature(items, sort) {
+      return [
+        sort,
+        ...items.map((item) => `${item.file.path}:${item.mtime}:${item.nodes}:${item.edges}`)
+      ].join("|");
+    }
+    var VIEW_TYPE_WORKBENCH = "collis-workbench";
+    var SVG_NS = "http://www.w3.org/2000/svg";
+    var BoardGalleryView = class extends import_obsidian3.ItemView {
+      constructor(leaf, plugin) {
+        super(leaf);
+        this.items = [];
+        this.sortMode = "created";
+        this.query = "";
+        this.multi = false;
+        this.selected = /* @__PURE__ */ new Set();
+        this.signature = "";
+        this.reloadTimer = null;
+        this.watching = false;
+        this.plugin = plugin;
+      }
+      getViewType() {
+        return VIEW_TYPE_WORKBENCH;
+      }
+      getDisplayText() {
+        return "\u753B\u5E03\u96C6";
+      }
+      getIcon() {
+        return "layout-grid";
+      }
+      async onOpen() {
+        try {
+          this.renderWall();
+        } catch (error) {
+          this.reportError("\u7ED8\u5236\u754C\u9762", error);
+          return;
+        }
+        try {
+          await this.loadItems();
+        } catch (error) {
+          this.reportError("\u8BFB\u53D6\u753B\u5E03", error);
+        }
+        this.watchSources();
+      }
+      async onClose() {
+        if (this.reloadTimer !== null) {
+          window.clearTimeout(this.reloadTimer);
+          this.reloadTimer = null;
+        }
+        const root = this.rootEl();
+        if (root)
+          this.clearRoot(root);
+      }
+      refreshWall() {
+        void this.loadItems();
+      }
+      /** The wall is a live mirror of the folder: a board saved in another tab, a
+       *  file added in the tree or the tab coming back to front all repaint it.
+       *  This is why nothing here needs a refresh button. */
+      watchSources() {
+        if (this.watching)
+          return;
+        this.watching = true;
+        const inFolder = (path) => isBoardPath(path, this.plugin.workbenchFolder);
+        this.registerEvent(
+          this.app.vault.on("modify", (file) => {
+            if (inFolder(file.path))
+              this.schedule(220);
+          })
+        );
+        this.registerEvent(
+          this.app.vault.on("create", (file) => {
+            if (inFolder(file.path))
+              this.schedule(60);
+          })
+        );
+        this.registerEvent(
+          this.app.vault.on("delete", (file) => {
+            if (inFolder(file.path))
+              this.schedule(60);
+          })
+        );
+        this.registerEvent(
+          this.app.vault.on("rename", (file, oldPath) => {
+            if (inFolder(file.path) || inFolder(oldPath))
+              this.schedule(60);
+          })
+        );
+        this.registerEvent(
+          this.app.workspace.on("active-leaf-change", (leaf) => {
+            if (leaf === this.leaf)
+              this.schedule(0);
+          })
+        );
+      }
+      schedule(delay) {
+        if (this.reloadTimer !== null)
+          window.clearTimeout(this.reloadTimer);
+        this.reloadTimer = window.setTimeout(() => {
+          this.reloadTimer = null;
+          void this.loadItems();
+        }, delay);
+      }
+      /** The element the wall is drawn into. `contentEl` is normally present, but
+       *  fall back to the view container rather than touching a null reference. */
+      rootEl() {
+        var _a, _b, _c;
+        const content = this.contentEl;
+        if (content)
+          return content;
+        const child = (_b = (_a = this.containerEl) == null ? void 0 : _a.children) == null ? void 0 : _b[1];
+        if (child)
+          return child;
+        return (_c = this.containerEl) != null ? _c : null;
+      }
+      clearRoot(el) {
+        while (el.firstChild)
+          el.removeChild(el.firstChild);
+      }
+      reportError(stage, error) {
+        const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        console.error(`[collis] \u753B\u5E03\u96C6${stage}\u5931\u8D25`, error);
+        const root = this.rootEl();
+        if (root) {
+          this.clearRoot(root);
+          const box = document.createElement("div");
+          box.className = "vw-error";
+          const title = document.createElement("strong");
+          title.textContent = `\u753B\u5E03\u96C6${stage}\u5931\u8D25`;
+          const detail = document.createElement("p");
+          detail.textContent = message;
+          box.appendChild(title);
+          box.appendChild(detail);
+          root.appendChild(box);
+        }
+        new import_obsidian3.Notice(`\u753B\u5E03\u96C6${stage}\u5931\u8D25\uFF1A${message}`);
+      }
+      async loadItems() {
+        let items = [];
+        try {
+          items = await listBoardItems(this.app, this.plugin.workbenchFolder);
+        } catch (e) {
+          new import_obsidian3.Notice("\u8BFB\u53D6\u753B\u5E03\u5217\u8868\u5931\u8D25");
+        }
+        items = [...items].sort((a, b) => {
+          if (this.sortMode === "name")
+            return a.title.localeCompare(b.title, "zh-CN");
+          if (this.sortMode === "modified")
+            return b.mtime - a.mtime;
+          return b.created - a.created;
+        });
+        this.items = items;
+        if (listSignature(items, this.sortMode) === this.signature)
+          return;
+        this.renderWall();
+      }
+      renderWall() {
+        const root = this.rootEl();
+        if (!root)
+          return;
+        const scrolled = root.querySelector(".vw-scroll");
+        const scroll = scrolled ? scrolled.scrollTop : 0;
+        this.clearRoot(root);
+        root.classList.add("wb-root");
+        const frame = node("div", "vw-frame");
+        const toolbar = node("div", "vw-toolbar");
+        toolbar.appendChild(this.buildHead());
+        frame.appendChild(toolbar);
+        const body = node("div", "vw-scroll");
+        const results = node("div", "vw-results");
+        results.appendChild(this.buildResults());
+        body.appendChild(results);
+        frame.appendChild(body);
+        root.appendChild(frame);
+        body.scrollTop = scroll;
+        this.signature = listSignature(this.items, this.sortMode);
+      }
+      /** Typing only swaps the results: the input keeps focus and caret. */
+      updateResults() {
+        const root = this.rootEl();
+        if (!root)
+          return;
+        const results = root.querySelector(".vw-results");
+        const count2 = root.querySelector(".vw-count");
+        if (!results)
+          return;
+        this.clearRoot(results);
+        results.appendChild(this.buildResults());
+        const visible = this.visibleItems();
+        if (count2) {
+          count2.textContent = this.query ? `${visible.length} / ${this.items.length} \u5757` : `${this.items.length} \u5757`;
+        }
+      }
+      visibleItems() {
+        const q = this.query.trim().toLocaleLowerCase();
+        if (!q)
+          return this.items;
+        return this.items.filter(
+          (item) => [item.title, ...item.cover.nodes.map((box) => box.text)].some((text) => text.toLocaleLowerCase().includes(q))
+        );
+      }
+      buildResults() {
+        const visible = this.visibleItems();
+        if (!visible.length) {
+          return this.buildEmpty(this.query.trim().length > 0);
+        }
+        const grid = node("div", "vw-grid");
+        for (const item of visible)
+          grid.appendChild(this.buildCard(item));
+        return grid;
+      }
+      buildEmpty(searching) {
+        const empty = node("div", "vw-empty");
+        const art = node("div", "vw-empty-art");
+        art.appendChild(collisMark());
+        const title = node("div", "vw-empty-title");
+        title.textContent = searching ? "\u6CA1\u6709\u5339\u914D\u7684\u753B\u5E03" : "\u8FD8\u6CA1\u6709\u753B\u5E03";
+        const hint = document.createElement("p");
+        hint.className = "vw-empty-hint";
+        hint.textContent = searching ? "\u6362\u4E2A\u5173\u952E\u8BCD\u8BD5\u8BD5\uFF0C\u641C\u7D22\u8303\u56F4\u5305\u62EC\u753B\u5E03\u540D\u79F0\u548C\u753B\u5E03\u4E0A\u7684\u6587\u5B57\u3002" : "\u65B0\u5EFA\u7684\u753B\u5E03\u4F1A\u5B58\u8FDB\u300C\u753B\u5E03\u300D\u6587\u4EF6\u5939\uFF0C\u548C\u6587\u4EF6\u6811\u5B8C\u5168\u540C\u6B65\u3002";
+        const button = document.createElement("button");
+        button.className = "vw-primary is-large";
+        if (searching) {
+          const label = document.createElement("span");
+          label.textContent = "\u6E05\u9664\u641C\u7D22";
+          button.appendChild(label);
+          button.addEventListener("click", () => {
+            var _a;
+            this.query = "";
+            this.renderWall();
+            const input = (_a = this.rootEl()) == null ? void 0 : _a.querySelector(".vw-search-input");
+            if (input)
+              input.focus();
+          });
+        } else {
+          const plus = node("span", "vw-ico");
+          (0, import_obsidian3.setIcon)(plus, "plus");
+          const label = document.createElement("span");
+          label.textContent = "\u65B0\u5EFA\u7B2C\u4E00\u5757\u753B\u5E03";
+          button.appendChild(plus);
+          button.appendChild(label);
+          button.addEventListener("click", () => {
+            void this.createBoard();
+          });
+        }
+        empty.appendChild(art);
+        empty.appendChild(title);
+        empty.appendChild(hint);
+        empty.appendChild(button);
+        return empty;
+      }
+      buildHead() {
+        const head = node("div", "vw-head");
+        const intro = node("div", "vw-intro");
+        const title = node("div", "vw-title");
+        const h1 = document.createElement("h1");
+        h1.textContent = "\u753B\u5E03\u96C6";
+        const count2 = node("span", "vw-count");
+        const visible = this.visibleItems();
+        count2.textContent = this.query ? `${visible.length} / ${this.items.length} \u5757` : `${this.items.length} \u5757`;
+        title.appendChild(h1);
+        title.appendChild(count2);
+        intro.appendChild(title);
+        head.appendChild(intro);
+        const actions = node("div", "vw-actions");
+        if (this.multi) {
+          const info = node("span", "vw-multi-count");
+          info.textContent = `\u5DF2\u9009 ${this.selected.size} \u5757`;
+          actions.appendChild(info);
+          actions.appendChild(simpleButton("\u5168\u9009", "vw-ghost", () => {
+            for (const item of this.visibleItems())
+              this.selected.add(item.file.path);
+            this.syncSelectionUI();
+          }));
+          const remove = simpleButton("\u5220\u9664\u6240\u9009", "vw-primary vw-danger", () => {
+            const chosen = this.items.filter((item) => this.selected.has(item.file.path));
+            this.confirmDelete(chosen, true);
+          });
+          if (!this.selected.size)
+            remove.disabled = true;
+          actions.appendChild(remove);
+          actions.appendChild(simpleButton("\u9000\u51FA\u591A\u9009", "vw-ghost", () => this.setMulti(false)));
+          head.appendChild(actions);
+          return head;
+        }
+        const search = node("div", "vw-search");
+        const glass = node("span", "vw-ico");
+        (0, import_obsidian3.setIcon)(glass, "search");
+        const input = document.createElement("input");
+        input.type = "search";
+        input.className = "vw-search-input";
+        input.placeholder = "\u641C\u7D22\u753B\u5E03";
+        input.style.cssText = "all: unset !important; display: block !important; width: 116px !important;padding: 0 !important; border: 0 !important; box-shadow: none !important;outline: none !important; background: transparent !important;font: inherit !important; font-size: 12px !important; line-height: 1.3 !important;color: var(--text-normal) !important; cursor: text !important;";
+        input.value = this.query;
+        input.addEventListener("input", () => {
+          this.query = input.value;
+          this.updateResults();
+        });
+        search.appendChild(glass);
+        search.appendChild(input);
+        actions.appendChild(search);
+        const create = document.createElement("button");
+        create.className = "vw-primary";
+        const plus = node("span", "vw-ico");
+        (0, import_obsidian3.setIcon)(plus, "plus");
+        const createLabel = document.createElement("span");
+        createLabel.textContent = "\u65B0\u5EFA\u753B\u5E03";
+        create.appendChild(plus);
+        create.appendChild(createLabel);
+        create.addEventListener("click", () => {
+          void this.createBoard();
+        });
+        actions.appendChild(create);
+        const more = node("button", "vw-sort vw-more");
+        more.setAttribute("title", "\u66F4\u591A\u64CD\u4F5C");
+        const moreIcon = node("span", "vw-ico");
+        (0, import_obsidian3.setIcon)(moreIcon, "more-horizontal");
+        more.appendChild(moreIcon);
+        more.addEventListener("click", (event) => this.showMoreMenu(event));
+        actions.appendChild(more);
+        head.appendChild(actions);
+        return head;
+      }
+      /** The single "..." control holds sorting and multi-select, like the menu
+       *  at the top of Obsidian's file tree. */
+      showMoreMenu(event) {
+        var _a, _b;
+        const menu = new import_obsidian3.Menu();
+        const options = [
+          ["created", "\u6309\u521B\u5EFA\u65F6\u95F4"],
+          ["modified", "\u6309\u4FEE\u6539\u65F6\u95F4"],
+          ["name", "\u6309\u540D\u79F0"]
+        ];
+        for (const [value, label] of options) {
+          menu.addItem(
+            (item) => item.setTitle(label).setChecked(this.sortMode === value).onClick(() => this.setSort(value))
+          );
+        }
+        menu.addSeparator();
+        menu.addItem(
+          (item) => item.setTitle(this.multi ? "\u9000\u51FA\u591A\u9009" : "\u591A\u9009").setChecked(this.multi).onClick(() => this.setMulti(!this.multi))
+        );
+        const anchor = (_a = event.currentTarget) != null ? _a : event.target;
+        const rect = (_b = anchor == null ? void 0 : anchor.getBoundingClientRect) == null ? void 0 : _b.call(anchor);
+        if (rect)
+          menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
+        else
+          menu.showAtMouseEvent(event);
+      }
+      setSort(value) {
+        if (this.sortMode === value)
+          return;
+        this.sortMode = value;
+        void this.loadItems();
+      }
+      buildCard(item) {
+        const card = node("div", "vw-card");
+        card.setAttribute("data-path", item.file.path);
+        if (this.multi && this.selected.has(item.file.path))
+          card.classList.add("is-selected");
+        card.appendChild(this.buildCover(item));
+        if (this.multi) {
+          const check = node("span", "vw-check");
+          (0, import_obsidian3.setIcon)(check, "check");
+          card.appendChild(check);
+        }
+        const del = document.createElement("button");
+        del.className = "vw-card-del";
+        del.setAttribute("title", "\u5220\u9664\u753B\u5E03");
+        (0, import_obsidian3.setIcon)(del, "trash-2");
+        del.addEventListener("click", (event) => {
+          event.stopPropagation();
+          this.confirmDelete([item]);
+        });
+        card.appendChild(del);
+        const body = node("div", "vw-card-body");
+        const head = node("div", "vw-card-head");
+        const icon = node("span", "vw-card-icon");
+        (0, import_obsidian3.setIcon)(icon, "layout-dashboard");
+        const title = node("div", "vw-card-title");
+        title.textContent = item.title;
+        head.appendChild(icon);
+        head.appendChild(title);
+        body.appendChild(head);
+        const date = node("div", "vw-card-date");
+        date.textContent = item.updated;
+        body.appendChild(date);
+        const props = node("div", "vw-card-props");
+        props.appendChild(prop("square", item.nodes ? `${item.nodes} \u4E2A\u8282\u70B9` : "\u7A7A\u767D\u753B\u5E03"));
+        if (item.edges)
+          props.appendChild(prop("link", `${item.edges} \u6761\u8FDE\u7EBF`));
+        body.appendChild(props);
+        card.appendChild(body);
+        card.addEventListener("click", () => {
+          if (this.multi)
+            this.toggleSelected(item.file.path);
+          else
+            this.openBoard(item);
+        });
+        return card;
+      }
+      /** The cover is a true miniature of the board: same layout, same colours,
+       *  and the real text of its nodes, so a card can be recognised without
+       *  opening it. */
+      buildCover(item) {
+        const cover = node("div", "vw-cover");
+        const { nodes, edges } = item.cover;
+        if (!nodes.length) {
+          cover.classList.add("is-blank");
+          const ghost = node("span", "vw-cover-ghost");
+          ghost.appendChild(collisMark());
+          cover.appendChild(ghost);
+          return cover;
+        }
+        if (edges.length)
+          cover.appendChild(edgeLayer(edges));
+        for (const box of nodes) {
+          const chip = node("span", "vw-chip");
+          applyBox(chip, box);
+          applyTone(chip, box.tone);
+          chip.setAttribute("data-kind", box.kind);
+          if (box.text && box.w >= 15 && box.h >= 13) {
+            const text = node("span", "vw-chip-text");
+            text.textContent = box.text;
+            chip.appendChild(text);
+          }
+          cover.appendChild(chip);
+        }
+        return cover;
+      }
+      openBoard(item) {
+        void this.plugin.openBoardFile(item.file.path);
+      }
+      setMulti(on) {
+        this.multi = on;
+        if (!on)
+          this.selected.clear();
+        this.renderWall();
+      }
+      toggleSelected(path) {
+        if (this.selected.has(path))
+          this.selected.delete(path);
+        else
+          this.selected.add(path);
+        this.syncSelectionUI();
+      }
+      /** Selecting a card touches only the affected attributes. Rebuilding the
+       *  whole wall here made the card flash and swallowed the next click. */
+      syncSelectionUI() {
+        var _a;
+        const root = this.rootEl();
+        if (!root)
+          return;
+        for (const card of Array.from(root.querySelectorAll("[data-path]"))) {
+          const path = (_a = card.getAttribute("data-path")) != null ? _a : "";
+          card.classList.toggle("is-selected", this.selected.has(path));
+        }
+        const count2 = root.querySelector(".vw-multi-count");
+        if (count2)
+          count2.textContent = `\u5DF2\u9009 ${this.selected.size} \u5757`;
+        const remove = root.querySelector(".vw-danger");
+        if (remove)
+          remove.disabled = this.selected.size === 0;
+      }
+      confirmDelete(items, exitMulti = false) {
+        if (!items.length)
+          return;
+        new DeleteBoardsModal(this.app, items.map((item) => item.title), () => {
+          void this.deleteBoards(items.map((item) => item.file), exitMulti);
+        }).open();
+      }
+      async deleteBoards(files, exitMulti = false) {
+        let removed = 0;
+        for (const file of files) {
+          try {
+            await this.app.fileManager.trashFile(file);
+            removed += 1;
+          } catch (e) {
+            try {
+              await this.app.vault.delete(file);
+              removed += 1;
+            } catch (error) {
+              new import_obsidian3.Notice(error instanceof Error ? error.message : "\u5220\u9664\u753B\u5E03\u5931\u8D25");
+            }
+          }
+        }
+        for (const file of files)
+          this.selected.delete(file.path);
+        if (exitMulti && removed > 0) {
+          this.multi = false;
+          this.selected.clear();
+          this.signature = "";
+        }
+        await this.loadItems();
+      }
+      async createBoard() {
+        try {
+          await this.plugin.createGalleryBoard();
+          await this.loadItems();
+        } catch (error) {
+          new import_obsidian3.Notice(error instanceof Error ? error.message : "\u65B0\u5EFA\u753B\u5E03\u5931\u8D25");
+        }
+      }
+    };
+    function collisMark() {
+      const svg = document.createElementNS(SVG_NS, "svg");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("fill", "none");
+      svg.setAttribute("stroke", "currentColor");
+      svg.setAttribute("stroke-width", "1.8");
+      svg.setAttribute("stroke-linecap", "round");
+      svg.setAttribute("stroke-linejoin", "round");
+      const frame = document.createElementNS(SVG_NS, "rect");
+      frame.setAttribute("x", "2.5");
+      frame.setAttribute("y", "3.5");
+      frame.setAttribute("width", "19");
+      frame.setAttribute("height", "17");
+      frame.setAttribute("rx", "5");
+      frame.setAttribute("stroke-dasharray", "3 2.6");
+      const stroke = document.createElementNS(SVG_NS, "path");
+      stroke.setAttribute("d", "M6 15.5C8.2 10.5 11 10.2 11.8 12.4C12.6 14.6 15.4 14.8 17.6 10.2");
+      const dot = document.createElementNS(SVG_NS, "circle");
+      dot.setAttribute("cx", "18.6");
+      dot.setAttribute("cy", "6.6");
+      dot.setAttribute("r", "1.5");
+      dot.setAttribute("fill", "currentColor");
+      dot.setAttribute("stroke", "none");
+      svg.appendChild(frame);
+      svg.appendChild(stroke);
+      svg.appendChild(dot);
+      return svg;
+    }
+    function prop(icon, label) {
+      const row = node("span", "vw-prop");
+      const glyph = node("span", "vw-ico");
+      (0, import_obsidian3.setIcon)(glyph, icon);
+      const text = document.createElement("span");
+      text.textContent = label;
+      row.appendChild(glyph);
+      row.appendChild(text);
+      return row;
+    }
+    function edgeLayer(edges) {
+      const svg = document.createElementNS(SVG_NS, "svg");
+      svg.setAttribute("class", "vw-cover-lines");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.setAttribute("preserveAspectRatio", "none");
+      for (const edge of edges) {
+        const line = document.createElementNS(SVG_NS, "line");
+        line.setAttribute("x1", String(edge.x1));
+        line.setAttribute("y1", String(edge.y1));
+        line.setAttribute("x2", String(edge.x2));
+        line.setAttribute("y2", String(edge.y2));
+        svg.appendChild(line);
+      }
+      return svg;
+    }
+    function applyBox(el, box) {
+      el.style.left = `${box.x}%`;
+      el.style.top = `${box.y}%`;
+      el.style.width = `${box.w}%`;
+      el.style.height = `${box.h}%`;
+    }
+    function applyTone(el, tone) {
+      if (!tone)
+        return;
+      if (tone.startsWith("#"))
+        el.style.setProperty("--tn", tone);
+      else
+        el.setAttribute("data-tone", tone);
+    }
+    function node(tag, className) {
+      const el = document.createElement(tag);
+      el.className = className;
+      return el;
+    }
+    function simpleButton(label, className, onClick) {
+      const button = document.createElement("button");
+      button.className = className;
+      const text = document.createElement("span");
+      text.textContent = label;
+      button.appendChild(text);
+      button.addEventListener("click", onClick);
+      return button;
+    }
+    var DeleteBoardsModal = class extends import_obsidian3.Modal {
+      constructor(app, names, onConfirm) {
+        super(app);
+        this.names = names;
+        this.onConfirm = onConfirm;
+      }
+      onOpen() {
+        const el = this.contentEl;
+        while (el.firstChild)
+          el.removeChild(el.firstChild);
+        el.classList.add("collis-delete-modal");
+        const heading2 = document.createElement("h2");
+        heading2.textContent = this.names.length === 1 ? "\u5220\u9664\u8FD9\u5757\u753B\u5E03\uFF1F" : `\u5220\u9664\u8FD9 ${this.names.length} \u5757\u753B\u5E03\uFF1F`;
+        const detail = document.createElement("p");
+        const shown = this.names.slice(0, 3).join("\u3001");
+        detail.textContent = this.names.length > 3 ? `\u4F1A\u79FB\u5230\u7CFB\u7EDF\u56DE\u6536\u7AD9\uFF1A${shown} \u7B49 ${this.names.length} \u5757\u3002` : `\u4F1A\u79FB\u5230\u7CFB\u7EDF\u56DE\u6536\u7AD9\uFF1A${shown}\u3002`;
+        const row = node("div", "vw-modal-actions");
+        const cancel = document.createElement("button");
+        cancel.className = "vw-ghost";
+        cancel.textContent = "\u53D6\u6D88";
+        cancel.addEventListener("click", () => this.close());
+        const confirm = document.createElement("button");
+        confirm.className = "vw-primary vw-danger";
+        confirm.textContent = "\u5220\u9664";
+        confirm.addEventListener("click", () => {
+          this.close();
+          this.onConfirm();
+        });
+        row.appendChild(cancel);
+        row.appendChild(confirm);
+        el.appendChild(heading2);
+        el.appendChild(detail);
+        el.appendChild(row);
+      }
+      onClose() {
+        const el = this.contentEl;
+        while (el.firstChild)
+          el.removeChild(el.firstChild);
+      }
+    };
+    var BLOCK_LINK_RE = /\[\[([^[\]|#]+?)#\^([^[\]|\n]+)(?:\|([^\]\n]+))?\]\]/g;
+    function extractBlockLinks(text) {
+      const out = [];
+      BLOCK_LINK_RE.lastIndex = 0;
+      let match;
+      while ((match = BLOCK_LINK_RE.exec(text)) !== null) {
+        const linkpath = match[1].trim();
+        const blockId = match[2].trim();
+        if (!linkpath || !blockId)
+          continue;
+        out.push({ linkpath, blockId, alias: match[3] ? match[3].trim() : void 0 });
+      }
+      return out;
+    }
+    function resolveCardRef(app, sourcePath, text) {
+      const links = extractBlockLinks(text);
+      if (links.length === 0)
+        return null;
+      const first = links[0];
+      const dest = app.metadataCache.getFirstLinkpathDest(first.linkpath, sourcePath);
+      if (!dest)
+        return null;
+      return { file: dest.path, blockId: first.blockId, linkpath: first.linkpath };
+    }
+    function makeBlockLink(ref) {
+      return `![[${ref.linkpath}#^${ref.blockId}]]`;
+    }
+    var import_obsidian4 = require("obsidian");
+    var LIST_START = /^[ \t]*(?:[-*+]|\d+[.)])[ \t]/;
+    var ANY_BLOCK_ID = /(?:^|[ \t])\^[A-Za-z0-9-]+[ \t]*$/;
+    function indentOf(line) {
+      const match = line.match(/^[ \t]*/);
+      if (!match)
+        return 0;
+      return match[0].replace(/\t/g, "  ").length;
+    }
+    function escapeRe(value) {
+      return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+    function locateBlock(lines, blockId) {
+      const endRe = new RegExp(`(?:^|[ \\t])\\^${escapeRe(blockId)}[ \\t]*$`);
+      let idLine = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (endRe.test(lines[i]))
+          idLine = i;
+      }
+      if (idLine === -1)
+        return null;
+      let start = idLine;
+      for (let i = idLine; i > 0; i--) {
+        const prev = lines[i - 1];
+        if (prev.trim() === "")
+          break;
+        if (ANY_BLOCK_ID.test(prev))
+          break;
+        start = i - 1;
+        if (LIST_START.test(prev) && indentOf(prev) === 0)
+          break;
+      }
+      return { start, end: idLine };
+    }
+    function readBlockContent(lines, range, blockId) {
+      var _a, _b;
+      const blockLines = lines.slice(range.start, range.end + 1);
+      const firstLine = (_a = blockLines[0]) != null ? _a : "";
+      const prefixMatch = firstLine.match(/^[ \t]*(?:[-*+]|\d+[.)])[ \t]+/);
+      const firstPrefix = prefixMatch ? prefixMatch[0] : "";
+      let contIndent = "";
+      if (blockLines.length > 1) {
+        const indentMatch = blockLines[1].match(/^[ \t]+/);
+        if (indentMatch)
+          contIndent = indentMatch[0];
+      }
+      const raw = blockLines.slice();
+      if (raw.length > 0 && firstPrefix) {
+        raw[0] = raw[0].slice(firstPrefix.length);
+      }
+      const lastIndex = raw.length - 1;
+      const idRe = new RegExp(`[ \\t]*\\^${escapeRe(blockId)}[ \\t]*$`);
+      if (lastIndex >= 0) {
+        raw[lastIndex] = raw[lastIndex].replace(idRe, "").replace(/[ \t]+$/, "");
+      }
+      for (let i = 1; i < raw.length; i++) {
+        if (contIndent && raw[i].startsWith(contIndent)) {
+          raw[i] = raw[i].slice(contIndent.length);
+        } else {
+          raw[i] = raw[i].replace(/^[ \t]{1,2}/, "");
+        }
+      }
+      const body = raw.join("\n").replace(/[ \t]+$/gm, "").replace(/\n+$/, "");
+      return {
+        range,
+        body,
+        firstPrefix,
+        contIndent: contIndent || "  ",
+        idLine: (_b = blockLines[blockLines.length - 1]) != null ? _b : ""
+      };
+    }
+    function buildBlockLines(body, firstPrefix, contIndent, blockId) {
+      const normalized = body.replace(/\r\n/g, "\n").replace(/\n+$/, "");
+      const bodyLines = normalized.split("\n");
+      const out = [];
+      bodyLines.forEach((line, index) => {
+        if (index === 0)
+          out.push(`${firstPrefix}${line}`);
+        else
+          out.push(`${contIndent}${line}`);
+      });
+      if (out.length === 0)
+        out.push(firstPrefix);
+      const last = out.length - 1;
+      out[last] = `${out[last].replace(/[ \t]+$/, "")} ^${blockId}`;
+      return out;
+    }
+    var TAG_RE = /(^|\s)#([^\s#[\]()]+)/g;
+    var TIME_RE = /^\s*(\d{1,2}:\d{2})\s/;
+    var DATE_RE = /^##\s+(\d{4}-\d{2}-\d{2})\s*$/;
+    function extractTags(body) {
+      const out = [];
+      TAG_RE.lastIndex = 0;
+      let match;
+      while ((match = TAG_RE.exec(body)) !== null) {
+        const tag = match[2];
+        if (tag && !out.includes(tag))
+          out.push(tag);
+      }
+      return out;
+    }
+    async function readCard(app, ref) {
+      const file = app.vault.getAbstractFileByPath(ref.file);
+      if (!(file instanceof import_obsidian4.TFile)) {
+        return { ref, body: "", timePrefix: "", editable: "", tags: [], stale: true };
+      }
+      const content = await app.vault.cachedRead(file);
+      const lines = content.split("\n");
+      const range = locateBlock(lines, ref.blockId);
+      if (!range) {
+        return { ref, body: "", timePrefix: "", editable: "", tags: [], stale: true };
+      }
+      const block = readBlockContent(lines, range, ref.blockId);
+      const body = block.body;
+      const tags = extractTags(body);
+      let date;
+      for (let i = range.start - 1; i >= 0; i--) {
+        const match = lines[i].match(DATE_RE);
+        if (match) {
+          date = match[1];
+          break;
+        }
+      }
+      const timeMatch = body.match(TIME_RE);
+      const timePrefix = timeMatch ? timeMatch[0] : "";
+      const editable = timePrefix ? body.slice(timePrefix.length) : body;
+      return {
+        ref,
+        body,
+        timePrefix,
+        editable,
+        tags,
+        date,
+        time: timeMatch ? timeMatch[1] : void 0,
+        stale: false
+      };
+    }
+    async function writeCard(app, ref, newBody) {
+      const file = app.vault.getAbstractFileByPath(ref.file);
+      if (!(file instanceof import_obsidian4.TFile))
+        return false;
+      let written = false;
+      await app.vault.process(file, (content) => {
+        const lines = content.split("\n");
+        const range = locateBlock(lines, ref.blockId);
+        if (!range)
+          return content;
+        const block = readBlockContent(lines, range, ref.blockId);
+        const replacement = buildBlockLines(newBody, block.firstPrefix, block.contIndent, ref.blockId);
+        lines.splice(range.start, range.end - range.start + 1, ...replacement);
+        written = true;
+        return lines.join("\n");
+      });
+      return written;
+    }
+    async function listCardsInFile(app, filePath) {
+      const file = app.vault.getAbstractFileByPath(filePath);
+      if (!(file instanceof import_obsidian4.TFile))
+        return [];
+      const content = await app.vault.cachedRead(file);
+      const lines = content.split("\n");
+      const idRe = /(?:^|[ \t])\^([A-Za-z0-9-]+)[ \t]*$/;
+      const refs = [];
+      const base = file.path.replace(/\.md$/, "");
+      lines.forEach((line) => {
+        const match = line.match(idRe);
+        if (match)
+          refs.push({ file: file.path, blockId: match[1], linkpath: base });
+      });
+      return refs;
+    }
+    function collectNodes(nodes) {
+      if (!nodes)
+        return [];
+      if (Array.isArray(nodes))
+        return nodes.slice();
+      if (nodes instanceof Map)
+        return Array.from(nodes.values());
+      if (nodes instanceof Set)
+        return Array.from(nodes);
+      return Object.values(nodes);
+    }
+    var NodeIndex = class {
+      constructor(app) {
+        this.app = app;
+        this.entries = /* @__PURE__ */ new Map();
+        this.inFlight = /* @__PURE__ */ new WeakSet();
+        this.sourcePath = "";
+      }
+      clear() {
+        this.entries.clear();
+      }
+      get(nodeId) {
+        return this.entries.get(nodeId);
+      }
+      values() {
+        return Array.from(this.entries.values());
+      }
+      get size() {
+        return this.entries.size;
+      }
+      async scan(canvasView) {
+        var _a, _b, _c;
+        const canvas = canvasView == null ? void 0 : canvasView.canvas;
+        if (!(canvas == null ? void 0 : canvas.nodes))
+          return;
+        if (this.inFlight.has(canvas))
+          return;
+        this.inFlight.add(canvas);
+        this.sourcePath = (_b = (_a = canvasView == null ? void 0 : canvasView.file) == null ? void 0 : _a.path) != null ? _b : "";
+        try {
+          const seen = /* @__PURE__ */ new Set();
+          const pending = [];
+          for (const node2 of collectNodes(canvas.nodes)) {
+            try {
+              const data = typeof node2.getData === "function" ? (_c = node2.getData()) != null ? _c : null : node2;
+              if (!data || data.type !== "text")
+                continue;
+              const id = data.id;
+              const text = typeof data.text === "string" ? data.text : "";
+              if (!id)
+                continue;
+              seen.add(id);
+              const existing = this.entries.get(id);
+              const fresh = existing && existing.text === text && existing.loadedAt > 0 && Date.now() - existing.loadedAt < 600;
+              if (fresh)
+                continue;
+              const entry = existing != null ? existing : { nodeId: id, text, meta: null, loadedAt: 0 };
+              entry.text = text;
+              this.entries.set(id, entry);
+              pending.push(this.loadMeta(entry));
+            } catch (error) {
+              console.error("[Collis] node parse failed", error);
+            }
+          }
+          for (const key of Array.from(this.entries.keys())) {
+            if (!seen.has(key))
+              this.entries.delete(key);
+          }
+          await Promise.all(pending);
+        } finally {
+          this.inFlight.delete(canvas);
+        }
+      }
+      async loadMeta(entry) {
+        const ref = resolveCardRef(this.app, this.sourcePath, entry.text);
+        if (!ref) {
+          this.entries.delete(entry.nodeId);
+          return;
+        }
+        try {
+          entry.meta = await readCard(this.app, ref);
+          entry.loadedAt = Date.now();
+        } catch (error) {
+          entry.meta = null;
+        }
+      }
+    };
+    var ActionRegistry = class {
+      constructor() {
+        this.actions = [];
+      }
+      register(action) {
+        this.actions.push(action);
+      }
+      all() {
+        return this.actions.slice();
+      }
+      forContext(ctx) {
+        return this.actions.filter((action) => {
+          try {
+            return !action.available || action.available(ctx);
+          } catch (error) {
+            return false;
+          }
+        });
+      }
+      byGroup(group) {
+        return this.actions.filter((action) => action.group === group);
+      }
+    };
+    var import_obsidian5 = require("obsidian");
+    var SyncEngine = class {
+      constructor(app, onRefreshed, canRefresh = () => true) {
+        this.app = app;
+        this.onRefreshed = onRefreshed;
+        this.canRefresh = canRefresh;
+        this.pending = /* @__PURE__ */ new Set();
+        this.refreshing = false;
+        this.scheduled = (0, import_obsidian5.debounce)(() => this.flush(), 400, true);
+      }
+      flushPending() {
+        if (this.pending.size > 0)
+          this.scheduled();
+      }
+      handleModify(file) {
+        var _a;
+        if (file.extension !== "md")
+          return;
+        const leaves = this.app.workspace.getLeavesOfType("canvas");
+        for (const leaf of leaves) {
+          const view = leaf.view;
+          if (typeof view.getViewData !== "function")
+            continue;
+          let raw = "";
+          try {
+            raw = (_a = view.getViewData()) != null ? _a : "";
+          } catch (error) {
+            continue;
+          }
+          if (!raw)
+            continue;
+          if (raw.includes(file.basename) || raw.includes(file.path)) {
+            this.pending.add(leafKey(leaf, view));
+          }
+        }
+        if (this.pending.size > 0)
+          this.scheduled();
+      }
+      flush() {
+        if (this.refreshing)
+          return;
+        if (!this.canRefresh())
+          return;
+        this.refreshing = true;
+        try {
+          const leaves = this.app.workspace.getLeavesOfType("canvas");
+          for (const leaf of leaves) {
+            const view = leaf.view;
+            const key = leafKey(leaf, view);
+            if (!this.pending.has(key))
+              continue;
+            this.refreshView(view);
+          }
+          this.pending.clear();
+        } finally {
+          this.refreshing = false;
+          this.onRefreshed();
+        }
+      }
+      refreshView(view) {
+        if (typeof view.getViewData !== "function" || typeof view.setViewData !== "function") {
+          return;
+        }
+        const canvas = view.canvas;
+        const viewport = captureViewport(canvas);
+        try {
+          const json = view.getViewData();
+          if (!json)
+            return;
+          void view.setViewData(json, true);
+          restoreViewport(view.canvas, viewport);
+        } catch (error) {
+          console.error("[Collis] refresh failed", error);
+        }
+      }
+    };
+    function leafKey(leaf, view) {
+      var _a, _b;
+      return (_b = (_a = leaf.id) != null ? _a : view.id) != null ? _b : "";
+    }
+    function captureViewport(canvas) {
+      const out = {};
+      if (!canvas)
+        return out;
+      const values = canvas;
+      for (const key of ["tx", "ty", "tz", "zoom", "scale"]) {
+        const value = values[key];
+        if (typeof value === "number")
+          out[key] = value;
+      }
+      return out;
+    }
+    function restoreViewport(canvas, viewport) {
+      if (!canvas)
+        return;
+      const values = canvas;
+      for (const key of Object.keys(viewport)) {
+        try {
+          values[key] = viewport[key];
+        } catch (error) {
+        }
+      }
+    }
+    var BADGE_CLASS = "collis-badge";
+    function applyBadges(canvasView, index, settings) {
+      var _a, _b, _c, _d;
+      const canvas = canvasView.canvas;
+      if (!(canvas == null ? void 0 : canvas.nodes))
+        return;
+      const container = canvasView.containerEl;
+      for (const node2 of collectNodes(canvas.nodes)) {
+        const nodeId = (_c = node2.id) != null ? _c : (_b = (_a = node2.getData) == null ? void 0 : _a.call(node2)) == null ? void 0 : _b.id;
+        if (!nodeId)
+          continue;
+        const el = (_d = node2.nodeEl) != null ? _d : container.querySelector(`.canvas-node[data-id="${nodeId}"]`);
+        if (!el)
+          continue;
+        let badge = el.querySelector(`.${BADGE_CLASS}`);
+        const entry = index.get(nodeId);
+        if (!settings.showBadge || !entry) {
+          if (badge)
+            badge.remove();
+          continue;
+        }
+        if (!badge) {
+          badge = document.createElement("div");
+          badge.className = BADGE_CLASS;
+          el.appendChild(badge);
+        }
+        const meta = entry.meta;
+        if (!meta) {
+          paint(badge, "\u2026", false);
+          continue;
+        }
+        if (meta.stale) {
+          paint(badge, "\u5361\u7247\u5DF2\u5220\u9664", true);
+          continue;
+        }
+        paint(badge, formatBadge(meta, settings.badgeFormat), false);
+        badge.setAttribute("title", tooltip(meta));
+      }
+    }
+    function clearBadges(canvasView) {
+      var _a;
+      const canvas = canvasView.canvas;
+      if (!(canvas == null ? void 0 : canvas.nodes))
+        return;
+      for (const node2 of collectNodes(canvas.nodes)) {
+        const badge = (_a = node2.nodeEl) == null ? void 0 : _a.querySelector(`.${BADGE_CLASS}`);
+        if (badge)
+          badge.remove();
+      }
+    }
+    function formatBadge(meta, format) {
+      var _a;
+      if (format === "full") {
+        const parts = [];
+        if (meta.tags.length > 0)
+          parts.push(`#${meta.tags[0]}`);
+        if (meta.date)
+          parts.push(meta.date.slice(5));
+        if (meta.time)
+          parts.push(meta.time);
+        return parts.join(" ");
+      }
+      if (meta.date)
+        return meta.date.slice(5);
+      return (_a = meta.time) != null ? _a : "";
+    }
+    function tooltip(meta) {
+      const parts = [];
+      if (meta.tags.length > 0)
+        parts.push(meta.tags.map((t) => `#${t}`).join(" "));
+      if (meta.date)
+        parts.push(meta.date);
+      if (meta.time)
+        parts.push(meta.time);
+      parts.push(meta.ref.file.replace(/\.md$/, ""));
+      return parts.join(" \xB7 ");
+    }
+    function paint(badge, text, stale) {
+      if (badge.textContent !== text)
+        badge.setText(text);
+      const currentlyStale = badge.hasClass("is-stale");
+      if (stale !== currentlyStale) {
+        if (stale)
+          badge.addClass("is-stale");
+        else
+          badge.removeClass("is-stale");
+      }
+    }
+    var import_obsidian16 = require("obsidian");
+    var InlineEditor = class {
+      constructor(nodeEl, initial, onCommit, onCancel, clickY, onClosed) {
+        this.onCommit = onCommit;
+        this.onCancel = onCancel;
+        this.clickY = clickY;
+        this.onClosed = onClosed;
+        this.closed = false;
+        this.focusGuardUntil = 0;
+        this.caretPlaced = false;
+        this.handleBlur = () => {
+          if (this.closed)
+            return;
+          if (Date.now() > this.focusGuardUntil)
+            return;
+          window.setTimeout(() => {
+            if (this.closed)
+              return;
+            if (document.activeElement === this.input)
+              return;
+            this.input.focus();
+          }, 20);
+        };
+        this.handleOutside = (evt) => {
+          const target = evt.target;
+          if (!target)
+            return;
+          if (this.root.contains(target))
+            return;
+          void this.commit();
+        };
+        this.root = document.createElement("div");
+        this.root.className = "collis-inline";
+        this.hostEl = nodeEl;
+        this.input = document.createElement("textarea");
+        this.input.className = "collis-inline-input";
+        this.input.value = initial;
+        this.input.spellcheck = false;
+        this.root.appendChild(this.input);
+        nodeEl.appendChild(this.root);
+        nodeEl.classList.add("collis-editing");
+        nodeEl.classList.add("is-selected");
+        this.root.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        this.input.addEventListener("mousedown", (evt) => evt.stopPropagation());
+        this.input.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        this.input.addEventListener("keydown", (evt) => {
+          if (evt.key === "Escape") {
+            evt.preventDefault();
+            this.cancel();
+            return;
+          }
+          if ((evt.ctrlKey || evt.metaKey) && evt.key === "Enter") {
+            evt.preventDefault();
+            void this.commit();
+          }
+        });
+        document.addEventListener("mousedown", this.handleOutside, true);
+        this.input.addEventListener("blur", this.handleBlur);
+        window.setTimeout(() => this.tryFocus(), 20);
+        window.setTimeout(() => this.tryFocus(), 120);
+      }
+      /**
+       * The canvas steals focus back right after the click that opened us, so
+       * claim focus more than once and re-claim it if it bounces within the first
+       * few frames.
+       */
+      tryFocus() {
+        if (this.closed)
+          return;
+        this.focusGuardUntil = Date.now() + 400;
+        this.input.focus();
+        if (!this.caretPlaced) {
+          this.placeCaret();
+          this.caretPlaced = true;
+        }
+      }
+      placeCaret() {
+        const value = this.input.value;
+        if (typeof this.clickY !== "number") {
+          this.input.setSelectionRange(value.length, value.length);
+          return;
+        }
+        try {
+          const style = window.getComputedStyle(this.input);
+          const lineHeight = parseFloat(style.lineHeight) || 20;
+          const rect = this.input.getBoundingClientRect();
+          const offset = this.clickY - rect.top + this.input.scrollTop;
+          const lines = value.split("\n");
+          const line = Math.max(0, Math.min(Math.floor(offset / lineHeight), lines.length - 1));
+          let index = 0;
+          for (let i = 0; i < line; i++)
+            index += lines[i].length + 1;
+          this.input.setSelectionRange(index, index);
+        } catch (error) {
+          this.input.setSelectionRange(value.length, value.length);
+        }
+      }
+      async commit() {
+        if (this.closed)
+          return;
+        const value = this.input.value;
+        this.closed = true;
+        this.destroy();
+        await this.onCommit(value);
+      }
+      cancel() {
+        if (this.closed)
+          return;
+        this.closed = true;
+        this.destroy();
+        this.onCancel();
+      }
+      destroy() {
+        document.removeEventListener("mousedown", this.handleOutside, true);
+        this.hostEl.classList.remove("collis-editing");
+        this.root.remove();
+        if (this.onClosed)
+          this.onClosed();
+      }
+      get isOpen() {
+        return !this.closed;
+      }
+    };
+    var import_obsidian6 = require("obsidian");
+    var MarkdownNodeEditor = class {
+      constructor(app, nodeEl, file, initialBody, onCommit, onCancel, onClosed) {
+        this.app = app;
+        this.nodeEl = nodeEl;
+        this.file = file;
+        this.onCommit = onCommit;
+        this.onCancel = onCancel;
+        this.onClosed = onClosed;
+        this.closed = false;
+        this.handleOutside = (evt) => {
+          const target = evt.target;
+          if (!target)
+            return;
+          if (this.root.contains(target))
+            return;
+          void this.commit();
+        };
+        this.root = document.createElement("div");
+        this.root.className = "collis-inline collis-md-editor";
+        this.titleInput = document.createElement("input");
+        this.titleInput.className = "collis-md-title inline-title";
+        this.titleInput.type = "text";
+        this.titleInput.value = file.basename;
+        this.titleInput.spellcheck = false;
+        this.bodyInput = document.createElement("textarea");
+        this.bodyInput.className = "collis-inline-input collis-md-body";
+        this.bodyInput.value = initialBody;
+        this.bodyInput.spellcheck = false;
+        this.root.appendChild(this.titleInput);
+        this.root.appendChild(this.bodyInput);
+        nodeEl.appendChild(this.root);
+        nodeEl.classList.add("collis-editing");
+        nodeEl.classList.add("is-selected");
+        this.root.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        this.root.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        this.root.addEventListener("keydown", (evt) => {
+          if (evt.key === "Escape") {
+            evt.preventDefault();
+            this.cancel();
+            return;
+          }
+          if ((evt.ctrlKey || evt.metaKey) && evt.key === "Enter") {
+            evt.preventDefault();
+            void this.commit();
+          }
+        });
+        document.addEventListener("mousedown", this.handleOutside, true);
+        window.setTimeout(() => {
+          if (this.closed)
+            return;
+          this.bodyInput.focus();
+          const end = this.bodyInput.value.length;
+          this.bodyInput.setSelectionRange(end, end);
+        }, 40);
+      }
+      async commit() {
+        var _a, _b;
+        if (this.closed)
+          return;
+        this.closed = true;
+        const nextTitle = this.titleInput.value.trim();
+        const nextBody = this.bodyInput.value;
+        this.destroy();
+        let target = this.file;
+        if (nextTitle && nextTitle !== this.file.basename) {
+          const folder = (_b = (_a = this.file.parent) == null ? void 0 : _a.path) != null ? _b : "";
+          const nextPath = `${folder && folder !== "/" ? `${folder}/` : ""}${nextTitle}.md`;
+          try {
+            await this.app.fileManager.renameFile(this.file, nextPath);
+            const renamed = this.app.vault.getAbstractFileByPath(nextPath);
+            if (renamed instanceof import_obsidian6.TFile)
+              target = renamed;
+          } catch (error) {
+          }
+        }
+        await this.onCommit(target, nextBody);
+      }
+      cancel() {
+        if (this.closed)
+          return;
+        this.closed = true;
+        this.destroy();
+        this.onCancel();
+      }
+      destroy() {
+        document.removeEventListener("mousedown", this.handleOutside, true);
+        this.nodeEl.classList.remove("collis-editing");
+        this.root.remove();
+        if (this.onClosed)
+          this.onClosed();
+      }
+    };
+    var import_obsidian7 = require("obsidian");
+    var IMAGE_EXT = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"];
+    var VIDEO_EXT = ["mp4", "webm", "mov", "mkv"];
+    var AUDIO_EXT = ["mp3", "wav", "m4a", "ogg"];
+    var MediaModal = class extends import_obsidian7.Modal {
+      constructor(app, file) {
+        super(app);
+        this.file = file;
+      }
+      onOpen() {
+        this.modalEl.addClass("collis-media-modal");
+        this.titleEl.setText(this.file.basename);
+        const src = this.app.vault.getResourcePath(this.file);
+        const ext = this.file.extension.toLowerCase();
+        if (IMAGE_EXT.includes(ext)) {
+          const img = this.contentEl.createEl("img", { cls: "collis-media-image" });
+          img.src = src;
+          return;
+        }
+        if (VIDEO_EXT.includes(ext)) {
+          const video = this.contentEl.createEl("video", { cls: "collis-media-video" });
+          video.src = src;
+          video.controls = true;
+          video.autoplay = true;
+          return;
+        }
+        if (AUDIO_EXT.includes(ext)) {
+          const audio = this.contentEl.createEl("audio", { cls: "collis-media-audio" });
+          audio.src = src;
+          audio.controls = true;
+          audio.autoplay = true;
+          return;
+        }
+        if (ext === "pdf") {
+          const embed = this.contentEl.createEl("embed", { cls: "collis-media-pdf" });
+          embed.setAttribute("src", src);
+          embed.setAttribute("type", "application/pdf");
+          return;
+        }
+        this.contentEl.createEl("p", { text: `\u65E0\u6CD5\u9884\u89C8 .${ext} \u6587\u4EF6` });
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
+    var import_obsidian8 = require("obsidian");
+    var RenameModal = class extends import_obsidian8.Modal {
+      constructor(app, initial, onSubmit) {
+        super(app);
+        this.initial = initial;
+        this.onSubmit = onSubmit;
+      }
+      onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.createEl("h3", { text: "\u91CD\u547D\u540D\u767D\u677F" });
+        const input = contentEl.createEl("input", { type: "text" });
+        input.value = this.initial;
+        input.addClass("collis-rename-input");
+        input.focus();
+        input.select();
+        const submit = () => {
+          const value = input.value.trim();
+          if (!value)
+            return;
+          this.close();
+          this.onSubmit(value);
+        };
+        input.addEventListener("keydown", (evt) => {
+          if (evt.key === "Enter") {
+            evt.preventDefault();
+            submit();
+          }
+          if (evt.key === "Escape") {
+            evt.preventDefault();
+            this.close();
+          }
+        });
+        new import_obsidian8.Setting(contentEl).addButton(
+          (button) => button.setButtonText("\u91CD\u547D\u540D").setCta().onClick(submit)
+        );
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
+    var import_obsidian9 = require("obsidian");
+    var ConfirmModal = class extends import_obsidian9.Modal {
+      constructor(app, heading2, message, confirmText, onConfirm) {
+        super(app);
+        this.heading = heading2;
+        this.message = message;
+        this.confirmText = confirmText;
+        this.onConfirm = onConfirm;
+      }
+      onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.createEl("h3", { text: this.heading });
+        contentEl.createEl("p", { text: this.message, cls: "collis-confirm-text" });
+        new import_obsidian9.Setting(contentEl).addButton((button) => button.setButtonText("\u53D6\u6D88").onClick(() => this.close())).addButton(
+          (button) => button.setButtonText(this.confirmText).setWarning().onClick(() => {
+            this.close();
+            this.onConfirm();
+          })
+        );
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
+    var import_obsidian10 = require("obsidian");
+    var DATE_HEADING = /^##[ \t]+(\d{4}-\d{2}-\d{2})[ \t]*$/;
+    var CARD_BODY_LINE = /^(\d{1,2}:\d{2})[ \t]+/;
+    async function resolveCardFolder(app, fallback) {
+      const adapter = app.vault.adapter;
+      const configPath = ".obsidian/plugins/collis/data.json";
+      try {
+        if (await adapter.exists(configPath)) {
+          const raw = JSON.parse(await adapter.read(configPath));
+          if (typeof raw.folderPath === "string" && raw.folderPath.trim()) {
+            return raw.folderPath.trim().replace(/^\/+|\/+$/g, "");
+          }
+        }
+      } catch (error) {
+      }
+      return (fallback || "00-Inbox/\u901F\u8BB0").replace(/^\/+|\/+$/g, "");
+    }
+    function pad(value) {
+      return String(value).padStart(2, "0");
+    }
+    function uniqueBlockId(lines) {
+      const used = /* @__PURE__ */ new Set();
+      const re = /\^([A-Za-z0-9-]+)/g;
+      const text = lines.join("\n");
+      let match;
+      while ((match = re.exec(text)) !== null)
+        used.add(match[1]);
+      for (let i = 0; i < 60; i++) {
+        const id = Math.random().toString(36).slice(2, 8);
+        if (id.length >= 6 && !used.has(id))
+          return id;
+      }
+      return Date.now().toString(36);
+    }
+    function buildCardLines(content, time, blockId) {
+      const bodyLines = content.replace(/\r\n/g, "\n").replace(/\n+$/, "").split("\n");
+      const out = bodyLines.map(
+        (line, index) => index === 0 ? `- ${time} ${line}`.replace(/[ \t]+$/, "") : `  ${line}`.replace(/[ \t]+$/, "")
+      );
+      const last = out.length - 1;
+      out[last] = `${out[last]} ^${blockId}`;
+      return out;
+    }
+    function insertIntoDateSection(lines, date, cardLines) {
+      const out = lines.slice();
+      let start = -1;
+      let end = -1;
+      for (let i = 0; i < out.length; i++) {
+        const match = out[i].match(DATE_HEADING);
+        if (match && match[1] === date) {
+          start = i;
+          for (let j = i + 1; j < out.length; j++) {
+            if (DATE_HEADING.test(out[j])) {
+              end = j;
+              break;
+            }
+          }
+          if (end === -1)
+            end = out.length;
+          break;
+        }
+      }
+      if (start !== -1) {
+        let insertAt2 = end;
+        while (insertAt2 > start + 1 && out[insertAt2 - 1].trim() === "")
+          insertAt2 -= 1;
+        out.splice(insertAt2, 0, ...cardLines);
+        const after = insertAt2 + cardLines.length;
+        if (after < out.length && out[after].trim() !== "") {
+          out.splice(after, 0, "");
+        }
+        return out;
+      }
+      let insertAt = out.length;
+      for (let i = 0; i < out.length; i++) {
+        const match = out[i].match(DATE_HEADING);
+        if (match && match[1] > date) {
+          insertAt = i;
+          break;
+        }
+      }
+      const block = [];
+      if (insertAt > 0 && out[insertAt - 1].trim() !== "")
+        block.push("");
+      block.push(`## ${date}`, "", ...cardLines);
+      if (insertAt < out.length)
+        block.push("");
+      out.splice(insertAt, 0, ...block);
+      return out;
+    }
+    async function appendCard(app, folder, content) {
+      var _a;
+      const text = content.replace(/\r\n/g, "\n").trim();
+      if (!text)
+        return null;
+      const now = /* @__PURE__ */ new Date();
+      const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      const monthPath = `${folder}/${now.getFullYear()}-${pad(now.getMonth() + 1)}.md`;
+      try {
+        if (folder && !await app.vault.adapter.exists(folder)) {
+          await app.vault.createFolder(folder).catch(() => void 0);
+        }
+        let file = app.vault.getAbstractFileByPath(monthPath);
+        if (!file) {
+          const blockId2 = uniqueBlockId([]);
+          const cardLines2 = buildCardLines(text, time, blockId2);
+          const heading2 = `## ${date}
+
+${cardLines2.join("\n")}
+`;
+          file = await app.vault.create(monthPath, heading2);
+          const meta2 = await readCard(app, { file: monthPath, blockId: blockId2, linkpath: "" });
+          if (meta2.stale)
+            return null;
+          return { file: monthPath, blockId: blockId2 };
+        }
+        const original = await app.vault.read(file);
+        const lines = original.split("\n");
+        const blockId = uniqueBlockId(lines);
+        const cardLines = buildCardLines(text, time, blockId);
+        const next = insertIntoDateSection(lines, date, cardLines).join("\n");
+        await app.vault.modify(file, next);
+        const meta = await readCard(app, { file: monthPath, blockId, linkpath: "" });
+        if (meta.stale)
+          return null;
+        const firstLine = (_a = meta.body.split("\n")[0]) != null ? _a : "";
+        if (!CARD_BODY_LINE.test(firstLine))
+          return null;
+        return { file: monthPath, blockId };
+      } catch (error) {
+        console.error("[Collis] append card failed", error);
+        return null;
+      }
+    }
+    async function createNoteFromText(app, folder, content, title = "\u672A\u547D\u540D") {
+      const dir = folder.replace(/^\/+|\/+$/g, "");
+      const base = title.trim() || "\u672A\u547D\u540D";
+      try {
+        if (dir && !await app.vault.adapter.exists(dir)) {
+          await app.vault.createFolder(dir).catch(() => void 0);
+        }
+        const firstPath = dir ? `${dir}/${base}.md` : `${base}.md`;
+        const existing = app.vault.getAbstractFileByPath(firstPath);
+        if (existing instanceof import_obsidian10.TFile) {
+          const head = (await app.vault.read(existing)).slice(0, 32);
+          if (head.startsWith("\u6765\u6E90\uFF1A")) {
+            await app.vault.modify(existing, content);
+            return existing;
+          }
+        }
+        let index = existing ? 1 : 0;
+        let path = "";
+        do {
+          const name = index === 0 ? `${base}.md` : `${base} ${index}.md`;
+          path = dir ? `${dir}/${name}` : name;
+          index += 1;
+        } while (await app.vault.adapter.exists(path));
+        return await app.vault.create(path, content);
+      } catch (error) {
+        console.error("[Collis] create note failed", error);
+        return null;
+      }
+    }
+    var import_obsidian11 = require("obsidian");
+    var DEFAULT_MAX_TOKENS = 8192;
+    var THINKING_ATE_BUDGET = "\u6A21\u578B\u7684\u601D\u8003\u8FC7\u7A0B\u7528\u5B8C\u4E86\u8FD9\u6B21\u8F93\u51FA\u989D\u5EA6\uFF0C\u6CA1\u7559\u4E0B\u6B63\u6587\u3002\u53EF\u4EE5\u5728\u8BBE\u7F6E\u91CC\u628A\u8FD9\u4E2A\u6A21\u578B\u7684\u300C\u5355\u6B21\u8F93\u51FA\u4E0A\u9650\u300D\u8C03\u5927\uFF0C\u6216\u628A\u300C\u601D\u8003\u6A21\u5F0F\u300D\u8BBE\u4E3A\u5173\u95ED\u540E\u91CD\u8BD5\u3002";
+    function isThinkingBudgetError(error) {
+      return error instanceof Error && error.message.startsWith("\u6A21\u578B\u7684\u601D\u8003\u8FC7\u7A0B\u7528\u5B8C\u4E86");
+    }
+    var NotConfiguredProvider = class {
+      constructor() {
+        this.id = "none";
+        this.configured = false;
+      }
+      async complete() {
+        throw new Error("AI \u5C1A\u672A\u914D\u7F6E\uFF0C\u8BF7\u5148\u5728\u8BBE\u7F6E\u91CC\u586B\u5199\u63A5\u53E3\u5730\u5740\u548C\u6A21\u578B");
+      }
+    };
+    function extractReply(data) {
+      var _a, _b, _c;
+      const choice = (_a = data == null ? void 0 : data.choices) == null ? void 0 : _a[0];
+      if (!choice)
+        return "";
+      const content = (_b = choice.message) == null ? void 0 : _b.content;
+      if (typeof content === "string" && content.trim())
+        return content.trim();
+      if (Array.isArray(content)) {
+        const joined = content.map((part) => {
+          var _a2;
+          return typeof part === "string" ? part : (_a2 = part == null ? void 0 : part.text) != null ? _a2 : "";
+        }).join("").trim();
+        if (joined)
+          return joined;
+      }
+      const reasoning = (_c = choice.message) == null ? void 0 : _c.reasoning_content;
+      if (typeof reasoning === "string" && reasoning.trim())
+        return reasoning.trim();
+      if (typeof choice.text === "string" && choice.text.trim())
+        return choice.text.trim();
+      return "";
+    }
+    function describeHttpError(status, body) {
+      var _a, _b, _c;
+      let detail = "";
+      try {
+        const parsed = JSON.parse(body);
+        detail = (_c = (_b = (_a = parsed == null ? void 0 : parsed.error) == null ? void 0 : _a.message) != null ? _b : parsed == null ? void 0 : parsed.message) != null ? _c : "";
+      } catch (e) {
+        detail = body.slice(0, 160);
+      }
+      if (status === 401 || status === 403)
+        return "API Key \u65E0\u6548\u6216\u6CA1\u6709\u6743\u9650";
+      if (status === 404)
+        return "\u63A5\u53E3\u5730\u5740\u6216\u6A21\u578B\u540D\u4E0D\u6B63\u786E";
+      if (status === 413)
+        return "\u5185\u5BB9\u592A\u957F\uFF0C\u8D85\u51FA\u6A21\u578B\u80FD\u63A5\u53D7\u7684\u8BF7\u6C42\u5927\u5C0F";
+      if (status === 429)
+        return "\u8BF7\u6C42\u8FC7\u4E8E\u9891\u7E41\u6216\u989D\u5EA6\u4E0D\u8DB3";
+      return detail || `\u8BF7\u6C42\u5931\u8D25\uFF08HTTP ${status}\uFF09`;
+    }
+    function isTruncatedStop(reason) {
+      return reason === "length" || reason === "max_tokens" || reason === "max_output_tokens";
+    }
+    function tokenLadder(preferred) {
+      const steps = [];
+      for (const value of [preferred, 32768, 16384, 8192, 4096, 2048]) {
+        const rounded = Math.round(value);
+        if (rounded <= 0)
+          continue;
+        if (steps.length === 0 || rounded < steps[steps.length - 1])
+          steps.push(rounded);
+      }
+      return steps;
+    }
+    function classifyRetry(status, body) {
+      if (status !== 400 && status !== 422)
+        return null;
+      if (/max_?tokens|max_?output|output_tokens|最大输出|输出上限/i.test(body))
+        return "cap";
+      if (/thinking|cache_control|reasoning|enable_thinking|unknown.*(field|parameter)|unsupported|not support|invalid.*(parameter|request body|argument)|参数|格式/i.test(
+        body
+      )) {
+        return "param";
+      }
+      return null;
+    }
+    function advanceAttempt(index, reason, capStart) {
+      if (reason === "cap")
+        return index < capStart ? capStart : index + 1;
+      return index + 1;
+    }
+    function mergeContinuation(base, chunk) {
+      const head = chunk.replace(/^\s+/, "");
+      if (!head)
+        return base;
+      if (!base)
+        return head;
+      const next = stripRepeatedHeading(base, head);
+      const tail = base.slice(-400);
+      const limit = Math.min(tail.length, next.length, 200);
+      for (let size = limit; size >= 2; size -= 1) {
+        if (tail.slice(-size) === next.slice(0, size)) {
+          return base + next.slice(size);
+        }
+      }
+      const glue = /[\u3400-\u9fff，。；：、）]$/.test(base) && /^[A-Za-z0-9]/.test(next) ? " " : "";
+      return base + glue + next;
+    }
+    function stripRepeatedHeading(base, chunk) {
+      const firstBreak = chunk.indexOf("\n");
+      if (firstBreak <= 0)
+        return chunk;
+      const firstLine = chunk.slice(0, firstBreak).trim();
+      if (!/^#{1,6}\s|^\*\*|^---/.test(firstLine))
+        return chunk;
+      const baseLines = base.split("\n");
+      for (let i = baseLines.length - 1; i >= 0 && i >= baseLines.length - 6; i -= 1) {
+        if (baseLines[i].trim() !== firstLine)
+          continue;
+        const rest = chunk.slice(firstBreak + 1).replace(/^\n+/, "").trimEnd();
+        return rest ? `
+
+${rest}` : "";
+      }
+      return chunk;
+    }
+    function balanceTail(text) {
+      const pairs = [
+        ["\u300C", "\u300D"],
+        ["\u201C", "\u201D"],
+        ["\uFF08", "\uFF09"],
+        ["\u3010", "\u3011"],
+        ["(", ")"],
+        ["[", "]"]
+      ];
+      let result = text;
+      for (const [open, close] of pairs) {
+        if (count(result, open) > count(result, close))
+          result += close;
+      }
+      if (count(result, "**") % 2 === 1) {
+        const last = result.lastIndexOf("**");
+        if (last >= 0)
+          result = result.slice(0, last) + result.slice(last + 2);
+      }
+      return result;
+    }
+    function count(text, needle) {
+      return text.split(needle).length - 1;
+    }
+    function buildAttempts(options, fallbackCap) {
+      var _a;
+      const preferred = Math.round((_a = options.maxTokens) != null ? _a : fallbackCap);
+      const useCache = options.cache !== false;
+      const thinking = options.thinking && options.thinking !== "auto" ? options.thinking : void 0;
+      const attempts = [];
+      attempts.push({ maxTokens: preferred, cache: useCache, thinking });
+      if (useCache)
+        attempts.push({ maxTokens: preferred, cache: false, thinking });
+      if (thinking)
+        attempts.push({ maxTokens: preferred, cache: false, thinking: void 0 });
+      const capStart = attempts.length;
+      for (const maxTokens of tokenLadder(preferred)) {
+        if (maxTokens >= preferred)
+          continue;
+        attempts.push({ maxTokens, cache: false, thinking: void 0 });
+      }
+      return { attempts, capStart };
+    }
+    function systemBlocks(options) {
+      if (!options.system)
+        return [];
+      if (typeof options.system === "string")
+        return [{ text: options.system }];
+      return options.system.filter((block) => Boolean(block == null ? void 0 : block.text));
+    }
+    function anthropicSystem(options, cache) {
+      const blocks = systemBlocks(options);
+      if (blocks.length === 0)
+        return [];
+      const cacheable = cache && blocks.some((block) => block.cache);
+      return blocks.map((block) => {
+        const body = { type: "text", text: block.text };
+        if (cacheable && block.cache)
+          body.cache_control = { type: "ephemeral" };
+        return body;
+      });
+    }
+    function openAISystem(options) {
+      return systemBlocks(options).map((block) => block.text).join("\n\n");
+    }
+    var OpenAICompatibleProvider = class {
+      constructor(settings) {
+        this.settings = settings;
+        this.id = "openai";
+        this.configured = true;
+      }
+      async complete(history, options = {}) {
+        var _a, _b, _c;
+        const url = `${sanitizeBaseUrl(this.settings.baseUrl)}/chat/completions`;
+        const fallbackCap = (_b = (_a = this.settings.capability) == null ? void 0 : _a.maxOutput) != null ? _b : DEFAULT_MAX_TOKENS;
+        const plan = buildAttempts(options, fallbackCap);
+        const system = openAISystem(options);
+        const build = (attempt) => {
+          const messages = [];
+          if (system)
+            messages.push({ role: "system", content: system });
+          messages.push(...history);
+          const body = {
+            model: this.settings.model,
+            messages,
+            max_tokens: attempt.maxTokens,
+            temperature: 0.6
+          };
+          if (attempt.thinking === "off")
+            body.enable_thinking = false;
+          if (attempt.thinking === "on")
+            body.enable_thinking = true;
+          return JSON.stringify(body);
+        };
+        let lastStatus = 0;
+        let lastBody = "";
+        let index = 0;
+        let calls = 0;
+        while (index < plan.attempts.length) {
+          const attempt = plan.attempts[index];
+          calls += 1;
+          let response;
+          try {
+            response = await (0, import_obsidian11.requestUrl)({
+              url,
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${this.settings.apiKey}`
+              },
+              body: build(attempt),
+              throw: false
+            });
+          } catch (error) {
+            throw new Error(describeNetworkError(error, url));
+          }
+          if (response.status < 400)
+            return parseOpenAI(response.text, response.json, calls);
+          lastStatus = response.status;
+          lastBody = (_c = response.text) != null ? _c : "";
+          const reason = classifyRetry(response.status, lastBody);
+          if (!reason)
+            break;
+          index = advanceAttempt(index, reason, plan.capStart);
+        }
+        if (lastStatus === 0)
+          throw new Error("\u8BF7\u6C42\u6CA1\u6709\u8FD4\u56DE\u7ED3\u679C");
+        throw new Error(describeHttpError(lastStatus, lastBody));
+      }
+    };
+    function parseOpenAI(text, json, attempts) {
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+      let data = json != null ? json : null;
+      if (!data) {
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          data = null;
+        }
+      }
+      if ((_a = data == null ? void 0 : data.error) == null ? void 0 : _a.message)
+        throw new Error(data.error.message);
+      const reason = (_c = (_b = data == null ? void 0 : data.choices) == null ? void 0 : _b[0]) == null ? void 0 : _c.finish_reason;
+      const reply = extractReply(data);
+      const usage = {
+        inputTokens: (_d = data == null ? void 0 : data.usage) == null ? void 0 : _d.prompt_tokens,
+        outputTokens: (_e = data == null ? void 0 : data.usage) == null ? void 0 : _e.completion_tokens,
+        cachedTokens: (_g = (_f = data == null ? void 0 : data.usage) == null ? void 0 : _f.prompt_tokens_details) == null ? void 0 : _g.cached_tokens,
+        reasoningTokens: (_i = (_h = data == null ? void 0 : data.usage) == null ? void 0 : _h.completion_tokens_details) == null ? void 0 : _i.reasoning_tokens
+      };
+      if (reply) {
+        return { text: reply, truncated: isTruncatedStop(reason), stopReason: reason, usage, attempts };
+      }
+      if (isTruncatedStop(reason))
+        throw new Error(THINKING_ATE_BUDGET);
+      const summary = (text != null ? text : "").replace(/\s+/g, " ").slice(0, 300);
+      throw new Error(
+        `\u6A21\u578B\u6CA1\u6709\u8FD4\u56DE\u5185\u5BB9${reason ? `\uFF08finish_reason: ${reason}\uFF09` : ""}\u3002
+\u54CD\u5E94\uFF1A${summary || "\uFF08\u7A7A\uFF09"}`
+      );
+    }
+    var AnthropicProvider = class {
+      constructor(settings) {
+        this.settings = settings;
+        this.id = "anthropic";
+        this.configured = true;
+      }
+      async complete(history, options = {}) {
+        var _a, _b, _c;
+        const base = sanitizeBaseUrl(this.settings.baseUrl);
+        const url = base.endsWith("/v1") ? `${base}/messages` : `${base}/v1/messages`;
+        const fallbackCap = (_b = (_a = this.settings.capability) == null ? void 0 : _a.maxOutput) != null ? _b : DEFAULT_MAX_TOKENS;
+        const plan = buildAttempts(options, fallbackCap);
+        const build = (attempt) => {
+          const body = {
+            model: this.settings.model,
+            max_tokens: attempt.maxTokens,
+            messages: history
+          };
+          const system = anthropicSystem(options, attempt.cache);
+          if (system.length > 0)
+            body.system = system;
+          if (attempt.thinking === "off") {
+            body.thinking = { type: "disabled" };
+          } else if (attempt.thinking === "on") {
+            body.thinking = {
+              type: "enabled",
+              budget_tokens: Math.max(1024, Math.min(8192, Math.floor(attempt.maxTokens / 2)))
+            };
+          }
+          return JSON.stringify(body);
+        };
+        let lastStatus = 0;
+        let lastBody = "";
+        let index = 0;
+        let calls = 0;
+        while (index < plan.attempts.length) {
+          const attempt = plan.attempts[index];
+          calls += 1;
+          let response;
+          try {
+            response = await (0, import_obsidian11.requestUrl)({
+              url,
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": this.settings.apiKey,
+                "anthropic-version": "2023-06-01"
+              },
+              body: build(attempt),
+              throw: false
+            });
+          } catch (error) {
+            throw new Error(describeNetworkError(error, url));
+          }
+          if (response.status < 400)
+            return parseAnthropic(response.json, calls);
+          lastStatus = response.status;
+          lastBody = (_c = response.text) != null ? _c : "";
+          const reason = classifyRetry(response.status, lastBody);
+          if (!reason)
+            break;
+          index = advanceAttempt(index, reason, plan.capStart);
+        }
+        if (lastStatus === 0)
+          throw new Error("\u8BF7\u6C42\u6CA1\u6709\u8FD4\u56DE\u7ED3\u679C");
+        throw new Error(describeHttpError(lastStatus, lastBody));
+      }
+    };
+    function parseAnthropic(json, attempts) {
+      var _a, _b, _c, _d, _e;
+      const data = json;
+      const parts = (_a = data == null ? void 0 : data.content) != null ? _a : [];
+      const text = parts.filter((part) => part.type === "text").map((part) => {
+        var _a2;
+        return (_a2 = part.text) != null ? _a2 : "";
+      }).join("").trim();
+      const usage = {
+        inputTokens: (_b = data == null ? void 0 : data.usage) == null ? void 0 : _b.input_tokens,
+        outputTokens: (_c = data == null ? void 0 : data.usage) == null ? void 0 : _c.output_tokens,
+        cachedTokens: (_d = data == null ? void 0 : data.usage) == null ? void 0 : _d.cache_read_input_tokens,
+        cacheWriteTokens: (_e = data == null ? void 0 : data.usage) == null ? void 0 : _e.cache_creation_input_tokens
+      };
+      if (!text) {
+        const usedThinking = parts.some((part) => part.type === "thinking");
+        if (usedThinking || isTruncatedStop(data == null ? void 0 : data.stop_reason))
+          throw new Error(THINKING_ATE_BUDGET);
+        throw new Error("\u6A21\u578B\u6CA1\u6709\u8FD4\u56DE\u5185\u5BB9");
+      }
+      return {
+        text,
+        truncated: isTruncatedStop(data == null ? void 0 : data.stop_reason),
+        stopReason: data == null ? void 0 : data.stop_reason,
+        usage,
+        attempts
+      };
+    }
+    function createProvider(profile) {
+      if (!profile || !profile.baseUrl.trim() || !profile.model.trim()) {
+        return new NotConfiguredProvider();
+      }
+      if (profile.protocol === "anthropic")
+        return new AnthropicProvider(profile);
+      return new OpenAICompatibleProvider(profile);
+    }
+    function estimateTokens(text) {
+      var _a;
+      if (!text)
+        return 0;
+      const cjk = ((_a = text.match(/[\u3400-\u9fff\u3000-\u303f\uff00-\uffef]/g)) != null ? _a : []).length;
+      const other = text.length - cjk;
+      return Math.ceil((cjk * 0.58 + other * 0.3) * 1.05);
+    }
+    function floorFor(node2, policy) {
+      var _a;
+      const smallest = (_a = policy.ladder[policy.ladder.length - 1]) != null ? _a : 200;
+      return node2.kind === "note" || node2.kind === "file" ? policy.noteFloorChars : smallest;
+    }
+    function capFor(node2, policy) {
+      return node2.kind === "note" || node2.kind === "file" ? policy.noteCapChars : Number.MAX_SAFE_INTEGER;
+    }
+    function allocate(sizes, floors, caps, charBudget) {
+      const allowed = sizes.map((size, i) => Math.min(size, Math.min(floors[i], caps[i])));
+      const omitted = [];
+      let used = allowed.reduce((sum, value) => sum + value, 0);
+      if (used > charBudget) {
+        let left2 = charBudget;
+        for (let i = 0; i < allowed.length; i += 1) {
+          const take = Math.min(Math.min(sizes[i], caps[i]), left2);
+          allowed[i] = take;
+          left2 -= take;
+          if (take <= 0)
+            omitted.push(i);
+        }
+        return { allowed, omitted };
+      }
+      let left = charBudget - used;
+      for (let round = 0; round < 3 && left > 0; round += 1) {
+        const weights = sizes.map((size, i) => Math.max(0, Math.min(size, caps[i]) - allowed[i]));
+        const totalWeight = weights.reduce((sum, value) => sum + value, 0);
+        if (totalWeight <= 0)
+          break;
+        let distributed = 0;
+        for (let i = 0; i < allowed.length; i += 1) {
+          if (weights[i] <= 0)
+            continue;
+          const share = Math.floor(left * weights[i] / totalWeight);
+          const take = Math.min(share, weights[i]);
+          if (take <= 0)
+            continue;
+          allowed[i] += take;
+          distributed += take;
+        }
+        if (distributed <= 0)
+          break;
+        left -= distributed;
+      }
+      return { allowed, omitted };
+    }
+    function cleanBody(text, limit) {
+      const flat = (text != null ? text : "").replace(/\r\n/g, "\n").trim();
+      if (flat.length <= limit)
+        return { text: flat, truncated: false };
+      const suffix = `\u2026\uFF08\u539F\u6587 ${flat.length} \u5B57\uFF0C\u5DF2\u622A\u65AD\uFF09`;
+      const keep = Math.max(0, limit - suffix.length);
+      return { text: flat.slice(0, keep) + suffix, truncated: true };
+    }
+    function buildBoardContext(input, budgetTokens, policy) {
+      const contentNodes = input.nodes.filter((node2) => node2.kind !== "group");
+      const tagOf = /* @__PURE__ */ new Map();
+      contentNodes.forEach((node2, i) => tagOf.set(node2.id, `N${i + 1}`));
+      const groupLines = [];
+      for (const group of input.groups) {
+        const tags = group.memberIds.map((id) => tagOf.get(id)).filter((tag) => Boolean(tag));
+        if (tags.length > 0) {
+          groupLines.push(`\u3010\u5206\u7EC4\u3011\u300C${group.label}\u300D\u5305\u542B ${tags.join("\u3001")}`);
+        } else if (group.memberIds.length > 0) {
+          groupLines.push(`\u3010\u5206\u7EC4\u3011\u300C${group.label}\u300D\u91CC\u6709 ${group.memberIds.length} \u4E2A\u8282\u70B9\uFF0C\u672C\u6B21\u672A\u53D1\u9001`);
+        }
+      }
+      const edgeLines = input.edges.filter((edge) => tagOf.has(edge.from) && tagOf.has(edge.to)).map((edge) => {
+        const label = edge.label ? `\uFF08${edge.label}\uFF09` : "";
+        const relation = edge.relation ? ` -[${edge.relation}]-> ` : " \u2192 ";
+        return `${tagOf.get(edge.from)}${relation}${tagOf.get(edge.to)}${label}`;
+      });
+      const overheadChars = groupLines.join("\n").length + edgeLines.join("\n").length + 120;
+      const bodies = contentNodes.map((node2) => {
+        var _a;
+        return node2.readable ? (_a = node2.text) != null ? _a : "" : "";
+      });
+      const totalChars = bodies.reduce((sum, body) => sum + body.length, 0);
+      const ratio = totalChars > 200 ? estimateTokens(bodies.join("")) / totalChars : 0.58;
+      const charBudget = Math.max(0, Math.floor((budgetTokens - overheadChars * ratio) / Math.max(0.2, ratio)));
+      const sizes = bodies.map((body) => body.length);
+      const floors = contentNodes.map((node2) => floorFor(node2, policy));
+      const caps = contentNodes.map((node2) => capFor(node2, policy));
+      const compose = (budgetChars2) => {
+        const { allowed, omitted } = allocate(sizes, floors, caps, budgetChars2);
+        const cells = [];
+        const nodes = [];
+        contentNodes.forEach((node2, i) => {
+          var _a, _b, _c, _d, _e;
+          const tag = (_a = tagOf.get(node2.id)) != null ? _a : `N${i + 1}`;
+          const body = bodies[i];
+          if (omitted.includes(i)) {
+            nodes.push({
+              id: node2.id,
+              tag,
+              label: node2.label,
+              kind: node2.kind,
+              charsSent: 0,
+              charsTotal: body.length,
+              truncated: false,
+              readable: node2.readable,
+              note: "\u9884\u7B97\u4E0D\u8DB3\uFF0C\u672A\u53D1\u9001"
+            });
+            return;
+          }
+          const { text: text2, truncated } = node2.readable ? cleanBody(body, allowed[i]) : { text: "", truncated: false };
+          const bits = [kindLabel(node2.kind)];
+          if ((_b = node2.meta) == null ? void 0 : _b.date) {
+            bits.push(node2.meta.date + (node2.meta.time ? ` ${node2.meta.time}` : ""));
+          }
+          if ((_d = (_c = node2.meta) == null ? void 0 : _c.tags) == null ? void 0 : _d.length) {
+            bits.push(node2.meta.tags.map((tagText) => `#${tagText}`).join(" "));
+          }
+          if (node2.color)
+            bits.push(`\u989C\u8272:${node2.color}`);
+          if (node2.path)
+            bits.push(`\u6765\u6E90:${node2.path}`);
+          let content = text2 || "\uFF08\u7A7A\uFF09";
+          if (!node2.readable) {
+            content = `\uFF08${(_e = node2.mediaKind) != null ? _e : "\u6587\u4EF6"}\uFF0C\u672C\u6B21\u53EA\u53D1\u9001\u4E86\u6587\u4EF6\u540D\uFF0C\u6B63\u6587\u672A\u89E3\u6790\uFF09`;
+          } else if (node2.kind === "note" || node2.kind === "file") {
+            if (!body.trim())
+              content = "\uFF08\u7B14\u8BB0\u5185\u5BB9\u4E3A\u7A7A\u6216\u672A\u8BFB\u53D6\u5230\uFF09";
+          }
+          cells.push(`\u3010${tag}\u3011${bits.join(" \xB7 ")}
+${content}`);
+          nodes.push({
+            id: node2.id,
+            tag,
+            label: node2.label,
+            kind: node2.kind,
+            charsSent: text2.length,
+            charsTotal: body.length,
+            truncated,
+            readable: node2.readable,
+            note: truncated ? "\u5DF2\u622A\u65AD" : void 0
+          });
+        });
+        const sentCount = nodes.filter((node2) => node2.charsSent > 0 || !node2.readable).length;
+        const droppedCount = nodes.length - sentCount;
+        const truncatedAny = nodes.some((node2) => node2.truncated);
+        const sections = [];
+        if (groupLines.length > 0)
+          sections.push(groupLines.join("\n"));
+        sections.push(...cells);
+        if (edgeLines.length > 0)
+          sections.push(`\u3010\u5173\u7CFB\u3011
+${edgeLines.join("\n")}`);
+        if (droppedCount > 0) {
+          sections.push(
+            `\u3010\u8BF4\u660E\u3011\u672C\u6B21\u53EA\u53D1\u9001\u4E86 ${sentCount} \u4E2A\u8282\u70B9\uFF0C\u8FD8\u6709 ${droppedCount} \u4E2A\u56E0\u4E3A\u4E0A\u4E0B\u6587\u9884\u7B97\u4E0D\u8DB3\u6CA1\u6709\u53D1\u9001\u3002\u56DE\u7B54\u65F6\u5982\u9700\u5F15\u7528\u672A\u53D1\u9001\u7684\u8282\u70B9\uFF0C\u8BF7\u5148\u8BF4\u660E\u8FD9\u4E00\u70B9\u3002`
+          );
+        }
+        const text = sections.join("\n\n");
+        const notes = [];
+        if (droppedCount > 0)
+          notes.push(`\u9884\u7B97\u4E0D\u8DB3\uFF0C${droppedCount} \u4E2A\u8282\u70B9\u672A\u53D1\u9001`);
+        if (truncatedAny) {
+          const count2 = nodes.filter((node2) => node2.truncated).length;
+          notes.push(`${count2} \u4E2A\u8282\u70B9\u5185\u5BB9\u88AB\u622A\u65AD`);
+        }
+        const unreadable = nodes.filter((node2) => !node2.readable).length;
+        if (unreadable > 0)
+          notes.push(`${unreadable} \u4E2A\u8282\u70B9\u53EA\u53D1\u9001\u4E86\u6587\u4EF6\u540D`);
+        return {
+          text,
+          manifest: {
+            nodes,
+            omitted: nodes.filter((node2) => node2.note === "\u9884\u7B97\u4E0D\u8DB3\uFF0C\u672A\u53D1\u9001").map((node2) => ({ id: node2.id, label: node2.label, charsTotal: node2.charsTotal })),
+            usedTokens: estimateTokens(text),
+            budgetTokens,
+            charBudget: budgetChars2,
+            ratio,
+            stage: droppedCount > 0 ? "partial" : truncatedAny ? "trimmed" : "full",
+            notes
+          }
+        };
+      };
+      let budgetChars = charBudget;
+      let result = compose(budgetChars);
+      for (let i = 0; i < 2 && result.manifest.usedTokens > budgetTokens && budgetChars > 0; i += 1) {
+        budgetChars = Math.max(0, Math.floor(budgetChars * budgetTokens / result.manifest.usedTokens) - 1);
+        result = compose(budgetChars);
+      }
+      return result;
+    }
+    function kindLabel(kind) {
+      if (kind === "card")
+        return "\u5361\u7247";
+      if (kind === "note")
+        return "\u7B14\u8BB0";
+      if (kind === "text")
+        return "\u6587\u672C\u8282\u70B9";
+      return "\u6587\u4EF6";
+    }
+    var import_obsidian12 = require("obsidian");
+    var MEDIA_EXT = /* @__PURE__ */ new Set([
+      "png",
+      "jpg",
+      "jpeg",
+      "gif",
+      "webp",
+      "svg",
+      "bmp",
+      "avif",
+      "mp4",
+      "webm",
+      "mov",
+      "mkv",
+      "mp3",
+      "wav",
+      "ogg",
+      "m4a",
+      "flac",
+      "pdf"
+    ]);
+    var MAX_RESULTS = 40;
+    async function searchInsertItems(app, cardFolderSetting, query, filter) {
+      var _a, _b;
+      const q = query.trim().toLowerCase();
+      if (!q && !filter) {
+        return [
+          { kind: "text", title: "\u65B0\u5EFA\u6587\u672C\u8282\u70B9", sub: "\u5728\u767D\u677F\u4E0A\u76F4\u63A5\u5199" },
+          { kind: "note", title: "\u65B0\u5EFA\u7A7A\u767D\u7B14\u8BB0", sub: "\u751F\u6210\u4E00\u4E2A md \u6587\u4EF6" }
+        ];
+      }
+      const out = [];
+      if (filter === "media") {
+        for (const file of app.vault.getFiles()) {
+          if (!(file instanceof import_obsidian12.TFile))
+            continue;
+          if (!MEDIA_EXT.has(file.extension.toLowerCase()))
+            continue;
+          if (q && !file.path.toLowerCase().includes(q))
+            continue;
+          out.push({
+            kind: "media",
+            // Full vault-relative path, matching Obsidian's own file picker.
+            title: file.path,
+            sub: "",
+            file: file.path
+          });
+          if (out.length >= MAX_RESULTS)
+            break;
+        }
+        return out;
+      }
+      const cardFolder = await resolveCardFolder(app, cardFolderSetting);
+      const markdownFiles = app.vault.getMarkdownFiles();
+      const isCardFile = (path) => !cardFolder || path.startsWith(`${cardFolder}/`);
+      if (filter !== "note") {
+        for (const file of markdownFiles.filter((item) => isCardFile(item.path))) {
+          const refs = await listCardsInFile(app, file.path);
+          for (const ref of refs) {
+            const meta = await readCard(app, ref);
+            if (meta.stale)
+              continue;
+            const text = meta.editable;
+            if (!text.toLowerCase().includes(q))
+              continue;
+            const preview = text.replace(/\s+/g, " ").slice(0, 60);
+            const tags = meta.tags.length > 0 ? ` \xB7 #${meta.tags[0]}` : "";
+            out.push({
+              kind: "card",
+              title: preview,
+              sub: `\u5361\u7247 \xB7 ${(_a = meta.date) != null ? _a : ""} ${(_b = meta.time) != null ? _b : ""}${tags}`,
+              file: ref.file,
+              blockId: ref.blockId
+            });
+            if (out.length >= MAX_RESULTS)
+              return out;
+          }
+        }
+      }
+      if (filter !== "card") {
+        for (const file of markdownFiles) {
+          if (isCardFile(file.path))
+            continue;
+          if (!file.basename.toLowerCase().includes(q))
+            continue;
+          out.push({ kind: "note", title: file.basename, sub: "\u7B14\u8BB0", file: file.path });
+          if (out.length >= MAX_RESULTS)
+            break;
+        }
+      }
+      return out;
+    }
+    var LABEL_T_MIN = 0.04;
+    var LABEL_T_MAX = 0.96;
+    function curvePath(curve) {
+      const { p1, c1, c2, p2 } = curve;
+      return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+    }
+    function curvePoint(curve, t) {
+      const u = 1 - t;
+      const a = u * u * u;
+      const b = 3 * u * u * t;
+      const c = 3 * u * t * t;
+      const d = t * t * t;
+      return {
+        x: a * curve.p1.x + b * curve.c1.x + c * curve.c2.x + d * curve.p2.x,
+        y: a * curve.p1.y + b * curve.c1.y + c * curve.c2.y + d * curve.p2.y
+      };
+    }
+    function nearestCurveT(curve, target) {
+      const steps = 64;
+      let best = 0.5;
+      let bestDist = Infinity;
+      const consider = (t) => {
+        const point = curvePoint(curve, t);
+        const dist = (point.x - target.x) ** 2 + (point.y - target.y) ** 2;
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = t;
+        }
+      };
+      for (let i = 0; i <= steps; i++)
+        consider(i / steps);
+      let span = 1 / steps * 2;
+      for (let round = 0; round < 10; round++) {
+        consider(Math.max(0, best - span));
+        consider(Math.min(1, best + span));
+        span /= 2;
+      }
+      return best;
+    }
+    function clampLabelT(t) {
+      if (!Number.isFinite(t))
+        return 0.5;
+      return Math.min(LABEL_T_MAX, Math.max(LABEL_T_MIN, t));
+    }
+    function doctorNodeName(node2) {
+      var _a, _b;
+      if (node2.type === "group")
+        return ((_a = node2.label) == null ? void 0 : _a.trim()) || "\u672A\u547D\u540D\u5206\u7EC4";
+      if (node2.type === "text") {
+        const first = (_b = node2.text.split("\n").find((line) => line.trim())) != null ? _b : "";
+        return first.trim().slice(0, 20) || "\u7A7A\u767D\u6587\u672C";
+      }
+      return node2.file.split("/").pop() || node2.file;
+    }
+    function pairKey(a, b) {
+      return a < b ? `${a}|${b}` : `${b}|${a}`;
+    }
+    function normalise(text) {
+      return text.toLowerCase().replace(/\s+/g, "").replace(/[，。！？、；：,.!?;:'"“”‘’()（）[\]{}<>《》\-—_]/g, "");
+    }
+    var LEVEL_ORDER = { error: 0, warning: 1, hint: 2 };
+    var KIND_ORDER = [
+      "stale-ref",
+      "dangling-edge",
+      "duplicate-ref",
+      "duplicate-text",
+      "unlabeled-edge",
+      "isolated-node",
+      "overlap",
+      "far-away",
+      "empty-node",
+      "empty-group"
+    ];
+    function scanBoard(input) {
+      var _a, _b;
+      const issues = [];
+      const byId = new Map(input.nodes.map((node2) => [node2.id, node2]));
+      const present = (id) => byId.has(id);
+      const name = (id) => {
+        const node2 = byId.get(id);
+        return node2 ? doctorNodeName(node2) : "\u5DF2\u5220\u9664\u7684\u8282\u70B9";
+      };
+      for (const node2 of input.nodes) {
+        if (node2.type !== "card" || !input.staleIds.has(node2.id))
+          continue;
+        issues.push({
+          key: `stale:${node2.id}`,
+          level: "error",
+          kind: "stale-ref",
+          title: "\u5F15\u7528\u5931\u6548",
+          detail: `${doctorNodeName(node2)} \u7684\u5757\u5F15\u7528\u5728\u6E90\u7B14\u8BB0\u91CC\u627E\u4E0D\u5230\uFF0C\u5361\u7247\u6B63\u6587\u4E3A\u7A7A`,
+          nodeIds: [node2.id],
+          removableNodeId: node2.id
+        });
+      }
+      const danglingNodeIds = /* @__PURE__ */ new Set();
+      for (const edge of input.edges) {
+        if (present(edge.from) && present(edge.to))
+          continue;
+        danglingNodeIds.add(edge.from);
+        danglingNodeIds.add(edge.to);
+        issues.push({
+          key: `dangling:${edge.id}`,
+          level: "error",
+          kind: "dangling-edge",
+          title: "\u8FDE\u7EBF\u7AEF\u70B9\u4E22\u5931",
+          detail: `${name(edge.from)} \u2192 ${name(edge.to)} \u4E2D\u6709\u4E00\u7AEF\u5DF2\u4E0D\u5728\u767D\u677F\u4E0A`,
+          nodeIds: [],
+          edgeId: edge.id
+        });
+      }
+      const byRef = /* @__PURE__ */ new Map();
+      for (const node2 of input.nodes) {
+        if (node2.type !== "card")
+          continue;
+        const ref = `${node2.file}#^${node2.blockId}`;
+        const list = (_a = byRef.get(ref)) != null ? _a : [];
+        list.push(node2);
+        byRef.set(ref, list);
+      }
+      const duplicatePairs = /* @__PURE__ */ new Set();
+      for (const [ref, list] of byRef) {
+        if (list.length < 2)
+          continue;
+        for (let i = 1; i < list.length; i++) {
+          const first = list[0];
+          const duplicate = list[i];
+          duplicatePairs.add(pairKey(first.id, duplicate.id));
+          issues.push({
+            key: `dupref:${duplicate.id}`,
+            level: "warning",
+            kind: "duplicate-ref",
+            title: "\u91CD\u590D\u5361\u7247",
+            detail: `${ref.split("/").pop()} \u5728\u767D\u677F\u4E0A\u51FA\u73B0\u4E86 ${list.length} \u6B21`,
+            nodeIds: [first.id, duplicate.id],
+            removableNodeId: duplicate.id
+          });
+        }
+      }
+      const texts = input.nodes.filter((node2) => node2.type !== "group" && !input.staleIds.has(node2.id)).slice(0, 300).map((node2) => ({ node: node2, text: normalise(input.textOf(node2)) })).filter((item) => item.text.length >= 24);
+      for (let i = 0; i < texts.length; i++) {
+        for (let j = i + 1; j < texts.length; j++) {
+          const a = texts[i];
+          const b = texts[j];
+          if (duplicatePairs.has(pairKey(a.node.id, b.node.id)))
+            continue;
+          const longer = a.text.length >= b.text.length ? a.text : b.text;
+          const shorter = a.text.length >= b.text.length ? b.text : a.text;
+          const similar = a.text === b.text || shorter.length >= longer.length * 0.8 && longer.includes(shorter);
+          if (!similar)
+            continue;
+          issues.push({
+            key: `duptext:${a.node.id}:${b.node.id}`,
+            level: "warning",
+            kind: "duplicate-text",
+            title: "\u6B63\u6587\u9AD8\u5EA6\u76F8\u4F3C",
+            detail: `\u300C${doctorNodeName(a.node)}\u300D\u4E0E\u300C${doctorNodeName(b.node)}\u300D\u7684\u6B63\u6587\u51E0\u4E4E\u4E00\u6837\uFF0C\u8BF7\u4EBA\u5DE5\u786E\u8BA4`,
+            nodeIds: [a.node.id, b.node.id]
+          });
+        }
+      }
+      for (const edge of input.edges) {
+        if (!present(edge.from) || !present(edge.to))
+          continue;
+        if (((_b = edge.label) == null ? void 0 : _b.trim()) || edge.relation)
+          continue;
+        issues.push({
+          key: `unlabeled:${edge.id}`,
+          level: "warning",
+          kind: "unlabeled-edge",
+          title: "\u8FDE\u7EBF\u6CA1\u6709\u8BED\u4E49",
+          detail: `${name(edge.from)} \u2192 ${name(edge.to)} \u53EA\u6709\u65B9\u5411\uFF0C\u5EFA\u8BAE\u52A0\u6807\u7B7E\u6216\u5173\u7CFB`,
+          nodeIds: [],
+          edgeId: edge.id
+        });
+      }
+      const connected = /* @__PURE__ */ new Set();
+      for (const edge of input.edges) {
+        if (!present(edge.from) || !present(edge.to))
+          continue;
+        connected.add(edge.from);
+        connected.add(edge.to);
+      }
+      for (const node2 of input.nodes) {
+        if (node2.type === "group")
+          continue;
+        if (connected.has(node2.id) || danglingNodeIds.has(node2.id))
+          continue;
+        issues.push({
+          key: `isolated:${node2.id}`,
+          level: "hint",
+          kind: "isolated-node",
+          title: "\u5B64\u7ACB\u8282\u70B9",
+          detail: `\u300C${doctorNodeName(node2)}\u300D\u6CA1\u6709\u4EFB\u4F55\u8FDE\u7EBF\uFF0C\u786E\u8BA4\u662F\u4E0D\u662F\u6F0F\u753B\u4E86\u5173\u7CFB`,
+          nodeIds: [node2.id]
+        });
+      }
+      const boxes = input.nodes.filter((node2) => node2.type !== "group").slice(0, 400).map((node2) => ({
+        node: node2,
+        x: node2.x,
+        y: node2.y,
+        w: node2.width,
+        h: Math.max(1, input.heightOf(node2))
+      }));
+      for (let i = 0; i < boxes.length; i++) {
+        for (let j = i + 1; j < boxes.length; j++) {
+          const a = boxes[i];
+          const b = boxes[j];
+          const ix = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+          const iy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+          if (ix <= 0 || iy <= 0)
+            continue;
+          if (ix * iy < Math.min(a.w * a.h, b.w * b.h) * 0.4)
+            continue;
+          issues.push({
+            key: `overlap:${a.node.id}:${b.node.id}`,
+            level: "hint",
+            kind: "overlap",
+            title: "\u8282\u70B9\u91CD\u53E0",
+            detail: `\u300C${doctorNodeName(a.node)}\u300D\u4E0E\u300C${doctorNodeName(b.node)}\u300D\u5927\u9762\u79EF\u91CD\u53E0`,
+            nodeIds: [a.node.id, b.node.id]
+          });
+        }
+      }
+      if (input.nodes.length >= 4) {
+        const others = input.nodes.filter((node2) => node2.type !== "group");
+        for (const node2 of others) {
+          if (others.length < 4)
+            break;
+          const rest = others.filter((other) => other.id !== node2.id);
+          if (rest.length === 0)
+            continue;
+          const minX = Math.min(...rest.map((item) => item.x));
+          const maxX = Math.max(...rest.map((item) => item.x + item.width));
+          const minY = Math.min(...rest.map((item) => item.y));
+          const maxY = Math.max(
+            ...rest.map((item) => item.y + Math.max(1, input.heightOf(item)))
+          );
+          const gapX = Math.max(0, minX - (node2.x + node2.width), node2.x - maxX);
+          const gapY = Math.max(
+            0,
+            minY - (node2.y + input.heightOf(node2)),
+            node2.y - maxY
+          );
+          if (Math.hypot(gapX, gapY) < 1200)
+            continue;
+          issues.push({
+            key: `far:${node2.id}`,
+            level: "hint",
+            kind: "far-away",
+            title: "\u8FDC\u79BB\u5185\u5BB9\u533A",
+            detail: `\u300C${doctorNodeName(node2)}\u300D\u79BB\u5176\u4ED6\u8282\u70B9\u5F88\u8FDC\uFF0C\u4ECD\u5728 AI \u4E0A\u4E0B\u6587\u91CC\u5360\u989D\u5EA6`,
+            nodeIds: [node2.id]
+          });
+        }
+      }
+      for (const node2 of input.nodes) {
+        if (node2.type === "text" && !node2.text.trim()) {
+          issues.push({
+            key: `empty:${node2.id}`,
+            level: "hint",
+            kind: "empty-node",
+            title: "\u7A7A\u767D\u6587\u672C\u8282\u70B9",
+            detail: "\u8FD9\u4E2A\u6587\u672C\u8282\u70B9\u6CA1\u6709\u5185\u5BB9\uFF0CAI \u4F1A\u8BFB\u5230\u5360\u4F4D\u7B26",
+            nodeIds: [node2.id]
+          });
+        }
+        if (node2.type === "group" && input.memberIdsOf(node2).length === 0) {
+          issues.push({
+            key: `emptygroup:${node2.id}`,
+            level: "hint",
+            kind: "empty-group",
+            title: "\u7A7A\u5206\u7EC4",
+            detail: `\u5206\u7EC4\u300C${doctorNodeName(node2)}\u300D\u91CC\u6CA1\u6709\u8282\u70B9`,
+            nodeIds: [node2.id]
+          });
+        }
+      }
+      return issues.sort((a, b) => {
+        const byLevel = LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level];
+        if (byLevel !== 0)
+          return byLevel;
+        const byKind = KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind);
+        return byKind !== 0 ? byKind : a.key.localeCompare(b.key);
+      });
+    }
+    var import_obsidian13 = require("obsidian");
+    var GROUPS = [
+      { level: "error", label: "\u9519\u8BEF", note: "\u5F15\u7528\u6216\u7ED3\u6784\u5DF2\u7ECF\u4E0D\u5BF9" },
+      { level: "warning", label: "\u63D0\u9192", note: "\u6570\u636E\u6CA1\u574F\uFF0C\u4F46\u4F1A\u5F71\u54CD AI \u7406\u89E3" },
+      { level: "hint", label: "\u5EFA\u8BAE", note: "\u6309\u9700\u5904\u7406\uFF0C\u901A\u5E38\u53EF\u4EE5\u5FFD\u7565" }
+    ];
+    var BoardDoctorModal = class extends import_obsidian13.Modal {
+      constructor(app, issues, actions) {
+        super(app);
+        this.issues = issues;
+        this.actions = actions;
+        this.dragStart = null;
+        this.dragOffset = { ...actions.offset() };
+      }
+      onOpen() {
+        this.modalEl.addClass("collis-doctor-modal");
+        this.contentEl.addClass("collis-doctor-content");
+        this.titleEl.setText("\u767D\u677F\u4F53\u68C0");
+        this.installDrag();
+        this.applyOffset();
+        this.render();
+      }
+      applyOffset() {
+        this.modalEl.style.transform = `translate(${this.dragOffset.x}px, ${this.dragOffset.y}px)`;
+      }
+      installDrag() {
+        const title = this.titleEl;
+        title.addClass("collis-doctor-drag");
+        title.setAttribute("title", "\u6309\u4F4F\u8FD9\u91CC\u53EF\u4EE5\u62D6\u52A8\u7A97\u53E3\uFF0C\u8BA9\u51FA\u767D\u677F");
+        title.addEventListener("pointerdown", (evt) => {
+          if (evt.button !== 0)
+            return;
+          evt.preventDefault();
+          this.dragStart = {
+            x: evt.clientX,
+            y: evt.clientY,
+            ox: this.dragOffset.x,
+            oy: this.dragOffset.y
+          };
+          title.setPointerCapture(evt.pointerId);
+        });
+        title.addEventListener("pointermove", (evt) => {
+          if (!this.dragStart)
+            return;
+          this.dragOffset = {
+            x: this.dragStart.ox + evt.clientX - this.dragStart.x,
+            y: this.dragStart.oy + evt.clientY - this.dragStart.y
+          };
+          this.applyOffset();
+        });
+        const finish = (evt) => {
+          if (!this.dragStart)
+            return;
+          this.dragStart = null;
+          if (title.hasPointerCapture(evt.pointerId)) {
+            title.releasePointerCapture(evt.pointerId);
+          }
+          this.actions.moved({ ...this.dragOffset });
+        };
+        title.addEventListener("pointerup", finish);
+        title.addEventListener("pointercancel", finish);
+      }
+      render() {
+        const host = this.contentEl;
+        host.empty();
+        host.createEl("p", {
+          cls: "collis-doctor-summary",
+          text: this.issues.length === 0 ? "\u672C\u6B21\u6CA1\u6709\u53D1\u73B0\u95EE\u9898\u3002\u62D6\u52A8\u6807\u9898\u680F\u53EF\u4EE5\u8BA9\u51FA\u767D\u677F\u3002" : `\u53D1\u73B0 ${this.issues.length} \u9879\u3002\u53EA\u662F\u62A5\u544A\uFF0C\u4E0D\u4F1A\u81EA\u52A8\u4FEE\u6539\u767D\u677F\uFF1B\u62D6\u52A8\u6807\u9898\u680F\u53EF\u4EE5\u8BA9\u51FA\u767D\u677F\u3002`
+        });
+        const scroll = host.createDiv({ cls: "collis-doctor-scroll" });
+        if (this.issues.length === 0) {
+          scroll.createDiv({ cls: "collis-doctor-empty", text: "\u6CA1\u6709\u95EE\u9898\uFF0C\u53EF\u4EE5\u76F4\u63A5\u5173\u95ED\u3002" });
+        }
+        for (const group of GROUPS) {
+          const rows = this.issues.filter((issue) => issue.level === group.level);
+          if (rows.length === 0)
+            continue;
+          const section = scroll.createDiv({ cls: "collis-doctor-group" });
+          const head = section.createDiv({ cls: "collis-doctor-group-head" });
+          head.createSpan({ text: group.label });
+          head.createSpan({ cls: "collis-doctor-group-note", text: group.note });
+          head.createSpan({ cls: "collis-doctor-count", text: `${rows.length}` });
+          for (const issue of rows) {
+            const row = section.createDiv({ cls: "collis-doctor-row" });
+            row.createDiv({ cls: `collis-doctor-dot is-${issue.level}` });
+            const body = row.createDiv({ cls: "collis-doctor-body" });
+            body.createDiv({ cls: "collis-doctor-title", text: issue.title });
+            body.createDiv({ cls: "collis-doctor-detail", text: issue.detail });
+            const actions = row.createDiv({ cls: "collis-doctor-actions" });
+            if (issue.nodeIds.length > 0 || issue.edgeId) {
+              const locate = actions.createEl("button", {
+                cls: "collis-doctor-btn",
+                text: "\u5B9A\u4F4D"
+              });
+              locate.addEventListener("click", () => this.actions.locate(issue));
+            }
+            if (issue.removableNodeId) {
+              const nodeId = issue.removableNodeId;
+              const remove = actions.createEl("button", {
+                cls: "collis-doctor-btn is-danger",
+                text: "\u79FB\u9664\u8282\u70B9"
+              });
+              remove.addEventListener("click", () => this.actions.removeNode(nodeId));
+            }
+            if (issue.kind === "dangling-edge" && issue.edgeId) {
+              const edgeId = issue.edgeId;
+              const remove = actions.createEl("button", {
+                cls: "collis-doctor-btn is-danger",
+                text: "\u5220\u9664\u8FDE\u7EBF"
+              });
+              remove.addEventListener("click", () => this.actions.removeEdge(edgeId));
+            }
+            if (issue.kind === "unlabeled-edge" && issue.edgeId) {
+              const edgeId = issue.edgeId;
+              const label = actions.createEl("button", {
+                cls: "collis-doctor-btn",
+                text: "\u6DFB\u52A0\u6807\u7B7E"
+              });
+              label.addEventListener("click", () => this.actions.addLabel(edgeId));
+            }
+          }
+        }
+        const footer = host.createDiv({ cls: "collis-doctor-footer" });
+        footer.createSpan({
+          cls: "collis-doctor-foot",
+          text: "\u6240\u6709\u4FEE\u590D\u90FD\u9700\u8981\u9010\u6761\u786E\u8BA4\uFF0C\u53EF Ctrl+Z \u64A4\u9500\u3002"
+        });
+        const rescan = footer.createEl("button", { cls: "collis-doctor-btn", text: "\u91CD\u65B0\u626B\u63CF" });
+        rescan.addEventListener("click", () => this.actions.rescan());
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
+    var import_obsidian14 = require("obsidian");
+    var BOARD_SHORTCUTS = [
+      {
+        title: "\u89C6\u56FE",
+        items: [
+          { label: "\u79FB\u52A8\u767D\u677F", keys: ["\u7A7A\u683C + \u62D6\u62FD", "\u4E2D\u952E\u62D6\u62FD"] },
+          { label: "\u6C34\u5E73\u79FB\u52A8\u767D\u677F", keys: ["Shift + \u6EDA\u8F6E"] },
+          { label: "\u7F29\u653E", keys: ["\u6EDA\u8F6E"] }
+        ]
+      },
+      {
+        title: "\u9009\u62E9",
+        items: [
+          { label: "\u52A0\u9009 / \u53D6\u6D88\u9009\u4E2D", keys: ["Shift + \u70B9\u51FB", "Ctrl / Cmd + \u70B9\u51FB"] },
+          { label: "\u6846\u9009\u5E76\u52A0\u9009", keys: ["Shift + \u62D6\u62FD", "Ctrl / Cmd + \u62D6\u62FD"] }
+        ]
+      },
+      {
+        title: "\u7F16\u8F91",
+        items: [
+          { label: "\u5220\u9664\u8282\u70B9\u6216\u8FDE\u7EBF", keys: ["Delete", "Backspace"] },
+          { label: "\u64A4\u9500", keys: ["Ctrl / Cmd + Z"] },
+          { label: "\u91CD\u505A", keys: ["Ctrl / Cmd + Y", "Ctrl / Cmd + Shift + Z"] },
+          { label: "\u590D\u5236\u9009\u4E2D\u8282\u70B9", keys: ["Ctrl / Cmd + C"] },
+          { label: "\u7C98\u8D34", keys: ["Ctrl / Cmd + V"] },
+          { label: "\u6682\u65F6\u5173\u95ED\u5438\u9644\u5BF9\u9F50", keys: ["\u6309\u4F4F Alt"] }
+        ]
+      },
+      {
+        title: "\u53CC\u51FB\u64CD\u4F5C",
+        items: [
+          { label: "\u7A7A\u767D\u5904\u65B0\u5EFA\u6587\u672C", keys: ["\u53CC\u51FB\u7A7A\u767D"] },
+          { label: "\u7F16\u8F91\u5361\u7247\u6216\u6253\u5F00\u6587\u4EF6", keys: ["\u53CC\u51FB\u8282\u70B9"] },
+          { label: "\u6DFB\u52A0\u8FDE\u7EBF\u6807\u7B7E", keys: ["\u53CC\u51FB\u8FDE\u7EBF"] },
+          { label: "\u4FEE\u6539\u8FDE\u7EBF\u6807\u7B7E", keys: ["\u53CC\u51FB\u6807\u7B7E"] }
+        ]
+      }
+    ];
+    var ShortcutHelpModal = class extends import_obsidian14.Modal {
+      constructor(app) {
+        super(app);
+      }
+      onOpen() {
+        this.modalEl.addClass("collis-help-modal");
+        this.titleEl.setText("\u767D\u677F\u5FEB\u6377\u952E");
+        const host = this.contentEl;
+        host.empty();
+        host.addClass("collis-help-content");
+        host.createEl("p", {
+          cls: "collis-help-scope",
+          text: "\u4EC5\u9002\u7528\u4E8E Collis \u767D\u677F\u5185\u7684\u64CD\u4F5C\u3002"
+        });
+        const scroll = host.createDiv({ cls: "collis-help-scroll" });
+        for (const group of BOARD_SHORTCUTS) {
+          const section = scroll.createDiv({ cls: "collis-help-group" });
+          section.createDiv({ cls: "collis-help-group-title", text: group.title });
+          for (const item of group.items) {
+            const row = section.createDiv({ cls: "collis-help-row" });
+            row.createSpan({ cls: "collis-help-label", text: item.label });
+            const keys = row.createDiv({ cls: "collis-help-keys" });
+            for (const key of item.keys) {
+              keys.createSpan({ cls: "collis-help-key", text: key });
+            }
+          }
+        }
+        host.createDiv({
+          cls: "collis-help-foot",
+          text: "\u547D\u4EE4\u7C7B\u64CD\u4F5C\uFF08\u5982\u767D\u677F\u4F53\u68C0\u3001AI \u9762\u677F\uFF09\u7684\u5FEB\u6377\u952E\uFF0C\u53EF\u5728 \u8BBE\u7F6E \u2192 \u5FEB\u6377\u952E \u2192 Collis \u4E2D\u4FEE\u6539\u3002"
+        });
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
+    var DEFAULT_CARD_WIDTH = 280;
+    var DEFAULT_FILE_WIDTH = 360;
+    var EDGE_RELATIONS = [
+      { id: "supports", label: "\u652F\u6301", color: "green", style: "solid", arrow: "target" },
+      { id: "refutes", label: "\u53CD\u9A73", color: "red", style: "dashed", arrow: "target" },
+      { id: "causes", label: "\u56E0\u679C", color: "orange", style: "solid", arrow: "target" },
+      { id: "derives", label: "\u63A8\u5BFC", color: "blue", style: "solid", arrow: "target" },
+      { id: "source", label: "\u6765\u6E90", color: "purple", style: "dashed", arrow: "target" },
+      { id: "sequence", label: "\u987A\u5E8F", color: "teal", style: "solid", arrow: "target" }
+    ];
+    var EDGE_RELATION_BY_ID = new Map(
+      EDGE_RELATIONS.map((meta) => [meta.id, meta])
+    );
+    function emptyBadges() {
+      return { supports: 0, refutes: 0, source: 0 };
+    }
+    function byPosition(a, b, nodeById) {
+      const na = nodeById.get(a);
+      const nb = nodeById.get(b);
+      if (!na || !nb)
+        return a.localeCompare(b);
+      return na.y - nb.y || na.x - nb.x || a.localeCompare(b);
+    }
+    function orderSiblings(ids, seqOut, nodeById) {
+      var _a, _b, _c, _d;
+      if (ids.length <= 1)
+        return ids.slice();
+      const present = new Set(ids);
+      const indegree = /* @__PURE__ */ new Map();
+      const outgoing = /* @__PURE__ */ new Map();
+      for (const id of ids)
+        indegree.set(id, 0);
+      for (const id of ids) {
+        const targets = seqOut.get(id);
+        if (!targets)
+          continue;
+        for (const to of targets) {
+          if (!present.has(to) || to === id)
+            continue;
+          const bucket = (_a = outgoing.get(id)) != null ? _a : /* @__PURE__ */ new Set();
+          if (bucket.has(to))
+            continue;
+          bucket.add(to);
+          outgoing.set(id, bucket);
+          indegree.set(to, ((_b = indegree.get(to)) != null ? _b : 0) + 1);
+        }
+      }
+      const ready = ids.filter((id) => {
+        var _a2;
+        return ((_a2 = indegree.get(id)) != null ? _a2 : 0) === 0;
+      }).sort((a, b) => byPosition(a, b, nodeById));
+      const ordered = [];
+      while (ready.length > 0) {
+        const id = ready.shift();
+        ordered.push(id);
+        for (const to of (_c = outgoing.get(id)) != null ? _c : []) {
+          const next = ((_d = indegree.get(to)) != null ? _d : 0) - 1;
+          indegree.set(to, next);
+          if (next === 0) {
+            ready.push(to);
+            ready.sort((a, b) => byPosition(a, b, nodeById));
+          }
+        }
+      }
+      if (ordered.length < ids.length) {
+        const seen = new Set(ordered);
+        const rest = ids.filter((id) => !seen.has(id));
+        rest.sort((a, b) => byPosition(a, b, nodeById));
+        ordered.push(...rest);
+      }
+      return ordered;
+    }
+    function buildOutline(nodes, edges, infoOf) {
+      var _a, _b, _c, _d, _e;
+      const nodeById = new Map(nodes.map((node2) => [node2.id, node2]));
+      const active = /* @__PURE__ */ new Set();
+      let cycle = false;
+      for (const edge of edges) {
+        if (!edge.relation)
+          continue;
+        if (edge.from === edge.to)
+          continue;
+        if (!nodeById.has(edge.from) || !nodeById.has(edge.to))
+          continue;
+        active.add(edge.from);
+        active.add(edge.to);
+      }
+      const included = nodes.filter(
+        (node2) => node2.kind !== "group" || active.has(node2.id)
+      );
+      const includedIds = new Set(included.map((node2) => node2.id));
+      const candidates = /* @__PURE__ */ new Map();
+      const badges = /* @__PURE__ */ new Map();
+      const seqOut = /* @__PURE__ */ new Map();
+      let hasSequence = false;
+      for (const edge of edges) {
+        if (!edge.relation)
+          continue;
+        if (!includedIds.has(edge.from) || !includedIds.has(edge.to))
+          continue;
+        if (edge.from === edge.to) {
+          cycle = true;
+          continue;
+        }
+        if (edge.relation === "derives" || edge.relation === "causes") {
+          const parent = nodeById.get(edge.from);
+          if (!parent)
+            continue;
+          const list = (_a = candidates.get(edge.to)) != null ? _a : [];
+          list.push({
+            parent: edge.from,
+            relation: edge.relation,
+            y: parent.y,
+            x: parent.x
+          });
+          candidates.set(edge.to, list);
+          continue;
+        }
+        if (edge.relation === "sequence") {
+          hasSequence = true;
+          const bucket = (_b = seqOut.get(edge.from)) != null ? _b : /* @__PURE__ */ new Set();
+          bucket.add(edge.to);
+          seqOut.set(edge.from, bucket);
+          continue;
+        }
+        const counts = (_c = badges.get(edge.to)) != null ? _c : emptyBadges();
+        counts[edge.relation] += 1;
+        badges.set(edge.to, counts);
+      }
+      for (const list of candidates.values()) {
+        list.sort((a, b) => {
+          const rank = (relation) => relation === "derives" ? 0 : 1;
+          return rank(a.relation) - rank(b.relation) || a.y - b.y || a.x - b.x || a.parent.localeCompare(b.parent);
+        });
+      }
+      const parentOf = /* @__PURE__ */ new Map();
+      let hasHierarchy = false;
+      for (const node2 of included) {
+        const list = candidates.get(node2.id);
+        if (!list)
+          continue;
+        for (const candidate of list) {
+          if (candidate.parent === node2.id) {
+            cycle = true;
+            continue;
+          }
+          let current = candidate.parent;
+          let loops = false;
+          let guard = 0;
+          while (current && guard < 1e4) {
+            guard += 1;
+            if (current === node2.id) {
+              loops = true;
+              break;
+            }
+            current = (_d = parentOf.get(current)) == null ? void 0 : _d.parent;
+          }
+          if (loops) {
+            cycle = true;
+            continue;
+          }
+          parentOf.set(node2.id, {
+            parent: candidate.parent,
+            relation: candidate.relation
+          });
+          hasHierarchy = true;
+          break;
+        }
+      }
+      const childrenOf = /* @__PURE__ */ new Map();
+      for (const node2 of included) {
+        const parent = parentOf.get(node2.id);
+        if (!parent)
+          continue;
+        const list = (_e = childrenOf.get(parent.parent)) != null ? _e : [];
+        list.push(node2.id);
+        childrenOf.set(parent.parent, list);
+      }
+      const buildItem = (id) => {
+        var _a2, _b2, _c2, _d2;
+        const node2 = nodeById.get(id);
+        const info = node2 ? infoOf(node2) : { title: "\u672A\u547D\u540D" };
+        const kids = orderSiblings((_a2 = childrenOf.get(id)) != null ? _a2 : [], seqOut, nodeById);
+        return {
+          id,
+          kind: (_b2 = node2 == null ? void 0 : node2.kind) != null ? _b2 : "text",
+          title: info.title || "\u672A\u547D\u540D",
+          snippet: info.snippet,
+          relation: (_c2 = parentOf.get(id)) == null ? void 0 : _c2.relation,
+          badges: (_d2 = badges.get(id)) != null ? _d2 : emptyBadges(),
+          children: kids.map(buildItem)
+        };
+      };
+      const roots = included.filter((node2) => !parentOf.has(node2.id)).map((node2) => node2.id);
+      return {
+        roots: orderSiblings(roots, seqOut, nodeById).map(buildItem),
+        nodeCount: included.length,
+        hasHierarchy,
+        hasSequence,
+        cycle
+      };
+    }
+    function emptyAnnotations() {
+      return { supports: [], refutes: [], sources: [] };
+    }
+    function collectAnnotations(input) {
+      var _a, _b;
+      const map = /* @__PURE__ */ new Map();
+      for (const edge of input.edges) {
+        const relation = edge.relation;
+        if (relation !== "supports" && relation !== "refutes" && relation !== "source")
+          continue;
+        if (edge.from === edge.to)
+          continue;
+        const label = (_a = edge.label) == null ? void 0 : _a.trim();
+        const title = input.titleOf(edge.from);
+        const text = label ? `${title}\uFF08${label}\uFF09` : title;
+        const bucket = (_b = map.get(edge.to)) != null ? _b : emptyAnnotations();
+        const list = relation === "supports" ? bucket.supports : relation === "refutes" ? bucket.refutes : bucket.sources;
+        if (!list.includes(text))
+          list.push(text);
+        map.set(edge.to, bucket);
+      }
+      return map;
+    }
+    function annotationLines(annotations, indent) {
+      if (!annotations)
+        return [];
+      const lines = [];
+      if (annotations.supports.length > 0) {
+        lines.push(`${indent}> \u652F\u6301\uFF1A${annotations.supports.join("\u3001")}`);
+      }
+      if (annotations.refutes.length > 0) {
+        lines.push(`${indent}> \u53CD\u9A73\uFF1A${annotations.refutes.join("\u3001")}`);
+      }
+      if (annotations.sources.length > 0) {
+        lines.push(`${indent}> \u6765\u6E90\uFF1A${annotations.sources.join("\u3001")}`);
+      }
+      return lines;
+    }
+    function heading(level, title) {
+      return `${"#".repeat(Math.min(level, 6))} ${title}`;
+    }
+    function indentBody(body, indent) {
+      return body.split(/\r?\n/).map((line) => line.trim() ? `${indent}${line}` : "");
+    }
+    function buildExportMarkdown(input, format) {
+      var _a;
+      const annotations = collectAnnotations(input);
+      const out = [`# ${input.boardTitle}`, ""];
+      const walk = (item, depth) => {
+        const info = input.infoOf(item.id);
+        const notes = annotations.get(item.id);
+        const body = info.body.trim();
+        if (format === "headings") {
+          out.push("", heading(depth + 2, info.title));
+          if (body)
+            out.push("", body);
+          const lines = annotationLines(notes, "");
+          if (lines.length > 0)
+            out.push("", ...lines);
+        } else {
+          const indent = "  ".repeat(depth);
+          out.push(`${indent}- **${info.title}**`);
+          if (body)
+            out.push("", ...indentBody(body, `${indent}  `), "");
+          const lines = annotationLines(notes, `${indent}  `);
+          if (lines.length > 0)
+            out.push(...lines);
+        }
+        for (const child of item.children)
+          walk(child, depth + 1);
+      };
+      if (input.outline.roots.length > 0) {
+        for (const root of input.outline.roots)
+          walk(root, 0);
+      } else {
+        out.push("", "_\u767D\u677F\u4E0A\u8FD8\u6CA1\u6709\u8282\u70B9\u3002_");
+      }
+      const loose = input.edges.filter((edge) => !edge.relation && edge.from !== edge.to);
+      if (loose.length > 0) {
+        out.push("", "## \u5173\u8054", "");
+        for (const edge of loose) {
+          const label = (_a = edge.label) == null ? void 0 : _a.trim();
+          const from = input.titleOf(edge.from);
+          const to = input.titleOf(edge.to);
+          out.push(`- ${from} \u2192 ${to}${label ? `\uFF1A${label}` : ""}`);
+        }
+      }
+      return `${out.join("\n").replace(/\n{3,}/g, "\n\n").trim()}
+`;
+    }
+    var import_obsidian15 = require("obsidian");
+    var MarkdownExportModal = class extends import_obsidian15.Modal {
+      constructor(app, options) {
+        super(app);
+        this.options = options;
+        this.format = "headings";
+        this.previewEl = null;
+        this.tabs = [];
+        this.markdown = "";
+        this.dragOffset = { x: 0, y: 0 };
+        this.dragStart = null;
+      }
+      onOpen() {
+        this.modalEl.addClass("collis-export-modal");
+        this.contentEl.addClass("collis-export-content");
+        this.titleEl.setText("\u5BFC\u51FA Markdown");
+        this.installDrag();
+        this.contentEl.createDiv({
+          cls: "collis-export-sub",
+          text: `\u767D\u677F\u300C${this.options.boardTitle}\u300D\xB7 ${this.options.nodeCount} \u4E2A\u8282\u70B9\u3002\u63A8\u5BFC\u4E0E\u56E0\u679C\u751F\u6210\u5C42\u7EA7\uFF0C\u652F\u6301\u3001\u53CD\u9A73\u3001\u6765\u6E90\u4FDD\u7559\u4E3A\u6CE8\u89E3\u3002`
+        });
+        const tabs = this.contentEl.createDiv({ cls: "collis-export-tabs" });
+        const makeTab = (format, label) => {
+          const button = tabs.createEl("button", { cls: "collis-export-tab", text: label });
+          button.dataset.format = format;
+          button.addEventListener("click", () => {
+            this.format = format;
+            this.refresh();
+          });
+          this.tabs.push(button);
+        };
+        makeTab("headings", "\u6807\u9898\u5C42\u7EA7");
+        makeTab("list", "\u5D4C\u5957\u5217\u8868");
+        this.previewEl = this.contentEl.createEl("textarea", { cls: "collis-export-preview" });
+        this.previewEl.readOnly = true;
+        this.previewEl.spellcheck = false;
+        const footer = this.contentEl.createDiv({ cls: "collis-export-footer" });
+        footer.createDiv({
+          cls: "collis-export-foot",
+          text: "\u4FDD\u5B58\u4F1A\u5728\u767D\u677F\u6240\u5728\u76EE\u5F55\u751F\u6210\u540C\u540D\u7B14\u8BB0\uFF0C\u91CD\u540D\u81EA\u52A8\u52A0\u5E8F\u53F7\u3002"
+        });
+        const actions = footer.createDiv({ cls: "collis-export-actions" });
+        const copyBtn = actions.createEl("button", { cls: "collis-export-btn", text: "\u590D\u5236" });
+        copyBtn.addEventListener("click", () => void this.copy());
+        const saveBtn = actions.createEl("button", {
+          cls: "mod-cta collis-export-btn",
+          text: "\u4FDD\u5B58\u4E3A\u7B14\u8BB0"
+        });
+        saveBtn.addEventListener("click", () => void this.save());
+        this.refresh();
+      }
+      applyOffset() {
+        this.modalEl.style.transform = `translate(${this.dragOffset.x}px, ${this.dragOffset.y}px)`;
+      }
+      installDrag() {
+        const title = this.titleEl;
+        title.addClass("collis-export-drag");
+        title.setAttribute("title", "\u6309\u4F4F\u8FD9\u91CC\u53EF\u4EE5\u62D6\u52A8\u7A97\u53E3");
+        title.addEventListener("pointerdown", (evt) => {
+          if (evt.button !== 0)
+            return;
+          evt.preventDefault();
+          this.dragStart = {
+            x: evt.clientX,
+            y: evt.clientY,
+            ox: this.dragOffset.x,
+            oy: this.dragOffset.y
+          };
+          title.setPointerCapture(evt.pointerId);
+        });
+        title.addEventListener("pointermove", (evt) => {
+          if (!this.dragStart)
+            return;
+          this.dragOffset = {
+            x: this.dragStart.ox + evt.clientX - this.dragStart.x,
+            y: this.dragStart.oy + evt.clientY - this.dragStart.y
+          };
+          this.applyOffset();
+        });
+        const finish = (evt) => {
+          if (!this.dragStart)
+            return;
+          this.dragStart = null;
+          if (title.hasPointerCapture(evt.pointerId)) {
+            title.releasePointerCapture(evt.pointerId);
+          }
+        };
+        title.addEventListener("pointerup", finish);
+        title.addEventListener("pointercancel", finish);
+      }
+      refresh() {
+        for (const tab of this.tabs) {
+          tab.toggleClass("is-active", tab.dataset.format === this.format);
+        }
+        this.markdown = this.options.build(this.format);
+        if (this.previewEl)
+          this.previewEl.value = this.markdown;
+      }
+      async copy() {
+        try {
+          await navigator.clipboard.writeText(this.markdown);
+          new import_obsidian15.Notice("\u5DF2\u590D\u5236 Markdown");
+        } catch (error) {
+          new import_obsidian15.Notice("\u590D\u5236\u5931\u8D25\uFF0C\u8BF7\u5728\u9884\u89C8\u6846\u4E2D\u624B\u52A8\u9009\u4E2D\u590D\u5236");
+        }
+      }
+      async save() {
+        try {
+          const path = await this.options.save(this.markdown);
+          new import_obsidian15.Notice(`\u5DF2\u4FDD\u5B58\u4E3A\u7B14\u8BB0\uFF1A${path}`);
+          this.close();
+        } catch (error) {
+          console.error("[Collis] export note failed", error);
+          new import_obsidian15.Notice("\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u767D\u677F\u6240\u5728\u76EE\u5F55\u7684\u5199\u5165\u6743\u9650");
+        }
+      }
+      onClose() {
+        this.contentEl.empty();
+        this.previewEl = null;
+        this.tabs = [];
+      }
+    };
+    var VIEW_TYPE_COLLIS_BOARD = "collis-board";
+    var GRID = 24;
+    var MIN_GRID = 10;
+    var EDGE_LABEL_MAX = 40;
+    var EDGE_LABEL_FONT_SIZE = 17;
+    var EDGE_LABEL_PAD_X = 12;
+    var EDGE_LABEL_HEIGHT = 32;
+    var EDGE_LABEL_RADIUS = 10;
+    var MIN_SCALE = 0.05;
+    var MAX_SCALE = 3;
+    var IMAGE_EXT2 = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"];
+    var VIDEO_EXT2 = ["mp4", "webm", "mov", "mkv"];
+    var CONTINUE_PROMPT = "\u4F60\u4E0A\u4E00\u6761\u56DE\u7B54\u56E0\u4E3A\u957F\u5EA6\u4E0A\u9650\u88AB\u622A\u65AD\u4E86\u3002\u8BF7\u4ECE\u65AD\u6389\u7684\u5730\u65B9\u76F4\u63A5\u5F80\u4E0B\u63A5\u7740\u5199\uFF0C\u4E0D\u8981\u91CD\u590D\u5DF2\u7ECF\u5199\u8FC7\u7684\u5185\u5BB9\uFF0C\u4E0D\u8981\u5F00\u573A\u767D\uFF0C\u4E0D\u8981\u89E3\u91CA\uFF0C\u53EA\u8F93\u51FA\u7EED\u5199\u7684\u90E8\u5206\u3002";
+    var AI_ROLE_PROMPT = "\u4F60\u662F\u767D\u677F\u6574\u7406\u52A9\u624B\u3002\u7528\u6237\u7ED9\u4F60\u767D\u677F\u4E0A\u7684\u8282\u70B9\u5185\u5BB9\u548C\u5B83\u4EEC\u4E4B\u95F4\u7684\u5173\u7CFB\uFF0C\u8BF7\u7528\u7B80\u6D01\u7684\u4E2D\u6587\u56DE\u7B54\uFF0C\u4E0D\u8981\u590D\u8FF0\u539F\u6587\uFF0C\u76F4\u63A5\u7ED9\u5224\u65AD\u548C\u5EFA\u8BAE\u3002\u5FC5\u8981\u65F6\u7528\u5217\u8868\u3002\u5982\u679C\u4E0A\u4E0B\u6587\u91CC\u8BF4\u660E\u67D0\u4E9B\u8282\u70B9\u6CA1\u6709\u53D1\u9001\u6216\u88AB\u622A\u65AD\uFF0C\u4E0D\u8981\u5047\u88C5\u8BFB\u8FC7\u5B83\u4EEC\u3002";
+    function mediaLabel(ext) {
+      if (IMAGE_EXT2.includes(ext))
+        return "\u56FE\u7247";
+      if (VIDEO_EXT2.includes(ext))
+        return "\u89C6\u9891";
+      if (ext === "pdf")
+        return "PDF";
+      if (["mp3", "wav", "m4a", "ogg", "flac", "aac"].includes(ext))
+        return "\u97F3\u9891";
+      return "\u6587\u4EF6";
+    }
+    var NODE_COLORS = [
+      { name: "red", label: "\u7EA2", line: "#d9534f", bg: "#f8dedd" },
+      { name: "orange", label: "\u6A59", line: "#e08a2e", bg: "#faecd9" },
+      { name: "yellow", label: "\u9EC4", line: "#c9a227", bg: "#f8f2d8" },
+      { name: "green", label: "\u7EFF", line: "#639922", bg: "#e8f1d9" },
+      { name: "teal", label: "\u9752", line: "#1d9e75", bg: "#d9f0e7" },
+      { name: "blue", label: "\u84DD", line: "#378add", bg: "#dfeafa" },
+      { name: "purple", label: "\u7D2B", line: "#7f77dd", bg: "#e7e5f9" }
+    ];
+    var _BoardView = class _BoardView2 extends import_obsidian16.TextFileView {
+      constructor(leaf, plugin) {
+        super(leaf);
+        this.plugin = plugin;
+        this.nodes = [];
+        this.edges = [];
+        this.nodeMap = /* @__PURE__ */ new Map();
+        this.nodeEls = /* @__PURE__ */ new Map();
+        this.selection = /* @__PURE__ */ new Set();
+        this.tx = 0;
+        this.ty = 0;
+        this.scale = 1;
+        this.drag = null;
+        this.boxEl = null;
+        this.boxStart = null;
+        this.lastDownNodeId = null;
+        this.pendingNodeClick = null;
+        this.spaceDown = false;
+        this.saveTimer = null;
+        this.frameEl = null;
+        this.edgesEl = null;
+        this.minimapEl = null;
+        this.minimapSvg = null;
+        this.minimapDragging = false;
+        this.selectedEdgeId = null;
+        this.nodeText = /* @__PURE__ */ new Map();
+        this.nodeMeta = /* @__PURE__ */ new Map();
+        this.noteTextCache = /* @__PURE__ */ new Map();
+        this.aiPanel = null;
+        this.outlinePanel = null;
+        this.outlineBodyEl = null;
+        this.outlineMetaEl = null;
+        this.outlineCollapsed = /* @__PURE__ */ new Set();
+        this.outlineTimer = null;
+        this.outlineSignatureCache = "";
+        this.outlinePos = { left: 16, top: 58 };
+        this.aiOutside = null;
+        this.aiProvider = null;
+        this.aiTargets = [];
+        this.aiHistory = [];
+        this.aiSystem = [];
+        this.aiSystemKey = "";
+        this.aiManifest = null;
+        this.aiSnapshots = [];
+        this.aiNumberMap = /* @__PURE__ */ new Map();
+        this.aiBadges = /* @__PURE__ */ new Map();
+        this.aiNotesLoading = false;
+        this.aiAnswers = [];
+        this.aiPicked = /* @__PURE__ */ new Set();
+        this.aiExpanded = false;
+        this.aiBusy = false;
+        this.aiCancelled = false;
+        this.aiPending = null;
+        this.aiConversationId = null;
+        this.aiRestore = null;
+        this.historyPop = null;
+        this.historyOutside = null;
+        this.searchPanel = null;
+        this.searchOutside = null;
+        this.clipboard = [];
+        this.clipboardEdges = [];
+        this.lastPointerWorld = null;
+        this.insertPanel = null;
+        this.edgeBar = null;
+        this.edgeLabelBtn = null;
+        this.edgeRelationBtn = null;
+        this.doctorModal = null;
+        this.helpModal = null;
+        this.doctorOffset = { x: 0, y: 0 };
+        this.edgeLabelEditor = null;
+        this.labelMetrics = null;
+        this.labelFontCache = "";
+        this.alignPop = null;
+        this.alignOutside = null;
+        this.colorPop = null;
+        this.colorOutside = null;
+        this.panelOutside = null;
+        this.linkDrag = null;
+        this.loaded = false;
+        this.history = [];
+        this.historyIndex = -1;
+        this.dragMoved = false;
+        this.toolbarKey = "";
+        this.rawFallback = null;
+        this.resizeObserver = null;
+        this.lastSize = { w: 0, h: 0 };
+        this.moreBtn = null;
+        this.undoBtn = null;
+        this.redoBtn = null;
+        this.staleIds = /* @__PURE__ */ new Set();
+        this.onHeaderTitleClick = (evt) => {
+          const target = evt.target;
+          if (!target || !target.closest(".view-header-title"))
+            return;
+          const file = this.file;
+          if (!file)
+            return;
+          evt.preventDefault();
+          evt.stopPropagation();
+          new RenameModal(this.app, file.basename, (value) => {
+            void this.renameBoard(file, value);
+          }).open();
+        };
+        this.onMinimapDown = (evt) => {
+          evt.preventDefault();
+          evt.stopPropagation();
+          this.minimapDragging = true;
+          this.jumpToMinimapPoint(evt.clientX, evt.clientY);
+          const move = (event) => {
+            if (!this.minimapDragging)
+              return;
+            this.jumpToMinimapPoint(event.clientX, event.clientY);
+          };
+          const up = () => {
+            this.minimapDragging = false;
+            document.removeEventListener("pointermove", move);
+            document.removeEventListener("pointerup", up);
+          };
+          document.addEventListener("pointermove", move);
+          document.addEventListener("pointerup", up);
+        };
+        this.onKeyDown = (evt) => {
+          var _a;
+          const active = document.activeElement;
+          const inInput = !!active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable);
+          if (evt.code === "Space" && !inInput) {
+            this.spaceDown = true;
+            this.root.addClass("is-space");
+          }
+          if (inInput)
+            return;
+          if (((_a = this.app.workspace.activeLeaf) == null ? void 0 : _a.view) !== this)
+            return;
+          const mod = evt.ctrlKey || evt.metaKey;
+          const key = evt.key.toLowerCase();
+          if (mod && key === "z") {
+            evt.preventDefault();
+            if (evt.shiftKey)
+              void this.redo();
+            else
+              void this.undo();
+            return;
+          }
+          if (mod && key === "y") {
+            evt.preventDefault();
+            void this.redo();
+            return;
+          }
+          if (mod && key === "c") {
+            evt.preventDefault();
+            this.copySelection();
+            return;
+          }
+          if (mod && key === "v") {
+            evt.preventDefault();
+            void this.pasteClipboard();
+            return;
+          }
+          if (evt.key === "Delete" || evt.key === "Backspace") {
+            if (this.selectedEdgeId) {
+              evt.preventDefault();
+              this.deleteSelectedEdge();
+              return;
+            }
+            if (this.selection.size > 0) {
+              evt.preventDefault();
+              this.deleteSelection();
+            }
+          }
+        };
+        this.onKeyUp = (evt) => {
+          if (evt.code !== "Space")
+            return;
+          this.spaceDown = false;
+          this.root.removeClass("is-space");
+        };
+        this.onWheel = (evt) => {
+          var _a;
+          const target = evt.target;
+          if (target == null ? void 0 : target.closest(".collis-inline"))
+            return;
+          if (target == null ? void 0 : target.closest(".collis-insert-panel"))
+            return;
+          if (target == null ? void 0 : target.closest(".collis-ai-panel"))
+            return;
+          if (target == null ? void 0 : target.closest(".collis-outline-panel"))
+            return;
+          const hoveredBody = target == null ? void 0 : target.closest(".collis-bnode-body");
+          if (hoveredBody) {
+            const nodeEl = hoveredBody.closest(".collis-bnode");
+            const nodeId = (_a = nodeEl == null ? void 0 : nodeEl.dataset) == null ? void 0 : _a.nodeId;
+            if (nodeId && this.selection.has(nodeId))
+              return;
+          }
+          evt.preventDefault();
+          if (evt.shiftKey) {
+            this.tx -= evt.deltaY + evt.deltaX;
+            this.applyTransform();
+            this.scheduleSave();
+            return;
+          }
+          const rect = this.root.getBoundingClientRect();
+          const mx = evt.clientX - rect.left;
+          const my = evt.clientY - rect.top;
+          const factor = Math.exp(-evt.deltaY * 15e-4);
+          const next = Math.max(MIN_SCALE, Math.min(MAX_SCALE, this.scale * factor));
+          if (next === this.scale)
+            return;
+          const ratio = next / this.scale;
+          this.tx = mx - (mx - this.tx) * ratio;
+          this.ty = my - (my - this.ty) * ratio;
+          this.scale = next;
+          this.applyTransform();
+          this.scheduleSave();
+        };
+        this.onPointerDown = (evt) => {
+          var _a, _b, _c, _d;
+          const target = evt.target;
+          if (!target)
+            return;
+          if (target.closest(".collis-board-toolbar"))
+            return;
+          if (target.closest(".collis-outline-panel"))
+            return;
+          const nodeEl = target.closest(".collis-bnode");
+          const nodeId = (_b = (_a = nodeEl == null ? void 0 : nodeEl.dataset) == null ? void 0 : _a.nodeId) != null ? _b : null;
+          this.lastDownNodeId = nodeId;
+          const portEl = target.closest(".collis-port");
+          if (portEl && nodeId) {
+            this.startLinkDrag(evt, nodeId, (_c = portEl.dataset.port) != null ? _c : "right");
+            return;
+          }
+          const handleEl = target.closest(".collis-resize-handle");
+          if (handleEl && nodeId) {
+            this.startResize(evt, nodeId, (_d = handleEl.dataset.dir) != null ? _d : "se");
+            return;
+          }
+          if (target.closest(".collis-bnode.is-playing"))
+            return;
+          const bodyEl = target.closest(".collis-bnode-body");
+          if (bodyEl && this.isOnScrollbar(bodyEl, evt.clientX))
+            return;
+          if (evt.button === 1 || evt.button === 0 && this.spaceDown) {
+            evt.preventDefault();
+            this.startPan(evt);
+            return;
+          }
+          if (evt.button !== 0)
+            return;
+          if (nodeEl && nodeId) {
+            this.pendingNodeClick = {
+              id: nodeId,
+              wasSelected: this.selection.has(nodeId),
+              x: evt.clientX,
+              y: evt.clientY
+            };
+            this.startNodeDrag(evt, nodeId);
+            return;
+          }
+          const worldPoint = this.toWorld(evt.clientX, evt.clientY);
+          if (this.selection.size > 0 && this.isInsideFrame(worldPoint)) {
+            this.beginNodeMove(evt);
+            return;
+          }
+          this.startBoxSelect(evt);
+        };
+        this.onPointerMove = (evt) => {
+          this.lastPointerWorld = this.toWorld(evt.clientX, evt.clientY);
+          if (this.linkDrag && this.linkDrag.pointerId === evt.pointerId) {
+            this.updateLinkDrag(evt);
+            return;
+          }
+          const drag = this.drag;
+          if (!drag || drag.pointerId !== evt.pointerId)
+            return;
+          if (drag.type === "pan") {
+            this.tx = drag.startView.tx + (evt.clientX - drag.startClient.x);
+            this.ty = drag.startView.ty + (evt.clientY - drag.startClient.y);
+            this.applyTransform();
+            return;
+          }
+          if (drag.type === "box") {
+            this.updateBox(evt);
+            return;
+          }
+          if (drag.type === "resize") {
+            const node2 = this.nodeMap.get(drag.nodeId);
+            const el = this.nodeEls.get(drag.nodeId);
+            if (!node2 || !el)
+              return;
+            const dx2 = (evt.clientX - drag.startX) / this.scale;
+            const dy2 = (evt.clientY - drag.startY) / this.scale;
+            if (Math.abs(dx2) > 1 || Math.abs(dy2) > 1)
+              this.dragMoved = true;
+            const dir = drag.dir;
+            const MIN_W = 160;
+            const MIN_H = 80;
+            let x = drag.start.x;
+            let y = drag.start.y;
+            let width = drag.start.width;
+            let height = drag.start.height;
+            if (dir.includes("e"))
+              width = drag.start.width + dx2;
+            if (dir.includes("s"))
+              height = drag.start.height + dy2;
+            if (dir.includes("w")) {
+              width = drag.start.width - dx2;
+              x = drag.start.x + dx2;
+            }
+            if (dir.includes("n")) {
+              height = drag.start.height - dy2;
+              y = drag.start.y + dy2;
+            }
+            if (width < MIN_W) {
+              if (dir.includes("w"))
+                x -= MIN_W - width;
+              width = MIN_W;
+            }
+            if (height < MIN_H) {
+              if (dir.includes("n"))
+                y -= MIN_H - height;
+              height = MIN_H;
+            }
+            node2.x = Math.round(x);
+            node2.y = Math.round(y);
+            node2.width = Math.round(width);
+            node2.height = Math.round(height);
+            el.style.width = `${node2.width}px`;
+            el.style.height = `${node2.height}px`;
+            el.style.transform = `translate3d(${node2.x}px, ${node2.y}px, 0)`;
+            this.renderEdges();
+            this.updateFrame();
+            return;
+          }
+          const point = this.toWorld(evt.clientX, evt.clientY);
+          let dx = point.x - drag.startWorld.x;
+          let dy = point.y - drag.startWorld.y;
+          if (Math.abs(dx) > 2 || Math.abs(dy) > 2)
+            this.dragMoved = true;
+          let guides = [];
+          if (!evt.altKey) {
+            const snap = this.computeSnap(drag.initial, dx, dy);
+            dx += snap.dx;
+            dy += snap.dy;
+            guides = snap.lines;
+          }
+          for (const [id, initial] of drag.initial) {
+            const node2 = this.nodeMap.get(id);
+            const el = this.nodeEls.get(id);
+            if (!node2 || !el)
+              continue;
+            node2.x = Math.round(initial.x + dx);
+            node2.y = Math.round(initial.y + dy);
+            el.style.transform = `translate3d(${node2.x}px, ${node2.y}px, 0)`;
+          }
+          this.renderEdges();
+          this.drawGuides(guides);
+          this.updateFrame();
+        };
+        this.onPointerUp = (evt) => {
+          if (this.linkDrag && this.linkDrag.pointerId === evt.pointerId) {
+            this.finishLinkDrag(evt);
+            this.clearBox();
+            return;
+          }
+          if (!this.drag || this.drag.pointerId !== evt.pointerId) {
+            this.clearBox();
+            return;
+          }
+          const pendingClick = this.pendingNodeClick;
+          this.pendingNodeClick = null;
+          const wasBox = this.drag.type === "box";
+          const wasResize = this.drag.type === "resize";
+          this.drag = null;
+          this.root.removeClass("is-panning");
+          this.root.removeClass("is-dragging-node");
+          this.root.removeClass("is-resizing");
+          if (wasBox)
+            this.clearBox();
+          try {
+            this.root.releasePointerCapture(evt.pointerId);
+          } catch (error) {
+          }
+          const didMove = this.dragMoved;
+          this.dragMoved = false;
+          if (wasBox)
+            return;
+          if (wasResize || didMove)
+            this.pushHistory();
+          if (didMove)
+            this.renderEdges();
+          this.scheduleSave();
+          if (!pendingClick || !pendingClick.wasSelected)
+            return;
+          const distance = Math.hypot(evt.clientX - pendingClick.x, evt.clientY - pendingClick.y);
+          if (distance > 6)
+            return;
+          const node2 = this.nodeMap.get(pendingClick.id);
+          if (node2)
+            this.activateNode(node2);
+        };
+        this.onDoubleClick = (evt) => {
+          var _a, _b, _c, _d;
+          const target = evt.target;
+          if (!target)
+            return;
+          if (target.closest(".collis-board-toolbar"))
+            return;
+          const group = target.closest(".collis-edge-group");
+          const edgeId = (_a = group == null ? void 0 : group.getAttribute("data-edge-id")) != null ? _a : null;
+          if (edgeId) {
+            const onChip = target.closest(".collis-edge-label-bg, .collis-edge-label") !== null;
+            this.openEdgeLabelEditor(
+              edgeId,
+              onChip ? void 0 : this.toWorld(evt.clientX, evt.clientY)
+            );
+            return;
+          }
+          const nodeId = (_d = (_c = this.lastDownNodeId) != null ? _c : (_b = target.closest(".collis-bnode")) == null ? void 0 : _b.getAttribute("data-node-id")) != null ? _d : null;
+          if (nodeId) {
+            const node2 = this.nodeMap.get(nodeId);
+            if (!node2)
+              return;
+            if (node2.type === "file") {
+              const file = this.app.vault.getAbstractFileByPath(node2.file);
+              if (file instanceof import_obsidian16.TFile && file.extension.toLowerCase() === "md") {
+                void this.openEditor(node2);
+                return;
+              }
+              this.openMedia(node2.file);
+              return;
+            }
+            void this.openEditor(node2);
+            return;
+          }
+          void this.createTextNode(this.toWorld(evt.clientX, evt.clientY));
+        };
+        this.onDragOver = (evt) => {
+          evt.preventDefault();
+          if (evt.dataTransfer)
+            evt.dataTransfer.dropEffect = "copy";
+          this.root.addClass("is-drop-target");
+        };
+        this.onDragLeave = (evt) => {
+          const related = evt.relatedTarget;
+          if (related && this.root.contains(related))
+            return;
+          this.root.removeClass("is-drop-target");
+        };
+        this.onDrop = async (evt) => {
+          var _a, _b, _c, _d, _e;
+          evt.preventDefault();
+          this.root.removeClass("is-drop-target");
+          const point = this.toWorld(evt.clientX, evt.clientY);
+          const dt = evt.dataTransfer;
+          if (!dt)
+            return;
+          const plain = (_a = dt.getData("text/plain")) != null ? _a : "";
+          const uri = (_c = ((_b = dt.getData("text/uri-list")) != null ? _b : "").split(/\r?\n/)[0]) != null ? _c : "";
+          const block = plain.match(/!?\[\[([^[\]|#]+)#\^([^\]|\n]+)(?:\|[^\]\n]+)?\]\]/);
+          if (block) {
+            const dest = this.app.metadataCache.getFirstLinkpathDest(block[1].trim(), "");
+            if (dest) {
+              await this.addCardNode(dest.path, block[2].trim(), point);
+              return;
+            }
+          }
+          if (uri) {
+            const resolved = this.resolveUri(uri);
+            if (resolved) {
+              await this.addFileNode(resolved, point);
+              return;
+            }
+          }
+          const candidate = plain.trim();
+          if (candidate) {
+            const direct = this.app.vault.getAbstractFileByPath(candidate);
+            if (direct instanceof import_obsidian16.TFile) {
+              await this.addFileNode(direct.path, point);
+              return;
+            }
+          }
+          const dropped = Array.from((_d = dt.files) != null ? _d : []);
+          if (dropped.length > 0) {
+            const basePath = String((_e = this.app.vault.adapter.basePath) != null ? _e : "").replace(/\\/g, "/");
+            let handled = false;
+            for (const item of dropped) {
+              const raw = item.path;
+              if (raw) {
+                const full = raw.replace(/\\/g, "/");
+                const rel = basePath && full.startsWith(basePath) ? full.slice(basePath.length).replace(/^\//, "") : "";
+                if (rel) {
+                  const inside = this.app.vault.getAbstractFileByPath(rel);
+                  if (inside instanceof import_obsidian16.TFile) {
+                    await this.addFileNode(inside.path, point);
+                    handled = true;
+                    continue;
+                  }
+                }
+              }
+              const imported = await this.importExternalFile(item);
+              if (imported) {
+                await this.addFileNode(imported, point);
+                handled = true;
+              }
+            }
+            if (handled)
+              return;
+          }
+        };
+      }
+      getViewType() {
+        return VIEW_TYPE_COLLIS_BOARD;
+      }
+      getDisplayText() {
+        var _a, _b;
+        return (_b = (_a = this.file) == null ? void 0 : _a.basename) != null ? _b : "\u767D\u677F";
+      }
+      getViewData() {
+        if (this.rawFallback !== null)
+          return this.rawFallback;
+        return JSON.stringify(this.serialize(), null, 2);
+      }
+      setViewData(data, _clear) {
+        this.loadWhenLaidOut(data, 0);
+      }
+      loadWhenLaidOut(data, attempt) {
+        if (!this.world) {
+          if (attempt < 25) {
+            window.setTimeout(() => this.loadWhenLaidOut(data, attempt + 1), 30);
+          }
+          return;
+        }
+        const rect = this.root.getBoundingClientRect();
+        if (rect.width === 0 && attempt < 25) {
+          window.setTimeout(() => this.loadWhenLaidOut(data, attempt + 1), 30);
+          return;
+        }
+        void this.loadFromJson(data);
+      }
+      clear() {
+      }
+      getIcon() {
+        return "layout-dashboard";
+      }
+      async onOpen() {
+        this.buildUI();
+        this.registerDomEvent(document, "keydown", this.onKeyDown);
+        this.registerDomEvent(document, "keyup", this.onKeyUp);
+        this.registerDomEvent(this.containerEl, "click", this.onHeaderTitleClick, {
+          capture: true
+        });
+        this.registerEvent(
+          this.app.vault.on("modify", (file) => {
+            if (file instanceof import_obsidian16.TFile)
+              void this.refreshNodesForFile(file.path, 80);
+          })
+        );
+        this.registerEvent(
+          this.app.vault.on("rename", (file, oldPath) => {
+            if (file instanceof import_obsidian16.TFile)
+              this.handleFileRename(file.path, oldPath);
+          })
+        );
+        this.registerEvent(this.app.workspace.on("css-change", () => this.repaintColors()));
+        this.loaded = true;
+      }
+      /**
+       * Every node pointing at this file mirrors the latest content, so the same
+       * note can appear several times on one board (or across boards) and all of
+       * them stay in sync.
+       */
+      async refreshNodesForFile(path, delay = 0) {
+        if (delay > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, delay));
+        }
+        const targets = this.nodes.filter(
+          (node2) => (node2.type === "file" || node2.type === "card") && node2.file === path
+        );
+        for (const node2 of targets) {
+          const el = this.nodeEls.get(node2.id);
+          if (el && el.hasClass("collis-editing"))
+            continue;
+          await this.renderNode(node2);
+        }
+        this.scheduleOutlineRefresh();
+      }
+      handleFileRename(newPath, oldPath) {
+        let touched = false;
+        for (const node2 of this.nodes) {
+          if (node2.type === "file" && node2.file === oldPath) {
+            node2.file = newPath;
+            touched = true;
+            void this.renderNode(node2);
+          }
+        }
+        if (touched)
+          this.scheduleSave();
+      }
+      async onClose() {
+        var _a, _b;
+        if (this.saveTimer !== null) {
+          window.clearTimeout(this.saveTimer);
+          this.saveTimer = null;
+        }
+        if (this.outlineTimer !== null) {
+          window.clearTimeout(this.outlineTimer);
+          this.outlineTimer = null;
+        }
+        if (this.resizeObserver) {
+          this.resizeObserver.disconnect();
+          this.resizeObserver = null;
+        }
+        this.closeEdgeLabelEditor(false);
+        (_a = this.doctorModal) == null ? void 0 : _a.close();
+        this.doctorModal = null;
+        (_b = this.helpModal) == null ? void 0 : _b.close();
+        this.helpModal = null;
+      }
+      handleResize() {
+        const rect = this.root.getBoundingClientRect();
+        const w = Math.round(rect.width);
+        const h = Math.round(rect.height);
+        if (w === 0 || h === 0)
+          return;
+        if (this.lastSize.w === 0) {
+          this.lastSize = { w, h };
+          return;
+        }
+        const dw = w - this.lastSize.w;
+        const dh = h - this.lastSize.h;
+        this.lastSize = { w, h };
+        if (dw === 0 && dh === 0)
+          return;
+        this.tx += dw / 2;
+        this.ty += dh / 2;
+        this.applyTransform();
+      }
+      buildUI() {
+        this.containerEl.addClass("collis-board-leaf");
+        const container = this.contentEl;
+        container.empty();
+        container.addClass("collis-board-host");
+        this.root = container.createDiv({ cls: "collis-board" });
+        this.world = this.root.createDiv({ cls: "collis-world" });
+        const toolbar = this.root.createDiv({ cls: "collis-board-toolbar" });
+        toolbar.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        toolbar.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        const addButton = (icon, label, handler) => {
+          const button = toolbar.createEl("button", {
+            cls: "collis-board-btn",
+            attr: { "aria-label": label }
+          });
+          (0, import_obsidian16.setIcon)(button, icon);
+          button.addEventListener("click", (evt) => {
+            evt.preventDefault();
+            evt.stopPropagation();
+            handler(evt);
+          });
+          return button;
+        };
+        this.moreBtn = addButton("more-vertical", "\u66F4\u591A", (evt) => this.showBoardMenu(evt));
+        toolbar.createDiv({ cls: "collis-board-sep" });
+        addButton("sticky-note", "\u65B0\u5EFA\u4FBF\u7B7E", () => {
+          void this.createStickyAtCenter();
+        });
+        addButton("type", "\u65B0\u5EFA\u6587\u672C", () => {
+          void this.createTextAtCenter();
+        });
+        toolbar.createDiv({ cls: "collis-board-sep" });
+        addButton("file-text", "\u6DFB\u52A0 md \u7B14\u8BB0", () => this.openInsertPanelAtCenter("note"));
+        addButton("list", "\u6DFB\u52A0\u5361\u7247\u7B14\u8BB0", () => this.openInsertPanelAtCenter("card"));
+        addButton("image", "\u6DFB\u52A0\u5A92\u4F53\u6587\u4EF6", () => this.openInsertPanelAtCenter("media"));
+        toolbar.createDiv({ cls: "collis-board-sep" });
+        addButton("plus", "\u653E\u5927", () => this.zoomBy(1.2));
+        addButton("maximize", "\u603B\u89C8", () => {
+          this.fitToContent();
+          this.scheduleSave();
+        });
+        addButton("minus", "\u7F29\u5C0F", () => this.zoomBy(1 / 1.2));
+        toolbar.createDiv({ cls: "collis-board-sep" });
+        this.undoBtn = addButton("undo-2", "\u64A4\u9500", () => void this.undo());
+        this.redoBtn = addButton("redo-2", "\u91CD\u505A", () => void this.redo());
+        addButton("list-tree", "\u5927\u7EB2", () => this.toggleOutlinePanel());
+        addButton("download", "\u5BFC\u51FA Markdown", () => this.openExportModal());
+        toolbar.createDiv({ cls: "collis-board-sep" });
+        addButton("help-circle", "\u5E2E\u52A9", () => this.openBoardHelp());
+        this.updateHistoryButtons();
+        this.toolbarEl = this.root.createDiv({ cls: "collis-node-toolbar is-hidden" });
+        this.toolbarEl.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        this.toolbarEl.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        this.minimapEl = this.root.createDiv({ cls: "collis-minimap is-hidden" });
+        const miniSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        miniSvg.classList.add("collis-minimap-svg");
+        this.minimapEl.appendChild(miniSvg);
+        this.minimapSvg = miniSvg;
+        this.minimapEl.addEventListener("pointerdown", this.onMinimapDown);
+        this.minimapEl.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        this.edgeBar = this.root.createDiv({ cls: "collis-edge-toolbar is-hidden" });
+        this.edgeBar.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        this.edgeBar.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        this.zoomEl = this.root.createDiv({ cls: "collis-board-zoom", text: "100%" });
+        this.hintEl = this.root.createDiv({ cls: "collis-board-hint is-hidden" });
+        this.hintEl.createDiv({ cls: "collis-hint-title", text: "\u7A7A\u767D\u767D\u677F" });
+        this.hintEl.createDiv({
+          cls: "collis-hint-sub",
+          text: "\u62D6\u5165\u5361\u7247\u6216\u6587\u4EF6 \xB7 \u53CC\u51FB\u7A7A\u767D\u5904\u65B0\u5EFA\u5361\u7247 \xB7 \u6EDA\u8F6E\u7F29\u653E \xB7 \u7A7A\u683C\u62D6\u52A8\u5E73\u79FB"
+        });
+        this.root.addEventListener("wheel", this.onWheel, { passive: false });
+        this.root.addEventListener("pointerdown", this.onPointerDown);
+        this.root.addEventListener("pointermove", this.onPointerMove);
+        this.root.addEventListener("pointerup", this.onPointerUp);
+        this.root.addEventListener("pointercancel", this.onPointerUp);
+        this.root.addEventListener("dblclick", this.onDoubleClick);
+        this.root.addEventListener("dragover", this.onDragOver);
+        this.root.addEventListener("dragleave", this.onDragLeave);
+        this.root.addEventListener("drop", (evt) => {
+          void this.onDrop(evt);
+        });
+        this.world.addEventListener("pointerdown", (evt) => {
+          var _a;
+          const target = evt.target;
+          if (!(target instanceof SVGElement))
+            return;
+          const group = target.closest(".collis-edge-group");
+          const edgeId = (_a = group == null ? void 0 : group.dataset.edgeId) != null ? _a : null;
+          if (!edgeId)
+            return;
+          evt.stopPropagation();
+          this.lastDownNodeId = null;
+          this.selectEdge(edgeId);
+        });
+        this.resizeObserver = new ResizeObserver(() => this.handleResize());
+        this.resizeObserver.observe(this.root);
+        this.register(() => {
+          var _a;
+          return (_a = this.resizeObserver) == null ? void 0 : _a.disconnect();
+        });
+      }
+      async loadFromJson(raw) {
+        var _a, _b;
+        let data = null;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.nodes))
+            data = parsed;
+        } catch (error) {
+          data = null;
+        }
+        if (!data && raw.trim()) {
+          this.rawFallback = raw;
+          this.nodes = [];
+          this.nodeMap.clear();
+          this.nodeEls.clear();
+          this.selection.clear();
+          this.staleIds.clear();
+          if (this.world)
+            this.world.empty();
+          this.updateHint();
+          this.updateToolbar();
+          new import_obsidian16.Notice("\u767D\u677F\u6587\u4EF6\u65E0\u6CD5\u89E3\u6790\uFF0C\u5DF2\u4FDD\u62A4\u539F\u6587\u4EF6\u4E0D\u88AB\u8986\u76D6");
+          return;
+        }
+        this.rawFallback = null;
+        const rect = this.root.getBoundingClientRect();
+        if (data == null ? void 0 : data.viewport) {
+          this.tx = data.viewport.tx;
+          this.ty = data.viewport.ty;
+          this.scale = data.viewport.scale;
+        } else {
+          this.tx = rect.width / 2;
+          this.ty = rect.height / 2;
+          this.scale = 1;
+        }
+        this.world.addClass("is-loading");
+        this.hintEl.addClass("is-hidden");
+        this.closeEdgeLabelEditor(false);
+        try {
+          this.world.empty();
+          this.edgesEl = null;
+          this.frameEl = null;
+          this.ensureLayers();
+          this.nodeEls.clear();
+          this.selection.clear();
+          this.nodes = (_a = data == null ? void 0 : data.nodes) != null ? _a : [];
+          this.edges = (_b = data == null ? void 0 : data.edges) != null ? _b : [];
+          this.nodeMap = new Map(this.nodes.map((node2) => [node2.id, node2]));
+          this.applyTransform();
+          try {
+            await Promise.all(this.nodes.map((node2) => this.renderNode(node2)));
+          } catch (error) {
+            console.error("[Collis] node render failed", error);
+          }
+          this.renderEdges();
+        } finally {
+          this.world.removeClass("is-loading");
+        }
+        this.updateHint();
+        this.resetHistory();
+        this.outlineSignatureCache = "";
+        if (this.outlinePanel)
+          this.renderOutlinePanel();
+      }
+      selectedNodes() {
+        const out = [];
+        for (const id of this.selection) {
+          const node2 = this.nodeMap.get(id);
+          if (node2)
+            out.push(node2);
+        }
+        return out;
+      }
+      isOpenable(node2) {
+        return node2.type === "card" || node2.type === "file";
+      }
+      openNode(node2, mode) {
+        if (node2.type === "text")
+          return;
+        if (node2.type === "card") {
+          void this.openCardView(node2, mode);
+          return;
+        }
+        if (node2.type === "group")
+          return;
+        const file = this.app.vault.getAbstractFileByPath(node2.file);
+        if (!(file instanceof import_obsidian16.TFile))
+          return;
+        const leaf = this.app.workspace.getLeaf(mode === "window" ? "window" : "tab");
+        void leaf.openFile(file);
+      }
+      /**
+       * A card lives inside a shared month note, so opening the note would show
+       * dozens of unrelated cards. Instead we keep a one-line note per card that
+       * embeds just that block — opening it shows exactly that card, and it stays
+       * in sync because it is an embed, not a copy.
+       */
+      async openCardView(node2, mode) {
+        const source = this.app.vault.getAbstractFileByPath(node2.file);
+        if (!(source instanceof import_obsidian16.TFile)) {
+          new import_obsidian16.Notice("\u6E90\u7B14\u8BB0\u4E0D\u5B58\u5728");
+          return;
+        }
+        const baseName2 = source.basename;
+        const path = `${baseName2}-${node2.blockId}.md`;
+        const embed = `![[${node2.file.replace(/\.md$/, "")}#^${node2.blockId}]]
+`;
+        try {
+          let file = this.app.vault.getAbstractFileByPath(path);
+          if (!file) {
+            file = await this.app.vault.create(path, embed);
+          } else {
+            const current = await this.app.vault.read(file);
+            if (current.trim() !== embed.trim()) {
+              await this.app.vault.modify(file, embed);
+            }
+          }
+          const leaf = this.app.workspace.getLeaf(mode === "window" ? "window" : "tab");
+          await leaf.openFile(file, { state: { mode: "preview" } });
+        } catch (error) {
+          console.error("[Collis] open card view failed", error);
+          new import_obsidian16.Notice("\u6253\u5F00\u5361\u7247\u5931\u8D25");
+        }
+      }
+      /**
+       * Named colours ride on `data-color`; a custom pick is a hex value applied as
+       * a CSS variable, so the tinted background is derived by CSS itself and the
+       * theme stays in charge of how light it gets.
+       */
+      /**
+       * Colour is applied inline, not through CSS classes: node styling is spread
+       * across several rules with different specificity, and inline values are the
+       * only thing that cannot be overridden by any of them.
+       */
+      paintColor(el, color) {
+        el.style.removeProperty("background");
+        el.style.removeProperty("border-color");
+        el.style.removeProperty("color");
+        if (!color)
+          return;
+        const dark = document.body.classList.contains("theme-dark");
+        const isGroup = el.classList.contains("is-group");
+        const ink = dark ? "#eceff1" : "#1f2225";
+        const applyFill = (line, lightFill, groupFill) => {
+          el.style.borderColor = line;
+          el.style.background = dark ? this.tintOf(line, isGroup ? 0.45 : 0.66) : lightFill;
+          el.style.color = ink;
+          if (isGroup)
+            el.style.setProperty("--group-tint", line);
+          else
+            el.style.removeProperty("--group-tint");
+        };
+        if (color.startsWith("#")) {
+          applyFill(color, this.tintOf(color), `${color}14`);
+          return;
+        }
+        const preset = NODE_COLORS.find((item) => item.name === color);
+        if (!preset)
+          return;
+        applyFill(preset.line, preset.bg, `${preset.line}14`);
+      }
+      /** Blends a colour towards white (light theme) or the board surface (dark). */
+      tintOf(hex, amount = 0.84) {
+        const raw = hex.replace("#", "");
+        if (raw.length !== 6)
+          return hex;
+        const num = parseInt(raw, 16);
+        const r = num >> 16 & 255;
+        const g = num >> 8 & 255;
+        const b = num & 255;
+        const dark = document.body.classList.contains("theme-dark");
+        const base = dark ? 38 : 255;
+        const blend = (channel) => Math.round(channel + (base - channel) * amount);
+        return `#${[blend(r), blend(g), blend(b)].map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+      }
+      closeColorPop() {
+        var _a;
+        (_a = this.colorPop) == null ? void 0 : _a.remove();
+        this.colorPop = null;
+        if (this.colorOutside) {
+          document.removeEventListener("mousedown", this.colorOutside, true);
+          this.colorOutside = null;
+        }
+      }
+      showColorPop(nodes, evt) {
+        var _a;
+        this.closeColorPop();
+        if (nodes.length === 0)
+          return;
+        const pop = this.root.createDiv({ cls: "collis-color-pop" });
+        this.colorPop = pop;
+        pop.addEventListener("pointerdown", (event) => event.stopPropagation());
+        for (const color of NODE_COLORS) {
+          const swatch = pop.createEl("button", {
+            cls: "collis-swatch",
+            attr: { "aria-label": color.label }
+          });
+          swatch.dataset.color = color.name;
+          swatch.addEventListener("click", () => {
+            this.applyNodeColor(nodes, color.name);
+            this.closeColorPop();
+          });
+        }
+        const custom = pop.createEl("label", {
+          cls: "collis-swatch is-custom",
+          attr: { "aria-label": "\u81EA\u5B9A\u4E49\u989C\u8272" }
+        });
+        const picker = custom.createEl("input", { attr: { type: "color" } });
+        picker.value = (_a = this.currentColorOf(nodes)) != null ? _a : "#7f77dd";
+        picker.addEventListener("input", () => this.applyNodeColor(nodes, picker.value));
+        picker.addEventListener("change", () => {
+          this.applyNodeColor(nodes, picker.value);
+          this.closeColorPop();
+        });
+        const clear = pop.createEl("button", {
+          cls: "collis-swatch is-clear",
+          attr: { "aria-label": "\u65E0\u989C\u8272" }
+        });
+        (0, import_obsidian16.setIcon)(clear, "ban");
+        clear.addEventListener("click", () => {
+          this.applyNodeColor(nodes, "");
+          this.closeColorPop();
+        });
+        const rect = this.root.getBoundingClientRect();
+        const popWidth = 260;
+        pop.style.left = `${Math.round(
+          Math.max(8, Math.min(evt.clientX - rect.left - 20, rect.width - popWidth - 8))
+        )}px`;
+        pop.style.top = `${Math.round(Math.max(8, evt.clientY - rect.top + 12))}px`;
+        this.colorOutside = (event) => {
+          const target = event.target;
+          if (target && pop.contains(target))
+            return;
+          this.closeColorPop();
+        };
+        document.addEventListener("mousedown", this.colorOutside, true);
+      }
+      closeAlignPop() {
+        var _a;
+        if (this.alignOutside) {
+          document.removeEventListener("mousedown", this.alignOutside, true);
+          this.alignOutside = null;
+        }
+        (_a = this.alignPop) == null ? void 0 : _a.remove();
+        this.alignPop = null;
+      }
+      showAlignPop(nodes, evt) {
+        this.closeAlignPop();
+        if (nodes.length < 2)
+          return;
+        const pop = this.root.createDiv({ cls: "collis-align-pop" });
+        this.alignPop = pop;
+        pop.addEventListener("pointerdown", (event) => event.stopPropagation());
+        const actions = [
+          { icon: "align-start-vertical", label: "\u5DE6\u5BF9\u9F50", run: () => this.alignNodes(nodes, "left") },
+          { icon: "align-center-vertical", label: "\u6C34\u5E73\u5C45\u4E2D", run: () => this.alignNodes(nodes, "hcenter") },
+          { icon: "align-end-vertical", label: "\u53F3\u5BF9\u9F50", run: () => this.alignNodes(nodes, "right") },
+          { icon: "align-horizontal-distribute-center", label: "\u6C34\u5E73\u7B49\u8DDD", run: () => this.distributeNodes(nodes, "h") },
+          { icon: "align-start-horizontal", label: "\u4E0A\u5BF9\u9F50", run: () => this.alignNodes(nodes, "top") },
+          { icon: "align-center-horizontal", label: "\u5782\u76F4\u5C45\u4E2D", run: () => this.alignNodes(nodes, "vcenter") },
+          { icon: "align-end-horizontal", label: "\u4E0B\u5BF9\u9F50", run: () => this.alignNodes(nodes, "bottom") },
+          { icon: "align-vertical-distribute-center", label: "\u5782\u76F4\u7B49\u8DDD", run: () => this.distributeNodes(nodes, "v") }
+        ];
+        for (const action of actions) {
+          const button = pop.createEl("button", {
+            cls: "collis-tool-btn",
+            attr: { "aria-label": action.label }
+          });
+          (0, import_obsidian16.setIcon)(button, action.icon);
+          button.addEventListener("click", () => action.run());
+        }
+        const rect = this.root.getBoundingClientRect();
+        const width = 168;
+        pop.style.left = `${Math.round(
+          Math.max(8, Math.min(evt.clientX - rect.left - 40, rect.width - width - 8))
+        )}px`;
+        pop.style.top = `${Math.round(Math.max(8, evt.clientY - rect.top + 12))}px`;
+        this.alignOutside = (event) => {
+          const target = event.target;
+          if (target && pop.contains(target))
+            return;
+          this.closeAlignPop();
+        };
+        document.addEventListener("mousedown", this.alignOutside, true);
+      }
+      applyNodeGeometry(node2) {
+        const el = this.nodeEls.get(node2.id);
+        if (!el)
+          return;
+        el.style.transform = `translate3d(${node2.x}px, ${node2.y}px, 0)`;
+        el.style.width = `${node2.width}px`;
+        if (node2.height)
+          el.style.height = `${node2.height}px`;
+      }
+      afterLayout() {
+        this.renderEdges();
+        this.updateFrame();
+        this.pushHistory();
+        this.scheduleSave();
+      }
+      alignNodes(nodes, mode) {
+        const items = nodes.map((node2) => ({ node: node2, height: this.nodeHeight(node2) }));
+        if (items.length < 2)
+          return;
+        const minX = Math.min(...items.map((item) => item.node.x));
+        const maxX = Math.max(...items.map((item) => item.node.x + item.node.width));
+        const minY = Math.min(...items.map((item) => item.node.y));
+        const maxY = Math.max(...items.map((item) => item.node.y + item.height));
+        for (const { node: node2, height } of items) {
+          switch (mode) {
+            case "left":
+              node2.x = Math.round(minX);
+              break;
+            case "right":
+              node2.x = Math.round(maxX - node2.width);
+              break;
+            case "hcenter":
+              node2.x = Math.round((minX + maxX) / 2 - node2.width / 2);
+              break;
+            case "top":
+              node2.y = Math.round(minY);
+              break;
+            case "bottom":
+              node2.y = Math.round(maxY - height);
+              break;
+            case "vcenter":
+              node2.y = Math.round((minY + maxY) / 2 - height / 2);
+              break;
+            default:
+              break;
+          }
+          this.applyNodeGeometry(node2);
+        }
+        this.afterLayout();
+      }
+      distributeNodes(nodes, axis) {
+        if (nodes.length < 3)
+          return;
+        const items = nodes.map((node2) => ({ node: node2, height: this.nodeHeight(node2) }));
+        if (axis === "h") {
+          items.sort((a, b) => a.node.x - b.node.x);
+          const first = items[0];
+          const last = items[items.length - 1];
+          const start = first.node.x + first.node.width;
+          const end = last.node.x;
+          const middle = items.slice(1, -1);
+          const used = middle.reduce((sum, item) => sum + item.node.width, 0);
+          const gap = (end - start - used) / (items.length - 1);
+          let cursor = start;
+          for (const item of middle) {
+            cursor += gap;
+            item.node.x = Math.round(cursor);
+            this.applyNodeGeometry(item.node);
+            cursor += item.node.width;
+          }
+        } else {
+          items.sort((a, b) => a.node.y - b.node.y);
+          const first = items[0];
+          const last = items[items.length - 1];
+          const start = first.node.y + first.height;
+          const end = last.node.y;
+          const middle = items.slice(1, -1);
+          const used = middle.reduce((sum, item) => sum + item.height, 0);
+          const gap = (end - start - used) / (items.length - 1);
+          let cursor = start;
+          for (const item of middle) {
+            cursor += gap;
+            item.node.y = Math.round(cursor);
+            this.applyNodeGeometry(item.node);
+            cursor += item.height;
+          }
+        }
+        this.afterLayout();
+      }
+      currentColorOf(nodes) {
+        var _a, _b;
+        return (_b = (_a = nodes[0]) == null ? void 0 : _a.color) != null ? _b : null;
+      }
+      applyNodeColor(nodes, color) {
+        const ids = new Set(nodes.map((node2) => node2.id));
+        for (const node2 of this.nodes) {
+          if (!ids.has(node2.id))
+            continue;
+          if (color)
+            node2.color = color;
+          else
+            delete node2.color;
+          const el = this.nodeEls.get(node2.id);
+          if (!el)
+            continue;
+          this.paintColor(el, color || void 0);
+        }
+        this.pushHistory();
+        this.scheduleSave();
+      }
+      showMoreMenu(node2, evt) {
+        const menu = new import_obsidian16.Menu();
+        if (node2.type === "text") {
+          menu.addItem(
+            (item) => item.setTitle("\u8F6C\u4E3A\u5361\u7247\u7B14\u8BB0").setIcon("list").onClick(() => {
+              void this.convertToCard(node2);
+            })
+          );
+        }
+        if (node2.type === "text" || node2.type === "card") {
+          menu.addItem(
+            (item) => item.setTitle("\u8F6C\u4E3A\u72EC\u7ACB\u7B14\u8BB0").setIcon("file-text").onClick(() => {
+              if (node2.type === "text")
+                void this.convertToNote(node2);
+              else
+                void this.convertCardToNote(node2);
+            })
+          );
+        }
+        menu.showAtMouseEvent(evt);
+      }
+      deriveTitle(text) {
+        var _a;
+        const first = (_a = text.split("\n")[0]) != null ? _a : "";
+        const cleaned = first.replace(/#[\p{L}\p{N}_/-]+/gu, " ").replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+        return cleaned.slice(0, 15).trim() || "\u672A\u547D\u540D";
+      }
+      async convertCardToNote(node2) {
+        var _a, _b;
+        if (node2.type !== "card")
+          return;
+        const current = this.nodeMap.get(node2.id);
+        if (!current || current.type !== "card")
+          return;
+        const meta = await readCard(this.app, {
+          file: current.file,
+          blockId: current.blockId,
+          linkpath: ""
+        });
+        if (meta.stale) {
+          new import_obsidian16.Notice("\u5361\u7247\u5DF2\u4E0D\u5B58\u5728");
+          return;
+        }
+        const text = meta.editable.trim();
+        if (!text) {
+          new import_obsidian16.Notice("\u5361\u7247\u5185\u5BB9\u4E3A\u7A7A");
+          return;
+        }
+        const title = this.deriveTitle(text);
+        const link = `[[${current.file.replace(/\.md$/, "")}#^${current.blockId}]]`;
+        const content = `---
+source: "${link}"
+---
+
+${text}
+`;
+        const folder = (_a = this.plugin.settings.boardFolder) != null ? _a : "";
+        const file = await createNoteFromText(this.app, folder, content, title);
+        if (!file) {
+          new import_obsidian16.Notice("\u8F6C\u6362\u5931\u8D25\uFF1A\u65E0\u6CD5\u521B\u5EFA\u7B14\u8BB0");
+          return;
+        }
+        const next = {
+          id: current.id,
+          type: "file",
+          file: file.path,
+          x: current.x,
+          y: current.y,
+          width: current.width,
+          height: (_b = current.height) != null ? _b : 320
+        };
+        const index = this.nodes.findIndex((item) => item.id === current.id);
+        if (index === -1)
+          return;
+        this.nodes[index] = next;
+        this.nodeMap.set(next.id, next);
+        this.detachNodeElement(next.id);
+        await this.renderNode(next);
+        this.pushHistory();
+        this.scheduleSave();
+        this.updateToolbar();
+        new import_obsidian16.Notice("\u5DF2\u8F6C\u4E3A\u72EC\u7ACB\u7B14\u8BB0\uFF0C\u6E90\u5361\u7247\u4FDD\u7559");
+      }
+      async convertToCard(node2) {
+        const current = this.nodeMap.get(node2.id);
+        if (!current || current.type !== "text")
+          return;
+        const text = current.text.trim();
+        if (!text) {
+          new import_obsidian16.Notice("\u5185\u5BB9\u4E3A\u7A7A\uFF0C\u65E0\u6CD5\u8F6C\u6362");
+          return;
+        }
+        const folder = await resolveCardFolder(this.app, this.plugin.settings.cardFolder);
+        const result = await appendCard(this.app, folder, text);
+        if (!result) {
+          new import_obsidian16.Notice("\u8F6C\u6362\u5931\u8D25\uFF1A\u5199\u5165\u5361\u7247\u6587\u4EF6\u540E\u6821\u9A8C\u672A\u901A\u8FC7");
+          return;
+        }
+        const { x, y, width, height } = current;
+        this.nodes = this.nodes.filter((item) => item.id !== current.id);
+        this.nodeMap.delete(current.id);
+        this.selection.delete(current.id);
+        this.detachNodeElement(current.id);
+        const added = await this.addCardNodeAt(result.file, result.blockId, x, y, width, height);
+        if (!added) {
+          new import_obsidian16.Notice("\u5361\u7247\u5DF2\u5199\u5165\u7B14\u8BB0\uFF0C\u4F46\u672A\u80FD\u6DFB\u52A0\u5230\u767D\u677F");
+          this.scheduleSave();
+          return;
+        }
+        this.selection.clear();
+        this.selection.add(added.id);
+        this.paintSelection();
+        this.updateHint();
+        this.pushHistory();
+        this.updateToolbar();
+        new import_obsidian16.Notice("\u5DF2\u8F6C\u4E3A\u5361\u7247\u7B14\u8BB0");
+      }
+      async addCardNodeAt(file, blockId, x, y, width, height) {
+        const node2 = {
+          id: createId(),
+          type: "card",
+          file,
+          blockId,
+          x,
+          y,
+          width,
+          height
+        };
+        this.nodes.push(node2);
+        this.nodeMap.set(node2.id, node2);
+        await this.renderNode(node2);
+        this.scheduleSave();
+        return node2;
+      }
+      async convertToNote(node2) {
+        var _a, _b;
+        const current = this.nodeMap.get(node2.id);
+        if (!current || current.type !== "text")
+          return;
+        const text = current.text.trim();
+        if (!text) {
+          new import_obsidian16.Notice("\u5185\u5BB9\u4E3A\u7A7A\uFF0C\u65E0\u6CD5\u8F6C\u6362");
+          return;
+        }
+        const file = await createNoteFromText(this.app, (_a = this.plugin.settings.boardFolder) != null ? _a : "", text);
+        if (!file) {
+          new import_obsidian16.Notice("\u8F6C\u6362\u5931\u8D25\uFF1A\u65E0\u6CD5\u521B\u5EFA\u7B14\u8BB0\u6587\u4EF6");
+          return;
+        }
+        const next = {
+          id: current.id,
+          type: "file",
+          file: file.path,
+          x: current.x,
+          y: current.y,
+          width: current.width,
+          height: (_b = current.height) != null ? _b : Math.max(120, current.width * 0.75)
+        };
+        const index = this.nodes.findIndex((item) => item.id === current.id);
+        if (index === -1)
+          return;
+        this.nodes[index] = next;
+        this.nodeMap.set(next.id, next);
+        this.detachNodeElement(next.id);
+        await this.renderNode(next);
+        this.pushHistory();
+        this.scheduleSave();
+        this.updateToolbar();
+        new import_obsidian16.Notice("\u5DF2\u8F6C\u4E3A\u72EC\u7ACB\u7B14\u8BB0");
+      }
+      buildToolbarActions() {
+        const single = (nodes) => nodes.length === 1;
+        const canOpen = (nodes) => nodes.length === 1 && this.isOpenable(nodes[0]);
+        return [
+          {
+            id: "open-tab",
+            icon: "external-link",
+            label: "\u5728\u65B0\u6807\u7B7E\u9875\u6253\u5F00",
+            visible: single,
+            enabled: canOpen,
+            run: (nodes) => this.openNode(nodes[0], "tab")
+          },
+          {
+            id: "open-window",
+            icon: "app-window",
+            label: "\u5728\u65B0\u7A97\u53E3\u6253\u5F00",
+            visible: single,
+            enabled: canOpen,
+            run: (nodes) => this.openNode(nodes[0], "window")
+          },
+          {
+            id: "group",
+            icon: "group",
+            label: "\u521B\u5EFA\u5206\u7EC4",
+            visible: (nodes) => nodes.length > 1,
+            run: () => void this.createGroupFromSelection()
+          },
+          {
+            id: "align",
+            icon: "align-start-vertical",
+            label: "\u5BF9\u9F50",
+            visible: (nodes) => nodes.length >= 2,
+            run: (nodes, evt) => this.showAlignPop(nodes, evt)
+          },
+          {
+            id: "color",
+            icon: "palette",
+            label: "\u989C\u8272",
+            run: (nodes, evt) => this.showColorPop(nodes, evt)
+          },
+          {
+            id: "ai",
+            icon: "sparkles",
+            label: "AI \u5206\u6790",
+            run: () => this.openAIPanel()
+          },
+          {
+            id: "more",
+            icon: "more-horizontal",
+            label: "\u66F4\u591A",
+            visible: (nodes) => nodes.length === 1 && (nodes[0].type === "text" || nodes[0].type === "card"),
+            run: (nodes, evt) => this.showMoreMenu(nodes[0], evt)
+          },
+          {
+            id: "ungroup",
+            icon: "ungroup",
+            label: "\u53D6\u6D88\u5206\u7EC4",
+            visible: (nodes) => nodes.length === 1 && nodes[0].type === "group",
+            run: () => this.deleteSelection()
+          },
+          {
+            id: "delete",
+            icon: "trash-2",
+            label: "\u5220\u9664",
+            danger: true,
+            run: () => this.deleteSelection()
+          }
+        ];
+      }
+      async renameBoard(file, value) {
+        var _a, _b;
+        const name = value.replace(/\.(volis|collis)$/i, "").trim();
+        if (!name || name === file.basename)
+          return;
+        const folder = (_b = (_a = file.parent) == null ? void 0 : _a.path) != null ? _b : "";
+        const prefix = folder && folder !== "/" ? `${folder}/` : "";
+        try {
+          await this.app.fileManager.renameFile(file, `${prefix}${name}.${BOARD_EXTENSION}`);
+        } catch (error) {
+          new import_obsidian16.Notice("\u91CD\u547D\u540D\u5931\u8D25\uFF1A\u540D\u79F0\u53EF\u80FD\u91CD\u590D\u6216\u5305\u542B\u975E\u6CD5\u5B57\u7B26");
+        }
+      }
+      repaintColors() {
+        for (const node2 of this.nodes) {
+          const el = this.nodeEls.get(node2.id);
+          if (el)
+            this.paintColor(el, node2.color);
+        }
+      }
+      hasEditingNode() {
+        for (const el of this.nodeEls.values()) {
+          if (el.hasClass("collis-editing"))
+            return true;
+        }
+        return false;
+      }
+      minimapWorld() {
+        if (this.nodes.length === 0)
+          return null;
+        const rect = this.root.getBoundingClientRect();
+        const viewLeft = -this.tx / this.scale;
+        const viewTop = -this.ty / this.scale;
+        const viewRight = viewLeft + rect.width / this.scale;
+        const viewBottom = viewTop + rect.height / this.scale;
+        let minX = viewLeft;
+        let minY = viewTop;
+        let maxX = viewRight;
+        let maxY = viewBottom;
+        for (const node2 of this.nodes) {
+          const height = this.nodeHeight(node2);
+          minX = Math.min(minX, node2.x);
+          minY = Math.min(minY, node2.y);
+          maxX = Math.max(maxX, node2.x + node2.width);
+          maxY = Math.max(maxY, node2.y + height);
+        }
+        const pad2 = 60;
+        let x = minX - pad2;
+        let y = minY - pad2;
+        let w = Math.max(1, maxX - minX + pad2 * 2);
+        let h = Math.max(1, maxY - minY + pad2 * 2);
+        const aspect = 180 / 120;
+        if (w / h < aspect) {
+          const nextW = h * aspect;
+          x -= (nextW - w) / 2;
+          w = nextW;
+        } else {
+          const nextH = w / aspect;
+          y -= (nextH - h) / 2;
+          h = nextH;
+        }
+        return { x, y, w, h };
+      }
+      updateMinimap() {
+        const el = this.minimapEl;
+        const svg = this.minimapSvg;
+        if (!el || !svg)
+          return;
+        if (this.nodes.length === 0) {
+          el.addClass("is-hidden");
+          return;
+        }
+        const world = this.minimapWorld();
+        if (!world) {
+          el.addClass("is-hidden");
+          return;
+        }
+        el.removeClass("is-hidden");
+        while (svg.firstChild)
+          svg.removeChild(svg.firstChild);
+        svg.setAttribute("viewBox", `${world.x} ${world.y} ${world.w} ${world.h}`);
+        for (const node2 of this.nodes) {
+          const rect = this.svgNode("rect");
+          rect.setAttribute("x", String(node2.x));
+          rect.setAttribute("y", String(node2.y));
+          rect.setAttribute("width", String(node2.width));
+          rect.setAttribute("height", String(this.nodeHeight(node2)));
+          rect.setAttribute("rx", node2.type === "group" ? "8" : "4");
+          rect.setAttribute("class", `collis-mini-node is-${node2.type}`);
+          svg.appendChild(rect);
+        }
+        const view = this.svgNode("rect");
+        const rootRect = this.root.getBoundingClientRect();
+        const viewLeft = -this.tx / this.scale;
+        const viewTop = -this.ty / this.scale;
+        view.setAttribute("x", String(viewLeft));
+        view.setAttribute("y", String(viewTop));
+        view.setAttribute("width", String(rootRect.width / this.scale));
+        view.setAttribute("height", String(rootRect.height / this.scale));
+        view.setAttribute("rx", "6");
+        view.setAttribute("class", "collis-mini-view");
+        svg.appendChild(view);
+      }
+      jumpToMinimapPoint(clientX, clientY) {
+        const svg = this.minimapSvg;
+        const el = this.minimapEl;
+        if (!svg || !el)
+          return;
+        const box = svg.viewBox.baseVal;
+        if (box.width === 0 || box.height === 0)
+          return;
+        const rect = el.getBoundingClientRect();
+        const padding = 4;
+        const relX = (clientX - rect.left - padding) / Math.max(1, rect.width - padding * 2);
+        const relY = (clientY - rect.top - padding) / Math.max(1, rect.height - padding * 2);
+        const worldX = box.x + Math.min(1, Math.max(0, relX)) * box.width;
+        const worldY = box.y + Math.min(1, Math.max(0, relY)) * box.height;
+        const rootRect = this.root.getBoundingClientRect();
+        this.tx = rootRect.width / 2 - worldX * this.scale;
+        this.ty = rootRect.height / 2 - worldY * this.scale;
+        this.applyTransform();
+        this.scheduleSave();
+      }
+      updateToolbar() {
+        if (!this.toolbarEl)
+          return;
+        const nodes = this.selectedNodes();
+        if (nodes.length === 0 || this.hasEditingNode()) {
+          this.toolbarEl.addClass("is-hidden");
+          return;
+        }
+        const actions = this.buildToolbarActions().filter(
+          (action) => !action.visible || action.visible(nodes)
+        );
+        if (actions.length === 0) {
+          this.toolbarEl.addClass("is-hidden");
+          return;
+        }
+        const key = actions.map((action) => `${action.id}:${action.enabled ? action.enabled(nodes) : true}`).join(",");
+        if (key !== this.toolbarKey) {
+          this.toolbarKey = key;
+          this.toolbarEl.empty();
+          for (const action of actions) {
+            const button = this.toolbarEl.createEl("button", {
+              cls: `collis-tool-btn${action.danger ? " is-danger" : ""}`,
+              attr: { "aria-label": action.label }
+            });
+            button.disabled = action.enabled ? !action.enabled(nodes) : false;
+            (0, import_obsidian16.setIcon)(button, action.icon);
+            button.addEventListener("click", (evt) => {
+              evt.preventDefault();
+              evt.stopPropagation();
+              action.run(this.selectedNodes(), evt);
+            });
+          }
+        }
+        const rect = this.root.getBoundingClientRect();
+        const box = this.selectionBox(nodes);
+        if (!box) {
+          this.toolbarEl.addClass("is-hidden");
+          return;
+        }
+        const left = box.minX * this.scale + this.tx;
+        const right = box.maxX * this.scale + this.tx;
+        const top = box.minY * this.scale + this.ty;
+        const bottom = box.maxY * this.scale + this.ty;
+        if (right < 0 || left > rect.width || bottom < 0 || top > rect.height) {
+          this.toolbarEl.addClass("is-hidden");
+          return;
+        }
+        this.toolbarEl.removeClass("is-hidden");
+        const barWidth = this.toolbarEl.offsetWidth || 110;
+        const barHeight = this.toolbarEl.offsetHeight || 36;
+        let x = (left + right) / 2 - barWidth / 2;
+        let y = top - barHeight - 10;
+        if (y < 6)
+          y = bottom + 10;
+        x = Math.max(6, Math.min(x, rect.width - barWidth - 6));
+        y = Math.max(6, Math.min(y, rect.height - barHeight - 6));
+        this.toolbarEl.style.left = `${Math.round(x)}px`;
+        this.toolbarEl.style.top = `${Math.round(y)}px`;
+      }
+      selectionBox(nodes) {
+        var _a;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        for (const node2 of nodes) {
+          const el = this.nodeEls.get(node2.id);
+          const height = (_a = el == null ? void 0 : el.offsetHeight) != null ? _a : 100;
+          minX = Math.min(minX, node2.x);
+          minY = Math.min(minY, node2.y);
+          maxX = Math.max(maxX, node2.x + node2.width);
+          maxY = Math.max(maxY, node2.y + height);
+        }
+        if (!Number.isFinite(minX))
+          return null;
+        return { minX, minY, maxX, maxY };
+      }
+      snapshotNodes() {
+        return JSON.stringify({ nodes: this.nodes, edges: this.edges });
+      }
+      resetHistory() {
+        this.history = [this.snapshotNodes()];
+        this.historyIndex = 0;
+        this.updateHistoryButtons();
+      }
+      pushHistory() {
+        const snap = this.snapshotNodes();
+        if (this.historyIndex >= 0 && this.history[this.historyIndex] === snap)
+          return;
+        this.history = this.history.slice(0, this.historyIndex + 1);
+        this.history.push(snap);
+        if (this.history.length > _BoardView2.HISTORY_LIMIT)
+          this.history.shift();
+        this.historyIndex = this.history.length - 1;
+        this.updateHistoryButtons();
+      }
+      copySelection() {
+        if (this.selection.size === 0)
+          return;
+        const ids = new Set(this.selection);
+        this.clipboard = this.nodes.filter((node2) => ids.has(node2.id)).map((node2) => ({ ...node2 }));
+        this.clipboardEdges = this.edges.filter((edge) => ids.has(edge.from) && ids.has(edge.to)).map((edge) => ({ ...edge }));
+      }
+      async pasteClipboard() {
+        if (this.clipboard.length === 0)
+          return;
+        const boxOf = (nodes) => {
+          let minX = Infinity;
+          let minY = Infinity;
+          let maxX = -Infinity;
+          let maxY = -Infinity;
+          for (const node2 of nodes) {
+            const height = this.nodeHeight(node2);
+            minX = Math.min(minX, node2.x);
+            minY = Math.min(minY, node2.y);
+            maxX = Math.max(maxX, node2.x + node2.width);
+            maxY = Math.max(maxY, node2.y + height);
+          }
+          return { minX, minY, maxX, maxY };
+        };
+        const box = boxOf(this.clipboard);
+        let dx = 24;
+        let dy = 24;
+        if (this.lastPointerWorld && Number.isFinite(box.minX)) {
+          dx = this.lastPointerWorld.x - (box.minX + box.maxX) / 2;
+          dy = this.lastPointerWorld.y - (box.minY + box.maxY) / 2;
+        }
+        const idMap = /* @__PURE__ */ new Map();
+        const copies = this.clipboard.map((node2) => {
+          const id = createId();
+          idMap.set(node2.id, id);
+          return {
+            ...node2,
+            id,
+            x: Math.round(node2.x + dx),
+            y: Math.round(node2.y + dy)
+          };
+        });
+        const edges = this.clipboardEdges.map((edge) => {
+          var _a, _b;
+          return {
+            ...edge,
+            id: createId(),
+            from: (_a = idMap.get(edge.from)) != null ? _a : "",
+            to: (_b = idMap.get(edge.to)) != null ? _b : ""
+          };
+        }).filter((edge) => edge.from && edge.to);
+        this.nodes.push(...copies);
+        for (const node2 of copies)
+          this.nodeMap.set(node2.id, node2);
+        this.edges.push(...edges);
+        try {
+          await Promise.all(copies.map((node2) => this.renderNode(node2)));
+        } catch (error) {
+          console.error("[Collis] paste render failed", error);
+        }
+        this.renderEdges();
+        this.selection.clear();
+        for (const node2 of copies)
+          this.selection.add(node2.id);
+        this.paintSelection();
+        this.updateHint();
+        this.pushHistory();
+        this.scheduleSave();
+      }
+      async undo() {
+        if (this.hasEditingNode()) {
+          new import_obsidian16.Notice("\u8BF7\u5148\u7ED3\u675F\u7F16\u8F91\u518D\u64A4\u9500");
+          return;
+        }
+        if (this.historyIndex <= 0)
+          return;
+        this.historyIndex -= 1;
+        await this.restoreSnapshot(this.history[this.historyIndex]);
+        this.updateHistoryButtons();
+      }
+      async redo() {
+        if (this.hasEditingNode()) {
+          new import_obsidian16.Notice("\u8BF7\u5148\u7ED3\u675F\u7F16\u8F91\u518D\u91CD\u505A");
+          return;
+        }
+        if (this.historyIndex >= this.history.length - 1)
+          return;
+        this.historyIndex += 1;
+        await this.restoreSnapshot(this.history[this.historyIndex]);
+        this.updateHistoryButtons();
+      }
+      async restoreSnapshot(snapshot) {
+        var _a, _b;
+        let next = [];
+        let nextEdges = [];
+        try {
+          const parsed = JSON.parse(snapshot);
+          if (Array.isArray(parsed)) {
+            next = parsed;
+          } else {
+            const value = parsed;
+            next = (_a = value.nodes) != null ? _a : [];
+            nextEdges = (_b = value.edges) != null ? _b : [];
+          }
+        } catch (error) {
+          return;
+        }
+        this.ensureLayers();
+        this.selection.clear();
+        this.staleIds.clear();
+        const nextIds = new Set(next.map((node2) => node2.id));
+        for (const [id, el] of Array.from(this.nodeEls.entries())) {
+          if (nextIds.has(id))
+            continue;
+          el.remove();
+          this.nodeEls.delete(id);
+        }
+        const previousMap = this.nodeMap;
+        this.closeEdgeLabelEditor(false);
+        this.nodes = next;
+        this.edges = nextEdges;
+        this.nodeMap = new Map(next.map((node2) => [node2.id, node2]));
+        const rebuilds = [];
+        for (const node2 of next) {
+          const el = this.nodeEls.get(node2.id);
+          const previous = previousMap.get(node2.id);
+          if (!el || !previous || this.nodeContentChanged(previous, node2)) {
+            rebuilds.push(this.renderNode(node2));
+            continue;
+          }
+          el.style.transform = `translate3d(${node2.x}px, ${node2.y}px, 0)`;
+          el.style.width = `${node2.width}px`;
+          if (node2.height)
+            el.style.height = `${node2.height}px`;
+          else
+            el.style.removeProperty("height");
+        }
+        try {
+          await Promise.all(rebuilds);
+        } catch (error) {
+          console.error("[Collis] node rebuild failed", error);
+        }
+        this.renderEdges();
+        this.updateHint();
+        this.updateFrame();
+        this.scheduleSave();
+      }
+      nodeContentChanged(a, b) {
+        if (a.type !== b.type)
+          return true;
+        if (a.type === "text" && b.type === "text")
+          return a.text !== b.text;
+        if (a.type === "card" && b.type === "card") {
+          return a.file !== b.file || a.blockId !== b.blockId;
+        }
+        if (a.type === "file" && b.type === "file")
+          return a.file !== b.file;
+        return false;
+      }
+      deleteSelection() {
+        if (this.selection.size === 0)
+          return;
+        const ids = /* @__PURE__ */ new Set();
+        for (const id of this.selection) {
+          const el = this.nodeEls.get(id);
+          if (el && el.hasClass("collis-editing"))
+            continue;
+          ids.add(id);
+        }
+        if (ids.size === 0)
+          return;
+        this.nodes = this.nodes.filter((node2) => !ids.has(node2.id));
+        for (const id of ids) {
+          const el = this.nodeEls.get(id);
+          if (el)
+            el.remove();
+          this.nodeEls.delete(id);
+          this.nodeMap.delete(id);
+          this.staleIds.delete(id);
+        }
+        this.pruneEdges();
+        this.renderEdges();
+        this.selection.clear();
+        this.updateFrame();
+        this.updateHint();
+        this.pushHistory();
+        this.scheduleSave();
+      }
+      updateHint() {
+        this.hintEl.toggleClass("is-hidden", this.nodes.length > 0);
+      }
+      /**
+       * Drop a node's DOM element and index entry so the next render must build it
+       * from scratch, even if an editor happens to still be attached.
+       */
+      detachNodeElement(nodeId) {
+        const el = this.nodeEls.get(nodeId);
+        if (!el)
+          return;
+        el.classList.remove("collis-editing");
+        el.remove();
+        this.nodeEls.delete(nodeId);
+      }
+      ensureLayers() {
+        if (!this.edgesEl || !this.world.contains(this.edgesEl)) {
+          const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          svg.classList.add("collis-edges");
+          this.world.prepend(svg);
+          this.edgesEl = svg;
+        }
+        if (!this.frameEl || !this.world.contains(this.frameEl)) {
+          this.frameEl = this.world.createDiv({ cls: "collis-selection-frame is-hidden" });
+        }
+      }
+      svgNode(tag) {
+        return document.createElementNS("http://www.w3.org/2000/svg", tag);
+      }
+      nodeHeight(node2) {
+        var _a, _b, _c;
+        return (_c = (_b = (_a = this.nodeEls.get(node2.id)) == null ? void 0 : _a.offsetHeight) != null ? _b : node2.height) != null ? _c : 100;
+      }
+      /** Where the line leaves a node's box, heading towards `towards`. */
+      borderPoint(node2, towards) {
+        return this.borderPointAt(
+          node2,
+          towards.x + towards.width / 2,
+          towards.y + this.nodeHeight(towards) / 2
+        );
+      }
+      borderPointAt(node2, tx, ty) {
+        const cx = node2.x + node2.width / 2;
+        const cy = node2.y + this.nodeHeight(node2) / 2;
+        const dx = tx - cx;
+        const dy = ty - cy;
+        const halfW = node2.width / 2;
+        const halfH = this.nodeHeight(node2) / 2;
+        const scaleX = Math.abs(dx) < 1e-3 ? Number.POSITIVE_INFINITY : halfW / Math.abs(dx);
+        const scaleY = Math.abs(dy) < 1e-3 ? Number.POSITIVE_INFINITY : halfH / Math.abs(dy);
+        const scale = Math.min(scaleX, scaleY);
+        if (!Number.isFinite(scale))
+          return { x: cx, y: cy };
+        return { x: cx + dx * scale, y: cy + dy * scale };
+      }
+      portPoint(node2, side, ratio = 0.5) {
+        const height = this.nodeHeight(node2);
+        const clamped = Math.min(0.9, Math.max(0.1, ratio));
+        switch (side) {
+          case "top":
+            return { x: node2.x + node2.width * clamped, y: node2.y };
+          case "bottom":
+            return { x: node2.x + node2.width * clamped, y: node2.y + height };
+          case "left":
+            return { x: node2.x, y: node2.y + height * clamped };
+          default:
+            return { x: node2.x + node2.width, y: node2.y + height * clamped };
+        }
+      }
+      sideNormal(side) {
+        switch (side) {
+          case "top":
+            return { x: 0, y: -1 };
+          case "bottom":
+            return { x: 0, y: 1 };
+          case "left":
+            return { x: -1, y: 0 };
+          default:
+            return { x: 1, y: 0 };
+        }
+      }
+      /**
+       * Curve that leaves along the side's normal, like the native canvas does.
+       * Returns the control points as well as the path: the label, its editor and
+       * the style bar all need a point along the same curve, so they resolve it
+       * from here instead of each keeping their own idea of "the middle".
+       */
+      orientedPath(p1, side1, p2, side2) {
+        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        const offset = Math.max(28, Math.min(150, dist * 0.35));
+        const n1 = this.sideNormal(side1);
+        const n2 = this.sideNormal(side2);
+        const c1 = { x: p1.x + n1.x * offset, y: p1.y + n1.y * offset };
+        const c2 = { x: p2.x + n2.x * offset, y: p2.y + n2.y * offset };
+        const curve = { p1, c1, c2, p2 };
+        return { ...curve, d: curvePath(curve) };
+      }
+      /** One edge's geometry, shared by the renderer and the label editor. */
+      edgeGeometry(edge) {
+        var _a, _b;
+        const from = this.nodeMap.get(edge.from);
+        const to = this.nodeMap.get(edge.to);
+        if (!from || !to)
+          return null;
+        const fromSide = (_a = edge.fromSide) != null ? _a : this.nearestSide(from, to.x + to.width / 2, to.y);
+        const toSide = (_b = edge.toSide) != null ? _b : this.nearestSide(to, from.x + from.width / 2, from.y);
+        const start = this.portPoint(from, fromSide);
+        const end = this.portPoint(to, toSide);
+        return this.orientedPath(start, fromSide, end, toSide);
+      }
+      /** Stored label, trimmed and capped. Hand-edited files must not throw. */
+      edgeLabelOf(edge) {
+        const raw = typeof edge.label === "string" ? edge.label.trim() : "";
+        return raw.slice(0, EDGE_LABEL_MAX);
+      }
+      /** What the chip shows: the user's label if present, otherwise the relation
+       *  name, so a semantic edge stays readable without opening the editor. */
+      edgeDisplayLabel(edge) {
+        var _a, _b;
+        const label = this.edgeLabelOf(edge);
+        if (label)
+          return label;
+        return edge.relation ? (_b = (_a = EDGE_RELATION_BY_ID.get(edge.relation)) == null ? void 0 : _a.label) != null ? _b : "" : "";
+      }
+      /** Where the label sits on the line. Missing or out-of-range values in a
+       *  hand-edited file fall back to the middle rather than throwing. */
+      edgeLabelT(edge) {
+        return typeof edge.labelAt === "number" ? clampLabelT(edge.labelAt) : 0.5;
+      }
+      nearestSide(node2, x, y) {
+        const height = this.nodeHeight(node2);
+        const cx = node2.x + node2.width / 2;
+        const cy = node2.y + height / 2;
+        const dx = x - cx;
+        const dy = y - cy;
+        const nx = Math.abs(dx) / Math.max(1, node2.width / 2);
+        const ny = Math.abs(dy) / Math.max(1, height / 2);
+        if (nx >= ny)
+          return dx >= 0 ? "right" : "left";
+        return dy >= 0 ? "bottom" : "top";
+      }
+      edgePath(p1, p2) {
+        const horizontal = Math.abs(p2.x - p1.x) >= Math.abs(p2.y - p1.y);
+        if (horizontal) {
+          const mx = (p1.x + p2.x) / 2;
+          return `M ${p1.x} ${p1.y} C ${mx} ${p1.y}, ${mx} ${p2.y}, ${p2.x} ${p2.y}`;
+        }
+        const my = (p1.y + p2.y) / 2;
+        return `M ${p1.x} ${p1.y} C ${p1.x} ${my}, ${p2.x} ${my}, ${p2.x} ${p2.y}`;
+      }
+      lineColorOf(color) {
+        var _a;
+        if (!color)
+          return void 0;
+        if (color.startsWith("#"))
+          return color;
+        return (_a = NODE_COLORS.find((item) => item.name === color)) == null ? void 0 : _a.line;
+      }
+      renderEdges() {
+        var _a, _b, _c, _d;
+        if (!this.edgesEl || !this.world.contains(this.edgesEl))
+          this.ensureLayers();
+        const svg = this.edgesEl;
+        if (!svg)
+          return;
+        while (svg.firstChild)
+          svg.removeChild(svg.firstChild);
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        for (const node2 of this.nodes) {
+          const height = this.nodeHeight(node2);
+          minX = Math.min(minX, node2.x);
+          minY = Math.min(minY, node2.y);
+          maxX = Math.max(maxX, node2.x + node2.width);
+          maxY = Math.max(maxY, node2.y + height);
+        }
+        if (!Number.isFinite(minX)) {
+          minX = 0;
+          minY = 0;
+          maxX = 1;
+          maxY = 1;
+        }
+        const pad2 = 400;
+        const vx = minX - pad2;
+        const vy = minY - pad2;
+        const vw = Math.max(1, maxX - minX + pad2 * 2);
+        const vh = Math.max(1, maxY - minY + pad2 * 2);
+        svg.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
+        svg.style.left = `${vx}px`;
+        svg.style.top = `${vy}px`;
+        svg.style.width = `${vw}px`;
+        svg.style.height = `${vh}px`;
+        const defs = this.svgNode("defs");
+        defs.innerHTML = '<marker id="collis-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker>';
+        svg.appendChild(defs);
+        for (const edge of this.edges) {
+          const from = this.nodeMap.get(edge.from);
+          const to = this.nodeMap.get(edge.to);
+          if (!from || !to)
+            continue;
+          const geometry = this.edgeGeometry(edge);
+          if (!geometry)
+            continue;
+          const d = geometry.d;
+          const group = this.svgNode("g");
+          group.setAttribute("class", "collis-edge-group");
+          group.dataset.edgeId = edge.id;
+          if (edge.id === this.selectedEdgeId)
+            group.classList.add("is-selected");
+          const hit = this.svgNode("path");
+          hit.setAttribute("d", d);
+          hit.setAttribute("class", "collis-edge-hit");
+          const path = this.svgNode("path");
+          path.setAttribute("d", d);
+          path.setAttribute("class", "collis-edge");
+          const relation = edge.relation ? EDGE_RELATION_BY_ID.get(edge.relation) : void 0;
+          const style = (_a = edge.style) != null ? _a : relation == null ? void 0 : relation.style;
+          path.setAttribute("marker-end", "url(#collis-arrow)");
+          if (style === "dashed")
+            path.setAttribute("stroke-dasharray", "6 4");
+          const stroke = (_b = this.lineColorOf(edge.color)) != null ? _b : this.lineColorOf(relation == null ? void 0 : relation.color);
+          if (stroke)
+            path.style.stroke = stroke;
+          const arrow = (_d = (_c = edge.arrow) != null ? _c : relation == null ? void 0 : relation.arrow) != null ? _d : "target";
+          if (arrow === "none") {
+            path.removeAttribute("marker-end");
+          } else {
+            path.setAttribute("marker-end", "url(#collis-arrow)");
+          }
+          if (arrow === "both") {
+            path.setAttribute("marker-start", "url(#collis-arrow)");
+          }
+          group.appendChild(hit);
+          group.appendChild(path);
+          this.attachEdgeLabel(group, edge, geometry);
+          svg.appendChild(group);
+        }
+      }
+      /**
+       * Label chip drawn above the stroke at the label's own point on the line: a
+       * rounded plate in the card colour plus a hairline border, so the stroke
+       * reads as interrupted behind the text instead of cutting through it. Both
+       * shapes live in the edge group, so they scale, pan and get selected along
+       * with the line and need no repositioning of their own.
+       */
+      attachEdgeLabel(group, edge, curve) {
+        const stored = this.edgeLabelOf(edge);
+        const label = stored || this.edgeDisplayLabel(edge);
+        if (!label)
+          return;
+        const anchor = curvePoint(curve, this.edgeLabelT(edge));
+        const text = this.svgNode("text");
+        text.setAttribute("class", stored ? "collis-edge-label" : "collis-edge-label is-relation");
+        text.setAttribute("x", String(anchor.x));
+        text.setAttribute("y", String(anchor.y));
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("dominant-baseline", "central");
+        text.style.font = this.labelFont();
+        text.textContent = label;
+        const width = this.edgeLabelWidth(label) + EDGE_LABEL_PAD_X * 2;
+        const chip = this.svgNode("rect");
+        chip.setAttribute("class", "collis-edge-label-bg");
+        chip.setAttribute("x", String(anchor.x - width / 2));
+        chip.setAttribute("y", String(anchor.y - EDGE_LABEL_HEIGHT / 2));
+        chip.setAttribute("width", String(width));
+        chip.setAttribute("height", String(EDGE_LABEL_HEIGHT));
+        chip.setAttribute("rx", String(EDGE_LABEL_RADIUS));
+        group.appendChild(chip);
+        group.appendChild(text);
+      }
+      /**
+       * Font spec for a label. The interface font comes from the theme, the rest
+       * from the constants above, and the result is applied inline — reading it
+       * back off the `<text>` element is not an option, because these labels are
+       * measured while the group is still detached (and the board is hidden), where
+       * `getComputedStyle` returns empty values and any measurement built on it
+       * silently falls back to the canvas default.
+       */
+      labelFont() {
+        if (this.labelFontCache)
+          return this.labelFontCache;
+        const family = window.getComputedStyle(this.root).getPropertyValue("--font-interface").trim() || "sans-serif";
+        this.labelFontCache = `500 ${EDGE_LABEL_FONT_SIZE}px ${family}`;
+        return this.labelFontCache;
+      }
+      /**
+       * Rendered width of the label, in board units, from canvas metrics.
+       * `getBBox()`/`getComputedTextLength()` would be exact but report zero
+       * whenever the board is not laid out, so a chip sized from them would
+       * collapse to a dot on load and in a background tab.
+       */
+      edgeLabelWidth(value) {
+        if (!this.labelMetrics) {
+          this.labelMetrics = document.createElement("canvas").getContext("2d");
+          if (this.labelMetrics)
+            this.labelMetrics.font = this.labelFont();
+        }
+        if (!this.labelMetrics)
+          return value.length * EDGE_LABEL_FONT_SIZE;
+        return this.labelMetrics.measureText(value).width;
+      }
+      /** Small icon sitting on the top border, so the node type stays readable
+       *  even when the content is scaled down to an illegible blur. */
+      attachTypeBadge(el, node2) {
+        var _a;
+        const ext = node2.type === "file" ? ((_a = node2.file.split(".").pop()) != null ? _a : "").toLowerCase() : "";
+        let kind = "file";
+        let icon = "file";
+        if (node2.type === "card") {
+          kind = "card";
+          icon = "quote";
+        } else if (node2.type === "text") {
+          kind = node2.sticky ? "sticky" : "text";
+          icon = node2.sticky ? "sticky-note" : "type";
+        } else if (ext === "md") {
+          kind = "note";
+          icon = "file-text";
+        } else if (IMAGE_EXT2.includes(ext)) {
+          kind = "image";
+          icon = "image";
+        } else if (VIDEO_EXT2.includes(ext)) {
+          kind = "video";
+          icon = "video";
+        }
+        const badge = el.createDiv({ cls: "collis-type-badge" });
+        badge.dataset.kind = kind;
+        (0, import_obsidian16.setIcon)(badge, icon);
+      }
+      renderGroupBody(el, node2) {
+        var _a, _b;
+        el.addClass("is-group");
+        this.nodeText.set(node2.id, (_a = node2.label) != null ? _a : "");
+        const input = document.createElement("input");
+        input.className = "collis-group-label";
+        input.type = "text";
+        input.spellcheck = false;
+        input.value = (_b = node2.label) != null ? _b : "\u5206\u7EC4";
+        input.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        input.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        input.addEventListener("focus", () => input.select());
+        let committing = false;
+        const commit = () => {
+          if (committing)
+            return;
+          committing = true;
+          node2.label = input.value.trim() || "\u5206\u7EC4";
+          input.value = node2.label;
+          this.pushHistory();
+          this.scheduleSave();
+          committing = false;
+        };
+        input.addEventListener("blur", commit);
+        input.addEventListener("keydown", (evt) => {
+          var _a2;
+          evt.stopPropagation();
+          if (evt.isComposing)
+            return;
+          if (evt.key === "Enter") {
+            evt.preventDefault();
+            input.blur();
+          }
+          if (evt.key === "Escape") {
+            evt.preventDefault();
+            input.value = (_a2 = node2.label) != null ? _a2 : "\u5206\u7EC4";
+            input.blur();
+          }
+        });
+        el.appendChild(input);
+      }
+      /** Nodes whose centre falls inside a group's box. Position is the only
+       *  membership record, so dragging in and out just works. */
+      groupMembers(group) {
+        var _a;
+        const left = group.x;
+        const top = group.y;
+        const right = group.x + group.width;
+        const bottom = group.y + ((_a = group.height) != null ? _a : 0);
+        return this.nodes.filter((node2) => {
+          if (node2.id === group.id || node2.type === "group")
+            return false;
+          const height = this.nodeHeight(node2);
+          const cx = node2.x + node2.width / 2;
+          const cy = node2.y + height / 2;
+          return cx >= left && cx <= right && cy >= top && cy <= bottom;
+        });
+      }
+      /**
+       * A group only stores a rectangle, so a selected group must be paired with
+       * the nodes it holds. Without this the AI would be handed a bare frame and
+       * answer "this group is empty" while four cards sit inside it.
+       */
+      expandGroups(nodes) {
+        const out = [];
+        const seen = /* @__PURE__ */ new Set();
+        const push = (node2) => {
+          if (seen.has(node2.id))
+            return;
+          seen.add(node2.id);
+          out.push(node2);
+        };
+        for (const node2 of nodes) {
+          push(node2);
+          if (node2.type !== "group")
+            continue;
+          for (const member of this.groupMembers(node2))
+            push(member);
+        }
+        return out;
+      }
+      async createGroupFromSelection() {
+        const nodes = this.selectedNodes().filter((node2) => node2.type !== "group");
+        if (nodes.length === 0)
+          return;
+        const box = this.selectionBox(nodes);
+        if (!box)
+          return;
+        const pad2 = 40;
+        const group = {
+          id: createId(),
+          type: "group",
+          x: Math.round(box.minX - pad2),
+          y: Math.round(box.minY - pad2 - 14),
+          width: Math.round(box.maxX - box.minX + pad2 * 2),
+          height: Math.round(box.maxY - box.minY + pad2 * 2 + 14),
+          label: "\u5206\u7EC4"
+        };
+        this.nodes.unshift(group);
+        this.nodeMap.set(group.id, group);
+        await this.renderNode(group);
+        this.selection.clear();
+        this.selection.add(group.id);
+        this.paintSelection();
+        this.updateHint();
+        this.pushHistory();
+        this.scheduleSave();
+      }
+      async renderNode(node2) {
+        const existing = this.nodeEls.get(node2.id);
+        if (existing && existing.hasClass("collis-editing"))
+          return existing;
+        this.staleIds.delete(node2.id);
+        const el = this.world.createDiv({ cls: "collis-bnode" });
+        el.dataset.nodeId = node2.id;
+        el.style.width = `${node2.width}px`;
+        if (node2.height)
+          el.style.height = `${node2.height}px`;
+        el.style.transform = `translate3d(${node2.x}px, ${node2.y}px, 0)`;
+        el.toggleClass("is-sticky", node2.type === "text" && Boolean(node2.sticky));
+        this.paintColor(el, node2.color);
+        for (const dir of ["n", "s", "e", "w", "ne", "nw", "se", "sw"]) {
+          const handle = el.createDiv({ cls: "collis-resize-handle" });
+          handle.dataset.dir = dir;
+        }
+        if (node2.type !== "group") {
+          for (const side of ["top", "right", "bottom", "left"]) {
+            const port = el.createDiv({ cls: `collis-port is-${side}` });
+            port.dataset.port = side;
+          }
+          this.attachTypeBadge(el, node2);
+        }
+        if (node2.type === "group") {
+          this.renderGroupBody(el, node2);
+        } else if (node2.type === "text") {
+          await this.renderTextBody(el, node2);
+        } else if (node2.type === "card") {
+          await this.renderCardBody(el, node2);
+        } else {
+          await this.renderFileBody(el, node2);
+        }
+        const previous = this.nodeEls.get(node2.id);
+        if (node2.type === "group" && this.frameEl) {
+          this.world.insertBefore(el, this.frameEl);
+        }
+        this.nodeEls.set(node2.id, el);
+        if (previous && previous !== el)
+          previous.remove();
+        if (this.aiPanel && this.aiNumberMap.size >= 2 && this.aiNumberMap.has(node2.id)) {
+          const badge = el.createDiv({
+            cls: "collis-ai-node-number",
+            text: this.aiNumberMap.get(node2.id)
+          });
+          badge.setAttribute("aria-hidden", "true");
+          this.aiBadges.set(node2.id, badge);
+        }
+        this.updateToolbar();
+        return el;
+      }
+      async renderTextBody(el, node2) {
+        const body = el.createDiv({ cls: "collis-bnode-body" });
+        this.nodeText.set(node2.id, node2.text);
+        if (!node2.text.trim())
+          return;
+        await import_obsidian16.MarkdownRenderer.render(this.app, node2.text, body, "", this);
+        this.decorateNumericTags(body);
+      }
+      async renderCardBody(el, node2) {
+        el.addClass("is-card");
+        const meta = await readCard(this.app, {
+          file: node2.file,
+          blockId: node2.blockId,
+          linkpath: ""
+        });
+        const body = el.createDiv({ cls: "collis-bnode-body" });
+        if (meta.stale) {
+          this.staleIds.add(node2.id);
+          body.createDiv({ cls: "collis-bnode-placeholder", text: "\u5361\u7247\u5DF2\u5220\u9664" });
+          return;
+        }
+        this.nodeText.set(node2.id, meta.editable);
+        this.nodeMeta.set(node2.id, { date: meta.date, time: meta.time, tags: meta.tags });
+        await import_obsidian16.MarkdownRenderer.render(this.app, normalizeTags(meta.body), body, node2.file, this);
+        this.decorateNumericTags(body);
+        const parts = [];
+        if (meta.date)
+          parts.push(meta.date.slice(5));
+        if (parts.length > 0) {
+          el.createDiv({ cls: "collis-bnode-meta", text: parts.join("  ") });
+        }
+      }
+      /**
+       * Reads a note for the AI context. Capped so a 300-page note cannot blow up
+       * memory; the budget builder trims it further. Frontmatter is dropped since
+       * it is metadata, not content.
+       */
+      async readNoteText(file) {
+        const cached = this.noteTextCache.get(file.path);
+        if (cached && cached.mtime === file.stat.mtime)
+          return cached.text;
+        let body = "";
+        try {
+          body = await this.app.vault.cachedRead(file);
+        } catch (error) {
+          return file.basename;
+        }
+        const stripped = body.replace(/^---\n[\s\S]*?\n---\n/, "").trim();
+        const text = stripped.length > 1e5 ? `${stripped.slice(0, 1e5)}
+\u2026\uFF08\u8D85\u957F\uFF0C\u5DF2\u622A\u65AD\uFF09` : stripped;
+        this.noteTextCache.set(file.path, { mtime: file.stat.mtime, text });
+        return text;
+      }
+      async renderFileBody(el, node2) {
+        el.addClass("is-file");
+        const file = this.app.vault.getAbstractFileByPath(node2.file);
+        if (file instanceof import_obsidian16.TFile) {
+          const isNote = file.extension.toLowerCase() === "md";
+          this.nodeText.set(node2.id, isNote ? await this.readNoteText(file) : file.basename);
+        }
+        if (!(file instanceof import_obsidian16.TFile)) {
+          this.staleIds.add(node2.id);
+          el.createDiv({ cls: "collis-bnode-placeholder", text: "\u6587\u4EF6\u7F3A\u5931" });
+          return;
+        }
+        const src = this.app.vault.getResourcePath(file);
+        const ext = file.extension.toLowerCase();
+        if (ext === "md") {
+          el.addClass("is-doc-text");
+          el.createDiv({ cls: "collis-bnode-doc-head", text: file.basename });
+          const body = el.createDiv({ cls: "collis-bnode-body collis-bnode-doc-body" });
+          let content = "";
+          try {
+            content = await this.app.vault.cachedRead(file);
+          } catch (error) {
+            content = "";
+          }
+          if (content.trim()) {
+            await import_obsidian16.MarkdownRenderer.render(this.app, content, body, file.path, this);
+            this.decorateNumericTags(body);
+          } else {
+            body.createDiv({ cls: "collis-bnode-placeholder", text: "\u7A7A\u7B14\u8BB0" });
+          }
+          return;
+        }
+        if (IMAGE_EXT2.includes(ext)) {
+          const img = el.createEl("img", { cls: "collis-bnode-media is-loading" });
+          img.draggable = false;
+          const reveal = () => img.removeClass("is-loading");
+          img.addEventListener("load", reveal);
+          img.addEventListener("error", reveal);
+          img.src = src;
+          if (img.complete)
+            reveal();
+          return;
+        }
+        if (ext === "pdf") {
+          const embed = el.createEl("embed", { cls: "collis-bnode-media" });
+          embed.setAttribute("src", src);
+          embed.setAttribute("type", "application/pdf");
+          return;
+        }
+        if (VIDEO_EXT2.includes(ext)) {
+          const video = el.createEl("video", { cls: "collis-bnode-media is-loading" });
+          const revealVideo = () => video.removeClass("is-loading");
+          video.addEventListener("loadeddata", revealVideo);
+          video.addEventListener("error", revealVideo);
+          video.src = src;
+          video.muted = true;
+          video.preload = "metadata";
+          const play = el.createDiv({ cls: "collis-bnode-play" });
+          play.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+          play.addEventListener("click", (evt) => {
+            evt.stopPropagation();
+            play.addClass("is-hidden");
+            el.addClass("is-playing");
+            video.controls = true;
+            video.muted = false;
+            void video.play();
+          });
+          return;
+        }
+        const audio = el.createEl("audio", { cls: "collis-bnode-media" });
+        audio.src = src;
+        audio.controls = false;
+        const audioPlay = el.createDiv({ cls: "collis-bnode-play" });
+        audioPlay.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        audioPlay.addEventListener("click", (evt) => {
+          evt.stopPropagation();
+          this.openMedia(node2.file);
+        });
+      }
+      /**
+       * Obsidian only treats a tag as such when it contains a non-digit character,
+       * so `#09` renders as plain text. Numbered tags are common in this workflow,
+       * so wrap them in the tag element after rendering. Code, links and existing
+       * tags are left alone.
+       */
+      decorateNumericTags(container) {
+        var _a, _b;
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+          acceptNode: (node2) => {
+            var _a2;
+            const parent = node2.parentElement;
+            if (!parent)
+              return NodeFilter.FILTER_REJECT;
+            if (parent.closest("code, pre, a, .tag"))
+              return NodeFilter.FILTER_REJECT;
+            return /(^|\s)#\d+\b/.test((_a2 = node2.nodeValue) != null ? _a2 : "") ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+          }
+        });
+        const targets = [];
+        let current = walker.nextNode();
+        while (current) {
+          targets.push(current);
+          current = walker.nextNode();
+        }
+        for (const textNode of targets) {
+          const text = (_a = textNode.nodeValue) != null ? _a : "";
+          const fragment = document.createDocumentFragment();
+          const pattern = /(^|\s)(#\d+)\b/g;
+          let last = 0;
+          let match;
+          while ((match = pattern.exec(text)) !== null) {
+            const start = match.index + match[1].length;
+            if (start > last) {
+              fragment.appendChild(document.createTextNode(text.slice(last, start)));
+            }
+            const tag = document.createElement("a");
+            tag.className = "tag";
+            tag.textContent = match[2];
+            tag.setAttribute("href", match[2]);
+            tag.addEventListener("click", (evt) => evt.preventDefault());
+            fragment.appendChild(tag);
+            last = start + match[2].length;
+          }
+          if (last === 0)
+            continue;
+          if (last < text.length) {
+            fragment.appendChild(document.createTextNode(text.slice(last)));
+          }
+          (_b = textNode.parentNode) == null ? void 0 : _b.replaceChild(fragment, textNode);
+        }
+      }
+      applyTransform() {
+        this.world.style.transform = `translate(${this.tx}px, ${this.ty}px) scale(${this.scale})`;
+        const gridSize = Math.max(MIN_GRID, GRID * this.scale);
+        this.root.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+        this.root.style.backgroundPosition = `${this.tx}px ${this.ty}px`;
+        this.zoomEl.setText(`${Math.round(this.scale * 100)}%`);
+        this.updateToolbar();
+        this.updateEdgeBar();
+        this.syncEdgeLabelEditor();
+        this.updateMinimap();
+      }
+      toWorld(clientX, clientY) {
+        const rect = this.root.getBoundingClientRect();
+        return {
+          x: (clientX - rect.left - this.tx) / this.scale,
+          y: (clientY - rect.top - this.ty) / this.scale
+        };
+      }
+      zoomBy(factor) {
+        const rect = this.root.getBoundingClientRect();
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+        const next = Math.max(MIN_SCALE, Math.min(MAX_SCALE, this.scale * factor));
+        if (next === this.scale)
+          return;
+        const ratio = next / this.scale;
+        this.tx = cx - (cx - this.tx) * ratio;
+        this.ty = cy - (cy - this.ty) * ratio;
+        this.scale = next;
+        this.applyTransform();
+        this.scheduleSave();
+      }
+      showBoardMenu(evt) {
+        var _a;
+        const menu = new import_obsidian16.Menu();
+        const issueCount = scanBoard(this.doctorInput()).length;
+        menu.addItem(
+          (item) => item.setTitle("\u67E5\u627E\u8282\u70B9").setIcon("search").onClick(() => this.openNodeSearch())
+        );
+        menu.addSeparator();
+        menu.addItem(
+          (item) => item.setTitle(issueCount > 0 ? `\u767D\u677F\u4F53\u68C0\uFF08${issueCount}\uFF09` : "\u767D\u677F\u4F53\u68C0").setIcon("stethoscope").onClick(() => this.openBoardDoctor())
+        );
+        const rect = (_a = this.moreBtn) == null ? void 0 : _a.getBoundingClientRect();
+        if (rect) {
+          menu.showAtPosition({ x: rect.left, y: rect.bottom });
+          const dom = menu.dom;
+          if (dom) {
+            const mw = dom.offsetWidth;
+            const vw = window.innerWidth;
+            let left = rect.left;
+            if (left + mw > vw - 4)
+              left = Math.max(4, rect.right - mw);
+            dom.style.left = `${Math.round(left)}px`;
+            dom.style.top = `${Math.round(rect.bottom)}px`;
+          }
+        } else {
+          menu.showAtMouseEvent(evt);
+        }
+      }
+      /** Snapshot for the read-only scan. Reuses the view's own maps and caches. */
+      doctorInput() {
+        return {
+          nodes: this.nodes,
+          edges: this.edges,
+          staleIds: this.staleIds,
+          textOf: (node2) => {
+            var _a;
+            return (_a = this.nodeText.get(node2.id)) != null ? _a : node2.type === "text" ? node2.text : "";
+          },
+          heightOf: (node2) => this.nodeHeight(node2),
+          memberIdsOf: (group) => this.groupMembers(group).map((member) => member.id)
+        };
+      }
+      /** Opens the health report. Scanning is read-only; nothing is applied here. */
+      openBoardDoctor() {
+        var _a;
+        const issues = scanBoard(this.doctorInput());
+        const actions = {
+          locate: (issue) => this.locateDoctorIssue(issue),
+          removeNode: (id) => this.confirmDoctorRemoveNode(id),
+          removeEdge: (id) => this.confirmDoctorRemoveEdge(id),
+          addLabel: (id) => {
+            var _a2;
+            if (!this.centerOnEdge(id))
+              return;
+            (_a2 = this.doctorModal) == null ? void 0 : _a2.close();
+            this.doctorModal = null;
+            window.setTimeout(() => this.openEdgeLabelEditor(id), 0);
+          },
+          rescan: () => this.openBoardDoctor(),
+          offset: () => ({ ...this.doctorOffset }),
+          moved: (offset) => {
+            this.doctorOffset = { ...offset };
+          }
+        };
+        (_a = this.doctorModal) == null ? void 0 : _a.close();
+        this.doctorModal = new BoardDoctorModal(this.app, issues, actions);
+        this.doctorModal.open();
+      }
+      /** Read-only reference for the gestures available inside this board. */
+      openBoardHelp() {
+        var _a;
+        (_a = this.helpModal) == null ? void 0 : _a.close();
+        this.helpModal = new ShortcutHelpModal(this.app);
+        this.helpModal.open();
+      }
+      /** Jump to the subject of a finding without changing any board data. */
+      locateDoctorIssue(issue) {
+        const firstId = issue.nodeIds[0];
+        if (firstId) {
+          const node2 = this.nodeMap.get(firstId);
+          if (node2) {
+            this.centerOnNode(node2);
+            return;
+          }
+        }
+        if (!issue.edgeId)
+          return;
+        this.centerOnEdge(issue.edgeId);
+      }
+      /**
+       * Centre and select a connection. Shared by the report's "定位" and by
+       * "添加标签", so the inline editor always opens where the user can see it.
+       */
+      centerOnEdge(edgeId) {
+        const edge = this.edges.find((item) => item.id === edgeId);
+        if (!edge)
+          return false;
+        this.selectedEdgeId = edge.id;
+        this.selection.clear();
+        this.paintSelection();
+        this.paintEdgeSelection();
+        this.updateEdgeBar();
+        const curve = this.edgeGeometry(edge);
+        if (curve) {
+          const anchor = curvePoint(curve, this.edgeLabelT(edge));
+          const rect = this.root.getBoundingClientRect();
+          this.tx = rect.width / 2 - anchor.x * this.scale;
+          this.ty = rect.height / 2 - anchor.y * this.scale;
+          this.applyTransform();
+          this.scheduleSave();
+        }
+        return true;
+      }
+      confirmDoctorRemoveNode(nodeId) {
+        var _a;
+        const node2 = this.nodeMap.get(nodeId);
+        if (!node2)
+          return;
+        if ((_a = this.nodeEls.get(nodeId)) == null ? void 0 : _a.hasClass("collis-editing")) {
+          new import_obsidian16.Notice("\u8BF7\u5148\u7ED3\u675F\u8FD9\u5F20\u5361\u7247\u7684\u7F16\u8F91\u518D\u79FB\u9664");
+          return;
+        }
+        new ConfirmModal(
+          this.app,
+          "\u79FB\u9664\u8FD9\u4E2A\u8282\u70B9\uFF1F",
+          `\u5C06\u4ECE\u767D\u677F\u79FB\u9664\u300C${doctorNodeName(node2)}\u300D\uFF0C\u76F8\u5173\u8FDE\u7EBF\u4E00\u5E76\u6E05\u9664\u3002\u6E90\u7B14\u8BB0\u4E0D\u4F1A\u88AB\u4FEE\u6539\uFF0C\u53EF\u6309 Ctrl+Z \u64A4\u9500\u3002`,
+          "\u79FB\u9664\u8282\u70B9",
+          () => {
+            this.selection.clear();
+            this.selection.add(nodeId);
+            this.deleteSelection();
+            new import_obsidian16.Notice("\u5DF2\u79FB\u9664\u8282\u70B9\uFF0C\u53EF\u6309 Ctrl+Z \u64A4\u9500");
+            this.openBoardDoctor();
+          }
+        ).open();
+      }
+      confirmDoctorRemoveEdge(edgeId) {
+        const edge = this.edges.find((item) => item.id === edgeId);
+        if (!edge)
+          return;
+        new ConfirmModal(
+          this.app,
+          "\u5220\u9664\u8FD9\u6761\u8FDE\u7EBF\uFF1F",
+          "\u53EA\u5220\u9664\u8FD9\u6761\u8FDE\u7EBF\uFF0C\u8282\u70B9\u4E0D\u53D7\u5F71\u54CD\uFF0C\u53EF\u6309 Ctrl+Z \u64A4\u9500\u3002",
+          "\u5220\u9664\u8FDE\u7EBF",
+          () => {
+            this.selectedEdgeId = edgeId;
+            this.deleteSelectedEdge();
+            new import_obsidian16.Notice("\u5DF2\u5220\u9664\u8FDE\u7EBF\uFF0C\u53EF\u6309 Ctrl+Z \u64A4\u9500");
+            this.openBoardDoctor();
+          }
+        ).open();
+      }
+      /**
+       * Drops connections whose endpoints no longer exist. Both delete paths call
+       * this, so a removed node never leaves a dangling line behind.
+       */
+      pruneEdges() {
+        const before = this.edges.length;
+        this.edges = this.edges.filter(
+          (edge) => this.nodeMap.has(edge.from) && this.nodeMap.has(edge.to)
+        );
+        if (this.edges.length === before)
+          return;
+        if (this.selectedEdgeId && !this.edges.some((edge) => edge.id === this.selectedEdgeId)) {
+          this.selectedEdgeId = null;
+          this.updateEdgeBar();
+        }
+        const editor = this.edgeLabelEditor;
+        if (editor && !this.edges.some((edge) => edge.id === editor.edgeId)) {
+          this.closeEdgeLabelEditor(false);
+        }
+      }
+      updateHistoryButtons() {
+        if (this.undoBtn)
+          this.undoBtn.disabled = this.historyIndex <= 0;
+        if (this.redoBtn)
+          this.redoBtn.disabled = this.historyIndex >= this.history.length - 1;
+      }
+      fitToContent() {
+        var _a;
+        if (this.nodes.length === 0) {
+          const empty = this.root.getBoundingClientRect();
+          this.scale = 1;
+          this.tx = empty.width / 2;
+          this.ty = empty.height / 2;
+          this.applyTransform();
+          return;
+        }
+        const rect = this.root.getBoundingClientRect();
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        for (const node2 of this.nodes) {
+          const el = this.nodeEls.get(node2.id);
+          const height2 = (_a = el == null ? void 0 : el.offsetHeight) != null ? _a : 120;
+          minX = Math.min(minX, node2.x);
+          minY = Math.min(minY, node2.y);
+          maxX = Math.max(maxX, node2.x + node2.width);
+          maxY = Math.max(maxY, node2.y + height2);
+        }
+        const width = Math.max(1, maxX - minX);
+        const height = Math.max(1, maxY - minY);
+        const scale = Math.min((rect.width - 120) / width, (rect.height - 120) / height, 1.2);
+        this.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
+        this.tx = rect.width / 2 - (minX + width / 2) * this.scale;
+        this.ty = rect.height / 2 - (minY + height / 2) * this.scale;
+        this.applyTransform();
+      }
+      /**
+       * Hit test for the native scrollbar. Everything here is in screen pixels:
+       * getBoundingClientRect() already includes the board's zoom transform, so it
+       * must NOT be compared with clientWidth/offsetWidth (unscaled CSS pixels).
+       */
+      isOnScrollbar(body, clientX) {
+        const cssWidth = body.offsetWidth;
+        const barCss = cssWidth - body.clientWidth;
+        if (barCss <= 0)
+          return false;
+        const rect = body.getBoundingClientRect();
+        if (rect.width <= 0 || cssWidth <= 0)
+          return false;
+        const scale = rect.width / cssWidth;
+        const barScreen = barCss * scale;
+        return clientX - rect.left >= rect.width - barScreen;
+      }
+      startResize(evt, nodeId, dir) {
+        const node2 = this.nodeMap.get(nodeId);
+        const el = this.nodeEls.get(nodeId);
+        if (!node2 || !el)
+          return;
+        evt.preventDefault();
+        evt.stopPropagation();
+        this.dragMoved = false;
+        this.drag = {
+          type: "resize",
+          pointerId: evt.pointerId,
+          nodeId,
+          dir,
+          startX: evt.clientX,
+          startY: evt.clientY,
+          start: { x: node2.x, y: node2.y, width: node2.width, height: el.offsetHeight }
+        };
+        this.root.setPointerCapture(evt.pointerId);
+        this.root.addClass("is-resizing");
+      }
+      /** Node whose box is within `slack` world units of the point. */
+      nodeNear(x, y, slack) {
+        for (let i = this.nodes.length - 1; i >= 0; i--) {
+          const node2 = this.nodes[i];
+          const height = this.nodeHeight(node2);
+          if (x >= node2.x - slack && x <= node2.x + node2.width + slack && y >= node2.y - slack && y <= node2.y + height + slack) {
+            return node2;
+          }
+        }
+        return null;
+      }
+      closeSearchPanel() {
+        var _a;
+        if (this.searchOutside) {
+          document.removeEventListener("mousedown", this.searchOutside, true);
+          this.searchOutside = null;
+        }
+        (_a = this.searchPanel) == null ? void 0 : _a.remove();
+        this.searchPanel = null;
+      }
+      centerOnNode(node2) {
+        const rect = this.root.getBoundingClientRect();
+        const height = this.nodeHeight(node2);
+        const fit = rect.width * 0.33 / Math.max(1, node2.width);
+        this.scale = Math.max(0.6, Math.min(1.1, fit));
+        this.tx = rect.width / 2 - (node2.x + node2.width / 2) * this.scale;
+        this.ty = rect.height / 2 - (node2.y + height / 2) * this.scale;
+        this.applyTransform();
+        this.scheduleSave();
+        this.selection.clear();
+        this.selection.add(node2.id);
+        this.paintSelection();
+        const el = this.nodeEls.get(node2.id);
+        if (!el)
+          return;
+        for (const [id, other] of this.nodeEls) {
+          other.toggleClass("is-dimmed", id !== node2.id);
+        }
+        this.root.addClass("is-focusing");
+        el.addClass("is-flash");
+        window.setTimeout(() => {
+          el.removeClass("is-flash");
+          this.root.removeClass("is-focusing");
+          for (const other of this.nodeEls.values())
+            other.removeClass("is-dimmed");
+        }, 1600);
+      }
+      closeAiPanel() {
+        var _a;
+        this.closeHistoryPop();
+        if (this.aiOutside) {
+          document.removeEventListener("mousedown", this.aiOutside, true);
+          this.aiOutside = null;
+        }
+        this.clearNodeNumbers();
+        (_a = this.aiPanel) == null ? void 0 : _a.remove();
+        this.aiPanel = null;
+      }
+      /**
+       * Maps board nodes to the plain data the budget builder understands. Node
+       * types live here, token math lives in ai/context.ts — adding a node type
+       * only touches this function.
+       */
+      contextInput(nodes) {
+        var _a, _b, _c, _d, _e, _f;
+        const present = new Set(nodes.map((node2) => node2.id));
+        const inputs = [];
+        const groups = [];
+        for (const node2 of nodes) {
+          if (node2.type === "group") {
+            const members = this.groupMembers(node2).filter((member) => present.has(member.id));
+            groups.push({
+              id: node2.id,
+              label: (_a = node2.label) != null ? _a : "\u672A\u547D\u540D",
+              memberIds: members.map((member) => member.id)
+            });
+            continue;
+          }
+          const meta = this.nodeMeta.get(node2.id);
+          const text = (_b = this.nodeText.get(node2.id)) != null ? _b : "";
+          if (node2.type === "file") {
+            const ext = (_d = (_c = node2.file.split(".").pop()) == null ? void 0 : _c.toLowerCase()) != null ? _d : "";
+            const isNote = ext === "md" || ext === "markdown";
+            const name = (_e = node2.file.split("/").pop()) != null ? _e : node2.file;
+            inputs.push({
+              id: node2.id,
+              kind: isNote ? "note" : "file",
+              label: name.replace(/\.md$/i, ""),
+              text: isNote ? text : "",
+              readable: isNote,
+              mediaKind: isNote ? void 0 : mediaLabel(ext),
+              path: node2.file
+            });
+            continue;
+          }
+          const kind = node2.type === "card" ? "card" : "text";
+          const firstLine = (_f = text.split("\n").find((line) => line.trim())) != null ? _f : "";
+          inputs.push({
+            id: node2.id,
+            kind,
+            label: firstLine.trim().slice(0, 24) || (kind === "card" ? "\u5361\u7247" : "\u6587\u672C"),
+            text,
+            readable: true,
+            meta: meta ? { date: meta.date, time: meta.time, tags: meta.tags } : void 0,
+            color: "color" in node2 ? node2.color : void 0
+          });
+        }
+        const edges = this.edges.filter((edge) => present.has(edge.from) && present.has(edge.to)).map((edge) => {
+          var _a2;
+          return {
+            from: edge.from,
+            to: edge.to,
+            label: edge.label,
+            relation: edge.relation ? (_a2 = EDGE_RELATION_BY_ID.get(edge.relation)) == null ? void 0 : _a2.label : void 0
+          };
+        });
+        return { nodes: inputs, groups, edges };
+      }
+      /** Tokens available for board content: window minus answer minus safety. */
+      inputBudget(profile) {
+        var _a, _b, _c, _d;
+        const policy = this.plugin.settings.ai.policy;
+        const window2 = (_b = (_a = profile == null ? void 0 : profile.capability) == null ? void 0 : _a.contextWindow) != null ? _b : 128e3;
+        const output = (_d = (_c = profile == null ? void 0 : profile.capability) == null ? void 0 : _c.maxOutput) != null ? _d : 8192;
+        return Math.max(2e3, window2 - output - policy.safetyTokens);
+      }
+      /**
+       * Rebuilds the cached board prefix. Only re-runs when the selection or the
+       * node text actually changed, so the cache marker keeps hitting between
+       * turns. `force` is used after an edit or when the model profile changes.
+       */
+      ensureSystem(profile, force = false) {
+        const nodeKey = this.aiTargets.map((node2) => {
+          var _a;
+          const text = (_a = this.nodeText.get(node2.id)) != null ? _a : "";
+          return `${node2.id}:${node2.type}:${text.length}:${"label" in node2 ? node2.label : ""}`;
+        }).join("|");
+        const targetIds = new Set(this.aiTargets.map((node2) => node2.id));
+        const edgeKey = this.edges.filter((edge) => targetIds.has(edge.from) && targetIds.has(edge.to)).map((edge) => {
+          var _a;
+          return `${edge.from}>${edge.to}:${(_a = edge.label) != null ? _a : ""}`;
+        }).join("|");
+        const key = `${nodeKey}#${edgeKey}`;
+        if (!force && key === this.aiSystemKey && this.aiSystem.length > 0)
+          return;
+        const policy = this.plugin.settings.ai.policy;
+        const result = buildBoardContext(
+          this.contextInput(this.aiTargets),
+          this.inputBudget(profile),
+          policy
+        );
+        this.aiManifest = result.manifest;
+        this.aiNumberMap = new Map(
+          result.manifest.nodes.map((node2) => [node2.tag, node2.id])
+        );
+        this.aiSystemKey = key;
+        this.aiSystem = [
+          { text: AI_ROLE_PROMPT },
+          { text: `\u3010\u767D\u677F\u5185\u5BB9\u3011
+${result.text}`, cache: true }
+        ];
+        const missing = this.aiTargets.filter(
+          (node2) => {
+            var _a;
+            return node2.type === "file" && node2.file.toLowerCase().endsWith(".md") && !((_a = this.nodeText.get(node2.id)) != null ? _a : "").trim();
+          }
+        );
+        if (missing.length > 0 && !this.aiNotesLoading) {
+          this.aiNotesLoading = true;
+          void Promise.all(
+            missing.map(async (node2) => {
+              if (node2.type !== "file")
+                return;
+              const file = this.app.vault.getAbstractFileByPath(node2.file);
+              if (!(file instanceof import_obsidian16.TFile))
+                return;
+              this.nodeText.set(node2.id, await this.readNoteText(file));
+            })
+          ).then(() => {
+            this.aiNotesLoading = false;
+            this.ensureSystem(profile, true);
+            this.applyNodeNumbers();
+          });
+        }
+      }
+      /**
+       * Number badges are decoration only: they live on the node element, never in
+       * the board JSON, and disappear when the AI panel closes.
+       */
+      applyNodeNumbers() {
+        this.clearNodeNumbers();
+        if (this.aiNumberMap.size < 2)
+          return;
+        for (const [tag, nodeId] of this.aiNumberMap) {
+          const el = this.nodeEls.get(nodeId);
+          if (!el || el.querySelector(":scope > .collis-ai-node-number"))
+            continue;
+          const badge = el.createDiv({ cls: "collis-ai-node-number", text: tag });
+          badge.setAttribute("aria-hidden", "true");
+          this.aiBadges.set(nodeId, badge);
+        }
+      }
+      clearNodeNumbers() {
+        for (const badge of this.aiBadges.values())
+          badge.remove();
+        this.aiBadges.clear();
+      }
+      historyTokens() {
+        return this.aiHistory.reduce((sum, message) => sum + estimateTokens(message.content), 0);
+      }
+      /** Profile setting wins; otherwise the global default; otherwise vendor. */
+      resolveThinking(profile) {
+        var _a;
+        const mode = (_a = profile == null ? void 0 : profile.thinking) != null ? _a : this.plugin.settings.ai.thinking;
+        return mode === "on" || mode === "off" ? mode : "auto";
+      }
+      /**
+       * Collapses early turns into one summary, keeping the last two exchanges raw.
+       * Only history is compressed — the board prefix lives in `aiSystem` and is
+       * never summarised, so the material stays intact however long the chat runs.
+       */
+      async compactHistory(profile) {
+        var _a, _b;
+        const budget = this.inputBudget(profile);
+        const threshold = Math.max(2e3, Math.floor(budget * 0.35));
+        if (this.aiHistory.length <= 4 || this.historyTokens() <= threshold)
+          return;
+        const recent = this.aiHistory.slice(-4);
+        const older = this.aiHistory.slice(0, -4);
+        const transcript = older.map((message) => `${message.role === "user" ? "\u7528\u6237" : "\u52A9\u624B"}\uFF1A${message.content}`).join("\n\n");
+        let summary = "";
+        try {
+          const result = await ((_a = this.aiProvider) == null ? void 0 : _a.complete(
+            [
+              {
+                role: "user",
+                content: `\u8BF7\u628A\u4E0B\u9762\u8FD9\u6BB5\u5BF9\u8BDD\u538B\u7F29\u6210\u8981\u70B9\uFF0C\u4FDD\u7559\u7ED3\u8BBA\u3001\u5224\u65AD\u3001\u7528\u6237\u610F\u56FE\u548C\u672A\u89E3\u51B3\u7684\u95EE\u9898\uFF0C\u53BB\u6389\u8FC7\u7A0B\u63CF\u8FF0\u4E0E\u91CD\u590D\u5185\u5BB9\uFF1A
+
+${transcript}`
+              }
+            ],
+            {
+              system: "\u4F60\u662F\u5BF9\u8BDD\u6458\u8981\u52A9\u624B\u3002\u53EA\u8F93\u51FA\u6458\u8981\u6B63\u6587\uFF0C\u4E0D\u8981\u5BD2\u6684\uFF0C\u4E0D\u8981\u6807\u9898\u3002",
+              maxTokens: 800,
+              thinking: "off",
+              cache: false
+            }
+          ));
+          summary = (_b = result == null ? void 0 : result.text) != null ? _b : "";
+        } catch (error) {
+          return;
+        }
+        if (!summary.trim())
+          return;
+        const block = `\u3010\u6B64\u524D\u5BF9\u8BDD\u6458\u8981\u3011
+${summary.trim()}`;
+        const head = recent[0];
+        this.aiHistory = head.role === "user" ? [{ role: "user", content: `${block}
+
+${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...recent];
+        new import_obsidian16.Notice("\u5BF9\u8BDD\u8F83\u957F\uFF0C\u65E9\u671F\u7684\u5F80\u6765\u5DF2\u538B\u7F29\u4E3A\u6458\u8981\uFF08\u767D\u677F\u5185\u5BB9\u4E0D\u53D7\u5F71\u54CD\uFF09");
+      }
+      openAIPanel() {
+        var _a;
+        this.closeAiPanel();
+        const profile = activeProfile(this.plugin.settings.ai);
+        const provider = createProvider(profile);
+        if (!this.plugin.settings.ai.enabled || !provider.configured) {
+          new import_obsidian16.Notice("\u8BF7\u5148\u5728\u8BBE\u7F6E\u4E2D\u542F\u7528 AI \u5E76\u6DFB\u52A0\u4E00\u4E2A\u6A21\u578B\u914D\u7F6E");
+          return;
+        }
+        const selected = this.selectedNodes();
+        const expanded = selected.length > 0 ? this.expandGroups(selected) : [];
+        const contentNodes = expanded.filter((node2) => node2.type !== "group");
+        if (selected.length > 0 && contentNodes.length === 0) {
+          new import_obsidian16.Notice("\u9009\u4E2D\u7684\u5206\u7EC4\u91CC\u8FD8\u6CA1\u6709\u5185\u5BB9\uFF0C\u5148\u628A\u5361\u7247\u653E\u8FDB\u53BB\u518D\u5206\u6790");
+          return;
+        }
+        const targets = expanded.length > 0 ? expanded : this.nodes.slice(0, 200);
+        if (targets.length === 0) {
+          new import_obsidian16.Notice("\u767D\u677F\u4E0A\u8FD8\u6CA1\u6709\u8282\u70B9");
+          return;
+        }
+        const targetCount = targets.filter((node2) => node2.type !== "group").length || targets.length;
+        this.aiProvider = provider;
+        this.aiTargets = targets;
+        this.aiHistory = [];
+        this.aiSystem = [];
+        this.aiSystemKey = "";
+        this.aiManifest = null;
+        this.aiAnswers = [];
+        this.aiSnapshots = [];
+        this.aiPicked = /* @__PURE__ */ new Set();
+        this.aiBusy = false;
+        this.aiConversationId = null;
+        this.aiExpanded = false;
+        this.ensureSystem(profile, true);
+        this.applyNodeNumbers();
+        const rect = this.root.getBoundingClientRect();
+        const box = this.selectionBox(targets);
+        const panel = this.root.createDiv({ cls: "collis-ai-panel" });
+        this.aiPanel = panel;
+        panel.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        panel.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        const head = panel.createDiv({ cls: "collis-ai-head" });
+        const headIcon = head.createDiv({ cls: "collis-ai-head-icon" });
+        (0, import_obsidian16.setIcon)(headIcon, "sparkles");
+        head.createDiv({
+          cls: "collis-ai-head-title",
+          text: `${selected.length > 0 ? "\u5206\u6790\u9009\u4E2D\u7684" : "\u5206\u6790\u5168\u90E8"} ${targetCount} \u4E2A\u8282\u70B9`
+        });
+        head.createDiv({ cls: "collis-ai-head-model", text: (_a = profile == null ? void 0 : profile.name) != null ? _a : "" });
+        head.createDiv({ cls: "collis-ai-head-spacer" });
+        const newBtn = head.createEl("button", {
+          cls: "collis-ai-head-btn",
+          attr: { "aria-label": "\u65B0\u5BF9\u8BDD" }
+        });
+        (0, import_obsidian16.setIcon)(newBtn, "square-pen");
+        const historyBtn = head.createEl("button", {
+          cls: "collis-ai-head-btn",
+          attr: { "aria-label": "\u5386\u53F2\u5BF9\u8BDD" }
+        });
+        (0, import_obsidian16.setIcon)(historyBtn, "history");
+        const expandBtn = head.createEl("button", {
+          cls: "collis-ai-head-btn",
+          attr: { "aria-label": "\u5C55\u5F00" }
+        });
+        (0, import_obsidian16.setIcon)(expandBtn, "maximize-2");
+        const closeBtn = head.createEl("button", {
+          cls: "collis-ai-head-btn",
+          attr: { "aria-label": "\u5173\u95ED" }
+        });
+        (0, import_obsidian16.setIcon)(closeBtn, "x");
+        const stream = panel.createDiv({ cls: "collis-ai-stream" });
+        const dock = panel.createDiv({ cls: "collis-ai-dock" });
+        const compose = dock.createDiv({ cls: "collis-ai-compose" });
+        const input = compose.createEl("input", {
+          cls: "collis-ai-input",
+          attr: { type: "text", placeholder: "\u95EE\u70B9\u4EC0\u4E48\uFF0C\u6216\u7EE7\u7EED\u8FFD\u95EE\u2026" }
+        });
+        const sendBtn = compose.createEl("button", {
+          cls: "collis-ai-send",
+          attr: { "aria-label": "\u53D1\u9001" }
+        });
+        (0, import_obsidian16.setIcon)(sendBtn, "arrow-up");
+        const actions = dock.createDiv({ cls: "collis-ai-actions" });
+        const insertBtn = actions.createEl("button", {
+          cls: "collis-ai-btn is-primary",
+          text: "\u63D2\u5165\u4E3A\u65B0\u8282\u70B9"
+        });
+        const overwriteBtn = actions.createEl("button", { cls: "collis-ai-btn", text: "\u8986\u76D6\u539F\u8282\u70B9" });
+        const noteBtn = actions.createEl("button", { cls: "collis-ai-btn", text: "\u5B58\u4E3A\u7B14\u8BB0" });
+        insertBtn.disabled = true;
+        noteBtn.disabled = true;
+        const single = targets.length === 1 ? targets[0] : null;
+        const overwriteTarget = single && (single.type === "text" || single.type === "card" || single.type === "file" && single.file.toLowerCase().endsWith(".md")) ? single : null;
+        if (!overwriteTarget) {
+          overwriteBtn.addClass("is-hidden");
+        } else {
+          overwriteBtn.disabled = true;
+        }
+        const syncActions = () => {
+          const has = this.aiPicked.size > 0 && !this.aiBusy;
+          insertBtn.disabled = !has;
+          noteBtn.disabled = !has;
+          if (overwriteTarget)
+            overwriteBtn.disabled = !has;
+          const count2 = this.aiPicked.size;
+          insertBtn.setText(count2 > 1 ? `\u63D2\u5165\u4E3A\u65B0\u8282\u70B9\uFF08${count2} \u6761\uFF09` : "\u63D2\u5165\u4E3A\u65B0\u8282\u70B9");
+          noteBtn.setText(count2 > 1 ? `\u5B58\u4E3A\u7B14\u8BB0\uFF08${count2} \u6761\uFF09` : "\u5B58\u4E3A\u7B14\u8BB0");
+          if (overwriteTarget) {
+            overwriteBtn.setText(count2 > 1 ? `\u8986\u76D6\u539F\u8282\u70B9\uFF08${count2} \u6761\uFF09` : "\u8986\u76D6\u539F\u8282\u70B9");
+          }
+        };
+        syncActions();
+        let dragStart = null;
+        head.addEventListener("pointerdown", (evt) => {
+          if (evt.target.closest("button"))
+            return;
+          if (this.aiExpanded)
+            return;
+          dragStart = {
+            x: evt.clientX,
+            y: evt.clientY,
+            left: panel.offsetLeft,
+            top: panel.offsetTop
+          };
+          head.setPointerCapture(evt.pointerId);
+          panel.addClass("is-dragging");
+        });
+        head.addEventListener("pointermove", (evt) => {
+          if (!dragStart)
+            return;
+          panel.style.left = `${Math.round(dragStart.left + evt.clientX - dragStart.x)}px`;
+          panel.style.top = `${Math.round(dragStart.top + evt.clientY - dragStart.y)}px`;
+        });
+        const endDrag = (evt) => {
+          if (!dragStart)
+            return;
+          dragStart = null;
+          panel.removeClass("is-dragging");
+          try {
+            head.releasePointerCapture(evt.pointerId);
+          } catch (error) {
+          }
+        };
+        head.addEventListener("pointerup", endDrag);
+        head.addEventListener("pointercancel", endDrag);
+        const place = () => {
+          if (this.aiExpanded) {
+            panel.style.left = `${Math.round(rect.width * 0.1)}px`;
+            panel.style.top = `${Math.round(rect.height * 0.06)}px`;
+            return;
+          }
+          const panelWidth = 580;
+          const screenLeft = box ? box.minX * this.scale + this.tx : rect.width / 2;
+          const screenTop = box ? box.minY * this.scale + this.ty : rect.height / 2;
+          const boxWidth = box ? (box.maxX - box.minX) * this.scale : 0;
+          let left = screenLeft + (boxWidth - panelWidth) / 2;
+          left = Math.max(8, Math.min(left, rect.width - panelWidth - 8));
+          let top = screenTop - 6;
+          top = Math.max(8, Math.min(top, rect.height - 560));
+          panel.style.left = `${Math.round(left)}px`;
+          panel.style.top = `${Math.round(top)}px`;
+        };
+        place();
+        const scrollDown = () => {
+          stream.scrollTop = stream.scrollHeight;
+        };
+        const addUserBubble = (text) => {
+          const row = stream.createDiv({ cls: "collis-ai-msg is-user" });
+          row.createDiv({ cls: "collis-ai-bubble", text });
+          scrollDown();
+        };
+        const refreshPicks = () => {
+          stream.querySelectorAll(".collis-ai-msg.is-ai").forEach((row) => {
+            var _a2;
+            const index = Number((_a2 = row.dataset.answerIndex) != null ? _a2 : "-1");
+            row.toggleClass("is-picked", this.aiPicked.has(index));
+          });
+          syncActions();
+        };
+        const togglePick = (index) => {
+          if (this.aiPicked.has(index))
+            this.aiPicked.delete(index);
+          else
+            this.aiPicked.add(index);
+          refreshPicks();
+        };
+        const clearPickOutside = (evt) => {
+          const target = evt.target;
+          if (target.closest(".collis-ai-msg.is-ai"))
+            return;
+          if (target.closest(".collis-ai-actions, .collis-ai-compose"))
+            return;
+          if (this.aiPicked.size === 0)
+            return;
+          this.aiPicked.clear();
+          refreshPicks();
+        };
+        this.aiOutside = clearPickOutside;
+        document.addEventListener("mousedown", this.aiOutside, true);
+        const appendContext = (host, snapshot) => {
+          if (!snapshot)
+            return null;
+          const details = host.createEl("details", { cls: "collis-ai-context" });
+          const summary = details.createEl("summary");
+          const label = summary.createSpan({ cls: "collis-ai-context-label", text: "\u5DF2\u8BFB\u53D6\u4E0A\u4E0B\u6587" });
+          summary.createSpan({
+            cls: "collis-ai-context-count",
+            text: `${snapshot.nodes.length} \u4E2A\u8282\u70B9 \xB7 ${formatTokens(snapshot.usedTokens)} token`
+          });
+          const body = details.createDiv({ cls: "collis-ai-context-body" });
+          for (const node2 of snapshot.nodes) {
+            const line = body.createDiv({ cls: "collis-ai-context-row" });
+            line.createSpan({ cls: "collis-ai-context-tag", text: node2.tag });
+            line.createSpan({ cls: "collis-ai-context-name", text: node2.label });
+            line.createSpan({
+              cls: "collis-ai-context-size",
+              text: node2.readable ? `${node2.charsSent}/${node2.charsTotal} \u5B57` : "\u4EC5\u6587\u4EF6\u540D"
+            });
+            if (node2.note)
+              line.createSpan({ cls: "collis-ai-context-flag", text: node2.note });
+          }
+          for (const note of snapshot.notes) {
+            body.createDiv({ cls: "collis-ai-context-note", text: note });
+          }
+          return label;
+        };
+        const appendCopy = (host, text) => {
+          const button = host.createEl("button", { cls: "collis-ai-reply-icon" });
+          (0, import_obsidian16.setIcon)(button, "copy");
+          button.addEventListener("click", (evt) => {
+            evt.stopPropagation();
+            void navigator.clipboard.writeText(text).then(
+              () => {
+                (0, import_obsidian16.setIcon)(button, "check");
+                button.addClass("is-done");
+                window.setTimeout(() => {
+                  (0, import_obsidian16.setIcon)(button, "copy");
+                  button.removeClass("is-done");
+                }, 1200);
+              },
+              () => new import_obsidian16.Notice("\u590D\u5236\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u526A\u8D34\u677F\u6743\u9650")
+            );
+          });
+        };
+        const addAiBubble = async (text, snapshot = null, selectable = true) => {
+          const index = this.aiAnswers.length;
+          this.aiAnswers.push(text);
+          this.aiSnapshots.push(snapshot);
+          const row = stream.createDiv({ cls: "collis-ai-msg is-ai" });
+          row.dataset.answerIndex = String(index);
+          appendContext(row, snapshot);
+          const refMap = snapshot ? new Map(snapshot.nodes.map((node2) => [node2.tag, node2.id])) : this.aiNumberMap;
+          const body = row.createDiv({ cls: "collis-ai-reply" });
+          await import_obsidian16.MarkdownRenderer.render(this.app, this.decorateAnswer(text, refMap), body, "", this);
+          this.linkAnswerRefs(body, refMap);
+          const bar = row.createDiv({ cls: "collis-ai-reply-bar" });
+          appendCopy(bar, text);
+          if (selectable) {
+            row.addEventListener("click", (evt) => {
+              var _a2;
+              if (!((_a2 = window.getSelection()) == null ? void 0 : _a2.isCollapsed))
+                return;
+              if (evt.target.closest("details, button"))
+                return;
+              evt.preventDefault();
+              togglePick(index);
+            });
+            if (this.aiPicked.size === 0)
+              this.aiPicked.add(index);
+          }
+          refreshPicks();
+          scrollDown();
+          return body;
+        };
+        const currentAnswer = () => {
+          const indexes = Array.from(this.aiPicked).sort((a, b) => a - b);
+          return indexes.map((index) => this.aiAnswers[index]).filter((value) => Boolean(value)).join("\n\n");
+        };
+        const thinkingLines = [
+          "\u6B63\u5728\u8BFB\u4F60\u7684\u5361\u7247\u2026",
+          "CPU \u75AF\u72C2\u71C3\u70E7\u{1F525}\u2026",
+          "\u8111\u7EC6\u80DE\u96C6\u5408\u4E2D\u2026",
+          "\u7EC4\u7EC7\u8BED\u8A00\u4E2D\u2026"
+        ];
+        const addPending = (snapshot) => {
+          const row = stream.createDiv({ cls: "collis-ai-msg is-status" });
+          const contextLabel = appendContext(row, snapshot);
+          const label = contextLabel != null ? contextLabel : row.createSpan({
+            cls: "collis-ai-thinking",
+            text: thinkingLines[0]
+          });
+          label.setText(thinkingLines[0]);
+          let step = 0;
+          const timer = window.setInterval(() => {
+            step = (step + 1) % thinkingLines.length;
+            label.setText(thinkingLines[step]);
+          }, 1500);
+          const stop = () => window.clearInterval(timer);
+          const say = (text) => {
+            stop();
+            label.setText(text);
+            scrollDown();
+          };
+          scrollDown();
+          return { row, stop, say };
+        };
+        const addError = (text, retry) => {
+          const row = stream.createDiv({ cls: "collis-ai-msg is-error" });
+          const body = row.createDiv({ cls: "collis-ai-error" });
+          body.createDiv({ cls: "collis-ai-error-title", text: "\u8BF7\u6C42\u672A\u6210\u529F" });
+          body.createDiv({ cls: "collis-ai-error-summary", text });
+          const details = body.createEl("details", { cls: "collis-ai-error-detail" });
+          details.createEl("summary", { text: "\u67E5\u770B\u539F\u56E0" });
+          const pre = details.createEl("pre", { text });
+          pre.createEl("span", {
+            cls: "collis-ai-error-hint",
+            text: "\u53EF\u68C0\u67E5\u8BE5\u6A21\u578B\u7684\u8F93\u51FA\u4E0A\u9650\u3001\u601D\u8003\u6A21\u5F0F\u6216\u63A5\u53E3\u5730\u5740\u540E\u91CD\u8BD5\u3002"
+          });
+          const bar = body.createDiv({ cls: "collis-ai-reply-bar" });
+          const retryBtn = bar.createEl("button", { cls: "collis-ai-reply-icon" });
+          (0, import_obsidian16.setIcon)(retryBtn, "rotate-ccw");
+          retryBtn.addEventListener("click", (evt) => {
+            evt.stopPropagation();
+            retry();
+          });
+          scrollDown();
+        };
+        const setBusy = (value) => {
+          this.aiBusy = value;
+          input.disabled = value;
+          sendBtn.empty();
+          (0, import_obsidian16.setIcon)(sendBtn, value ? "square" : "arrow-up");
+          sendBtn.toggleClass("is-stop", value);
+          sendBtn.setAttribute("aria-label", value ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001");
+          if (value) {
+            insertBtn.disabled = true;
+            noteBtn.disabled = true;
+            overwriteBtn.disabled = true;
+          } else {
+            syncActions();
+          }
+        };
+        const ask = async () => {
+          var _a2, _b;
+          const question = input.value.trim();
+          if (!question || this.aiBusy || !this.aiProvider)
+            return;
+          input.value = "";
+          addUserBubble(question);
+          this.aiCancelled = false;
+          setBusy(true);
+          const snapshot = this.aiManifest ? {
+            usedTokens: this.aiManifest.usedTokens,
+            stage: this.aiManifest.stage,
+            nodes: this.aiManifest.nodes.map((node2) => ({
+              id: node2.id,
+              tag: node2.tag,
+              label: node2.label,
+              charsSent: node2.charsSent,
+              charsTotal: node2.charsTotal,
+              truncated: node2.truncated,
+              readable: node2.readable,
+              note: node2.note
+            })),
+            notes: [...this.aiManifest.notes]
+          } : null;
+          const pending = addPending(snapshot);
+          this.aiPending = pending;
+          const aiSettings = this.plugin.settings.ai;
+          const thinking = this.resolveThinking(profile);
+          const cache = (profile == null ? void 0 : profile.protocol) === "anthropic" && (profile == null ? void 0 : profile.cache) !== false;
+          let outCap = (_b = (_a2 = profile == null ? void 0 : profile.capability) == null ? void 0 : _a2.maxOutput) != null ? _b : 8192;
+          this.ensureSystem(profile);
+          await this.compactHistory(profile);
+          if (snapshot && snapshot.notes.length > 0) {
+            new import_obsidian16.Notice(`\u672C\u6B21\u5DF2\u8BFB\u53D6\u4E0A\u4E0B\u6587\uFF1A${snapshot.notes.join("\uFF1B")}`.slice(0, 160));
+          }
+          this.aiHistory.push({ role: "user", content: question });
+          let result = null;
+          let capDoubled = false;
+          try {
+            for (; ; ) {
+              try {
+                result = await this.aiProvider.complete(this.aiHistory, {
+                  system: this.aiSystem,
+                  maxTokens: outCap,
+                  thinking,
+                  cache
+                });
+                break;
+              } catch (error) {
+                if (!capDoubled && isThinkingBudgetError(error) && outCap < 32768) {
+                  capDoubled = true;
+                  outCap = Math.min(32768, outCap * 2);
+                  pending.say(`\u601D\u8003\u5360\u6EE1\u4E86\u989D\u5EA6\uFF0C\u7528 ${formatTokens(outCap)} \u91CD\u8BD5\u4E00\u6B21\u2026`);
+                  continue;
+                }
+                throw error;
+              }
+            }
+            if (!result)
+              throw new Error("\u8BF7\u6C42\u6CA1\u6709\u8FD4\u56DE\u7ED3\u679C");
+            let reply = result.text;
+            let rounds = 0;
+            let continueFailed = false;
+            while (result.truncated && rounds < aiSettings.continuations && !this.aiCancelled) {
+              rounds += 1;
+              pending.say(`\u56DE\u7B54\u8F83\u957F\uFF0C\u6B63\u5728\u7EED\u5199\u7B2C ${rounds} \u6BB5\u2026`);
+              try {
+                result = await this.aiProvider.complete(
+                  [
+                    ...this.aiHistory,
+                    { role: "assistant", content: reply },
+                    { role: "user", content: CONTINUE_PROMPT }
+                  ],
+                  { system: this.aiSystem, maxTokens: outCap, thinking, cache }
+                );
+              } catch (error) {
+                continueFailed = true;
+                break;
+              }
+              const merged = mergeContinuation(reply, result.text);
+              if (merged.length <= reply.length + 8)
+                break;
+              reply = merged;
+            }
+            if (result.truncated || rounds > 0)
+              reply = balanceTail(reply);
+            this.aiHistory.push({ role: "assistant", content: reply });
+            pending.stop();
+            pending.row.remove();
+            this.aiPending = null;
+            if (this.aiCancelled) {
+              this.aiHistory.pop();
+              this.aiHistory.pop();
+              return;
+            }
+            await addAiBubble(reply, snapshot);
+            this.persistConversation(question);
+            if (continueFailed) {
+              new import_obsidian16.Notice("\u7EED\u5199\u5931\u8D25\uFF0C\u8FD9\u6B21\u7B54\u590D\u53EF\u80FD\u4E0D\u5B8C\u6574");
+            } else if (result.truncated) {
+              new import_obsidian16.Notice("\u56DE\u7B54\u4ECD\u88AB\u957F\u5EA6\u4E0A\u9650\u622A\u65AD\uFF0C\u53EF\u5728\u6A21\u578B\u914D\u7F6E\u91CC\u8C03\u5927\u300C\u5355\u6B21\u8F93\u51FA\u4E0A\u9650\u300D");
+            }
+            insertBtn.disabled = false;
+            noteBtn.disabled = false;
+            if (overwriteTarget)
+              overwriteBtn.disabled = false;
+          } catch (error) {
+            this.aiHistory.pop();
+            pending.stop();
+            pending.row.remove();
+            this.aiPending = null;
+            if (!this.aiCancelled) {
+              const failedQuestion = question;
+              addError(error instanceof Error ? error.message : String(error), () => {
+                input.value = failedQuestion;
+                void ask();
+              });
+            }
+          } finally {
+            setBusy(false);
+            input.focus();
+          }
+        };
+        input.addEventListener("keydown", (evt) => {
+          if (evt.key === "Escape") {
+            evt.preventDefault();
+            this.closeAiPanel();
+            return;
+          }
+          if (evt.key === "Enter") {
+            evt.preventDefault();
+            void ask();
+          }
+        });
+        sendBtn.addEventListener("click", () => {
+          var _a2, _b;
+          if (this.aiBusy) {
+            this.aiCancelled = true;
+            (_a2 = this.aiPending) == null ? void 0 : _a2.stop();
+            (_b = this.aiPending) == null ? void 0 : _b.row.remove();
+            this.aiPending = null;
+            setBusy(false);
+            new import_obsidian16.Notice("\u5DF2\u505C\u6B62\u751F\u6210");
+            return;
+          }
+          void ask();
+        });
+        newBtn.addEventListener("click", () => {
+          this.aiConversationId = null;
+          this.aiHistory = [];
+          this.aiAnswers = [];
+          this.aiSnapshots = [];
+          this.aiPicked = /* @__PURE__ */ new Set();
+          stream.empty();
+          stream.createDiv({ cls: "collis-ai-empty-hint", text: "\u65B0\u5BF9\u8BDD\u5DF2\u5F00\u59CB\uFF0C\u9009\u4E2D\u7684\u8282\u70B9\u4FDD\u6301\u4E0D\u53D8\u3002" });
+          insertBtn.disabled = true;
+          noteBtn.disabled = true;
+          if (overwriteTarget)
+            overwriteBtn.disabled = true;
+          input.focus();
+        });
+        this.aiRestore = (conv) => {
+          var _a2, _b;
+          stream.empty();
+          const answers = conv.messages.filter((message) => message.role === "assistant").map((message) => message.content);
+          this.aiAnswers = [];
+          this.aiSnapshots = [];
+          this.aiPicked = /* @__PURE__ */ new Set();
+          const firstSnapshot = (_a2 = conv.messages.find(
+            (message) => message.role === "assistant" && message.send
+          )) == null ? void 0 : _a2.send;
+          if (firstSnapshot) {
+            this.aiNumberMap = new Map(
+              firstSnapshot.nodes.map((node2) => [node2.tag, node2.id])
+            );
+            this.applyNodeNumbers();
+          }
+          for (const message of conv.messages) {
+            if (message.role === "user") {
+              addUserBubble(message.content);
+              continue;
+            }
+            void addAiBubble(message.content, (_b = message.send) != null ? _b : null, true);
+          }
+          this.aiPicked.clear();
+          refreshPicks();
+          scrollDown();
+        };
+        historyBtn.addEventListener("click", () => this.openHistoryPop(historyBtn));
+        expandBtn.addEventListener("click", () => {
+          this.aiExpanded = !this.aiExpanded;
+          panel.toggleClass("is-expanded", this.aiExpanded);
+          (0, import_obsidian16.setIcon)(expandBtn, this.aiExpanded ? "minimize-2" : "maximize-2");
+          place();
+        });
+        closeBtn.addEventListener("click", () => this.closeAiPanel());
+        insertBtn.addEventListener("click", () => {
+          const text = currentAnswer();
+          if (!text)
+            return;
+          void this.insertAIText(text, this.aiTargets);
+          this.closeAiPanel();
+        });
+        noteBtn.addEventListener("click", () => {
+          var _a2;
+          const text = currentAnswer();
+          if (!text)
+            return;
+          void createNoteFromText(
+            this.app,
+            (_a2 = this.plugin.settings.boardFolder) != null ? _a2 : "",
+            text,
+            "AI \u6574\u7406"
+          ).then((file) => {
+            if (file)
+              new import_obsidian16.Notice(`\u5DF2\u4FDD\u5B58\u4E3A ${file.basename}`);
+          });
+          this.closeAiPanel();
+        });
+        overwriteBtn.addEventListener("click", () => {
+          if (!overwriteTarget)
+            return;
+          const text = this.replyTextForOverwrite();
+          if (!text)
+            return;
+          const indexes = Array.from(this.aiPicked).sort((a, b) => a - b);
+          const scope = indexes.length === 1 ? `\u7B2C ${indexes[0] + 1} \u6761\u56DE\u7B54` : `\u9009\u4E2D\u7684 ${indexes.length} \u6761\u56DE\u7B54\uFF08\u6309\u987A\u5E8F\u5408\u5E76\uFF09`;
+          const targetName = overwriteTarget.type === "card" ? "\u5361\u7247\uFF08\u4F1A\u540C\u65F6\u6539\u5199\u901F\u8BB0\u91CC\u7684\u539F\u6587\uFF09" : overwriteTarget.type === "file" ? "\u8FD9\u7BC7\u7B14\u8BB0\u7684\u5168\u6587" : "\u8FD9\u4E2A\u6587\u672C\u8282\u70B9";
+          new ConfirmModal(
+            this.app,
+            "\u8986\u76D6\u539F\u8282\u70B9\u5185\u5BB9\uFF1F",
+            `\u5C06\u7528${scope}\u8986\u76D6${targetName}\u3002\u539F\u6709\u5185\u5BB9\u4F1A\u88AB\u66FF\u6362\uFF0C\u53EF\u6309 Ctrl+Z \u64A4\u9500\u3002`,
+            "\u786E\u8BA4\u8986\u76D6",
+            () => {
+              void this.overwriteNode(overwriteTarget, text).then((ok) => {
+                if (ok) {
+                  new import_obsidian16.Notice("\u5DF2\u8986\u76D6\u539F\u8282\u70B9\u5185\u5BB9\uFF0C\u53EF\u6309 Ctrl+Z \u64A4\u9500");
+                  this.closeAiPanel();
+                } else {
+                  new import_obsidian16.Notice("\u8986\u76D6\u5931\u8D25");
+                }
+              });
+            }
+          ).open();
+        });
+        window.setTimeout(() => input.focus(), 30);
+      }
+      stripContext(content) {
+        const marker = "\u3010\u95EE\u9898\u3011\n";
+        const index = content.indexOf(marker);
+        return index >= 0 ? content.slice(index + marker.length) : content;
+      }
+      persistConversation(question) {
+        var _a, _b;
+        const boardPath = (_b = (_a = this.file) == null ? void 0 : _a.path) != null ? _b : "";
+        if (!boardPath)
+          return;
+        const store = this.plugin.settings.conversations;
+        let conversation = store.find((item) => item.id === this.aiConversationId);
+        if (!conversation) {
+          conversation = {
+            id: `c${Date.now()}`,
+            title: question.replace(/\s+/g, " ").trim().slice(0, 24) || "\u672A\u547D\u540D\u5BF9\u8BDD",
+            boardPath,
+            updatedAt: Date.now(),
+            messages: [],
+            nodeIds: []
+          };
+          store.push(conversation);
+          this.aiConversationId = conversation.id;
+        }
+        let answerIndex = 0;
+        conversation.messages = this.aiHistory.map((message) => {
+          var _a2;
+          if (message.role === "user") {
+            return { role: "user", content: this.stripContext(message.content) };
+          }
+          const snapshot = (_a2 = this.aiSnapshots[answerIndex]) != null ? _a2 : void 0;
+          answerIndex += 1;
+          return { role: "assistant", content: message.content, ...snapshot ? { send: snapshot } : {} };
+        });
+        conversation.updatedAt = Date.now();
+        conversation.nodeIds = this.aiTargets.map((node2) => node2.id);
+        this.plugin.settings.conversations = store.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 30);
+        void this.plugin.saveSettings();
+      }
+      async loadConversation(conversation) {
+        var _a;
+        this.aiConversationId = conversation.id;
+        this.aiHistory = conversation.messages.map((message) => ({
+          role: message.role,
+          content: message.content
+        }));
+        const alive = conversation.nodeIds.map((id) => this.nodeMap.get(id)).filter((node2) => Boolean(node2));
+        if (alive.length > 0)
+          this.aiTargets = this.expandGroups(alive);
+        this.ensureSystem(activeProfile(this.plugin.settings.ai), true);
+        this.applyNodeNumbers();
+        (_a = this.aiRestore) == null ? void 0 : _a.call(this, conversation);
+        if (alive.length < conversation.nodeIds.length) {
+          new import_obsidian16.Notice("\u90E8\u5206\u8282\u70B9\u5DF2\u4E0D\u5B58\u5728\uFF0C\u8FD9\u6B21\u5BF9\u8BDD\u53EA\u80FD\u67E5\u770B\uFF0C\u8FFD\u95EE\u65F6 AI \u770B\u4E0D\u5230\u5B83\u4EEC");
+        }
+      }
+      deleteConversation(id) {
+        const store = this.plugin.settings.conversations.filter((item) => item.id !== id);
+        this.plugin.settings.conversations = store;
+        if (this.aiConversationId === id)
+          this.aiConversationId = null;
+        void this.plugin.saveSettings();
+      }
+      closeHistoryPop() {
+        var _a;
+        if (this.historyOutside) {
+          document.removeEventListener("mousedown", this.historyOutside, true);
+          this.historyOutside = null;
+        }
+        (_a = this.historyPop) == null ? void 0 : _a.remove();
+        this.historyPop = null;
+      }
+      formatStamp(timestamp) {
+        const date = new Date(timestamp);
+        const pad2 = (value) => String(value).padStart(2, "0");
+        return `${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+      }
+      openHistoryPop(anchor) {
+        var _a, _b, _c;
+        const wasOpen = Boolean(this.historyPop);
+        this.closeHistoryPop();
+        if (wasOpen)
+          return;
+        const boardPath = (_b = (_a = this.file) == null ? void 0 : _a.path) != null ? _b : "";
+        const items = this.plugin.settings.conversations.filter((conversation) => conversation.boardPath === boardPath).sort((a, b) => b.updatedAt - a.updatedAt);
+        const pop = this.root.createDiv({ cls: "collis-ai-history" });
+        this.historyPop = pop;
+        pop.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        pop.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        const head = pop.createDiv({ cls: "collis-ai-history-head" });
+        head.createDiv({ cls: "collis-ai-history-heading", text: "\u5BF9\u8BDD\u8BB0\u5F55" });
+        if (items.length > 0) {
+          const clear = head.createEl("button", { cls: "collis-ai-history-clear", text: "\u5168\u90E8\u5220\u9664" });
+          clear.addEventListener("click", () => {
+            new ConfirmModal(
+              this.app,
+              "\u5220\u9664\u5168\u90E8\u5BF9\u8BDD\u8BB0\u5F55\uFF1F",
+              `\u5C06\u5220\u9664\u8FD9\u5757\u767D\u677F\u7684 ${items.length} \u6761\u8BB0\u5F55\uFF0C\u65E0\u6CD5\u6062\u590D\u3002`,
+              "\u5168\u90E8\u5220\u9664",
+              () => {
+                this.plugin.settings.conversations = this.plugin.settings.conversations.filter(
+                  (conversation) => conversation.boardPath !== boardPath
+                );
+                this.aiConversationId = null;
+                void this.plugin.saveSettings();
+                this.closeHistoryPop();
+              }
+            ).open();
+          });
+        }
+        if (items.length === 0) {
+          pop.createDiv({ cls: "collis-ai-history-empty", text: "\u8FD9\u5757\u767D\u677F\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u8BB0\u5F55" });
+        }
+        for (const conversation of items) {
+          const row = pop.createDiv({ cls: "collis-ai-history-item" });
+          if (conversation.id === this.aiConversationId)
+            row.addClass("is-current");
+          const iconEl = row.createDiv({ cls: "collis-ai-history-icon" });
+          (0, import_obsidian16.setIcon)(iconEl, "message-square");
+          const body = row.createDiv({ cls: "collis-ai-history-body" });
+          body.createDiv({ cls: "collis-ai-history-name", text: conversation.title });
+          body.createDiv({
+            cls: "collis-ai-history-time",
+            text: this.formatStamp(conversation.updatedAt)
+          });
+          const del = row.createEl("button", {
+            cls: "collis-ai-history-del",
+            attr: { "aria-label": "\u5220\u9664\u8FD9\u6761\u8BB0\u5F55" }
+          });
+          (0, import_obsidian16.setIcon)(del, "trash-2");
+          del.addEventListener("click", (evt) => {
+            evt.stopPropagation();
+            this.deleteConversation(conversation.id);
+            this.closeHistoryPop();
+            this.openHistoryPop(anchor);
+          });
+          row.addEventListener("click", () => {
+            this.closeHistoryPop();
+            void this.loadConversation(conversation);
+          });
+        }
+        const anchorRect = anchor.getBoundingClientRect();
+        const panelEl = anchor.closest(".collis-ai-panel");
+        const panelRect = (_c = panelEl == null ? void 0 : panelEl.getBoundingClientRect()) != null ? _c : anchorRect;
+        const rootRect = this.root.getBoundingClientRect();
+        const width = 300;
+        const gap = 8;
+        pop.style.left = `${Math.round(
+          Math.max(gap, Math.min(panelRect.right - rootRect.left - width - gap, rootRect.width - width - gap))
+        )}px`;
+        pop.style.top = `${Math.round(anchorRect.bottom - rootRect.top + 6)}px`;
+        this.historyOutside = (evt) => {
+          const target = evt.target;
+          if (target && (pop.contains(target) || anchor.contains(target)))
+            return;
+          this.closeHistoryPop();
+        };
+        document.addEventListener("mousedown", this.historyOutside, true);
+      }
+      /**
+       * Turns bare references like N3 into N3「content preview」. The lookup uses
+       * the explicit N→id map, never the targets array: a selected group occupies
+       * a slot there and would shift every number by one.
+       */
+      decorateAnswer(text, map) {
+        return text.replace(/\bN(\d+)\b/g, (match, digits) => {
+          var _a;
+          const nodeId = map.get(`N${digits}`);
+          if (!nodeId)
+            return match;
+          const preview = ((_a = this.nodeText.get(nodeId)) != null ? _a : "").replace(/\s+/g, " ").trim();
+          if (!preview)
+            return match;
+          const short = preview.length > 12 ? `${preview.slice(0, 12)}\u2026` : preview;
+          return `${match}\u300C${short}\u300D`;
+        });
+      }
+      /**
+       * After Markdown is rendered, turn N1「…」 into a clickable reference. Doing
+       * this on the DOM keeps the copied answer as plain Markdown.
+       */
+      linkAnswerRefs(host, map) {
+        var _a, _b, _c;
+        if (map.size === 0)
+          return;
+        const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+        const texts = [];
+        while (walker.nextNode())
+          texts.push(walker.currentNode);
+        const pattern = /\b(N\d+)「[^」]*」/g;
+        for (const textNode of texts) {
+          const value = (_a = textNode.textContent) != null ? _a : "";
+          const matches = Array.from(value.matchAll(pattern));
+          if (matches.length === 0)
+            continue;
+          const fragment = document.createDocumentFragment();
+          let cursor = 0;
+          for (const match of matches) {
+            const index = (_b = match.index) != null ? _b : 0;
+            if (index > cursor) {
+              fragment.appendChild(document.createTextNode(value.slice(cursor, index)));
+            }
+            const tag = match[1];
+            const nodeId = map.get(tag);
+            if (!nodeId) {
+              fragment.appendChild(document.createTextNode(match[0]));
+            } else {
+              const button = document.createElement("button");
+              button.className = "collis-ai-nref";
+              button.type = "button";
+              button.textContent = match[0];
+              button.addEventListener("click", (evt) => {
+                evt.stopPropagation();
+                evt.preventDefault();
+                this.jumpToNumberedNode(nodeId);
+              });
+              fragment.appendChild(button);
+            }
+            cursor = index + match[0].length;
+          }
+          if (cursor < value.length) {
+            fragment.appendChild(document.createTextNode(value.slice(cursor)));
+          }
+          (_c = textNode.parentNode) == null ? void 0 : _c.replaceChild(fragment, textNode);
+        }
+      }
+      /** Centre and briefly highlight the node an answer referred to. */
+      jumpToNumberedNode(nodeId) {
+        const node2 = this.nodeMap.get(nodeId);
+        if (!node2 || !this.nodeEls.has(nodeId)) {
+          new import_obsidian16.Notice("\u8FD9\u4E2A\u8282\u70B9\u5DF2\u7ECF\u4E0D\u5728\u5F53\u524D\u767D\u677F\u4E0A\u4E86");
+          return;
+        }
+        this.centerOnNode(node2);
+      }
+      /** Selected text inside the panel, otherwise the latest full answer. */
+      replyTextForOverwrite() {
+        var _a, _b;
+        const selection = window.getSelection();
+        const text = (_a = selection == null ? void 0 : selection.toString().trim()) != null ? _a : "";
+        if (text && (selection == null ? void 0 : selection.anchorNode) && ((_b = this.aiPanel) == null ? void 0 : _b.contains(selection.anchorNode))) {
+          return text;
+        }
+        return Array.from(this.aiPicked).sort((a, b) => a - b).map((index) => this.aiAnswers[index]).filter((value) => Boolean(value)).join("\n\n");
+      }
+      /**
+       * A card lives inside a single list item, so blank lines and nested Markdown
+       * would break the block apart. This keeps the meaning but makes the result
+       * storable as one contiguous block.
+       */
+      flattenForCard(text) {
+        const out = [];
+        for (const raw of text.replace(/\r\n/g, "\n").split("\n")) {
+          const line = raw.trim();
+          if (!line)
+            continue;
+          const heading2 = /^#{1,6}\s+(.*)$/.exec(line);
+          if (heading2) {
+            out.push(`**${heading2[1].replace(/\*\*/g, "")}**`);
+            continue;
+          }
+          const bullet = /^[-*+]\s+(.*)$/.exec(line);
+          if (bullet) {
+            out.push(`\u2022 ${bullet[1]}`);
+            continue;
+          }
+          const rule = /^([-*_])\1{2,}$/.test(line);
+          if (rule)
+            continue;
+          out.push(line);
+        }
+        return out.join("\n");
+      }
+      async overwriteNode(node2, text) {
+        const content = text.trim();
+        if (!content)
+          return false;
+        if (node2.type === "text") {
+          node2.text = content;
+          await this.renderNode(node2);
+        } else if (node2.type === "card") {
+          const ref = { file: node2.file, blockId: node2.blockId, linkpath: "" };
+          const meta = await readCard(this.app, ref);
+          const ok = await writeCard(
+            this.app,
+            ref,
+            `${meta.timePrefix}${this.flattenForCard(content)}`
+          );
+          if (!ok)
+            return false;
+          await this.renderNode(node2);
+        } else if (node2.type === "file") {
+          const file = this.app.vault.getAbstractFileByPath(node2.file);
+          if (!(file instanceof import_obsidian16.TFile) || file.extension.toLowerCase() !== "md")
+            return false;
+          await this.app.vault.modify(file, content);
+          await this.renderNode(node2);
+        } else {
+          return false;
+        }
+        this.pushHistory();
+        this.scheduleSave();
+        return true;
+      }
+      centerWorld() {
+        const rect = this.root.getBoundingClientRect();
+        return this.toWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      }
+      /** Directly creates a new text node, optionally as a yellow sticky. */
+      async createTextAtCenter(sticky = false) {
+        const point = this.centerWorld();
+        const node2 = {
+          id: createId(),
+          type: "text",
+          text: "",
+          x: Math.round(point.x - DEFAULT_CARD_WIDTH / 2),
+          y: Math.round(point.y - 24),
+          width: DEFAULT_CARD_WIDTH
+        };
+        if (sticky)
+          node2.sticky = true;
+        this.nodes.push(node2);
+        this.nodeMap.set(node2.id, node2);
+        this.selection.clear();
+        this.selection.add(node2.id);
+        const el = await this.renderNode(node2);
+        this.paintSelection();
+        this.updateHint();
+        this.pushHistory();
+        this.scheduleSave();
+        void this.openEditor(node2, el);
+      }
+      async createStickyAtCenter() {
+        await this.createTextAtCenter(true);
+      }
+      async insertAIText(text, targets) {
+        const box = this.selectionBox(targets);
+        const anchor = box != null ? box : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+        const node2 = {
+          id: createId(),
+          type: "text",
+          text,
+          x: Math.round(anchor.maxX + 40),
+          y: Math.round(anchor.minY),
+          width: 360
+        };
+        this.nodes.push(node2);
+        this.nodeMap.set(node2.id, node2);
+        await this.renderNode(node2);
+        this.selection.clear();
+        this.selection.add(node2.id);
+        this.paintSelection();
+        this.updateHint();
+        this.pushHistory();
+        this.scheduleSave();
+      }
+      openNodeSearch() {
+        this.closeSearchPanel();
+        const rect = this.root.getBoundingClientRect();
+        const panel = this.root.createDiv({ cls: "collis-insert-panel" });
+        const width = 328;
+        const left = Math.max(8, (rect.width - width) / 2);
+        const top = Math.max(48, rect.height * 0.22);
+        panel.style.left = `${Math.round(left)}px`;
+        panel.style.top = `${Math.round(top)}px`;
+        panel.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        panel.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        const head = panel.createDiv({ cls: "collis-insert-head" });
+        let dragOrigin = null;
+        head.addEventListener("pointerdown", (evt) => {
+          if (evt.target.closest("input, button"))
+            return;
+          dragOrigin = {
+            x: evt.clientX,
+            y: evt.clientY,
+            left: panel.offsetLeft,
+            top: panel.offsetTop
+          };
+          head.setPointerCapture(evt.pointerId);
+          panel.addClass("is-dragging");
+        });
+        head.addEventListener("pointermove", (evt) => {
+          if (!dragOrigin)
+            return;
+          panel.style.left = `${Math.round(dragOrigin.left + evt.clientX - dragOrigin.x)}px`;
+          panel.style.top = `${Math.round(dragOrigin.top + evt.clientY - dragOrigin.y)}px`;
+        });
+        const endDrag = (evt) => {
+          if (!dragOrigin)
+            return;
+          dragOrigin = null;
+          panel.removeClass("is-dragging");
+          try {
+            head.releasePointerCapture(evt.pointerId);
+          } catch (error) {
+          }
+        };
+        head.addEventListener("pointerup", endDrag);
+        head.addEventListener("pointercancel", endDrag);
+        const headIcon = head.createDiv({ cls: "collis-insert-head-icon" });
+        (0, import_obsidian16.setIcon)(headIcon, "search");
+        const input = head.createEl("input", {
+          cls: "collis-insert-input",
+          attr: { type: "text", placeholder: "\u5728\u767D\u677F\u4E2D\u67E5\u627E\u8282\u70B9\u2026" }
+        });
+        const list = panel.createDiv({ cls: "collis-insert-list" });
+        panel.createDiv({
+          cls: "collis-insert-foot",
+          text: "\u2191\u2193 \u9009\u62E9 \xB7 Enter \u5B9A\u4F4D \xB7 Esc \u53D6\u6D88"
+        });
+        this.searchPanel = panel;
+        const all = this.nodes;
+        let results = [];
+        let active = 0;
+        const render = () => {
+          list.empty();
+          if (results.length === 0) {
+            list.createDiv({ cls: "collis-insert-empty", text: "\u6CA1\u6709\u5339\u914D\u7684\u8282\u70B9" });
+            return;
+          }
+          results.forEach((node2, index) => {
+            var _a;
+            const row = list.createDiv({ cls: "collis-insert-item" });
+            if (index === active) {
+              row.addClass("is-active");
+              window.requestAnimationFrame(() => row.scrollIntoView({ block: "nearest" }));
+            }
+            const iconEl = row.createDiv({ cls: "collis-insert-item-icon" });
+            (0, import_obsidian16.setIcon)(
+              iconEl,
+              node2.type === "card" ? "list" : node2.type === "group" ? "group" : node2.type === "text" ? "type" : "file-text"
+            );
+            const body = row.createDiv({ cls: "collis-insert-item-body" });
+            const text = ((_a = this.nodeText.get(node2.id)) != null ? _a : "").replace(/\s+/g, " ").trim();
+            body.createDiv({
+              cls: "collis-insert-title",
+              text: text.slice(0, 48) || "\uFF08\u7A7A\u8282\u70B9\uFF09"
+            });
+            body.createDiv({
+              cls: "collis-insert-sub",
+              text: node2.type === "card" ? "\u5361\u7247" : node2.type === "group" ? "\u5206\u7EC4" : node2.type === "text" ? "\u6587\u672C\u8282\u70B9" : node2.file
+            });
+            row.addEventListener("click", () => {
+              this.closeSearchPanel();
+              this.centerOnNode(node2);
+            });
+          });
+        };
+        const search = (query) => {
+          const q = query.trim().toLowerCase();
+          results = q ? all.filter((node2) => {
+            var _a;
+            const text = ((_a = this.nodeText.get(node2.id)) != null ? _a : "").toLowerCase();
+            return text.includes(q);
+          }) : all.slice(0, 30);
+          active = 0;
+          render();
+        };
+        input.addEventListener("input", () => search(input.value));
+        input.addEventListener("keydown", (evt) => {
+          if (evt.key === "Escape") {
+            evt.preventDefault();
+            this.closeSearchPanel();
+            return;
+          }
+          if (evt.key === "ArrowDown") {
+            evt.preventDefault();
+            active = Math.min(results.length - 1, active + 1);
+            render();
+            return;
+          }
+          if (evt.key === "ArrowUp") {
+            evt.preventDefault();
+            active = Math.max(0, active - 1);
+            render();
+            return;
+          }
+          if (evt.key === "Enter") {
+            evt.preventDefault();
+            const node2 = results[active];
+            if (!node2)
+              return;
+            this.closeSearchPanel();
+            this.centerOnNode(node2);
+          }
+        });
+        this.searchOutside = (evt) => {
+          const target = evt.target;
+          if (target && panel.contains(target))
+            return;
+          this.closeSearchPanel();
+        };
+        document.addEventListener("mousedown", this.searchOutside, true);
+        search("");
+        window.setTimeout(() => input.focus(), 20);
+      }
+      openInsertPanelAtCenter(filter) {
+        const rect = this.root.getBoundingClientRect();
+        const world = this.toWorld(
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2
+        );
+        void this.openInsertPanel(world, null, null, filter);
+      }
+      closeInsertPanel() {
+        if (this.panelOutside) {
+          document.removeEventListener("mousedown", this.panelOutside, true);
+          this.panelOutside = null;
+        }
+        if (this.insertPanel) {
+          this.insertPanel.remove();
+          this.insertPanel = null;
+        }
+      }
+      async openInsertPanel(world, fromId, fromSide, filter) {
+        this.closeInsertPanel();
+        const rect = this.root.getBoundingClientRect();
+        const boxWidth = 320;
+        const screenX = world.x * this.scale + this.tx;
+        const screenY = world.y * this.scale + this.ty;
+        const panel = this.root.createDiv({ cls: "collis-insert-panel" });
+        panel.style.left = `${Math.round(Math.max(8, Math.min(screenX, rect.width - boxWidth - 8)))}px`;
+        panel.style.top = `${Math.round(Math.max(8, Math.min(screenY, rect.height - 300)))}px`;
+        panel.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        panel.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        const head = panel.createDiv({ cls: "collis-insert-head" });
+        let dragOrigin = null;
+        head.addEventListener("pointerdown", (evt) => {
+          if (evt.target.closest("input, button"))
+            return;
+          dragOrigin = {
+            x: evt.clientX,
+            y: evt.clientY,
+            left: panel.offsetLeft,
+            top: panel.offsetTop
+          };
+          head.setPointerCapture(evt.pointerId);
+          panel.addClass("is-dragging");
+        });
+        head.addEventListener("pointermove", (evt) => {
+          if (!dragOrigin)
+            return;
+          panel.style.left = `${Math.round(dragOrigin.left + evt.clientX - dragOrigin.x)}px`;
+          panel.style.top = `${Math.round(dragOrigin.top + evt.clientY - dragOrigin.y)}px`;
+        });
+        const endDrag = (evt) => {
+          if (!dragOrigin)
+            return;
+          dragOrigin = null;
+          panel.removeClass("is-dragging");
+          try {
+            head.releasePointerCapture(evt.pointerId);
+          } catch (error) {
+          }
+        };
+        head.addEventListener("pointerup", endDrag);
+        head.addEventListener("pointercancel", endDrag);
+        const headIcon = head.createDiv({ cls: "collis-insert-head-icon" });
+        (0, import_obsidian16.setIcon)(headIcon, "search");
+        const input = head.createEl("input", {
+          cls: "collis-insert-input",
+          attr: { type: "text", placeholder: "\u641C\u7D22\u5361\u7247\u3001\u7B14\u8BB0\uFF0C\u6216\u65B0\u5EFA\u2026" }
+        });
+        const list = panel.createDiv({ cls: "collis-insert-list" });
+        panel.createDiv({ cls: "collis-insert-foot", text: "\u2191\u2193 \u9009\u62E9 \xB7 Enter \u786E\u8BA4 \xB7 Esc \u53D6\u6D88" });
+        this.insertPanel = panel;
+        let items = [];
+        let active = 0;
+        let token = 0;
+        const render = () => {
+          list.empty();
+          items.forEach((item, index) => {
+            const row = list.createDiv({ cls: "collis-insert-item" });
+            if (index === active) {
+              row.addClass("is-active");
+              window.requestAnimationFrame(() => {
+                row.scrollIntoView({ block: "nearest" });
+              });
+            }
+            const iconEl = row.createDiv({ cls: "collis-insert-item-icon" });
+            (0, import_obsidian16.setIcon)(
+              iconEl,
+              item.kind === "card" ? "list" : item.kind === "note" ? "file-text" : item.kind === "media" ? "image" : "type"
+            );
+            const body = row.createDiv({ cls: "collis-insert-item-body" });
+            body.createDiv({ cls: "collis-insert-title", text: item.title });
+            body.createDiv({ cls: "collis-insert-sub", text: item.sub });
+            row.addEventListener("click", () => void choose(index));
+          });
+        };
+        const reload = async (query) => {
+          const mine = ++token;
+          const found = await searchInsertItems(
+            this.app,
+            this.plugin.settings.cardFolder,
+            query,
+            filter
+          );
+          if (mine !== token || !this.insertPanel)
+            return;
+          items = found;
+          active = 0;
+          render();
+        };
+        const choose = async (index) => {
+          const item = items[index];
+          if (!item)
+            return;
+          this.closeInsertPanel();
+          await this.applyInsert(item, world, fromId, fromSide);
+        };
+        input.addEventListener("input", () => void reload(input.value));
+        input.addEventListener("keydown", (evt) => {
+          if (evt.key === "Escape") {
+            evt.preventDefault();
+            this.closeInsertPanel();
+            return;
+          }
+          if (evt.key === "ArrowDown") {
+            evt.preventDefault();
+            active = Math.min(items.length - 1, active + 1);
+            render();
+            return;
+          }
+          if (evt.key === "ArrowUp") {
+            evt.preventDefault();
+            active = Math.max(0, active - 1);
+            render();
+            return;
+          }
+          if (evt.key === "Enter") {
+            evt.preventDefault();
+            void choose(active);
+          }
+        });
+        this.panelOutside = (evt) => {
+          if (!this.insertPanel)
+            return;
+          const target = evt.target;
+          if (target && panel.contains(target))
+            return;
+          this.closeInsertPanel();
+        };
+        document.addEventListener("mousedown", this.panelOutside, true);
+        await reload("");
+        window.setTimeout(() => input.focus(), 20);
+      }
+      async applyInsert(item, world, fromId, fromSide) {
+        var _a;
+        let created = null;
+        if (item.kind === "text") {
+          created = await this.createTextNode(world);
+        } else if (item.kind === "note") {
+          if (item.file) {
+            created = await this.addFileNode(item.file, world);
+          } else {
+            const folder = (_a = this.plugin.settings.boardFolder) != null ? _a : "";
+            const file = await createNoteFromText(this.app, folder, "", "\u672A\u547D\u540D");
+            if (file)
+              created = await this.addFileNode(file.path, world);
+          }
+        } else if (item.kind === "media" && item.file) {
+          created = await this.addFileNode(item.file, world);
+        } else if (item.kind === "card" && item.file && item.blockId) {
+          created = await this.addCardNodeAt(
+            item.file,
+            item.blockId,
+            Math.round(world.x - DEFAULT_CARD_WIDTH / 2),
+            Math.round(world.y - 60),
+            DEFAULT_CARD_WIDTH,
+            320
+          );
+        }
+        if (!fromId || !created)
+          return;
+        const target = this.nodeMap.get(created.id);
+        const toSide = target ? this.nearestSide(target, world.x, world.y) : "left";
+        this.edges.push({
+          id: createId(),
+          from: fromId,
+          to: created.id,
+          fromSide: fromSide != null ? fromSide : "right",
+          toSide
+        });
+        this.renderEdges();
+        this.pushHistory();
+        this.scheduleSave();
+      }
+      nodeAt(x, y) {
+        for (let i = this.nodes.length - 1; i >= 0; i--) {
+          const node2 = this.nodes[i];
+          const height = this.nodeHeight(node2);
+          if (x >= node2.x && x <= node2.x + node2.width && y >= node2.y && y <= node2.y + height) {
+            return node2;
+          }
+        }
+        return null;
+      }
+      /**
+       * Duplicate check is per port pair, not per node pair: two nodes can hold up
+       * to sixteen distinct connections (4 sides x 4 sides).
+       */
+      hasEdge(from, to, fromSide, toSide) {
+        return this.edges.some(
+          (edge) => {
+            var _a, _b;
+            return edge.from === from && edge.to === to && ((_a = edge.fromSide) != null ? _a : null) === (fromSide != null ? fromSide : null) && ((_b = edge.toSide) != null ? _b : null) === (toSide != null ? toSide : null);
+          }
+        );
+      }
+      /**
+       * Alignment snapping during a drag: compares the moving selection's six
+       * anchor lines with every other node and pulls to the closest one within a
+       * small screen-space threshold.
+       */
+      computeSnap(initial, dx, dy) {
+        const moving = new Set(initial.keys());
+        const threshold = 6 / this.scale;
+        let minX = Number.POSITIVE_INFINITY;
+        let minY = Number.POSITIVE_INFINITY;
+        let maxX = Number.NEGATIVE_INFINITY;
+        let maxY = Number.NEGATIVE_INFINITY;
+        for (const [id, start] of initial) {
+          const node2 = this.nodeMap.get(id);
+          if (!node2)
+            continue;
+          const height = this.nodeHeight(node2);
+          minX = Math.min(minX, start.x + dx);
+          minY = Math.min(minY, start.y + dy);
+          maxX = Math.max(maxX, start.x + dx + node2.width);
+          maxY = Math.max(maxY, start.y + dy + height);
+        }
+        if (!Number.isFinite(minX))
+          return { dx: 0, dy: 0, lines: [] };
+        const anchorX = [minX, (minX + maxX) / 2, maxX];
+        const anchorY = [minY, (minY + maxY) / 2, maxY];
+        let bestDx = 0;
+        let bestDy = 0;
+        let distX = threshold;
+        let distY = threshold;
+        let lineX = null;
+        let lineY = null;
+        for (const other of this.nodes) {
+          if (moving.has(other.id))
+            continue;
+          const height = this.nodeHeight(other);
+          const otherX = [other.x, other.x + other.width / 2, other.x + other.width];
+          const otherY = [other.y, other.y + height / 2, other.y + height];
+          for (const a of anchorX) {
+            for (const b of otherX) {
+              const delta = b - a;
+              const distance = Math.abs(delta);
+              if (distance < distX) {
+                distX = distance;
+                bestDx = delta;
+                lineX = { axis: "x", pos: b };
+              }
+            }
+          }
+          for (const a of anchorY) {
+            for (const b of otherY) {
+              const delta = b - a;
+              const distance = Math.abs(delta);
+              if (distance < distY) {
+                distY = distance;
+                bestDy = delta;
+                lineY = { axis: "y", pos: b };
+              }
+            }
+          }
+        }
+        const lines = [];
+        if (lineX)
+          lines.push(lineX);
+        if (lineY)
+          lines.push(lineY);
+        return { dx: bestDx, dy: bestDy, lines };
+      }
+      drawGuides(lines) {
+        const svg = this.edgesEl;
+        if (!svg || lines.length === 0)
+          return;
+        const box = svg.viewBox.baseVal;
+        const left = box.x;
+        const top = box.y;
+        const right = box.x + box.width;
+        const bottom = box.y + box.height;
+        for (const guide of lines) {
+          const line = this.svgNode("line");
+          if (guide.axis === "x") {
+            line.setAttribute("x1", String(guide.pos));
+            line.setAttribute("y1", String(top));
+            line.setAttribute("x2", String(guide.pos));
+            line.setAttribute("y2", String(bottom));
+          } else {
+            line.setAttribute("x1", String(left));
+            line.setAttribute("y1", String(guide.pos));
+            line.setAttribute("x2", String(right));
+            line.setAttribute("y2", String(guide.pos));
+          }
+          line.setAttribute("class", "collis-guide");
+          svg.appendChild(line);
+        }
+      }
+      setLinkTarget(nodeId) {
+        for (const [id, el] of this.nodeEls) {
+          el.toggleClass("is-link-target", id === nodeId);
+        }
+      }
+      startLinkDrag(evt, fromId, side) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        if (!this.edgesEl)
+          return;
+        const from = this.nodeMap.get(fromId);
+        if (!from)
+          return;
+        const height = this.nodeHeight(from);
+        const anchor = side === "top" ? { x: from.x + from.width / 2, y: from.y } : side === "bottom" ? { x: from.x + from.width / 2, y: from.y + height } : side === "left" ? { x: from.x, y: from.y + height / 2 } : { x: from.x + from.width, y: from.y + height / 2 };
+        const preview = this.svgNode("path");
+        preview.setAttribute("class", "collis-edge is-preview");
+        this.edgesEl.appendChild(preview);
+        this.setLinkTarget(null);
+        this.linkDrag = {
+          fromId,
+          pointerId: evt.pointerId,
+          path: preview,
+          anchor,
+          side
+        };
+        this.root.setPointerCapture(evt.pointerId);
+        this.root.addClass("is-linking");
+      }
+      updateLinkDrag(evt) {
+        var _a, _b, _c;
+        const drag = this.linkDrag;
+        if (!drag)
+          return;
+        const world = this.toWorld(evt.clientX, evt.clientY);
+        const hit = document.elementFromPoint(evt.clientX, evt.clientY);
+        let hovered = (_b = (_a = hit == null ? void 0 : hit.closest(".collis-bnode")) == null ? void 0 : _a.getAttribute("data-node-id")) != null ? _b : null;
+        if (!hovered) {
+          const near = this.nodeNear(world.x, world.y, 24 / this.scale);
+          hovered = (_c = near == null ? void 0 : near.id) != null ? _c : null;
+        }
+        if (hovered === drag.fromId)
+          hovered = null;
+        this.setLinkTarget(hovered);
+        const normal = this.sideNormal(drag.side);
+        const dist = Math.hypot(world.x - drag.anchor.x, world.y - drag.anchor.y);
+        const offset = Math.max(28, Math.min(150, dist * 0.35));
+        const c1 = {
+          x: drag.anchor.x + normal.x * offset,
+          y: drag.anchor.y + normal.y * offset
+        };
+        drag.path.setAttribute(
+          "d",
+          `M ${drag.anchor.x} ${drag.anchor.y} C ${c1.x} ${c1.y}, ${world.x} ${world.y}, ${world.x} ${world.y}`
+        );
+      }
+      finishLinkDrag(evt) {
+        var _a, _b, _c;
+        const drag = this.linkDrag;
+        if (!drag)
+          return;
+        this.linkDrag = null;
+        this.setLinkTarget(null);
+        drag.path.remove();
+        this.root.removeClass("is-linking");
+        try {
+          this.root.releasePointerCapture(evt.pointerId);
+        } catch (error) {
+        }
+        const hit = document.elementFromPoint(evt.clientX, evt.clientY);
+        const nodeEl = hit == null ? void 0 : hit.closest(".collis-bnode");
+        const portSide = (_b = (_a = hit == null ? void 0 : hit.closest(".collis-port")) == null ? void 0 : _a.dataset.port) != null ? _b : null;
+        const world = this.toWorld(evt.clientX, evt.clientY);
+        let targetId = (_c = nodeEl == null ? void 0 : nodeEl.getAttribute("data-node-id")) != null ? _c : null;
+        if (!targetId) {
+          const nearby = this.nodeNear(world.x, world.y, 24 / this.scale);
+          if (nearby)
+            targetId = nearby.id;
+        }
+        if (!targetId || targetId === drag.fromId) {
+          void this.openInsertPanel(
+            this.toWorld(evt.clientX, evt.clientY),
+            drag.fromId,
+            drag.side
+          );
+          return;
+        }
+        const target = this.nodeMap.get(targetId);
+        if (!target)
+          return;
+        const toSide = portSide != null ? portSide : this.nearestSide(target, world.x, world.y);
+        if (this.hasEdge(drag.fromId, targetId, drag.side, toSide))
+          return;
+        this.edges.push({
+          id: createId(),
+          from: drag.fromId,
+          to: targetId,
+          fromSide: drag.side,
+          toSide
+        });
+        this.renderEdges();
+        this.pushHistory();
+        this.scheduleSave();
+      }
+      buildEdgeBar() {
+        const bar = this.edgeBar;
+        if (!bar)
+          return;
+        bar.empty();
+        for (const color of NODE_COLORS) {
+          const dot = bar.createEl("button", {
+            cls: "collis-edge-dot",
+            attr: { "aria-label": color.label }
+          });
+          dot.style.background = color.line;
+          dot.addEventListener("click", () => this.styleSelectedEdge({ color: color.name }));
+        }
+        const picker = bar.createEl("label", {
+          cls: "collis-edge-dot is-custom",
+          attr: { "aria-label": "\u81EA\u5B9A\u4E49\u989C\u8272" }
+        });
+        const input = picker.createEl("input", { attr: { type: "color" } });
+        input.value = "#888888";
+        input.addEventListener("change", () => this.styleSelectedEdge({ color: input.value }));
+        bar.createDiv({ cls: "collis-edge-sep" });
+        const arrowBtn = (arrow, icon, label) => {
+          const button = bar.createEl("button", {
+            cls: "collis-tool-btn",
+            attr: { "aria-label": label }
+          });
+          (0, import_obsidian16.setIcon)(button, icon);
+          button.addEventListener("click", () => this.styleSelectedEdge({ arrow }));
+        };
+        arrowBtn("target", "arrow-right", "\u5355\u5411\u7BAD\u5934");
+        arrowBtn("both", "arrow-left-right", "\u53CC\u5411\u7BAD\u5934");
+        arrowBtn("none", "minus", "\u65E0\u7BAD\u5934");
+        bar.createDiv({ cls: "collis-edge-sep" });
+        this.edgeRelationBtn = bar.createEl("button", {
+          cls: "collis-tool-btn",
+          attr: { "aria-label": "\u8BBE\u7F6E\u5173\u7CFB" }
+        });
+        (0, import_obsidian16.setIcon)(this.edgeRelationBtn, "git-branch");
+        this.edgeRelationBtn.addEventListener("click", () => {
+          if (this.selectedEdgeId)
+            this.openEdgeLabelEditor(this.selectedEdgeId, void 0, "relation");
+        });
+        this.edgeLabelBtn = bar.createEl("button", {
+          cls: "collis-tool-btn",
+          attr: { "aria-label": "\u6DFB\u52A0\u6807\u7B7E" }
+        });
+        (0, import_obsidian16.setIcon)(this.edgeLabelBtn, "tag");
+        this.edgeLabelBtn.addEventListener("click", () => {
+          if (this.selectedEdgeId)
+            this.openEdgeLabelEditor(this.selectedEdgeId);
+        });
+        bar.createDiv({ cls: "collis-edge-sep" });
+        const remove = bar.createEl("button", {
+          cls: "collis-tool-btn is-danger",
+          attr: { "aria-label": "\u5220\u9664\u8FDE\u7EBF" }
+        });
+        (0, import_obsidian16.setIcon)(remove, "trash-2");
+        remove.addEventListener("click", () => this.deleteSelectedEdge());
+      }
+      styleSelectedEdge(patch) {
+        const edge = this.edges.find((item) => item.id === this.selectedEdgeId);
+        if (!edge)
+          return;
+        if (patch.color !== void 0)
+          edge.color = patch.color;
+        if (patch.arrow !== void 0)
+          edge.arrow = patch.arrow;
+        this.renderEdges();
+        this.updateEdgeBar();
+        this.pushHistory();
+        this.scheduleSave();
+      }
+      updateEdgeBar() {
+        var _a;
+        const bar = this.edgeBar;
+        if (!bar)
+          return;
+        if (!this.selectedEdgeId || this.edgeLabelEditor) {
+          bar.addClass("is-hidden");
+          return;
+        }
+        const edge = this.edges.find((item) => item.id === this.selectedEdgeId);
+        if (!edge) {
+          bar.addClass("is-hidden");
+          return;
+        }
+        if (!bar.hasChildNodes())
+          this.buildEdgeBar();
+        bar.removeClass("is-hidden");
+        if (this.edgeLabelBtn) {
+          this.edgeLabelBtn.setAttribute(
+            "aria-label",
+            this.edgeLabelOf(edge) ? "\u4FEE\u6539\u6807\u7B7E" : "\u6DFB\u52A0\u6807\u7B7E"
+          );
+        }
+        if (this.edgeRelationBtn) {
+          const meta = edge.relation ? EDGE_RELATION_BY_ID.get(edge.relation) : void 0;
+          this.edgeRelationBtn.setAttribute("aria-label", meta ? `\u5173\u7CFB\uFF1A${meta.label}` : "\u8BBE\u7F6E\u5173\u7CFB");
+          const color = (_a = this.lineColorOf(edge.color)) != null ? _a : this.lineColorOf(meta == null ? void 0 : meta.color);
+          this.edgeRelationBtn.style.color = color != null ? color : "";
+        }
+        const rect = this.root.getBoundingClientRect();
+        const curve = this.edgeGeometry(edge);
+        const anchor = curve ? curvePoint(curve, this.edgeLabelT(edge)) : { x: 0, y: 0 };
+        const screenX = anchor.x * this.scale + this.tx;
+        const screenY = anchor.y * this.scale + this.ty;
+        const width = bar.offsetWidth || 240;
+        const height = bar.offsetHeight || 36;
+        const left = Math.max(8, Math.min(screenX - width / 2, rect.width - width - 8));
+        const chipLift = this.edgeDisplayLabel(edge) ? EDGE_LABEL_HEIGHT / 2 * this.scale : 0;
+        const top = Math.max(8, screenY - height - 12 - chipLift);
+        bar.style.left = `${Math.round(left)}px`;
+        bar.style.top = `${Math.round(top)}px`;
+      }
+      /**
+       * Inline editor for a connection's relation and label, anchored in world
+       * space on the label's point on the line. Enter commits, Escape cancels,
+       * clicking away commits.
+       *
+       * `at` is the board point the user aimed at (a double-click on the line); it
+       * is projected onto the curve and becomes the label's position. Without it
+       * the label keeps the position it already has, or lands in the middle.
+       * `focus` decides which control receives focus when the popup opens.
+       */
+      openEdgeLabelEditor(edgeId, at, focus = "label") {
+        var _a;
+        const edge = this.edges.find((item) => item.id === edgeId);
+        if (!edge)
+          return;
+        const curve = this.edgeGeometry(edge);
+        if (!curve)
+          return;
+        const t = at ? clampLabelT(nearestCurveT(curve, at)) : this.edgeLabelT(edge);
+        this.closeEdgeLabelEditor(true);
+        const wrap = this.world.createDiv({ cls: "collis-edge-label-editor" });
+        wrap.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        wrap.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        const select = wrap.createEl("select", {
+          cls: "collis-edge-relation-select",
+          attr: { "aria-label": "\u8FDE\u7EBF\u5173\u7CFB" }
+        });
+        select.createEl("option", { text: "\u65E0\u5173\u7CFB", value: "" });
+        for (const meta of EDGE_RELATIONS) {
+          select.createEl("option", { text: meta.label, value: meta.id });
+        }
+        select.value = (_a = edge.relation) != null ? _a : "";
+        const input = wrap.createEl("input", {
+          cls: "collis-edge-label-input",
+          attr: {
+            type: "text",
+            placeholder: "\u8F93\u5165\u6807\u7B7E",
+            maxlength: String(EDGE_LABEL_MAX),
+            spellcheck: "false"
+          }
+        });
+        input.value = this.edgeLabelOf(edge);
+        const onKeydown = (evt) => {
+          evt.stopPropagation();
+          if (evt.isComposing)
+            return;
+          if (evt.key === "Enter") {
+            evt.preventDefault();
+            this.closeEdgeLabelEditor(true);
+          } else if (evt.key === "Escape") {
+            evt.preventDefault();
+            this.closeEdgeLabelEditor(false);
+          }
+        };
+        input.addEventListener("keydown", onKeydown);
+        select.addEventListener("keydown", onKeydown);
+        wrap.addEventListener("focusout", (evt) => {
+          const next = evt.relatedTarget;
+          if (next && wrap.contains(next))
+            return;
+          this.closeEdgeLabelEditor(true);
+        });
+        this.edgeLabelEditor = { el: wrap, input, select, edgeId, t };
+        this.syncEdgeLabelEditor();
+        if (focus === "relation") {
+          select.focus();
+        } else {
+          input.focus();
+          input.select();
+        }
+        this.updateEdgeBar();
+      }
+      /**
+       * Pins the field to the label's point on the line and cancels the board zoom,
+       * so the input stays a normal, readable size however far the board is scaled.
+       * The chip under it scales with the board, but a text field that shrinks to a
+       * few pixels would be unusable.
+       */
+      syncEdgeLabelEditor() {
+        const editor = this.edgeLabelEditor;
+        if (!editor)
+          return;
+        const edge = this.edges.find((item) => item.id === editor.edgeId);
+        const curve = edge ? this.edgeGeometry(edge) : null;
+        if (curve) {
+          const anchor = curvePoint(curve, editor.t);
+          editor.el.style.left = `${Math.round(anchor.x)}px`;
+          editor.el.style.top = `${Math.round(anchor.y)}px`;
+        }
+        editor.el.style.transform = `translate(-50%, -50%) scale(${1 / this.scale})`;
+      }
+      closeEdgeLabelEditor(commit) {
+        const editor = this.edgeLabelEditor;
+        if (!editor)
+          return;
+        this.edgeLabelEditor = null;
+        const value = editor.input.value;
+        const relation = editor.select.value ? editor.select.value : void 0;
+        editor.el.remove();
+        if (commit)
+          this.commitEdgeEdit(editor.edgeId, value, editor.t, relation);
+        this.updateEdgeBar();
+      }
+      commitEdgeEdit(edgeId, raw, t, relation) {
+        const edge = this.edges.find((item) => item.id === edgeId);
+        if (!edge)
+          return;
+        const value = raw.trim().slice(0, EDGE_LABEL_MAX);
+        const position = clampLabelT(t);
+        const moved = Math.abs(position - this.edgeLabelT(edge)) > 1e-3;
+        const relationChanged = edge.relation !== relation;
+        if (value === this.edgeLabelOf(edge) && !moved && !relationChanged)
+          return;
+        if (value) {
+          edge.label = value;
+          edge.labelAt = position;
+        } else {
+          delete edge.label;
+          if (relation)
+            edge.labelAt = position;
+          else
+            delete edge.labelAt;
+        }
+        if (relationChanged) {
+          if (relation) {
+            edge.relation = relation;
+            delete edge.color;
+            delete edge.style;
+            delete edge.arrow;
+          } else {
+            delete edge.relation;
+          }
+        }
+        this.renderEdges();
+        this.updateEdgeBar();
+        this.pushHistory();
+        this.scheduleSave();
+      }
+      /**
+       * Selecting is a class toggle, never a re-render. Rebuilding the SVG here
+       * would replace the very path the user just pressed, and the browser drops
+       * the second click of a double-click when the two clicks land on different
+       * elements — which is why double-clicking a line did nothing at all.
+       */
+      selectEdge(edgeId) {
+        this.selectedEdgeId = edgeId;
+        this.selection.clear();
+        this.paintSelection();
+        this.paintEdgeSelection();
+        this.updateEdgeBar();
+      }
+      paintEdgeSelection() {
+        var _a;
+        const groups = (_a = this.edgesEl) == null ? void 0 : _a.querySelectorAll(".collis-edge-group");
+        if (!groups)
+          return;
+        for (const group of Array.from(groups)) {
+          group.classList.toggle("is-selected", group.dataset.edgeId === this.selectedEdgeId);
+        }
+      }
+      deleteSelectedEdge() {
+        var _a;
+        if (!this.selectedEdgeId)
+          return false;
+        if (((_a = this.edgeLabelEditor) == null ? void 0 : _a.edgeId) === this.selectedEdgeId) {
+          this.closeEdgeLabelEditor(false);
+        }
+        this.edges = this.edges.filter((edge) => edge.id !== this.selectedEdgeId);
+        this.selectedEdgeId = null;
+        this.updateEdgeBar();
+        this.renderEdges();
+        this.pushHistory();
+        this.scheduleSave();
+        return true;
+      }
+      bringToFront(nodeId) {
+        const el = this.nodeEls.get(nodeId);
+        if (!el)
+          return;
+        this.world.appendChild(el);
+      }
+      startNodeDrag(evt, nodeId) {
+        const additive = evt.ctrlKey || evt.metaKey || evt.shiftKey;
+        if (additive) {
+          if (this.selection.has(nodeId))
+            this.selection.delete(nodeId);
+          else
+            this.selection.add(nodeId);
+        } else if (!this.selection.has(nodeId)) {
+          this.selection.clear();
+          this.selection.add(nodeId);
+        }
+        this.paintSelection();
+        if (!this.selection.has(nodeId))
+          return;
+        this.bringToFront(nodeId);
+        this.dragMoved = false;
+        this.beginNodeMove(evt);
+      }
+      beginNodeMove(evt) {
+        const initial = /* @__PURE__ */ new Map();
+        for (const id of this.selection) {
+          const node2 = this.nodeMap.get(id);
+          if (!node2)
+            continue;
+          initial.set(node2.id, { x: node2.x, y: node2.y });
+          if (node2.type === "group") {
+            for (const member of this.groupMembers(node2)) {
+              if (!initial.has(member.id)) {
+                initial.set(member.id, { x: member.x, y: member.y });
+              }
+            }
+          }
+        }
+        if (initial.size === 0)
+          return;
+        this.drag = {
+          type: "node",
+          pointerId: evt.pointerId,
+          startWorld: this.toWorld(evt.clientX, evt.clientY),
+          initial
+        };
+        this.root.setPointerCapture(evt.pointerId);
+        this.root.addClass("is-dragging-node");
+      }
+      startPan(evt) {
+        this.drag = {
+          type: "pan",
+          pointerId: evt.pointerId,
+          startClient: { x: evt.clientX, y: evt.clientY },
+          startView: { tx: this.tx, ty: this.ty }
+        };
+        this.root.setPointerCapture(evt.pointerId);
+        this.root.addClass("is-panning");
+      }
+      stopAllPlayback() {
+        this.world.querySelectorAll(".collis-bnode.is-playing").forEach((element) => {
+          const el = element;
+          el.removeClass("is-playing");
+          const video = el.querySelector("video");
+          if (video) {
+            video.pause();
+            video.controls = false;
+          }
+          const play = el.querySelector(".collis-bnode-play");
+          if (play)
+            play.removeClass("is-hidden");
+        });
+      }
+      clearBox() {
+        if (this.boxEl) {
+          this.boxEl.remove();
+          this.boxEl = null;
+        }
+        this.boxStart = null;
+      }
+      startBoxSelect(evt) {
+        this.clearBox();
+        this.stopAllPlayback();
+        if (this.selectedEdgeId) {
+          this.selectedEdgeId = null;
+          this.paintEdgeSelection();
+          this.updateEdgeBar();
+        }
+        if (!evt.ctrlKey && !evt.metaKey && !evt.shiftKey) {
+          this.selection.clear();
+          this.paintSelection();
+        }
+        const rect = this.root.getBoundingClientRect();
+        this.boxStart = { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+        this.boxEl = this.root.createDiv({ cls: "collis-select-box" });
+        this.boxEl.style.left = `${this.boxStart.x}px`;
+        this.boxEl.style.top = `${this.boxStart.y}px`;
+        this.drag = { type: "box", pointerId: evt.pointerId };
+        this.root.setPointerCapture(evt.pointerId);
+      }
+      updateBox(evt) {
+        var _a;
+        if (!this.boxEl || !this.boxStart)
+          return;
+        const rect = this.root.getBoundingClientRect();
+        const cx = evt.clientX - rect.left;
+        const cy = evt.clientY - rect.top;
+        const left = Math.min(this.boxStart.x, cx);
+        const top = Math.min(this.boxStart.y, cy);
+        const width = Math.abs(cx - this.boxStart.x);
+        const height = Math.abs(cy - this.boxStart.y);
+        this.boxEl.style.left = `${left}px`;
+        this.boxEl.style.top = `${top}px`;
+        this.boxEl.style.width = `${width}px`;
+        this.boxEl.style.height = `${height}px`;
+        const wx1 = (left - this.tx) / this.scale;
+        const wy1 = (top - this.ty) / this.scale;
+        const wx2 = (left + width - this.tx) / this.scale;
+        const wy2 = (top + height - this.ty) / this.scale;
+        this.selection.clear();
+        for (const node2 of this.nodes) {
+          const el = this.nodeEls.get(node2.id);
+          const nh = (_a = el == null ? void 0 : el.offsetHeight) != null ? _a : 100;
+          if (node2.x > wx2 || node2.x + node2.width < wx1)
+            continue;
+          if (node2.y > wy2 || node2.y + nh < wy1)
+            continue;
+          this.selection.add(node2.id);
+        }
+        this.paintSelection();
+      }
+      activateNode(node2) {
+        if (node2.type === "group")
+          return;
+        if (node2.type === "file") {
+          const file = this.app.vault.getAbstractFileByPath(node2.file);
+          if (file instanceof import_obsidian16.TFile && file.extension.toLowerCase() === "md") {
+            void this.openEditor(node2);
+          }
+          return;
+        }
+        void this.openEditor(node2);
+      }
+      paintSelection() {
+        for (const [id, el] of this.nodeEls) {
+          el.toggleClass("is-selected", this.selection.has(id));
+        }
+        this.updateFrame();
+        this.updateOutlineActive();
+      }
+      updateFrame() {
+        var _a;
+        this.updateToolbar();
+        const frame = this.frameEl;
+        if (!frame)
+          return;
+        if (this.selection.size <= 1) {
+          frame.addClass("is-hidden");
+          return;
+        }
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        for (const id of this.selection) {
+          const node2 = this.nodeMap.get(id);
+          if (!node2)
+            continue;
+          const el = this.nodeEls.get(id);
+          const height = (_a = el == null ? void 0 : el.offsetHeight) != null ? _a : 100;
+          minX = Math.min(minX, node2.x);
+          minY = Math.min(minY, node2.y);
+          maxX = Math.max(maxX, node2.x + node2.width);
+          maxY = Math.max(maxY, node2.y + height);
+        }
+        if (!Number.isFinite(minX)) {
+          frame.addClass("is-hidden");
+          return;
+        }
+        frame.removeClass("is-hidden");
+        frame.style.left = `${minX}px`;
+        frame.style.top = `${minY}px`;
+        frame.style.width = `${maxX - minX}px`;
+        frame.style.height = `${maxY - minY}px`;
+      }
+      isInsideFrame(point) {
+        const frame = this.frameEl;
+        if (!frame || frame.hasClass("is-hidden"))
+          return false;
+        const x = parseFloat(frame.style.left) || 0;
+        const y = parseFloat(frame.style.top) || 0;
+        const w = parseFloat(frame.style.width) || 0;
+        const h = parseFloat(frame.style.height) || 0;
+        return point.x >= x && point.x <= x + w && point.y >= y && point.y <= y + h;
+      }
+      openMedia(path) {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (file instanceof import_obsidian16.TFile)
+          new MediaModal(this.app, file).open();
+      }
+      async createTextNode(point) {
+        const node2 = {
+          id: createId(),
+          type: "text",
+          text: "",
+          x: Math.round(point.x - DEFAULT_CARD_WIDTH / 2),
+          y: Math.round(point.y - 24),
+          width: DEFAULT_CARD_WIDTH
+        };
+        this.nodes.push(node2);
+        this.nodeMap.set(node2.id, node2);
+        const el = await this.renderNode(node2);
+        this.selection.clear();
+        this.selection.add(node2.id);
+        this.paintSelection();
+        this.updateHint();
+        this.pushHistory();
+        void this.openEditor(node2, el);
+        return node2;
+      }
+      async openEditor(node2, existingEl) {
+        const el = existingEl != null ? existingEl : this.nodeEls.get(node2.id);
+        if (!el)
+          return;
+        if (el.hasClass("collis-editing"))
+          return;
+        const restoreBar = () => window.setTimeout(() => this.updateToolbar(), 0);
+        if (node2.type === "text") {
+          new InlineEditor(
+            el,
+            node2.text,
+            async (value) => {
+              const current = this.nodeMap.get(node2.id);
+              if (!current || current.type !== "text")
+                return;
+              current.text = value;
+              await this.renderNode(current);
+              this.scheduleSave();
+            },
+            () => void 0,
+            void 0,
+            restoreBar
+          );
+          return;
+        }
+        if (node2.type === "card") {
+          const meta = await readCard(this.app, {
+            file: node2.file,
+            blockId: node2.blockId,
+            linkpath: ""
+          });
+          if (meta.stale)
+            return;
+          new InlineEditor(
+            el,
+            meta.editable,
+            async (value) => {
+              if (!value.trim())
+                return;
+              const ok = await writeCard(this.app, meta.ref, meta.timePrefix + value);
+              if (ok) {
+                const current = this.nodeMap.get(node2.id);
+                if (current && current.type === "card") {
+                  await this.renderNode(current);
+                }
+                this.scheduleSave();
+              }
+            },
+            () => void 0,
+            void 0,
+            restoreBar
+          );
+          return;
+        }
+        if (node2.type === "file") {
+          const file = this.app.vault.getAbstractFileByPath(node2.file);
+          if (!(file instanceof import_obsidian16.TFile) || file.extension.toLowerCase() !== "md")
+            return;
+          const content = await this.app.vault.read(file);
+          new MarkdownNodeEditor(
+            this.app,
+            el,
+            file,
+            content,
+            async (target, body) => {
+              const current = this.nodeMap.get(node2.id);
+              if (!current || current.type !== "file")
+                return;
+              if (body !== content) {
+                await this.app.vault.modify(target, body);
+              }
+              current.file = target.path;
+              await this.renderNode(current);
+              this.scheduleSave();
+            },
+            () => void 0,
+            restoreBar
+          );
+        }
+      }
+      async importExternalFile(file) {
+        var _a, _b;
+        try {
+          const buffer = await file.arrayBuffer();
+          const config = (_b = (_a = this.app.vault).getConfig) == null ? void 0 : _b.call(_a, "attachmentFolderPath");
+          let dir = typeof config === "string" ? config : "Attachments";
+          if (dir === "/" || dir === "./")
+            dir = "";
+          dir = dir.replace(/^\.\//, "").replace(/\/$/, "");
+          if (dir && !await this.app.vault.adapter.exists(dir)) {
+            try {
+              await this.app.vault.createFolder(dir);
+            } catch (error) {
+            }
+          }
+          const dot = file.name.lastIndexOf(".");
+          const base = dot > 0 ? file.name.slice(0, dot) : file.name;
+          const ext = dot > 0 ? file.name.slice(dot) : "";
+          let name = file.name;
+          let path = dir ? `${dir}/${name}` : name;
+          let index = 1;
+          while (await this.app.vault.adapter.exists(path)) {
+            name = `${base} ${index}${ext}`;
+            path = dir ? `${dir}/${name}` : name;
+            index += 1;
+          }
+          await this.app.vault.createBinary(path, buffer);
+          return path;
+        } catch (error) {
+          console.error("[Collis] import file failed", error);
+          return null;
+        }
+      }
+      resolveUri(uri) {
+        try {
+          const url = new URL(uri);
+          if (!url.protocol.startsWith("obsidian"))
+            return null;
+          const file = url.searchParams.get("file");
+          if (!file)
+            return null;
+          const dest = this.app.metadataCache.getFirstLinkpathDest(file, "");
+          return dest ? dest.path : null;
+        } catch (error) {
+          return null;
+        }
+      }
+      async addCardNode(file, blockId, point) {
+        const node2 = {
+          id: createId(),
+          type: "card",
+          file,
+          blockId,
+          x: Math.round(point.x - DEFAULT_CARD_WIDTH / 2),
+          y: Math.round(point.y - 60),
+          width: DEFAULT_CARD_WIDTH
+        };
+        this.nodes.push(node2);
+        this.nodeMap.set(node2.id, node2);
+        await this.renderNode(node2);
+        this.updateHint();
+        this.pushHistory();
+        this.scheduleSave();
+      }
+      async addFileNode(file, point) {
+        const target = this.app.vault.getAbstractFileByPath(file);
+        const width = DEFAULT_FILE_WIDTH;
+        const ext = target instanceof import_obsidian16.TFile ? target.extension.toLowerCase() : "";
+        const isImage = IMAGE_EXT2.includes(ext);
+        const isNote = ext === "md";
+        const node2 = {
+          id: createId(),
+          type: "file",
+          file,
+          x: Math.round(point.x - width / 2),
+          y: Math.round(point.y - 100),
+          width,
+          height: isImage ? 240 : isNote ? 320 : void 0
+        };
+        this.nodes.push(node2);
+        this.nodeMap.set(node2.id, node2);
+        await this.renderNode(node2);
+        this.updateHint();
+        this.pushHistory();
+        this.scheduleSave();
+        return node2;
+      }
+      toggleOutlinePanel() {
+        if (this.outlinePanel) {
+          this.closeOutlinePanel();
+          return;
+        }
+        this.openOutlinePanel();
+      }
+      /** Opens the floating outline. Public so a command can reach it directly. */
+      openOutlinePanel() {
+        if (this.outlinePanel) {
+          this.renderOutlinePanel();
+          return;
+        }
+        const panel = this.root.createDiv({ cls: "collis-outline-panel" });
+        panel.style.left = `${this.outlinePos.left}px`;
+        panel.style.top = `${this.outlinePos.top}px`;
+        panel.addEventListener("pointerdown", (evt) => evt.stopPropagation());
+        panel.addEventListener("dblclick", (evt) => evt.stopPropagation());
+        panel.addEventListener("wheel", (evt) => evt.stopPropagation(), { passive: true });
+        const head = panel.createDiv({ cls: "collis-outline-head" });
+        const headIcon = head.createDiv({ cls: "collis-outline-head-icon" });
+        (0, import_obsidian16.setIcon)(headIcon, "list-tree");
+        head.createDiv({ cls: "collis-outline-head-title", text: "\u5927\u7EB2" });
+        this.outlineMetaEl = head.createDiv({ cls: "collis-outline-head-meta" });
+        head.createDiv({ cls: "collis-outline-head-spacer" });
+        const closeBtn = head.createEl("button", {
+          cls: "collis-outline-head-btn",
+          attr: { "aria-label": "\u5173\u95ED" }
+        });
+        (0, import_obsidian16.setIcon)(closeBtn, "x");
+        closeBtn.addEventListener("click", () => this.closeOutlinePanel());
+        this.outlineBodyEl = panel.createDiv({ cls: "collis-outline-body" });
+        this.outlinePanel = panel;
+        this.installOutlineDrag(panel, head);
+        this.outlineSignatureCache = "";
+        this.renderOutlinePanel();
+        this.outlineSignatureCache = this.outlineSignature();
+      }
+      closeOutlinePanel() {
+        if (this.outlineTimer !== null) {
+          window.clearTimeout(this.outlineTimer);
+          this.outlineTimer = null;
+        }
+        if (this.outlinePanel) {
+          this.outlinePos = {
+            left: this.outlinePanel.offsetLeft,
+            top: this.outlinePanel.offsetTop
+          };
+          this.outlinePanel.remove();
+        }
+        this.outlinePanel = null;
+        this.outlineBodyEl = null;
+        this.outlineMetaEl = null;
+      }
+      installOutlineDrag(panel, head) {
+        let start = null;
+        head.addEventListener("pointerdown", (evt) => {
+          if (evt.target.closest("button"))
+            return;
+          start = {
+            x: evt.clientX,
+            y: evt.clientY,
+            left: panel.offsetLeft,
+            top: panel.offsetTop
+          };
+          head.setPointerCapture(evt.pointerId);
+          panel.addClass("is-dragging");
+        });
+        head.addEventListener("pointermove", (evt) => {
+          if (!start)
+            return;
+          panel.style.left = `${Math.round(start.left + evt.clientX - start.x)}px`;
+          panel.style.top = `${Math.round(start.top + evt.clientY - start.y)}px`;
+        });
+        const end = (evt) => {
+          if (!start)
+            return;
+          start = null;
+          panel.removeClass("is-dragging");
+          try {
+            head.releasePointerCapture(evt.pointerId);
+          } catch (error) {
+          }
+        };
+        head.addEventListener("pointerup", end);
+        head.addEventListener("pointercancel", end);
+      }
+      renderOutlinePanel() {
+        const body = this.outlineBodyEl;
+        if (!body)
+          return;
+        const scrollTop = body.scrollTop;
+        body.empty();
+        const inputs = this.nodes.map((node2) => ({
+          id: node2.id,
+          x: node2.x,
+          y: node2.y,
+          kind: node2.type
+        }));
+        const result = buildOutline(inputs, this.edges, (input) => this.outlineInfoOf(input));
+        if (result.nodeCount === 0) {
+          body.createDiv({
+            cls: "collis-outline-empty",
+            text: "\u767D\u677F\u4E0A\u8FD8\u6CA1\u6709\u8282\u70B9\u3002\u65B0\u5EFA\u5361\u7247\u6216\u4FBF\u7B7E\u540E\uFF0C\u8FD9\u91CC\u4F1A\u6309\u7ED3\u6784\u5217\u51FA\u5B83\u4EEC\u3002"
+          });
+          this.updateOutlineMeta(result);
+          return;
+        }
+        for (const item of result.roots) {
+          this.renderOutlineItem(body, item, 0);
+        }
+        if (result.cycle) {
+          body.createDiv({
+            cls: "collis-outline-note",
+            text: "\u68C0\u6D4B\u5230\u5FAA\u73AF\u7684\u63A8\u5BFC/\u56E0\u679C\u5173\u7CFB\uFF0C\u73AF\u4E0A\u7684\u4E00\u6761\u8FDE\u7EBF\u5DF2\u5728\u5927\u7EB2\u4E2D\u8DF3\u8FC7\u3002"
+          });
+        } else if (!result.hasHierarchy) {
+          body.createDiv({
+            cls: "collis-outline-note",
+            text: "\u8FD8\u6CA1\u6709\u63A8\u5BFC\u6216\u56E0\u679C\u8FDE\u7EBF\uFF0C\u8282\u70B9\u6309\u4F4D\u7F6E\u5E73\u94FA\u3002\u7ED9\u8FDE\u7EBF\u8BBE\u7F6E\u300C\u63A8\u5BFC\u300D\u6216\u300C\u56E0\u679C\u300D\u5373\u53EF\u751F\u6210\u5C42\u7EA7\u3002"
+          });
+        }
+        this.updateOutlineMeta(result);
+        body.scrollTop = scrollTop;
+      }
+      updateOutlineMeta(result) {
+        if (!this.outlineMetaEl)
+          return;
+        const parts = [`${result.nodeCount} \u4E2A\u8282\u70B9`];
+        if (result.hasHierarchy)
+          parts.push(result.hasSequence ? "\u5206\u5C42 + \u987A\u5E8F" : "\u5206\u5C42");
+        else
+          parts.push("\u5E73\u94FA");
+        this.outlineMetaEl.setText(parts.join(" \xB7 "));
+      }
+      renderOutlineItem(host, item, depth) {
+        const collapsed = this.outlineCollapsed.has(item.id);
+        const row = host.createDiv({ cls: "collis-outline-row" });
+        row.dataset.nodeId = item.id;
+        row.toggleClass("is-root", depth === 0);
+        row.toggleClass("is-active", this.selection.has(item.id));
+        row.toggleClass("is-group", item.kind === "group");
+        if (item.children.length > 0) {
+          const toggle = row.createEl("button", {
+            cls: "collis-outline-toggle",
+            attr: { "aria-label": collapsed ? "\u5C55\u5F00" : "\u6298\u53E0" }
+          });
+          (0, import_obsidian16.setIcon)(toggle, collapsed ? "chevron-right" : "chevron-down");
+          toggle.addEventListener("click", (evt) => {
+            evt.stopPropagation();
+            if (collapsed)
+              this.outlineCollapsed.delete(item.id);
+            else
+              this.outlineCollapsed.add(item.id);
+            this.renderOutlinePanel();
+          });
+        } else {
+          row.createDiv({ cls: "collis-outline-toggle is-empty" });
+        }
+        const main = row.createDiv({ cls: "collis-outline-main" });
+        const titleRow = main.createDiv({ cls: "collis-outline-title-row" });
+        const title = titleRow.createDiv({ cls: "collis-outline-title", text: item.title });
+        title.setAttribute("title", item.title);
+        if (item.relation) {
+          titleRow.createSpan({
+            cls: `collis-outline-relation is-${item.relation}`,
+            text: item.relation === "derives" ? "\u63A8\u5BFC" : "\u56E0\u679C"
+          });
+        }
+        const badges = titleRow.createDiv({ cls: "collis-outline-badges" });
+        if (item.badges.supports > 0) {
+          badges.createSpan({
+            cls: "collis-outline-badge is-supports",
+            text: `\u652F\u6301 ${item.badges.supports}`
+          });
+        }
+        if (item.badges.refutes > 0) {
+          badges.createSpan({
+            cls: "collis-outline-badge is-refutes",
+            text: `\u53CD\u9A73 ${item.badges.refutes}`
+          });
+        }
+        if (item.badges.source > 0) {
+          badges.createSpan({
+            cls: "collis-outline-badge is-source",
+            text: `\u6765\u6E90 ${item.badges.source}`
+          });
+        }
+        if (item.snippet) {
+          main.createDiv({ cls: "collis-outline-snippet", text: item.snippet });
+        }
+        row.addEventListener("click", () => this.focusNodeInBoard(item.id));
+        if (collapsed || item.children.length === 0)
+          return;
+        const kids = host.createDiv({ cls: "collis-outline-children" });
+        for (const child of item.children) {
+          this.renderOutlineItem(kids, child, depth + 1);
+        }
+      }
+      focusNodeInBoard(nodeId) {
+        var _a, _b;
+        const node2 = this.nodeMap.get(nodeId);
+        if (!node2)
+          return;
+        const el = this.nodeEls.get(nodeId);
+        const height = (_b = (_a = el == null ? void 0 : el.offsetHeight) != null ? _a : node2.height) != null ? _b : 100;
+        const rect = this.root.getBoundingClientRect();
+        const centerX = node2.x + node2.width / 2;
+        const centerY = node2.y + height / 2;
+        this.tx = rect.width / 2 - centerX * this.scale;
+        this.ty = rect.height / 2 - centerY * this.scale;
+        this.selectedEdgeId = null;
+        this.selection.clear();
+        this.selection.add(nodeId);
+        this.paintSelection();
+        this.paintEdgeSelection();
+        this.applyTransform();
+        this.updateHint();
+        this.scheduleSave();
+      }
+      updateOutlineActive() {
+        if (!this.outlinePanel)
+          return;
+        const rows = this.outlinePanel.querySelectorAll(".collis-outline-row");
+        rows.forEach((row) => {
+          row.toggleClass(
+            "is-active",
+            !!row.dataset.nodeId && this.selection.has(row.dataset.nodeId)
+          );
+        });
+      }
+      scheduleOutlineRefresh() {
+        if (!this.outlinePanel)
+          return;
+        if (this.outlineTimer !== null)
+          window.clearTimeout(this.outlineTimer);
+        this.outlineTimer = window.setTimeout(() => {
+          this.outlineTimer = null;
+          if (!this.outlinePanel)
+            return;
+          const signature = this.outlineSignature();
+          if (signature === this.outlineSignatureCache)
+            return;
+          this.outlineSignatureCache = signature;
+          this.renderOutlinePanel();
+        }, 220);
+      }
+      outlineSignature() {
+        const nodes = this.nodes.map((node2) => {
+          var _a;
+          const label = node2.type === "group" ? (_a = node2.label) != null ? _a : "" : "";
+          return `${node2.id}@${Math.round(node2.x)},${Math.round(node2.y)}:${node2.type}:${label}`;
+        }).join("|");
+        const edges = this.edges.map((edge) => {
+          var _a;
+          return `${edge.from}>${edge.to}:${(_a = edge.relation) != null ? _a : ""}`;
+        }).join("|");
+        const text = this.nodes.map((node2) => {
+          var _a;
+          return ((_a = this.nodeText.get(node2.id)) != null ? _a : "").slice(0, 120);
+        }).join("|");
+        return `${nodes}##${edges}##${text}`;
+      }
+      /** Opens the Markdown export dialog. Public so a command can reach it. */
+      openExportModal() {
+        var _a, _b;
+        const inputs = this.nodes.map((node2) => ({
+          id: node2.id,
+          x: node2.x,
+          y: node2.y,
+          kind: node2.type
+        }));
+        const result = buildOutline(inputs, this.edges, (input) => this.outlineInfoOf(input));
+        const infoById = /* @__PURE__ */ new Map();
+        const collect = (items) => {
+          for (const item of items) {
+            infoById.set(item.id, this.exportInfoOf(item));
+            collect(item.children);
+          }
+        };
+        collect(result.roots);
+        new MarkdownExportModal(this.app, {
+          boardTitle: (_b = (_a = this.file) == null ? void 0 : _a.basename) != null ? _b : "\u767D\u677F",
+          nodeCount: result.nodeCount,
+          build: (format) => {
+            var _a2, _b2;
+            return buildExportMarkdown(
+              {
+                boardTitle: (_b2 = (_a2 = this.file) == null ? void 0 : _a2.basename) != null ? _b2 : "\u767D\u677F",
+                outline: result,
+                infoOf: (id) => {
+                  var _a3;
+                  return (_a3 = infoById.get(id)) != null ? _a3 : { title: "\u672A\u547D\u540D", body: "" };
+                },
+                edges: this.edges,
+                titleOf: (id) => {
+                  var _a3, _b3;
+                  return (_b3 = (_a3 = infoById.get(id)) == null ? void 0 : _a3.title) != null ? _b3 : this.exportTitleOf(id);
+                }
+              },
+              format
+            );
+          },
+          save: (markdown) => this.saveExportNote(markdown)
+        }).open();
+      }
+      exportTitleOf(id) {
+        const node2 = this.nodeMap.get(id);
+        if (!node2)
+          return "\u672A\u547D\u540D";
+        return this.outlineInfoOf({ id, x: node2.x, y: node2.y, kind: node2.type }).title;
+      }
+      exportInfoOf(item) {
+        var _a;
+        const node2 = this.nodeMap.get(item.id);
+        if (!node2 || node2.type === "group")
+          return { title: item.title, body: "" };
+        if (node2.type === "file") {
+          return { title: item.title, body: `[[${node2.file}|${item.title}]]` };
+        }
+        const full = (_a = this.nodeText.get(node2.id)) != null ? _a : node2.type === "text" ? node2.text : "";
+        return { title: item.title, body: this.exportBody(full) };
+      }
+      /** The first line already became the heading; the rest is the body. */
+      exportBody(text) {
+        const lines = text.split(/\r?\n/);
+        const first = lines.findIndex((line) => line.trim() !== "");
+        if (first === -1)
+          return "";
+        return lines.slice(first + 1).join("\n").trim();
+      }
+      async saveExportNote(markdown) {
+        var _a, _b, _c, _d;
+        const boardPath = (_b = (_a = this.file) == null ? void 0 : _a.path) != null ? _b : "";
+        const folder = boardPath.includes("/") ? boardPath.slice(0, boardPath.lastIndexOf("/")) : "";
+        const base = ((_d = (_c = this.file) == null ? void 0 : _c.basename) != null ? _d : "\u767D\u677F").replace(/[\\/:*?"<>|]/g, " ").trim() || "\u767D\u677F";
+        const adapter = this.app.vault.adapter;
+        let name = `${base}.md`;
+        let path = folder ? `${folder}/${name}` : name;
+        let index = 1;
+        while (await adapter.exists(path)) {
+          name = `${base} ${index}.md`;
+          path = folder ? `${folder}/${name}` : name;
+          index += 1;
+        }
+        const file = await this.app.vault.create(path, markdown);
+        return file.path;
+      }
+      outlineInfoOf(node2) {
+        var _a, _b, _c;
+        const source = this.nodeMap.get(node2.id);
+        if (!source)
+          return { title: "\u672A\u547D\u540D" };
+        if (source.type === "group") {
+          return { title: ((_a = source.label) == null ? void 0 : _a.trim()) || "\u672A\u547D\u540D\u5206\u7EC4" };
+        }
+        if (source.type === "file") {
+          const file = this.app.vault.getAbstractFileByPath(source.file);
+          const name = file instanceof import_obsidian16.TFile ? file.basename : (_b = source.file.split("/").pop()) != null ? _b : "\u6587\u4EF6";
+          const body = this.nodeText.get(source.id);
+          const snippet = body ? this.outlineSnippet(body) : "";
+          return { title: name, snippet: snippet || void 0 };
+        }
+        const text = (_c = this.nodeText.get(source.id)) != null ? _c : source.type === "text" ? source.text : "";
+        return this.outlineTextInfo(text);
+      }
+      outlineTextInfo(text) {
+        const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        if (lines.length === 0)
+          return { title: "\u672A\u547D\u540D" };
+        const cleaned = lines.map((line) => this.outlineClean(line)).filter(Boolean);
+        if (cleaned.length === 0)
+          return { title: "\u672A\u547D\u540D" };
+        const title = cleaned[0];
+        const snippet = cleaned.slice(1).join(" ");
+        return {
+          title: this.outlineTruncate(title, 40),
+          snippet: snippet ? this.outlineTruncate(snippet, 70) : void 0
+        };
+      }
+      outlineSnippet(text) {
+        const lines = text.split(/\r?\n/).map((line) => this.outlineClean(line)).filter(Boolean);
+        return lines.length > 1 ? this.outlineTruncate(lines.slice(1).join(" "), 70) : "";
+      }
+      /** Strips the Markdown that would only add noise in a one-line outline. */
+      outlineClean(raw) {
+        return raw.replace(/^\s{0,3}#{1,6}\s+/, "").replace(/^\s*>\s?/, "").replace(/^\s*[-*+]\s+\[[ xX]\]\s+/, "").replace(/^\s*[-*+]\s+/, "").replace(/!?\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, target, alias) => {
+          if (alias)
+            return alias;
+          const clean2 = target.split("#")[0];
+          return clean2.split("/").pop() || target;
+        }).replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/`([^`]*)`/g, "$1").replace(/\*\*|__|~~/g, "").replace(/(^|\s)#[\p{L}\p{N}_/-]+/gu, " ").replace(/\s+/g, " ").trim();
+      }
+      outlineTruncate(text, max) {
+        const chars = Array.from(text);
+        return chars.length > max ? `${chars.slice(0, max).join("")}\u2026` : text;
+      }
+      scheduleSave() {
+        if (!this.loaded)
+          return;
+        this.scheduleOutlineRefresh();
+        if (this.saveTimer !== null)
+          window.clearTimeout(this.saveTimer);
+        this.saveTimer = window.setTimeout(() => {
+          this.saveTimer = null;
+          this.requestSave();
+        }, 500);
+      }
+      serialize() {
+        return {
+          version: 1,
+          edges: this.edges,
+          nodes: this.nodes.map((node2) => ({
+            ...node2,
+            x: Math.round(node2.x),
+            y: Math.round(node2.y)
+          })),
+          viewport: {
+            tx: Math.round(this.tx),
+            ty: Math.round(this.ty),
+            scale: Number(this.scale.toFixed(3))
+          }
+        };
+      }
+    };
+    _BoardView.HISTORY_LIMIT = 60;
+    var BoardView = _BoardView;
+    function createId() {
+      return Math.random().toString(36).slice(2, 10);
+    }
+    function normalizeTags(text) {
+      return text.replace(/([^\s#\w])#([\p{L}\p{N}_/-]+)/gu, "$1 #$2");
+    }
+    var import_obsidian17 = require("obsidian");
+    var BoardPickerModal = class extends import_obsidian17.FuzzySuggestModal {
+      constructor(app, onPick) {
+        super(app);
+        this.onPick = onPick;
+        this.setPlaceholder("\u9009\u62E9\u8981\u6253\u5F00\u7684\u767D\u677F");
+      }
+      getItems() {
+        return listBoards(this.app);
+      }
+      getItemText(file) {
+        return file.basename;
+      }
+      onChooseItem(file) {
+        this.onPick(file);
+      }
+    };
+    var ContextMenuInjector = class {
+      constructor(app, registry, resolveContext) {
+        this.app = app;
+        this.registry = registry;
+        this.resolveContext = resolveContext;
+      }
+      install(plugin) {
+        const workspace = this.app.workspace;
+        plugin.registerEvent(
+          workspace.on("canvas:node-menu", (menu, node2) => {
+            try {
+              this.inject(menu, node2);
+            } catch (error) {
+              console.error("[Collis] menu injection failed", error);
+            }
+          })
+        );
+      }
+      inject(menu, node2) {
+        var _a;
+        const data = typeof node2.getData === "function" ? (_a = node2.getData()) != null ? _a : {} : node2;
+        const nodeId = data.id;
+        if (!nodeId)
+          return;
+        const ctx = this.resolveContext(nodeId);
+        if (!ctx)
+          return;
+        const actions = this.registry.forContext(ctx);
+        if (actions.length === 0)
+          return;
+        menu.addSeparator();
+        for (const action of actions) {
+          menu.addItem((item) => {
+            var _a2;
+            item.setTitle(action.label).setIcon((_a2 = action.icon) != null ? _a2 : "dot").onClick(() => {
+              void action.run(ctx);
+            });
+          });
+        }
+      }
+    };
+    var import_obsidian18 = require("obsidian");
+    var CardEditorModal = class extends import_obsidian18.Modal {
+      constructor(app, meta, onSave) {
+        super(app);
+        this.meta = meta;
+        this.onSave = onSave;
+        this.value = meta.body;
+      }
+      onOpen() {
+        const { contentEl, titleEl, modalEl } = this;
+        modalEl.addClass("collis-editor-modal");
+        titleEl.setText("\u7F16\u8F91\u5361\u7247");
+        const metaEl = contentEl.createDiv({ cls: "collis-editor-meta" });
+        metaEl.setText(this.describe());
+        const textarea = contentEl.createEl("textarea", { cls: "collis-editor-input" });
+        textarea.value = this.value;
+        textarea.addEventListener("input", () => {
+          this.value = textarea.value;
+        });
+        textarea.addEventListener("keydown", (evt) => {
+          if ((evt.ctrlKey || evt.metaKey) && evt.key === "Enter") {
+            evt.preventDefault();
+            void this.submit();
+          }
+        });
+        window.setTimeout(() => {
+          textarea.focus();
+          const end = textarea.value.length;
+          textarea.setSelectionRange(end, end);
+        }, 40);
+        const footer = contentEl.createDiv({ cls: "collis-editor-footer" });
+        const cancel = footer.createEl("button", { text: "\u53D6\u6D88" });
+        cancel.addEventListener("click", () => this.close());
+        const save = footer.createEl("button", { text: "\u4FDD\u5B58", cls: "mod-cta" });
+        save.addEventListener("click", () => {
+          void this.submit();
+        });
+      }
+      describe() {
+        const parts = [];
+        if (this.meta.tags.length > 0)
+          parts.push(this.meta.tags.map((t) => `#${t}`).join(" "));
+        if (this.meta.date)
+          parts.push(this.meta.date);
+        if (this.meta.time)
+          parts.push(this.meta.time);
+        parts.push(this.meta.ref.file.replace(/\.md$/, ""));
+        return parts.join(" \xB7 ");
+      }
+      async submit() {
+        if (this.value === this.meta.body) {
+          this.close();
+          return;
+        }
+        const ok = await this.onSave(this.value);
+        if (!ok) {
+          new import_obsidian18.Notice("\u4FDD\u5B58\u5931\u8D25\uFF1A\u5361\u7247\u53EF\u80FD\u5DF2\u79FB\u52A8\u6216\u5220\u9664");
+          return;
+        }
+        this.close();
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
+    var import_obsidian20 = require("obsidian");
+    var import_obsidian19 = require("obsidian");
+    var PRESETS = {
+      deepseek: { name: "DeepSeek", protocol: "openai", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
+      kimi: { name: "Kimi", protocol: "openai", baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-8k" },
+      zhipu: { name: "\u667A\u8C31 GLM", protocol: "openai", baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4-flash" },
+      qwen: { name: "\u901A\u4E49\u5343\u95EE", protocol: "openai", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", model: "qwen-plus" },
+      openai: { name: "OpenAI", protocol: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
+      anthropic: { name: "Anthropic", protocol: "anthropic", baseUrl: "https://api.anthropic.com", model: "claude-sonnet-4-20250514" },
+      ollama: { name: "\u672C\u5730 Ollama", protocol: "openai", baseUrl: "http://localhost:11434/v1", model: "qwen2.5" }
+    };
+    var AIProfileModal = class extends import_obsidian19.Modal {
+      constructor(app, profile, onSubmit) {
+        super(app);
+        this.onSubmit = onSubmit;
+        this.probing = false;
+        this.fieldsEl = null;
+        this.draft = profile ? { ...profile } : {
+          id: `p${Date.now()}`,
+          name: "",
+          protocol: "openai",
+          baseUrl: "",
+          model: "",
+          apiKey: "",
+          capability: inferCapability(""),
+          thinking: "auto",
+          cache: true
+        };
+      }
+      onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.addClass("collis-ai-modal");
+        contentEl.createEl("h3", { text: this.draft.name ? "\u7F16\u8F91\u6A21\u578B\u914D\u7F6E" : "\u6DFB\u52A0\u6A21\u578B\u914D\u7F6E" });
+        new import_obsidian19.Setting(contentEl).setName("\u5FEB\u901F\u586B\u5165").setDesc("\u9009\u4E00\u4E2A\u670D\u52A1\u81EA\u52A8\u586B\u597D\u5730\u5740\u548C\u6A21\u578B\uFF0CKey \u4ECD\u9700\u81EA\u5DF1\u586B\u3002").addDropdown((dropdown) => {
+          dropdown.addOption("", "\u9009\u62E9\u670D\u52A1\u2026");
+          for (const [key, preset] of Object.entries(PRESETS)) {
+            dropdown.addOption(key, preset.name);
+          }
+          dropdown.onChange((value) => {
+            const preset = PRESETS[value];
+            if (!preset)
+              return;
+            this.draft.name = preset.name;
+            this.draft.protocol = preset.protocol;
+            this.draft.baseUrl = preset.baseUrl;
+            this.draft.model = preset.model;
+            this.draft.capability = inferCapability(preset.model);
+            this.refreshFields();
+            dropdown.setValue("");
+          });
+        });
+        this.fieldsEl = contentEl.createDiv();
+        new import_obsidian19.Setting(contentEl).addButton((button) => button.setButtonText("\u53D6\u6D88").onClick(() => this.close())).addButton((button) => button.setButtonText("\u4FDD\u5B58").setCta().onClick(() => this.submit()));
+        this.renderFields();
+      }
+      renderFields() {
+        var _a;
+        const host = this.fieldsEl;
+        if (!host)
+          return;
+        host.empty();
+        new import_obsidian19.Setting(host).setName("\u540D\u79F0").addText((text) => {
+          text.setPlaceholder("\u4F8B\u5982 DeepSeek").setValue(this.draft.name).onChange((value) => {
+            this.draft.name = value.trim();
+          });
+        });
+        new import_obsidian19.Setting(host).setName("\u63A5\u53E3\u534F\u8BAE").addDropdown(
+          (dropdown) => dropdown.addOption("openai", "OpenAI \u517C\u5BB9").addOption("anthropic", "Anthropic Messages").setValue(this.draft.protocol).onChange((value) => {
+            this.draft.protocol = value === "anthropic" ? "anthropic" : "openai";
+          })
+        );
+        new import_obsidian19.Setting(host).setName("\u63A5\u53E3\u5730\u5740").setDesc("\u4F8B\u5982 https://api.deepseek.com/v1").addText((text) => {
+          text.setPlaceholder("https://").setValue(this.draft.baseUrl).onChange((value) => {
+            this.draft.baseUrl = value.trim();
+          });
+        });
+        new import_obsidian19.Setting(host).setName("\u6A21\u578B").setDesc("\u6539\u52A8\u6A21\u578B\u540D\u540E\uFF0C\u80FD\u529B\u503C\u4F1A\u6309\u540D\u5B57\u91CD\u65B0\u63A8\u65AD\uFF1B\u4E5F\u53EF\u70B9\u4E0B\u9762\u7684\u300C\u63A2\u6D4B\u300D\u3002").addText((text) => {
+          text.setPlaceholder("deepseek-chat").setValue(this.draft.model).onChange((value) => {
+            var _a2;
+            this.draft.model = value.trim();
+            if (((_a2 = this.draft.capability) == null ? void 0 : _a2.source) !== "manual") {
+              this.draft.capability = inferCapability(this.draft.model);
+            }
+          });
+        });
+        new import_obsidian19.Setting(host).setName("API Key").setDesc("\u4EC5\u4FDD\u5B58\u5728\u672C\u673A\u63D2\u4EF6\u914D\u7F6E\u4E2D\u3002").addText((text) => {
+          text.inputEl.type = "password";
+          text.setPlaceholder("sk-\u2026").setValue(this.draft.apiKey).onChange((value) => {
+            this.draft.apiKey = value.trim();
+          });
+        });
+        host.createEl("h4", { text: "\u6A21\u578B\u80FD\u529B" });
+        host.createDiv({
+          cls: "collis-ai-hint",
+          text: "\u8FD9\u4E24\u9879\u586B\u7684\u662F\u300C\u8FD9\u4E2A\u6A21\u578B\u80FD\u5403\u591A\u5C11\u300D\uFF0C\u4E0D\u662F\u63D2\u4EF6\u7684\u9650\u5236\u3002\u7559\u7A7A\u8868\u793A\u6309\u6A21\u578B\u540D\u81EA\u52A8\u63A8\u65AD\uFF1B\u586B\u9519\u4E86\u53EA\u4F1A\u8BA9\u63D2\u4EF6\u5C11\u7528\u6216\u591A\u7528\u4E00\u70B9\u4F59\u91CF\uFF0C\u4E0D\u4F1A\u635F\u574F\u6570\u636E\u3002"
+        });
+        const capability = (_a = this.draft.capability) != null ? _a : inferCapability(this.draft.model);
+        new import_obsidian19.Setting(host).setName("\u4E0A\u4E0B\u6587\u7A97\u53E3\uFF08token\uFF09").setDesc(`\u5F53\u524D\uFF1A${describeCapability(capability)} \xB7 ${capabilitySourceLabel(capability.source)}`).addText((text) => {
+          text.inputEl.type = "number";
+          text.setPlaceholder(String(capability.contextWindow)).setValue(String(capability.contextWindow)).onChange((value) => {
+            var _a2, _b;
+            if (!value.trim()) {
+              this.draft.capability = inferCapability(this.draft.model);
+              return;
+            }
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed < 1e3)
+              return;
+            this.draft.capability = {
+              contextWindow: Math.round(parsed),
+              maxOutput: (_b = (_a2 = this.draft.capability) == null ? void 0 : _a2.maxOutput) != null ? _b : 8192,
+              source: "manual"
+            };
+          });
+        });
+        new import_obsidian19.Setting(host).setName("\u5355\u6B21\u8F93\u51FA\u4E0A\u9650\uFF08token\uFF09").setDesc(
+          "\u6A21\u578B\u4E00\u6B21\u6700\u591A\u80FD\u5199\u591A\u5C11\u3002\u601D\u8003\u8FC7\u7A0B\u4E5F\u82B1\u8FD9\u4EFD\u989D\u5EA6\uFF0C\u6240\u4EE5\u5E26\u601D\u8003\u7684\u6A21\u578B\u5EFA\u8BAE 16384 \u4EE5\u4E0A\u3002"
+        ).addText((text) => {
+          text.inputEl.type = "number";
+          text.setPlaceholder(String(capability.maxOutput)).setValue(String(capability.maxOutput)).onChange((value) => {
+            var _a2, _b, _c, _d;
+            if (!value.trim()) {
+              const inferred = inferCapability(this.draft.model);
+              this.draft.capability = {
+                contextWindow: (_b = (_a2 = this.draft.capability) == null ? void 0 : _a2.contextWindow) != null ? _b : inferred.contextWindow,
+                maxOutput: inferred.maxOutput,
+                source: inferred.source
+              };
+              return;
+            }
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed < 64)
+              return;
+            this.draft.capability = {
+              contextWindow: (_d = (_c = this.draft.capability) == null ? void 0 : _c.contextWindow) != null ? _d : 128e3,
+              maxOutput: Math.round(parsed),
+              source: "manual"
+            };
+          });
+        });
+        new import_obsidian19.Setting(host).setName("\u63A2\u6D4B\u771F\u5B9E\u4E0A\u9650").setDesc("\u5411\u63A5\u53E3\u95EE\u4E00\u6B21\uFF0C\u80FD\u8BFB\u5230\u5C31\u5199\u8FDB\u6765\uFF1B\u8BFB\u4E0D\u5230\u4F1A\u8BF4\u660E\u539F\u56E0\uFF0C\u4E0D\u4F1A\u778E\u731C\u3002").addButton(
+          (button) => button.setButtonText(this.probing ? "\u63A2\u6D4B\u4E2D\u2026" : "\u63A2\u6D4B").onClick(async () => {
+            var _a2, _b;
+            if (this.probing)
+              return;
+            if (!this.draft.baseUrl.trim() || !this.draft.model.trim() || !this.draft.apiKey.trim()) {
+              new import_obsidian19.Notice("\u5148\u586B\u597D\u5730\u5740\u3001\u6A21\u578B\u548C Key \u518D\u63A2\u6D4B");
+              return;
+            }
+            this.probing = true;
+            this.renderFields();
+            try {
+              const result = await probeCapability({
+                ...this.draft,
+                capability: (_a2 = this.draft.capability) != null ? _a2 : inferCapability(this.draft.model)
+              });
+              if (result.capability) {
+                this.draft.capability = result.capability;
+                new import_obsidian19.Notice(`\u5DF2\u63A2\u6D4B\uFF1A${describeCapability(result.capability)}`);
+              } else {
+                new import_obsidian19.Notice((_b = result.notes[0]) != null ? _b : "\u6CA1\u6709\u63A2\u6D4B\u5230\uFF0C\u4FDD\u7559\u5F53\u524D\u503C");
+              }
+            } catch (error) {
+              new import_obsidian19.Notice(`\u63A2\u6D4B\u5931\u8D25\uFF1A${error instanceof Error ? error.message : String(error)}`);
+            } finally {
+              this.probing = false;
+              this.renderFields();
+            }
+          })
+        );
+        host.createEl("h4", { text: "\u8C03\u7528\u504F\u597D" });
+        new import_obsidian19.Setting(host).setName("\u601D\u8003\u6A21\u5F0F").setDesc(
+          "\u81EA\u52A8\uFF1A\u4E0D\u53D1\u9001\u601D\u8003\u53C2\u6570\uFF0C\u6CBF\u7528\u6A21\u578B\u9ED8\u8BA4\u884C\u4E3A\u3002\u5F00\u542F\uFF1A\u663E\u5F0F\u8BF7\u6C42\u63A8\u7406\uFF0C\u4F1A\u6D88\u8017\u8F93\u51FA\u989D\u5EA6\u3002\u5173\u95ED\uFF1A\u8DF3\u8FC7\u63A8\u7406\uFF0C\u6B63\u6587\u66F4\u591A\u3001\u54CD\u5E94\u66F4\u5FEB\uFF0C\u5206\u6790\u6DF1\u5EA6\u53EF\u80FD\u4E0B\u964D\u3002"
+        ).addDropdown(
+          (dropdown) => {
+            var _a2;
+            return dropdown.addOption("auto", "\u81EA\u52A8\uFF08\u6CBF\u7528\u6A21\u578B\u9ED8\u8BA4\uFF09").addOption("on", "\u5F00\u542F\uFF08\u663E\u5F0F\u542F\u7528\u63A8\u7406\uFF09").addOption("off", "\u5173\u95ED\uFF08\u8DF3\u8FC7\u63A8\u7406\uFF09").setValue((_a2 = this.draft.thinking) != null ? _a2 : "auto").onChange((value) => {
+              this.draft.thinking = value;
+            });
+          }
+        );
+        new import_obsidian19.Setting(host).setName("\u7F13\u5B58\u524D\u7F00").setDesc(
+          "\u4EC5 Anthropic \u534F\u8BAE\u751F\u6548\uFF1A\u7ED9\u767D\u677F\u5185\u5BB9\u6253\u7F13\u5B58\u6807\u8BB0\uFF0C\u8FDE\u7EED\u8FFD\u95EE\u65F6\u8F93\u5165\u8D39\u5927\u5E45\u4E0B\u964D\uFF08\u5B9E\u6D4B\u53EF\u7701 99%\uFF09\u3002\u7F51\u5173\u4E0D\u652F\u6301\u65F6\u4F1A\u81EA\u52A8\u53BB\u6389\u91CD\u8BD5\u3002"
+        ).addToggle(
+          (toggle) => toggle.setValue(this.draft.cache !== false).onChange((value) => {
+            this.draft.cache = value;
+          })
+        );
+      }
+      /** Keeps the visible inputs in sync when a preset fills the draft. */
+      refreshFields() {
+        this.draft.baseUrl = sanitizeBaseUrl(this.draft.baseUrl);
+        this.renderFields();
+      }
+      submit() {
+        var _a, _b;
+        const baseUrl = sanitizeBaseUrl(this.draft.baseUrl);
+        if (!this.draft.name.trim()) {
+          new import_obsidian19.Notice("\u8BF7\u586B\u5199\u540D\u79F0");
+          return;
+        }
+        if (!baseUrl) {
+          new import_obsidian19.Notice("\u8BF7\u586B\u5199\u63A5\u53E3\u5730\u5740");
+          return;
+        }
+        if (!this.draft.model.trim()) {
+          new import_obsidian19.Notice("\u8BF7\u586B\u5199\u6A21\u578B\u540D");
+          return;
+        }
+        const capability = (_a = this.draft.capability) != null ? _a : inferCapability(this.draft.model.trim());
+        this.onSubmit({
+          ...this.draft,
+          name: this.draft.name.trim(),
+          baseUrl,
+          model: this.draft.model.trim(),
+          apiKey: this.draft.apiKey.trim(),
+          capability: capability.maxOutput >= capability.contextWindow ? { ...capability, maxOutput: Math.floor(capability.contextWindow / 4) } : capability,
+          thinking: (_b = this.draft.thinking) != null ? _b : "auto",
+          cache: this.draft.cache !== false
+        });
+        this.close();
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
+    function voidAsync(fn) {
+      return () => {
+        void fn();
+      };
+    }
+    var CollisBoardSettingTab = class extends import_obsidian20.PluginSettingTab {
+      constructor(app, plugin) {
+        super(app, plugin);
+        this.plugin = plugin;
+      }
+      display() {
+        const { containerEl } = this;
+        containerEl.empty();
+        containerEl.addClass("collis-settings");
+        new import_obsidian20.Setting(containerEl).setName("\u5E38\u89C4").setHeading();
+        this.divider(containerEl);
+        new import_obsidian20.Setting(containerEl).setName("\u89D2\u6807").setHeading();
+        new import_obsidian20.Setting(containerEl).setName("\u663E\u793A\u89D2\u6807").setDesc("\u5728\u5361\u7247\u8282\u70B9\u53F3\u4E0B\u89D2\u663E\u793A\u65E5\u671F\u3002\u4EC5\u5728\u753B\u5E03\u89C6\u56FE\u4E2D\u751F\u6548\uFF0C\u4E0D\u5F71\u54CD\u5361\u7247\u6B63\u6587\u3002").addToggle(
+          (toggle) => toggle.setValue(this.plugin.settings.showBadge).onChange(async (value) => {
+            this.plugin.settings.showBadge = value;
+            await this.plugin.saveSettings();
+          })
+        );
+        new import_obsidian20.Setting(containerEl).setName("\u89D2\u6807\u5185\u5BB9").setDesc("\u7CBE\u7B80\u53EA\u663E\u793A\u65E5\u671F\uFF1B\u5B8C\u6574\u663E\u793A\u6807\u7B7E\u3001\u65E5\u671F\u548C\u65F6\u95F4\u3002").addDropdown(
+          (dropdown) => dropdown.addOption("date", "\u7CBE\u7B80\uFF0811-11\uFF09").addOption("full", "\u5B8C\u6574\uFF08#\u6807\u7B7E 11-11 11:08\uFF09").setValue(this.plugin.settings.badgeFormat).onChange(async (value) => {
+            this.plugin.settings.badgeFormat = value === "full" ? "full" : "date";
+            await this.plugin.saveSettings();
+          })
+        );
+        this.divider(containerEl);
+        new import_obsidian20.Setting(containerEl).setName("\u767D\u677F").setHeading();
+        new import_obsidian20.Setting(containerEl).setName("\u767D\u677F\u4FDD\u5B58\u4F4D\u7F6E").setDesc("\u65B0\u5EFA\u767D\u677F\u65F6\u628A\u6587\u4EF6\u5B58\u5230\u8FD9\u4E2A\u6587\u4EF6\u5939\uFF1B\u7559\u7A7A\u8868\u793A\u5E93\u6839\u76EE\u5F55\u3002\u6BCF\u6B21\u65B0\u5EFA\u90FD\u4F1A\u751F\u6210\u4E00\u4E2A\u72EC\u7ACB\u6587\u4EF6\u3002").addText(
+          (text) => text.setPlaceholder("\u7559\u7A7A = \u5E93\u6839\u76EE\u5F55").setValue(this.plugin.settings.boardFolder).onChange(async (value) => {
+            this.plugin.settings.boardFolder = value.trim();
+            await this.plugin.saveSettings();
+          })
+        );
+        new import_obsidian20.Setting(containerEl).setName("\u5361\u7247\u7B14\u8BB0\u76EE\u5F55").setDesc("\u4ECE\u767D\u677F\u8F6C\u6210\u5361\u7247\u65F6\u5199\u5230\u8FD9\u91CC\u3002\u7559\u7A7A\u5219\u81EA\u52A8\u8BFB Collis \u7684\u8BBE\u7F6E\uFF0C\u8BFB\u4E0D\u5230\u7528 00-Inbox/\u901F\u8BB0\u3002").addText(
+          (text) => text.setPlaceholder("\u7559\u7A7A = \u8DDF\u968F Collis").setValue(this.plugin.settings.cardFolder).onChange(async (value) => {
+            this.plugin.settings.cardFolder = value.trim();
+            await this.plugin.saveSettings();
+          })
+        );
+        this.divider(containerEl);
+        this.renderAI(containerEl);
+        this.divider(containerEl);
+        this.renderDiagnostics(containerEl);
+      }
+      /** A thin rule between sections; keeps the long settings page scannable. */
+      divider(host) {
+        host.createDiv({ cls: "collis-settings-divider" });
+      }
+      renderAI(containerEl) {
+        new import_obsidian20.Setting(containerEl).setName("AI").setHeading();
+        const ai = this.plugin.settings.ai;
+        const save = () => this.plugin.saveSettings();
+        new import_obsidian20.Setting(containerEl).setName("\u542F\u7528 AI").setDesc("\u5F00\u542F\u540E\u53EF\u5728\u767D\u677F\u4E2D\u9009\u4E2D\u8282\u70B9\u63D0\u95EE\uFF0C\u5185\u5BB9\u53D1\u9001\u81F3\u5F53\u524D\u542F\u7528\u7684\u6A21\u578B\u3002").addToggle(
+          (toggle) => toggle.setValue(ai.enabled).onChange(async (value) => {
+            ai.enabled = value;
+            await save();
+          })
+        );
+        containerEl.createDiv({
+          cls: "collis-ai-hint",
+          text: "\u53D1\u9001\u91CF\u7531\u6A21\u578B\u81EA\u5DF1\u7684\u7A97\u53E3\u51B3\u5B9A\uFF0C\u63D2\u4EF6\u4E0D\u989D\u5916\u8BBE\u9650\uFF1B\u5B9E\u9645\u7528\u91CF\u89C1 AI \u9762\u677F\u9876\u90E8\u3002\u6279\u91CF\u5904\u7406\u4E0A\u767E\u6761\u5361\u7247\u65F6\u5EFA\u8BAE\u9009 200K \u4EE5\u4E0A\u7A97\u53E3\u7684\u6A21\u578B\u3002"
+        });
+        new import_obsidian20.Setting(containerEl).setName("\u9ED8\u8BA4\u601D\u8003\u6A21\u5F0F").setDesc(
+          "\u65B0\u5EFA\u914D\u7F6E\u672A\u5355\u72EC\u6307\u5B9A\u65F6\u91C7\u7528\u3002\u5F00\u542F\uFF1A\u6A21\u578B\u5148\u63A8\u7406\u518D\u4F5C\u7B54\uFF0C\u5360\u7528\u8F93\u51FA\u989D\u5EA6\uFF0C\u5206\u6790\u66F4\u6DF1\u3002\u5173\u95ED\uFF1A\u8DF3\u8FC7\u63A8\u7406\uFF0C\u6B63\u6587\u66F4\u591A\u3001\u54CD\u5E94\u66F4\u5FEB\u3002\u81EA\u52A8\uFF1A\u6CBF\u7528\u6A21\u578B\u5382\u5546\u7684\u9ED8\u8BA4\u884C\u4E3A\u3002"
+        ).addDropdown(
+          (dropdown) => dropdown.addOption("auto", "\u81EA\u52A8\uFF08\u6CBF\u7528\u6A21\u578B\u9ED8\u8BA4\uFF09").addOption("on", "\u5F00\u542F\uFF08\u663E\u5F0F\u542F\u7528\u63A8\u7406\uFF09").addOption("off", "\u5173\u95ED\uFF08\u8DF3\u8FC7\u63A8\u7406\uFF09").setValue(ai.thinking).onChange(async (value) => {
+            ai.thinking = value;
+            await save();
+          })
+        );
+        new import_obsidian20.Setting(containerEl).setName("\u5185\u5BB9\u88C5\u4E0D\u4E0B\u65F6").setDesc("\u8D85\u51FA\u6A21\u578B\u7A97\u53E3\u65F6\u7684\u5904\u7406\u65B9\u5F0F\u3002\u4E24\u79CD\u65B9\u5F0F\u90FD\u4E0D\u4F1A\u9759\u9ED8\u5C11\u53D1\u3002").addDropdown(
+          (dropdown) => dropdown.addOption("auto", "\u81EA\u52A8\u538B\u7F29\uFF08\u9762\u677F\u6807\u6CE8\u8C03\u6574\u5185\u5BB9\uFF09").addOption("ask", "\u5148\u8BE2\u95EE\u6211").setValue(ai.onOverflow).onChange(async (value) => {
+            ai.onOverflow = value === "ask" ? "ask" : "auto";
+            await save();
+          })
+        );
+        new import_obsidian20.Setting(containerEl).setName("\u6700\u591A\u7EED\u5199\u6BB5\u6570").setDesc("\u56DE\u7B54\u88AB\u8F93\u51FA\u4E0A\u9650\u622A\u65AD\u65F6\u81EA\u52A8\u7EED\u5199\u7684\u6BB5\u6570\uFF1B0 \u8868\u793A\u4E0D\u7EED\u5199\u3002").addSlider(
+          (slider) => slider.setLimits(0, 6, 1).setValue(ai.continuations).setDynamicTooltip().onChange(async (value) => {
+            ai.continuations = value;
+            await save();
+          })
+        );
+        this.renderAdvanced(containerEl, save);
+        this.renderCards(containerEl, save);
+      }
+      /** Every density knob lives here so tuning later needs no code change. */
+      renderAdvanced(containerEl, save) {
+        const ai = this.plugin.settings.ai;
+        const details = containerEl.createEl("details", { cls: "collis-ai-advanced" });
+        details.createEl("summary", { text: "\u9AD8\u7EA7 \xB7 \u5185\u5BB9\u5206\u914D\u89C4\u5219" });
+        new import_obsidian20.Setting(details).setName("\u7B14\u8BB0\u6BCF\u7BC7\u4FDD\u5E95\uFF08\u5B57\u7B26\uFF09").setDesc("\u957F\u7B14\u8BB0\u88AB\u538B\u7F29\u65F6\u81F3\u5C11\u4FDD\u7559\u8FD9\u4E48\u591A\u5B57\uFF0C\u907F\u514D\u53EA\u5269\u5F00\u5934\u4E00\u53E5\u3002").addText((text) => {
+          text.inputEl.type = "number";
+          text.setPlaceholder(String(DEFAULT_CONTEXT_POLICY.noteFloorChars)).setValue(String(ai.policy.noteFloorChars)).onChange(async (value) => {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed < 0)
+              return;
+            ai.policy.noteFloorChars = Math.round(parsed);
+            await save();
+          });
+        });
+        new import_obsidian20.Setting(details).setName("\u7B14\u8BB0\u5355\u7BC7\u4E0A\u9650\uFF08\u5B57\u7B26\uFF09").setDesc("\u5355\u7BC7\u6700\u591A\u53D1\u9001\u591A\u5C11\u5B57\uFF0C\u9632\u6B62\u4E00\u7BC7\u957F\u6587\u5403\u6389\u6574\u4E2A\u9884\u7B97\u3002").addText((text) => {
+          text.inputEl.type = "number";
+          text.setPlaceholder(String(DEFAULT_CONTEXT_POLICY.noteCapChars)).setValue(String(ai.policy.noteCapChars)).onChange(async (value) => {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed < 200)
+              return;
+            ai.policy.noteCapChars = Math.round(parsed);
+            await save();
+          });
+        });
+        new import_obsidian20.Setting(details).setName("\u666E\u901A\u8282\u70B9\u538B\u7F29\u9636\u68AF\uFF08\u5B57\u7B26\uFF09").setDesc("\u9884\u7B97\u4E0D\u591F\u65F6\u6309\u8FD9\u4E2A\u987A\u5E8F\u9010\u7EA7\u538B\u7F29\uFF0C\u9017\u53F7\u5206\u9694\uFF0C\u4ECE\u5BBD\u5230\u7A84\u3002").addText((text) => {
+          text.setPlaceholder(DEFAULT_CONTEXT_POLICY.ladder.join(", ")).setValue(ai.policy.ladder.join(", ")).onChange(async (value) => {
+            const ladder = value.split(/[,，\s]+/).map((part) => Number(part)).filter((part) => Number.isFinite(part) && part >= 0);
+            if (ladder.length === 0)
+              return;
+            ai.policy.ladder = ladder.sort((a, b) => b - a);
+            await save();
+          });
+        });
+        new import_obsidian20.Setting(details).setName("\u9884\u7B97\u5B89\u5168\u4F59\u91CF\uFF08token\uFF09").setDesc("\u6BCF\u6B21\u8BF7\u6C42\u9884\u7559\u8FD9\u4E48\u591A\uFF0C\u5438\u6536\u4F30\u7B97\u8BEF\u5DEE\u548C system \u63D0\u793A\u3002").addText((text) => {
+          text.inputEl.type = "number";
+          text.setPlaceholder(String(DEFAULT_CONTEXT_POLICY.safetyTokens)).setValue(String(ai.policy.safetyTokens)).onChange(async (value) => {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed < 0)
+              return;
+            ai.policy.safetyTokens = Math.round(parsed);
+            await save();
+          });
+        });
+      }
+      renderCards(containerEl, save) {
+        const ai = this.plugin.settings.ai;
+        const listEl = containerEl.createDiv({ cls: "collis-ai-cards" });
+        const renderCards = () => {
+          var _a;
+          listEl.empty();
+          if (ai.profiles.length === 0) {
+            listEl.createDiv({
+              cls: "collis-ai-empty",
+              text: "\u8FD8\u6CA1\u6709\u6A21\u578B\u914D\u7F6E\u3002\u70B9\u4E0B\u9762\u7684\u300C\u6DFB\u52A0\u914D\u7F6E\u300D\u65B0\u5EFA\u4E00\u4E2A\u3002"
+            });
+            return;
+          }
+          for (const profile of ai.profiles) {
+            const active = profile.id === ai.activeId;
+            const card = listEl.createDiv({ cls: "collis-ai-card" });
+            if (active)
+              card.addClass("is-active");
+            card.createDiv({
+              cls: "collis-ai-avatar",
+              text: (profile.name || "?").trim().charAt(0).toUpperCase()
+            });
+            const main = card.createDiv({ cls: "collis-ai-card-main" });
+            main.createDiv({ cls: "collis-ai-card-name", text: profile.name || "\u672A\u547D\u540D\u914D\u7F6E" });
+            const capability = (_a = profile.capability) != null ? _a : inferCapability(profile.model);
+            main.createDiv({
+              cls: "collis-ai-card-meta",
+              text: `${describeCapability(capability)} \xB7 ${capabilitySourceLabel(capability.source)} \xB7 ${profile.protocol === "anthropic" ? "Anthropic" : "OpenAI \u517C\u5BB9"}`
+            });
+            main.createDiv({
+              cls: "collis-ai-card-url",
+              text: profile.baseUrl || "\u672A\u586B\u5199\u63A5\u53E3\u5730\u5740"
+            });
+            const actions = card.createDiv({ cls: "collis-ai-card-actions" });
+            if (!active) {
+              const useBtn = actions.createEl("button", { cls: "collis-ai-use", text: "\u542F\u7528" });
+              useBtn.addEventListener("click", voidAsync(async () => {
+                ai.activeId = profile.id;
+                ai.enabled = true;
+                await save();
+                renderCards();
+              }));
+            }
+            const editBtn = actions.createEl("button", {
+              cls: "collis-ai-icon",
+              attr: { "aria-label": "\u7F16\u8F91" }
+            });
+            (0, import_obsidian20.setIcon)(editBtn, "pencil");
+            editBtn.addEventListener("click", () => {
+              new AIProfileModal(this.app, profile, (next) => {
+                void (async () => {
+                  const index = ai.profiles.findIndex((item) => item.id === profile.id);
+                  if (index === -1)
+                    return;
+                  ai.profiles[index] = next;
+                  await save();
+                  renderCards();
+                })();
+              }).open();
+            });
+            const delBtn = actions.createEl("button", {
+              cls: "collis-ai-icon is-danger",
+              attr: { "aria-label": "\u5220\u9664" }
+            });
+            (0, import_obsidian20.setIcon)(delBtn, "trash-2");
+            delBtn.addEventListener("click", voidAsync(async () => {
+              var _a2, _b;
+              ai.profiles = ai.profiles.filter((item) => item.id !== profile.id);
+              if (ai.activeId === profile.id) {
+                ai.activeId = (_b = (_a2 = ai.profiles[0]) == null ? void 0 : _a2.id) != null ? _b : "";
+              }
+              await save();
+              renderCards();
+            }));
+          }
+        };
+        renderCards();
+        new import_obsidian20.Setting(containerEl).setName("\u6DFB\u52A0\u914D\u7F6E").setDesc("\u6BCF\u4E2A\u914D\u7F6E\u53EF\u4EE5\u586B\u81EA\u5DF1\u7684\u7A97\u53E3\u548C\u8F93\u51FA\u4E0A\u9650\uFF0C\u4E92\u4E0D\u5F71\u54CD\u3002").addButton(
+          (button) => button.setButtonText("\u6DFB\u52A0\u914D\u7F6E").setCta().onClick(() => {
+            new AIProfileModal(this.app, null, (profile) => {
+              void (async () => {
+                ai.profiles.push(profile);
+                if (!ai.activeId)
+                  ai.activeId = profile.id;
+                await save();
+                renderCards();
+              })();
+            }).open();
+          })
+        );
+      }
+      renderDiagnostics(containerEl) {
+        var _a, _b;
+        new import_obsidian20.Setting(containerEl).setName("\u8BCA\u65AD").setHeading();
+        const stat = containerEl.createEl("p", {
+          text: "\u5728\u753B\u5E03\u89C6\u56FE\u4E2D\u6253\u5F00\u672C\u9875\uFF0C\u53EF\u770B\u5230\u5F53\u524D\u8BC6\u522B\u5230\u7684\u5361\u7247\u6570\u91CF\u3002"
+        });
+        new import_obsidian20.Setting(containerEl).setName("\u5F53\u524D\u753B\u5E03").addButton(
+          (button) => button.setButtonText("\u5237\u65B0\u8BC6\u522B").onClick(() => {
+            this.plugin.scheduleRefresh(0);
+            window.setTimeout(() => {
+              stat.setText(`\u5F53\u524D\u753B\u5E03\u8BC6\u522B\u5230 ${this.plugin.recognizedCount()} \u5F20\u5361\u7247\u3002`);
+            }, 300);
+          })
+        );
+        const active = this.plugin.settings.ai.profiles.find(
+          (profile) => profile.id === this.plugin.settings.ai.activeId
+        );
+        const capability = (_b = active == null ? void 0 : active.capability) != null ? _b : inferCapability((_a = active == null ? void 0 : active.model) != null ? _a : "");
+        new import_obsidian20.Setting(containerEl).setName("\u5F53\u524D\u6A21\u578B\u53EF\u7528\u8F93\u5165").setDesc(
+          `\u7A97\u53E3 ${formatTokens(capability.contextWindow)} \u2212 \u8F93\u51FA ${formatTokens(capability.maxOutput)} \u2212 \u4F59\u91CF ${formatTokens(
+            this.plugin.settings.ai.policy.safetyTokens
+          )}`
+        );
+      }
+    };
+    var SVG_NS2 = "http://www.w3.org/2000/svg";
+    var LEGACY_WORKBENCH_FOLDER = "\u767D\u677F";
+    var RenameBoardFolderModal = class extends import_obsidian21.Modal {
+      constructor(app, from, to, count2, onResult) {
+        super(app);
+        this.from = from;
+        this.to = to;
+        this.count = count2;
+        this.onResult = onResult;
+      }
+      onOpen() {
+        const el = this.contentEl;
+        while (el.firstChild)
+          el.removeChild(el.firstChild);
+        const heading2 = document.createElement("h2");
+        heading2.textContent = `\u628A\u300C${this.from}\u300D\u6539\u540D\u4E3A\u300C${this.to}\u300D\uFF1F`;
+        const detail = document.createElement("p");
+        detail.textContent = this.count ? `\u91CC\u9762\u7684 ${this.count} \u4E2A\u6587\u4EF6\u4F1A\u4E00\u8D77\u79FB\u52A8\uFF0C\u5185\u5BB9\u4E0D\u53D8\u3002\u4E5F\u53EF\u4EE5\u4FDD\u7559\u65E7\u6587\u4EF6\u5939\uFF0C\u7A0D\u540E\u81EA\u5DF1\u6574\u7406\u3002` : "\u8FD9\u4E2A\u6587\u4EF6\u5939\u662F\u7A7A\u7684\uFF0C\u6539\u540D\u4E0D\u4F1A\u5F71\u54CD\u4EFB\u4F55\u5185\u5BB9\u3002";
+        const row = document.createElement("div");
+        row.className = "collis-rename-actions";
+        const cancel = document.createElement("button");
+        cancel.textContent = "\u6682\u65F6\u4E0D\u6539";
+        cancel.addEventListener("click", () => {
+          this.close();
+          this.onResult(false);
+        });
+        const confirm = document.createElement("button");
+        confirm.className = "mod-cta";
+        confirm.textContent = "\u6539\u540D\u5E76\u7EE7\u7EED";
+        confirm.addEventListener("click", () => {
+          this.close();
+          this.onResult(true);
+        });
+        row.appendChild(cancel);
+        row.appendChild(confirm);
+        el.appendChild(heading2);
+        el.appendChild(detail);
+        el.appendChild(row);
+      }
+      onClose() {
+        while (this.contentEl.firstChild)
+          this.contentEl.removeChild(this.contentEl.firstChild);
+      }
+    };
+    function svgEl(tag, attrs) {
+      const el = document.createElementNS(SVG_NS2, tag);
+      for (const [key, value] of Object.entries(attrs))
+        el.setAttribute(key, value);
+      return el;
+    }
+    function paintRibbonIcon(host) {
+      host.empty();
+      const svg = svgEl("svg", {
+        xmlns: SVG_NS2,
+        viewBox: "0 0 24 24",
+        width: "18",
+        height: "18",
+        fill: "none",
+        stroke: "currentColor",
+        "stroke-width": "1.8",
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round"
+      });
+      svg.append(
+        svgEl("rect", {
+          x: "2.5",
+          y: "3.5",
+          width: "19",
+          height: "17",
+          rx: "5",
+          "stroke-dasharray": "3 2.6"
+        }),
+        svgEl("path", {
+          d: "M6 15.5C8.2 10.5 11 10.2 11.8 12.4C12.6 14.6 15.4 14.8 17.6 10.2"
+        }),
+        svgEl("circle", {
+          cx: "18.6",
+          cy: "6.6",
+          r: "1.5",
+          fill: "currentColor",
+          stroke: "none"
+        })
+      );
+      host.appendChild(svg);
+    }
+    var CollisBoardPlugin = class extends import_obsidian21.Plugin {
+      constructor() {
+        super(...arguments);
+        this.workbenchViewRef = null;
+        this.observer = null;
+        this.observedContainer = null;
+        this.timer = null;
+        this.painting = false;
+        this.lastPaintAt = 0;
+        this.suppressDblClickUntil = 0;
+        this.pendingClick = null;
+        this.editingCount = 0;
+      }
+      async onload() {
+        await this.loadSettings();
+        this.index = new NodeIndex(this.app);
+        this.registry = new ActionRegistry();
+        this.sync = new SyncEngine(
+          this.app,
+          () => {
+            this.index.clear();
+            this.scheduleRefresh(120);
+          },
+          () => this.editingCount === 0
+        );
+        this.registerActions();
+        new ContextMenuInjector(this.app, this.registry, (nodeId) => this.buildContext(nodeId)).install(this);
+        this.addSettingTab(new CollisBoardSettingTab(this.app, this));
+        this.registerCommands();
+        this.registerWatchers();
+        this.installInlineEditing();
+        this.registerView(VIEW_TYPE_COLLIS_BOARD, (leaf) => new BoardView(leaf, this));
+        this.registerExtensions(["collis"], VIEW_TYPE_COLLIS_BOARD);
+        this.installWorkbench();
+        const ribbon = this.addRibbonIcon("dot", "Collis", () => {
+          void this.openBoardGallery();
+        });
+        paintRibbonIcon(ribbon);
+        this.app.workspace.onLayoutReady(() => {
+          this.scheduleRefresh(300);
+        });
+      }
+      /** Installs the board wall. collis's own board view, paths and commands stay
+       *  exactly as they were; this only adds one view and one folder entry point. */
+      installWorkbench() {
+        this.registerView(VIEW_TYPE_WORKBENCH, (leaf) => {
+          const view = new BoardGalleryView(leaf, this);
+          this.workbenchViewRef = view;
+          return view;
+        });
+        this.addCommand({
+          id: "open-workbench",
+          name: "\u6253\u5F00\u753B\u5E03\u96C6",
+          callback: () => {
+            void this.openBoardGallery();
+          }
+        });
+      }
+      /** Single folder used by the wall. Users can change it in data.json. */
+      get workbenchFolder() {
+        var _a;
+        return ((_a = this.settings.workbench) == null ? void 0 : _a.boardFolder) || "\u753B\u5E03";
+      }
+      async ensureBoardFolder() {
+        const path = this.workbenchFolder;
+        const existing = this.app.vault.getAbstractFileByPath(path);
+        if (existing instanceof import_obsidian21.TFolder)
+          return;
+        if (existing) {
+          new import_obsidian21.Notice(`\u300C${path}\u300D\u5DF2\u662F\u4E00\u4E2A\u6587\u4EF6\uFF0C\u4E0D\u80FD\u4F5C\u4E3A\u753B\u5E03\u6587\u4EF6\u5939\u3002`);
+          return;
+        }
+        const legacy = this.app.vault.getAbstractFileByPath(LEGACY_WORKBENCH_FOLDER);
+        if (legacy instanceof import_obsidian21.TFolder && path !== LEGACY_WORKBENCH_FOLDER) {
+          const confirmed = await new Promise((resolve) => {
+            new RenameBoardFolderModal(
+              this.app,
+              LEGACY_WORKBENCH_FOLDER,
+              path,
+              legacy.children.length,
+              resolve
+            ).open();
+          });
+          if (confirmed) {
+            try {
+              await this.app.vault.rename(legacy, path);
+              return;
+            } catch (error) {
+              new import_obsidian21.Notice(error instanceof Error ? error.message : "\u6587\u4EF6\u5939\u6539\u540D\u5931\u8D25");
+            }
+          }
+        }
+        try {
+          await this.app.vault.createFolder(path);
+        } catch (error) {
+          new import_obsidian21.Notice(error instanceof Error ? error.message : "\u521B\u5EFA\u753B\u5E03\u6587\u4EF6\u5939\u5931\u8D25");
+        }
+      }
+      /** Ribbon / command entry: make the folder exist, then open or focus the
+       *  one board wall on the right. Never creates a second one. */
+      async openBoardGallery() {
+        var _a, _b, _c;
+        this.debugLog("openBoardGallery: start");
+        await this.ensureBoardFolder();
+        this.debugLog(`openBoardGallery: folder="${this.workbenchFolder}"`);
+        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_WORKBENCH);
+        this.debugLog(`openBoardGallery: existing leaves=${leaves.length}`);
+        const existing = leaves[0];
+        if (existing) {
+          await this.app.workspace.revealLeaf(existing);
+          this.app.workspace.setActiveLeaf(existing, { focus: true });
+          if (existing.view instanceof BoardGalleryView) {
+            existing.view.refreshWall();
+            this.debugLog("openBoardGallery: repainted existing view");
+          } else {
+            this.debugLog(
+              `openBoardGallery: existing view is ${(_c = (_b = (_a = existing.view) == null ? void 0 : _a.getViewType) == null ? void 0 : _b.call(_a)) != null ? _c : "unknown"}`
+            );
+            await existing.setViewState({ type: VIEW_TYPE_WORKBENCH, active: true });
+          }
+          return;
+        }
+        const leaf = this.app.workspace.getLeaf("tab");
+        try {
+          await leaf.setViewState({ type: VIEW_TYPE_WORKBENCH, active: true });
+          await this.app.workspace.revealLeaf(leaf);
+          this.app.workspace.setActiveLeaf(leaf, { focus: true });
+          this.debugLog("openBoardGallery: new tab created");
+        } catch (error) {
+          this.debugLog(`openBoardGallery: setViewState failed ${String(error)}`);
+          new import_obsidian21.Notice(
+            `\u65E0\u6CD5\u6253\u5F00\u753B\u5E03\u96C6\uFF1A${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+      /** Temporary runtime trace for the board wall. Writes inside the plugin
+       *  folder, never into notes, and never throws. */
+      debugLog(message) {
+        const line = `${(/* @__PURE__ */ new Date()).toISOString()} ${message}
+`;
+        const path = ".obsidian/plugins/workbench/collis-board-debug.log";
+        const adapter = this.app.vault.adapter;
+        void (async () => {
+          try {
+            if (await adapter.exists(path))
+              await adapter.append(path, line);
+            else
+              await adapter.write(path, line);
+          } catch (e) {
+          }
+        })();
+      }
+      /** Create from inside the wall, so the file always lands in its folder. */
+      async createGalleryBoard() {
+        await this.ensureBoardFolder();
+        const file = await createBoardItem(this.app, this.workbenchFolder);
+        await this.openBoardFile(file.path);
+        this.refreshWorkbench();
+      }
+      refreshWorkbench() {
+        var _a;
+        (_a = this.workbenchViewRef) == null ? void 0 : _a.refreshWall();
+      }
+      async openBoard() {
+        const boards = listBoards(this.app);
+        if (boards.length === 0) {
+          await this.createBoard();
+          return;
+        }
+        new BoardPickerModal(this.app, (file) => {
+          void this.openBoardFile(file.path);
+        }).open();
+      }
+      async createBoard() {
+        var _a;
+        const folder = (_a = this.settings.boardFolder) != null ? _a : "";
+        const path = await nextBoardPath(this.app, folder);
+        const file = await this.app.vault.create(
+          path,
+          JSON.stringify(blankBoardData(), null, 2)
+        );
+        await this.openBoardFile(file.path);
+      }
+      async openBoardFile(path) {
+        var _a;
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof import_obsidian21.TFile))
+          return;
+        for (const leaf2 of this.app.workspace.getLeavesOfType(VIEW_TYPE_COLLIS_BOARD)) {
+          const view = leaf2.view;
+          if (((_a = view.file) == null ? void 0 : _a.path) === file.path) {
+            void this.app.workspace.revealLeaf(leaf2);
+            return;
+          }
+        }
+        const leaf = this.app.workspace.getLeaf("tab");
+        await leaf.openFile(file);
+        void this.app.workspace.revealLeaf(leaf);
+      }
+      onunload() {
+        if (this.observer) {
+          this.observer.disconnect();
+          this.observer = null;
+        }
+        if (this.timer !== null) {
+          window.clearTimeout(this.timer);
+          this.timer = null;
+        }
+        const view = this.getCanvasView();
+        if (view)
+          clearBadges(view);
+      }
+      async loadSettings() {
+        const loaded = await this.loadData();
+        this.settings = {
+          ...DEFAULT_SETTINGS2,
+          ...loaded != null ? loaded : {},
+          ai: normalizeAISettings(loaded == null ? void 0 : loaded.ai),
+          conversations: Array.isArray(loaded == null ? void 0 : loaded.conversations) ? loaded.conversations : [],
+          workbench: normalizeWorkbenchSettings(loaded == null ? void 0 : loaded.workbench)
+        };
+      }
+      async saveSettings() {
+        await this.saveData(this.settings);
+        this.scheduleRefresh(150);
+      }
+      recognizedCount() {
+        return this.index.size;
+      }
+      scheduleRefresh(delay = 250) {
+        if (this.timer !== null)
+          window.clearTimeout(this.timer);
+        this.timer = window.setTimeout(() => {
+          this.timer = null;
+          void this.refreshCanvas();
+        }, delay);
+      }
+      async refreshCanvas() {
+        if (this.editingCount > 0)
+          return;
+        const view = this.getCanvasView();
+        if (!view)
+          return;
+        try {
+          this.ensureObserver(view);
+          await this.index.scan(view);
+          if (this.painting)
+            return;
+          this.painting = true;
+          this.lastPaintAt = Date.now();
+          try {
+            applyBadges(view, this.index, this.settings);
+          } finally {
+            this.painting = false;
+          }
+        } catch (error) {
+          console.error("[Collis] refresh failed", error);
+        }
+      }
+      ensureObserver(view) {
+        const container = view.containerEl;
+        if (!container)
+          return;
+        if (this.observer && this.observedContainer === container)
+          return;
+        if (this.observer)
+          this.observer.disconnect();
+        this.observedContainer = container;
+        this.observer = new MutationObserver(() => {
+          if (this.painting)
+            return;
+          if (Date.now() - this.lastPaintAt < 600)
+            return;
+          this.scheduleRefresh(400);
+        });
+        this.observer.observe(container, { childList: true, subtree: true });
+        this.register(() => {
+          if (this.observer)
+            this.observer.disconnect();
+        });
+      }
+      getCanvasView() {
+        var _a;
+        const workspace = this.app.workspace;
+        const candidates = [];
+        if (workspace.activeLeaf)
+          candidates.push(workspace.activeLeaf);
+        const recent = (_a = workspace.getMostRecentLeaf) == null ? void 0 : _a.call(workspace);
+        if (recent)
+          candidates.push(recent);
+        for (const leaf of this.app.workspace.getLeavesOfType("canvas")) {
+          candidates.push(leaf);
+        }
+        for (const leaf of candidates) {
+          const view = leaf == null ? void 0 : leaf.view;
+          if (view && typeof view.getViewType === "function" && view.getViewType() === "canvas") {
+            return view;
+          }
+        }
+        return null;
+      }
+      selfCheck() {
+        var _a, _b, _c;
+        const view = this.getCanvasView();
+        const canvas = view == null ? void 0 : view.canvas;
+        const nodes = (canvas == null ? void 0 : canvas.nodes) ? collectNodes(canvas.nodes) : [];
+        console.warn("[Collis] self-check", {
+          version: this.manifest.version,
+          hasCanvasView: !!view,
+          hasCanvas: !!canvas,
+          hasNodesMap: !!(canvas == null ? void 0 : canvas.nodes),
+          nodeCount: nodes.length,
+          recognized: this.index.size
+        });
+        const first = nodes[0];
+        if (first) {
+          const data = typeof first.getData === "function" ? (_a = first.getData()) != null ? _a : {} : first;
+          console.warn("[Collis] first node", {
+            keys: Object.keys(data),
+            type: data.type,
+            text: data.text,
+            hasNodeEl: !!first.nodeEl,
+            nodeElClass: (_c = (_b = first.nodeEl) == null ? void 0 : _b.className) != null ? _c : null
+          });
+        }
+        new import_obsidian21.Notice(
+          `Collis \u81EA\u68C0 \xB7 \u753B\u5E03:${view ? "\u6709" : "\u65E0"} \xB7 \u8282\u70B9:${nodes.length} \xB7 \u8BC6\u522B:${this.index.size}`,
+          1e4
+        );
+      }
+      buildContext(nodeId) {
+        const view = this.getCanvasView();
+        if (!view)
+          return null;
+        const entry = this.index.get(nodeId);
+        if (!entry)
+          return null;
+        return { app: this.app, entry, canvasView: view, nodeId };
+      }
+      getSelectedContext() {
+        var _a, _b, _c, _d;
+        const view = this.getCanvasView();
+        const selection = (_a = view == null ? void 0 : view.canvas) == null ? void 0 : _a.selection;
+        if (!selection)
+          return null;
+        const items = Array.from(selection);
+        if (items.length === 0)
+          return null;
+        const first = items[0];
+        const id = (_d = first.id) != null ? _d : (_c = (_b = first.getData) == null ? void 0 : _b.call(first)) == null ? void 0 : _c.id;
+        if (!id)
+          return null;
+        return this.buildContext(id);
+      }
+      installInlineEditing() {
+        this.registerDomEvent(
+          document,
+          "mousedown",
+          (evt) => {
+            var _a, _b, _c, _d;
+            if (evt.button !== 0)
+              return;
+            const target = evt.target;
+            if (!target)
+              return;
+            if (target.closest(".collis-inline"))
+              return;
+            const nodeEl = target.closest(".canvas-node");
+            if (!nodeEl) {
+              this.pendingClick = null;
+              return;
+            }
+            const view = this.getCanvasView();
+            if (!view)
+              return;
+            const node2 = this.findNodeByElement(view, nodeEl);
+            const nodeId = (_c = (_b = (_a = node2 == null ? void 0 : node2.getData) == null ? void 0 : _a.call(node2)) == null ? void 0 : _b.id) != null ? _c : node2 == null ? void 0 : node2.id;
+            if (!node2 || !nodeId)
+              return;
+            const meta = (_d = this.index.get(nodeId)) == null ? void 0 : _d.meta;
+            if (!meta || meta.stale)
+              return;
+            this.pendingClick = {
+              nodeId,
+              nodeEl,
+              x: evt.clientX,
+              y: evt.clientY,
+              wasSelected: isNodeSelected(view, node2, nodeId)
+            };
+          },
+          true
+        );
+        this.registerDomEvent(
+          document,
+          "mouseup",
+          (evt) => {
+            var _a;
+            const pending = this.pendingClick;
+            this.pendingClick = null;
+            if (!pending || evt.button !== 0)
+              return;
+            const distance = Math.hypot(evt.clientX - pending.x, evt.clientY - pending.y);
+            if (distance > 6)
+              return;
+            if (!pending.wasSelected)
+              return;
+            const meta = (_a = this.index.get(pending.nodeId)) == null ? void 0 : _a.meta;
+            if (!meta || meta.stale)
+              return;
+            this.openInline(pending.nodeEl, meta, evt.clientY);
+          },
+          true
+        );
+        this.registerDomEvent(
+          document,
+          "dblclick",
+          (evt) => {
+            if (Date.now() >= this.suppressDblClickUntil)
+              return;
+            evt.preventDefault();
+            evt.stopPropagation();
+          },
+          true
+        );
+        this.registerDomEvent(
+          document,
+          "click",
+          (evt) => {
+            if (Date.now() >= this.suppressDblClickUntil)
+              return;
+            const target = evt.target;
+            if (target == null ? void 0 : target.closest(".collis-inline"))
+              return;
+            evt.preventDefault();
+            evt.stopPropagation();
+          },
+          true
+        );
+      }
+      findNodeByElement(view, el) {
+        var _a;
+        for (const node2 of collectNodes((_a = view.canvas) == null ? void 0 : _a.nodes)) {
+          const nodeEl = node2.nodeEl;
+          if (!nodeEl)
+            continue;
+          if (nodeEl === el || nodeEl.contains(el))
+            return node2;
+        }
+        return null;
+      }
+      openInline(nodeEl, meta, clickY) {
+        this.suppressDblClickUntil = Date.now() + 400;
+        this.editingCount += 1;
+        new InlineEditor(
+          nodeEl,
+          meta.editable,
+          async (value) => {
+            if (!value.trim()) {
+              new import_obsidian21.Notice("\u5185\u5BB9\u4E3A\u7A7A\uFF0C\u672A\u4FDD\u5B58");
+              this.scheduleRefresh(0);
+              return;
+            }
+            const next = meta.timePrefix + value;
+            if (next === meta.body)
+              return;
+            const ok = await writeCard(this.app, meta.ref, next);
+            if (!ok) {
+              new import_obsidian21.Notice("\u4FDD\u5B58\u5931\u8D25\uFF1A\u5361\u7247\u53EF\u80FD\u5DF2\u79FB\u52A8\u6216\u5220\u9664");
+              return;
+            }
+            this.index.clear();
+            this.scheduleRefresh(60);
+          },
+          () => void 0,
+          clickY,
+          () => {
+            this.editingCount = Math.max(0, this.editingCount - 1);
+            if (this.editingCount === 0) {
+              this.sync.flushPending();
+              this.scheduleRefresh(250);
+            }
+          }
+        );
+      }
+      registerWatchers() {
+        this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.scheduleRefresh(150)));
+        this.registerEvent(this.app.workspace.on("layout-change", () => this.scheduleRefresh(150)));
+        this.registerEvent(this.app.workspace.on("file-open", () => this.scheduleRefresh(150)));
+        this.registerEvent(
+          this.app.metadataCache.on("changed", (file) => {
+            if (file instanceof import_obsidian21.TFile)
+              this.sync.handleModify(file);
+          })
+        );
+      }
+      registerCommands() {
+        this.addCommand({
+          id: "ai-analyze",
+          name: "\u7528 AI \u5206\u6790\u767D\u677F",
+          callback: () => {
+            var _a;
+            const view = this.getCanvasView();
+            if (view)
+              (_a = view.openAIPanel) == null ? void 0 : _a.call(view);
+          }
+        });
+        this.addCommand({
+          id: "board-doctor",
+          name: "\u767D\u677F\u4F53\u68C0",
+          callback: () => {
+            var _a;
+            const view = this.getCanvasView();
+            if (view)
+              (_a = view.openBoardDoctor) == null ? void 0 : _a.call(view);
+          }
+        });
+        this.addCommand({
+          id: "board-outline",
+          name: "\u6253\u5F00\u767D\u677F\u5927\u7EB2",
+          checkCallback: (checking) => {
+            var _a;
+            const view = this.app.workspace.getActiveViewOfType(BoardView);
+            if (!view)
+              return false;
+            if (!checking)
+              (_a = view.openOutlinePanel) == null ? void 0 : _a.call(view);
+            return true;
+          }
+        });
+        this.addCommand({
+          id: "board-export-markdown",
+          name: "\u5BFC\u51FA\u767D\u677F\u4E3A Markdown",
+          checkCallback: (checking) => {
+            var _a;
+            const view = this.app.workspace.getActiveViewOfType(BoardView);
+            if (!view)
+              return false;
+            if (!checking)
+              (_a = view.openExportModal) == null ? void 0 : _a.call(view);
+            return true;
+          }
+        });
+        this.addCommand({
+          id: "find-node",
+          name: "\u5728\u767D\u677F\u4E2D\u67E5\u627E\u8282\u70B9",
+          callback: () => {
+            var _a;
+            const view = this.getCanvasView();
+            if (view)
+              (_a = view.openNodeSearch) == null ? void 0 : _a.call(view);
+          }
+        });
+        this.addCommand({
+          id: "insert-node",
+          name: "\u641C\u7D22\u6216\u65B0\u5EFA\u8282\u70B9",
+          callback: () => {
+            var _a;
+            const view = this.getCanvasView();
+            if (view)
+              (_a = view.openInsertPanelAtCenter) == null ? void 0 : _a.call(view);
+          }
+        });
+        this.addCommand({
+          id: "open-card-board",
+          name: "\u6253\u5F00\u5DF2\u6709\u767D\u677F",
+          callback: () => {
+            void this.openBoard();
+          }
+        });
+        this.addCommand({
+          id: "new-card-board",
+          name: "\u65B0\u5EFA\u7A7A\u767D\u767D\u677F",
+          callback: () => {
+            void this.createBoard();
+          }
+        });
+        this.addCommand({
+          id: "self-check",
+          name: "\u81EA\u68C0",
+          callback: () => this.selfCheck()
+        });
+        this.addCommand({
+          id: "refresh-cards",
+          name: "\u5237\u65B0\u5F53\u524D\u753B\u5E03\u7684\u5361\u7247",
+          checkCallback: (checking) => {
+            const view = this.getCanvasView();
+            if (!view)
+              return false;
+            if (!checking)
+              this.scheduleRefresh(0);
+            return true;
+          }
+        });
+        this.addCommand({
+          id: "edit-selected-card",
+          name: "\u7F16\u8F91\u9009\u4E2D\u7684\u5361\u7247",
+          checkCallback: (checking) => {
+            const ctx = this.getSelectedContext();
+            if (!ctx)
+              return false;
+            const meta = ctx.entry.meta;
+            if (!meta || meta.stale)
+              return false;
+            if (!checking)
+              this.editCard(meta, ctx.nodeId);
+            return true;
+          }
+        });
+        this.addCommand({
+          id: "locate-selected-card",
+          name: "\u5728\u7B14\u8BB0\u4E2D\u5B9A\u4F4D\u9009\u4E2D\u7684\u5361\u7247",
+          checkCallback: (checking) => {
+            const ctx = this.getSelectedContext();
+            if (!ctx)
+              return false;
+            const meta = ctx.entry.meta;
+            if (!meta || meta.stale)
+              return false;
+            if (!checking)
+              void this.locateCard(meta);
+            return true;
+          }
+        });
+        this.addCommand({
+          id: "copy-selected-block-link",
+          name: "\u590D\u5236\u9009\u4E2D\u5361\u7247\u7684\u5757\u94FE\u63A5",
+          checkCallback: (checking) => {
+            const ctx = this.getSelectedContext();
+            if (!ctx)
+              return false;
+            const meta = ctx.entry.meta;
+            if (!meta)
+              return false;
+            if (!checking) {
+              void navigator.clipboard.writeText(makeBlockLink(meta.ref)).then(() => {
+                new import_obsidian21.Notice("\u5DF2\u590D\u5236\u5757\u94FE\u63A5");
+              });
+            }
+            return true;
+          }
+        });
+      }
+      registerActions() {
+        this.registry.register({
+          id: "edit-card",
+          label: "\u7F16\u8F91\u5361\u7247\u5185\u5BB9",
+          group: "card",
+          icon: "pencil",
+          available: (ctx) => !!ctx.entry.meta && !ctx.entry.meta.stale,
+          run: (ctx) => {
+            if (ctx.entry.meta)
+              this.editCard(ctx.entry.meta, ctx.nodeId);
+          }
+        });
+        this.registry.register({
+          id: "locate-card",
+          label: "\u5728\u7B14\u8BB0\u4E2D\u5B9A\u4F4D",
+          group: "card",
+          icon: "crosshair",
+          available: (ctx) => !!ctx.entry.meta && !ctx.entry.meta.stale,
+          run: (ctx) => {
+            if (ctx.entry.meta)
+              void this.locateCard(ctx.entry.meta);
+          }
+        });
+        this.registry.register({
+          id: "copy-block-link",
+          label: "\u590D\u5236\u5757\u94FE\u63A5",
+          group: "card",
+          icon: "link",
+          available: (ctx) => !!ctx.entry.meta,
+          run: async (ctx) => {
+            if (!ctx.entry.meta)
+              return;
+            await navigator.clipboard.writeText(makeBlockLink(ctx.entry.meta.ref));
+            new import_obsidian21.Notice("\u5DF2\u590D\u5236\u5757\u94FE\u63A5");
+          }
+        });
+        this.registry.register({
+          id: "refresh-node",
+          label: "\u5237\u65B0\u8BE5\u8282\u70B9",
+          group: "diagnostic",
+          icon: "refresh-cw",
+          run: () => this.scheduleRefresh(0)
+        });
+        this.registry.register({
+          id: "remove-stale-node",
+          label: "\u79FB\u9664\u5931\u6548\u8282\u70B9",
+          group: "diagnostic",
+          icon: "trash-2",
+          available: (ctx) => {
+            const meta = ctx.entry.meta;
+            return !meta || meta.stale;
+          },
+          run: (ctx) => this.removeNode(ctx)
+        });
+      }
+      editCard(meta, nodeId) {
+        var _a, _b, _c, _d, _e, _f, _g;
+        const view = this.getCanvasView();
+        const canvas = view == null ? void 0 : view.canvas;
+        let node2 = nodeId ? (_b = (_a = canvas == null ? void 0 : canvas.get) == null ? void 0 : _a.call(canvas, nodeId)) != null ? _b : null : null;
+        if (!node2) {
+          for (const candidate of collectNodes(canvas == null ? void 0 : canvas.nodes)) {
+            const entry = this.index.get((_f = (_e = (_d = (_c = candidate.getData) == null ? void 0 : _c.call(candidate)) == null ? void 0 : _d.id) != null ? _e : candidate.id) != null ? _f : "");
+            const ref = (_g = entry == null ? void 0 : entry.meta) == null ? void 0 : _g.ref;
+            if (ref && ref.file === meta.ref.file && ref.blockId === meta.ref.blockId) {
+              node2 = candidate;
+              break;
+            }
+          }
+        }
+        const nodeEl = node2 == null ? void 0 : node2.nodeEl;
+        if (nodeEl) {
+          this.openInline(nodeEl, meta);
+          return;
+        }
+        new CardEditorModal(this.app, meta, async (value) => {
+          const ok = await writeCard(this.app, meta.ref, value);
+          if (ok)
+            this.scheduleRefresh(150);
+          return ok;
+        }).open();
+      }
+      async locateCard(meta) {
+        var _a, _b, _c, _d, _e;
+        const file = this.app.vault.getAbstractFileByPath(meta.ref.file);
+        if (!(file instanceof import_obsidian21.TFile)) {
+          new import_obsidian21.Notice("\u627E\u4E0D\u5230\u6E90\u6587\u4EF6");
+          return;
+        }
+        const cache = this.app.metadataCache.getFileCache(file);
+        const line = (_e = (_d = (_c = (_b = (_a = cache == null ? void 0 : cache.blocks) == null ? void 0 : _a[meta.ref.blockId]) == null ? void 0 : _b.position) == null ? void 0 : _c.start) == null ? void 0 : _d.line) != null ? _e : 0;
+        const leaf = this.app.workspace.getLeaf("tab");
+        await leaf.openFile(file, { eState: { line } });
+      }
+      removeNode(ctx) {
+        var _a, _b;
+        const canvas = ctx.canvasView.canvas;
+        const node2 = (_b = (_a = canvas == null ? void 0 : canvas.get) == null ? void 0 : _a.call(canvas, ctx.nodeId)) != null ? _b : null;
+        try {
+          if (node2 && (canvas == null ? void 0 : canvas.removeNode)) {
+            canvas.removeNode(node2);
+          } else if (node2 == null ? void 0 : node2.remove) {
+            node2.remove();
+          } else {
+            return;
+          }
+          this.scheduleRefresh(150);
+        } catch (error) {
+          new import_obsidian21.Notice("\u65E0\u6CD5\u79FB\u9664\u8BE5\u8282\u70B9");
+        }
+      }
+    };
+    function isNodeSelected(view, node2, nodeId) {
+      var _a, _b, _c, _d;
+      const selection = (_a = view.canvas) == null ? void 0 : _a.selection;
+      if (!selection)
+        return false;
+      if (selection instanceof Set && selection.has(node2))
+        return true;
+      for (const item of Array.from(selection)) {
+        const id = (_d = item.id) != null ? _d : (_c = (_b = item.getData) == null ? void 0 : _b.call(item)) == null ? void 0 : _c.id;
+        if (id === nodeId)
+          return true;
+      }
+      return false;
+    }
+  }
+});
+
+// src/collis-gallery.js
+var require_collis_gallery = __commonJS({
+  "src/collis-gallery.js"(exports2, module2) {
+    var { Menu: Menu2, Modal: Modal2, Notice: Notice2, setIcon: setIcon2, TFile } = require("obsidian");
+    var SVG_NS = "http://www.w3.org/2000/svg";
+    var BOARD_EXTENSION = "collis";
+    var PAD = 7;
+    var MAX_NODES = 14;
+    var MAX_CARDS = 6;
+    var TEXT_CAP = 96;
+    function anchorMenuBelow2(menu, anchor) {
+      const rect = anchor && anchor.getBoundingClientRect && anchor.getBoundingClientRect();
+      if (!rect) {
+        menu.showAtPosition({ x: 8, y: 8 });
+        return;
+      }
+      menu.showAtPosition({ x: rect.left, y: rect.bottom });
+      const dom = menu.dom;
+      if (dom) {
+        const mw = dom.offsetWidth;
+        const vw = window.innerWidth;
+        let left = rect.left;
+        if (left + mw > vw - 4)
+          left = Math.max(4, rect.right - mw);
+        dom.style.left = Math.round(left) + "px";
+        dom.style.top = Math.round(rect.bottom) + "px";
+      }
+    }
+    var blockCache = /* @__PURE__ */ new Map();
+    function clean(text) {
+      return text.replace(/!\[[^\]]*\]\([^)]*\)/g, " ").replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g, "$2").replace(/\[\[([^\]]*)\]\]/g, "$1").replace(/[*_`>#~]/g, "").replace(/\s+/g, " ").trim();
+    }
+    function cut(text, max = TEXT_CAP) {
+      const value = clean(text);
+      return value.length > max ? `${value.slice(0, max)}\u2026` : value;
+    }
+    function baseName(path) {
+      const name = path.split("/").pop() ?? path;
+      return name.replace(/\.[^.]+$/, "");
+    }
+    function toneOf(node2) {
+      const color = node2.color;
+      if (!color)
+        return "";
+      return color;
+    }
+    async function blockText(app, node2) {
+      if (node2.type !== "card")
+        return "";
+      const card = node2;
+      if (!card.file || !card.blockId)
+        return "";
+      const file = app.vault.getAbstractFileByPath(card.file);
+      if (!(file instanceof TFile))
+        return "";
+      const key = `${file.path}@${file.stat.mtime}`;
+      const cached = blockCache.get(key);
+      if (cached !== void 0)
+        return cached;
+      let excerpt = "";
+      try {
+        const content = await app.vault.cachedRead(file);
+        const marker = `^${card.blockId}`;
+        const lines = content.split(/\r?\n/);
+        const at = lines.findIndex((line) => line.includes(marker));
+        if (at >= 0) {
+          const parts = [lines[at].replace(marker, "")];
+          for (let i = at - 1; i >= 0 && parts.length < 4; i--) {
+            const line = lines[i];
+            if (!line.trim() || /^#{1,6}\s/.test(line) || /^(---|\*\*\*)/.test(line))
+              break;
+            parts.unshift(line);
+          }
+          excerpt = cut(parts.join(" "), 140);
+        }
+      } catch {
+        excerpt = "";
+      }
+      if (blockCache.size > 300)
+        blockCache.clear();
+      blockCache.set(key, excerpt);
+      return excerpt;
+    }
+    function labelOf(node2, cardText) {
+      if (node2.type === "text")
+        return cut(node2.text ?? "");
+      if (node2.type === "file")
+        return cut(baseName(node2.file ?? ""), 40);
+      if (node2.type === "card")
+        return cardText || cut(baseName(node2.file ?? ""), 40);
+      if (node2.type === "group")
+        return cut(node2.label ?? "", 28);
+      return "";
+    }
+    function layout(data, labels) {
+      const nodes = (data.nodes ?? []).filter(
+        (node2) => node2.type !== "group" && Number.isFinite(node2.x) && Number.isFinite(node2.y) && node2.width > 0
+      );
+      if (!nodes.length)
+        return { nodes: [], edges: [] };
+      const minX = Math.min(...nodes.map((n) => n.x));
+      const minY = Math.min(...nodes.map((n) => n.y));
+      const maxX = Math.max(...nodes.map((n) => n.x + n.width));
+      const maxY = Math.max(...nodes.map((n) => n.y + (n.height ?? 120)));
+      const spanX = Math.max(maxX - minX, 1);
+      const spanY = Math.max(maxY - minY, 1);
+      const area = 100 - PAD * 2;
+      const ratio = spanX / spanY;
+      const boxW = ratio >= 1 ? area : area * ratio;
+      const boxH = ratio >= 1 ? area / ratio : area;
+      const offX = PAD + (area - boxW) / 2;
+      const offY = PAD + (area - boxH) / 2;
+      const pick = [...nodes].sort((a, b) => b.width * (b.height ?? 120) - a.width * (a.height ?? 120)).slice(0, MAX_NODES);
+      const kept = new Set(pick.map((n) => n.id));
+      const built = pick.map((n) => ({
+        id: n.id,
+        box: {
+          x: offX + (n.x - minX) / spanX * boxW,
+          y: offY + (n.y - minY) / spanY * boxH,
+          w: Math.max(n.width / spanX * boxW, 6),
+          h: Math.max((n.height ?? 120) / spanY * boxH, 5),
+          kind: n.type,
+          tone: toneOf(n),
+          text: labels.get(n.id) ?? ""
+        }
+      }));
+      const center = new Map(built.map((entry) => [entry.id, entry.box]));
+      const mini = built.map((entry) => entry.box).sort((a, b) => a.w * a.h - b.w * b.h);
+      const edges = [];
+      for (const edge of data.edges ?? []) {
+        if (!kept.has(edge.from) || !kept.has(edge.to))
+          continue;
+        const from = center.get(edge.from);
+        const to = center.get(edge.to);
+        if (!from || !to)
+          continue;
+        edges.push({
+          x1: from.x + from.w / 2,
+          y1: from.y + from.h / 2,
+          x2: to.x + to.w / 2,
+          y2: to.y + to.h / 2
+        });
+        if (edges.length >= 24)
+          break;
+      }
+      return { nodes: mini, edges };
+    }
+    function stamp(time) {
+      const d = new Date(time);
+      const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate()
+      ).padStart(2, "0")}`;
+      return `${day} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    }
+    function isBoardPath(path, folder) {
+      if (!path.toLowerCase().endsWith(`.${BOARD_EXTENSION}`))
+        return false;
+      if (!folder)
+        return true;
+      const prefix = folder.replace(/^\/+|\/+$/g, "");
+      return !prefix || path.startsWith(`${prefix}/`);
+    }
+    async function listBoardItems(app, folder) {
+      const files = app.vault.getFiles().filter((file) => isBoardPath(file.path, folder)).sort((a, b) => b.stat.mtime - a.stat.mtime);
+      const items = [];
+      for (const file of files) {
+        let nodes = 0;
+        let edges = 0;
+        let cover = { nodes: [], edges: [] };
+        try {
+          const data = JSON.parse(await app.vault.read(file));
+          nodes = Array.isArray(data.nodes) ? data.nodes.length : 0;
+          edges = Array.isArray(data.edges) ? data.edges.length : 0;
+          const labels = /* @__PURE__ */ new Map();
+          let cards = 0;
+          for (const node2 of data.nodes ?? []) {
+            if (node2.type === "card") {
+              cards += 1;
+              labels.set(node2.id, cards <= MAX_CARDS ? await blockText(app, node2) : "");
+            } else {
+              labels.set(node2.id, labelOf(node2, ""));
+            }
+          }
+          cover = layout(data, labels);
+        } catch {
+          nodes = 0;
+        }
+        items.push({
+          file,
+          title: file.basename,
+          nodes,
+          edges,
+          updated: stamp(file.stat.mtime),
+          mtime: file.stat.mtime,
+          created: file.stat.ctime,
+          cover
+        });
+      }
+      return items;
+    }
+    function listSignature(items, sort) {
+      return [
+        sort,
+        ...items.map((item) => `${item.file.path}:${item.mtime}:${item.nodes}:${item.edges}`)
+      ].join("|");
+    }
+    function collisMark() {
+      const svg = document.createElementNS(SVG_NS, "svg");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("fill", "none");
+      svg.setAttribute("stroke", "currentColor");
+      svg.setAttribute("stroke-width", "1.8");
+      svg.setAttribute("stroke-linecap", "round");
+      svg.setAttribute("stroke-linejoin", "round");
+      const frame = document.createElementNS(SVG_NS, "rect");
+      frame.setAttribute("x", "2.5");
+      frame.setAttribute("y", "3.5");
+      frame.setAttribute("width", "19");
+      frame.setAttribute("height", "17");
+      frame.setAttribute("rx", "5");
+      frame.setAttribute("stroke-dasharray", "3 2.6");
+      const stroke = document.createElementNS(SVG_NS, "path");
+      stroke.setAttribute("d", "M6 15.5C8.2 10.5 11 10.2 11.8 12.4C12.6 14.6 15.4 14.8 17.6 10.2");
+      const dot = document.createElementNS(SVG_NS, "circle");
+      dot.setAttribute("cx", "18.6");
+      dot.setAttribute("cy", "6.6");
+      dot.setAttribute("r", "1.5");
+      dot.setAttribute("fill", "currentColor");
+      dot.setAttribute("stroke", "none");
+      svg.appendChild(frame);
+      svg.appendChild(stroke);
+      svg.appendChild(dot);
+      return svg;
+    }
+    function edgeLayer(edges) {
+      const svg = document.createElementNS(SVG_NS, "svg");
+      svg.setAttribute("class", "vw-cover-lines");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.setAttribute("preserveAspectRatio", "none");
+      for (const edge of edges) {
+        const line = document.createElementNS(SVG_NS, "line");
+        line.setAttribute("x1", String(edge.x1));
+        line.setAttribute("y1", String(edge.y1));
+        line.setAttribute("x2", String(edge.x2));
+        line.setAttribute("y2", String(edge.y2));
+        svg.appendChild(line);
+      }
+      return svg;
+    }
+    function applyBox(el, box) {
+      el.style.left = `${box.x}%`;
+      el.style.top = `${box.y}%`;
+      el.style.width = `${box.w}%`;
+      el.style.height = `${box.h}%`;
+    }
+    function applyTone(el, tone) {
+      if (!tone)
+        return;
+      if (tone.startsWith("#"))
+        el.style.setProperty("--tn", tone);
+      else
+        el.setAttribute("data-tone", tone);
+    }
+    function node(tag, className) {
+      const el = document.createElement(tag);
+      el.className = className;
+      return el;
+    }
+    function simpleButton(label, className, onClick) {
+      const button = document.createElement("button");
+      button.className = className;
+      const text = document.createElement("span");
+      text.textContent = label;
+      button.appendChild(text);
+      button.addEventListener("click", onClick);
+      return button;
+    }
+    var DeleteBoardsModal = class extends Modal2 {
+      constructor(app, names, onConfirm) {
+        super(app);
+        this.names = names;
+        this.onConfirm = onConfirm;
+      }
+      onOpen() {
+        const el = this.contentEl;
+        while (el.firstChild)
+          el.removeChild(el.firstChild);
+        el.classList.add("collis-delete-modal");
+        const heading = document.createElement("h2");
+        heading.textContent = this.names.length === 1 ? "\u5220\u9664\u8FD9\u5757\u753B\u5E03\uFF1F" : `\u5220\u9664\u8FD9 ${this.names.length} \u5757\u753B\u5E03\uFF1F`;
+        const detail = document.createElement("p");
+        const shown = this.names.slice(0, 3).join("\u3001");
+        detail.textContent = this.names.length > 3 ? `\u4F1A\u79FB\u5230\u7CFB\u7EDF\u56DE\u6536\u7AD9\uFF1A${shown} \u7B49 ${this.names.length} \u5757\u3002` : `\u4F1A\u79FB\u5230\u7CFB\u7EDF\u56DE\u6536\u7AD9\uFF1A${shown}\u3002`;
+        const row = node("div", "vw-modal-actions");
+        const cancel = document.createElement("button");
+        cancel.className = "vw-ghost";
+        cancel.textContent = "\u53D6\u6D88";
+        cancel.addEventListener("click", () => this.close());
+        const confirm = document.createElement("button");
+        confirm.className = "vw-primary vw-danger";
+        confirm.textContent = "\u5220\u9664";
+        confirm.addEventListener("click", () => {
+          this.close();
+          this.onConfirm();
+        });
+        row.appendChild(cancel);
+        row.appendChild(confirm);
+        el.appendChild(heading);
+        el.appendChild(detail);
+        el.appendChild(row);
+      }
+      onClose() {
+        const el = this.contentEl;
+        while (el.firstChild)
+          el.removeChild(el.firstChild);
+      }
+    };
+    var CollisGalleryPanel2 = class {
+      constructor(app, collisPlugin) {
+        this.app = app;
+        this.collis = collisPlugin;
+        this.root = null;
+        this.items = [];
+        this.sortMode = "created";
+        this.query = "";
+        this.multi = false;
+        this.selected = /* @__PURE__ */ new Set();
+        this.signature = "";
+        this.reloadTimer = null;
+        this.watching = false;
+        this.vaultRefs = [];
+        this.workspaceRefs = [];
+      }
+      async mount(containerEl) {
+        if (this.root)
+          this.destroy();
+        this.root = document.createElement("div");
+        containerEl.appendChild(this.root);
+        try {
+          this.renderWall();
+        } catch (error) {
+          this.reportError("\u7ED8\u5236\u754C\u9762", error);
+          return;
+        }
+        try {
+          await this.loadItems();
+        } catch (error) {
+          this.reportError("\u8BFB\u53D6\u753B\u5E03", error);
+        }
+        this.watchSources();
+      }
+      destroy() {
+        if (this.reloadTimer !== null) {
+          window.clearTimeout(this.reloadTimer);
+          this.reloadTimer = null;
+        }
+        for (const ref of this.vaultRefs)
+          this.app.vault.offref(ref);
+        for (const ref of this.workspaceRefs)
+          this.app.workspace.offref(ref);
+        this.vaultRefs = [];
+        this.workspaceRefs = [];
+        this.watching = false;
+        this.signature = "";
+        if (this.root) {
+          if (this.root.parentNode)
+            this.root.parentNode.removeChild(this.root);
+          this.root = null;
+        }
+      }
+      async refresh() {
+        this.signature = "";
+        await this.loadItems();
+      }
+      /** 墙是文件夹的实时镜像：保存、增删、改名、切回前台都会重绘。 */
+      watchSources() {
+        if (this.watching)
+          return;
+        this.watching = true;
+        const inFolder = (path) => isBoardPath(path, this.collis.workbenchFolder);
+        this.vaultRefs.push(
+          this.app.vault.on("modify", (file) => {
+            if (inFolder(file.path))
+              this.schedule(220);
+          })
+        );
+        this.vaultRefs.push(
+          this.app.vault.on("create", (file) => {
+            if (inFolder(file.path))
+              this.schedule(60);
+          })
+        );
+        this.vaultRefs.push(
+          this.app.vault.on("delete", (file) => {
+            if (inFolder(file.path))
+              this.schedule(60);
+          })
+        );
+        this.vaultRefs.push(
+          this.app.vault.on("rename", (file, oldPath) => {
+            if (inFolder(file.path) || inFolder(oldPath))
+              this.schedule(60);
+          })
+        );
+        this.workspaceRefs.push(
+          this.app.workspace.on("active-leaf-change", (leaf) => {
+            if (leaf === this.app.workspace.activeLeaf)
+              this.schedule(0);
+          })
+        );
+      }
+      schedule(delay) {
+        if (this.reloadTimer !== null)
+          window.clearTimeout(this.reloadTimer);
+        this.reloadTimer = window.setTimeout(() => {
+          this.reloadTimer = null;
+          void this.loadItems();
+        }, delay);
+      }
+      clearRoot(el) {
+        while (el.firstChild)
+          el.removeChild(el.firstChild);
+      }
+      reportError(stage, error) {
+        const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        console.error(`[collis] \u753B\u5E03\u96C6${stage}\u5931\u8D25`, error);
+        if (this.root) {
+          this.clearRoot(this.root);
+          const box = document.createElement("div");
+          box.className = "vw-error";
+          const title = document.createElement("strong");
+          title.textContent = `\u753B\u5E03\u96C6${stage}\u5931\u8D25`;
+          const detail = document.createElement("p");
+          detail.textContent = message;
+          box.appendChild(title);
+          box.appendChild(detail);
+          this.root.appendChild(box);
+        }
+        new Notice2(`\u753B\u5E03\u96C6${stage}\u5931\u8D25\uFF1A${message}`);
+      }
+      async loadItems() {
+        let items = [];
+        try {
+          items = await listBoardItems(this.app, this.collis.workbenchFolder);
+        } catch {
+          new Notice2("\u8BFB\u53D6\u753B\u5E03\u5217\u8868\u5931\u8D25");
+        }
+        items = [...items].sort((a, b) => {
+          if (this.sortMode === "name")
+            return a.title.localeCompare(b.title, "zh-CN");
+          if (this.sortMode === "modified")
+            return b.mtime - a.mtime;
+          return b.created - a.created;
+        });
+        this.items = items;
+        if (listSignature(items, this.sortMode) === this.signature)
+          return;
+        this.renderWall();
+      }
+      renderWall() {
+        const root = this.root;
+        if (!root)
+          return;
+        const scrolled = root.querySelector(".vw-scroll");
+        const scroll = scrolled ? scrolled.scrollTop : 0;
+        this.clearRoot(root);
+        root.classList.add("wb-root");
+        const frame = node("div", "vw-frame");
+        const toolbar = node("div", "vw-toolbar");
+        toolbar.appendChild(this.buildHead());
+        frame.appendChild(toolbar);
+        const body = node("div", "vw-scroll");
+        const results = node("div", "vw-results");
+        results.appendChild(this.buildResults());
+        body.appendChild(results);
+        frame.appendChild(body);
+        root.appendChild(frame);
+        body.scrollTop = scroll;
+        this.signature = listSignature(this.items, this.sortMode);
+      }
+      /** 纯输入只换结果区，输入框保持焦点与光标。 */
+      updateResults() {
+        const root = this.root;
+        if (!root)
+          return;
+        const results = root.querySelector(".vw-results");
+        const count = root.querySelector(".vw-count");
+        if (!results)
+          return;
+        this.clearRoot(results);
+        results.appendChild(this.buildResults());
+        const visible = this.visibleItems();
+        if (count) {
+          count.textContent = this.query ? `${visible.length} / ${this.items.length} \u5757` : `${this.items.length} \u5757`;
+        }
+      }
+      visibleItems() {
+        const q = this.query.trim().toLocaleLowerCase();
+        if (!q)
+          return this.items;
+        return this.items.filter(
+          (item) => [item.title, ...item.cover.nodes.map((box) => box.text)].some((text) => text.toLocaleLowerCase().includes(q))
+        );
+      }
+      buildResults() {
+        const visible = this.visibleItems();
+        if (!visible.length) {
+          return this.buildEmpty(this.query.trim().length > 0);
+        }
+        const grid = node("div", "vw-grid");
+        for (const item of visible)
+          grid.appendChild(this.buildCard(item));
+        return grid;
+      }
+      buildEmpty(searching) {
+        const empty = node("div", "vw-empty");
+        const art = node("div", "vw-empty-art");
+        art.appendChild(collisMark());
+        const title = node("div", "vw-empty-title");
+        title.textContent = searching ? "\u6CA1\u6709\u5339\u914D\u7684\u753B\u5E03" : "\u8FD8\u6CA1\u6709\u753B\u5E03";
+        const hint = document.createElement("p");
+        hint.className = "vw-empty-hint";
+        hint.textContent = searching ? "\u6362\u4E2A\u5173\u952E\u8BCD\u8BD5\u8BD5\uFF0C\u641C\u7D22\u8303\u56F4\u5305\u62EC\u753B\u5E03\u540D\u79F0\u548C\u753B\u5E03\u4E0A\u7684\u6587\u5B57\u3002" : "\u65B0\u5EFA\u7684\u753B\u5E03\u4F1A\u5B58\u8FDB\u300C\u753B\u5E03\u300D\u6587\u4EF6\u5939\uFF0C\u548C\u6587\u4EF6\u6811\u5B8C\u5168\u540C\u6B65\u3002";
+        const button = document.createElement("button");
+        button.className = "vw-primary is-large";
+        if (searching) {
+          const label = document.createElement("span");
+          label.textContent = "\u6E05\u9664\u641C\u7D22";
+          button.appendChild(label);
+          button.addEventListener("click", () => {
+            this.query = "";
+            this.renderWall();
+            const input = this.root ? this.root.querySelector(".vw-search-input") : null;
+            if (input)
+              input.focus();
+          });
+        } else {
+          const plus = node("span", "vw-ico");
+          setIcon2(plus, "plus");
+          const label = document.createElement("span");
+          label.textContent = "\u65B0\u5EFA\u7B2C\u4E00\u5757\u753B\u5E03";
+          button.appendChild(plus);
+          button.appendChild(label);
+          button.addEventListener("click", () => {
+            void this.createBoard();
+          });
+        }
+        empty.appendChild(art);
+        empty.appendChild(title);
+        empty.appendChild(hint);
+        empty.appendChild(button);
+        return empty;
+      }
+      buildHead() {
+        const head = node("div", "vw-head");
+        const intro = node("div", "vw-intro");
+        const title = node("div", "vw-title");
+        const h1 = document.createElement("h1");
+        h1.textContent = "\u753B\u5E03\u96C6";
+        const count = node("span", "vw-count");
+        const visible = this.visibleItems();
+        count.textContent = this.query ? `${visible.length} / ${this.items.length} \u5757` : `${this.items.length} \u5757`;
+        title.appendChild(h1);
+        title.appendChild(count);
+        intro.appendChild(title);
+        head.appendChild(intro);
+        const actions = node("div", "vw-actions");
+        if (this.multi) {
+          const info = node("span", "vw-multi-count");
+          info.textContent = `\u5DF2\u9009 ${this.selected.size} \u5757`;
+          actions.appendChild(info);
+          actions.appendChild(simpleButton("\u5168\u9009", "vw-ghost", () => {
+            for (const item of this.visibleItems())
+              this.selected.add(item.file.path);
+            this.syncSelectionUI();
+          }));
+          const remove = simpleButton("\u5220\u9664\u6240\u9009", "vw-primary vw-danger", () => {
+            const chosen = this.items.filter((item) => this.selected.has(item.file.path));
+            this.confirmDelete(chosen, true);
+          });
+          if (!this.selected.size)
+            remove.disabled = true;
+          actions.appendChild(remove);
+          actions.appendChild(simpleButton("\u9000\u51FA\u591A\u9009", "vw-ghost", () => this.setMulti(false)));
+          head.appendChild(actions);
+          return head;
+        }
+        const search = node("div", "vw-search");
+        const glass = node("span", "vw-ico");
+        setIcon2(glass, "search");
+        const input = document.createElement("input");
+        input.type = "search";
+        input.className = "vw-search-input";
+        input.placeholder = "\u641C\u7D22\u753B\u5E03";
+        input.style.cssText = "all: unset !important; display: block !important; width: 116px !important;padding: 0 !important; border: 0 !important; box-shadow: none !important;outline: none !important; background: transparent !important;font: inherit !important; font-size: 12px !important; line-height: 1.3 !important;color: var(--text-normal) !important; cursor: text !important;";
+        input.value = this.query;
+        input.addEventListener("input", () => {
+          this.query = input.value;
+          this.updateResults();
+        });
+        search.appendChild(glass);
+        search.appendChild(input);
+        actions.appendChild(search);
+        const create = document.createElement("button");
+        create.className = "vw-primary";
+        const plus = node("span", "vw-ico");
+        setIcon2(plus, "plus");
+        const createLabel = document.createElement("span");
+        createLabel.textContent = "\u65B0\u5EFA\u753B\u5E03";
+        create.appendChild(plus);
+        create.appendChild(createLabel);
+        create.addEventListener("click", () => {
+          void this.createBoard();
+        });
+        actions.appendChild(create);
+        const more = node("button", "vw-sort vw-more");
+        more.setAttribute("title", "\u66F4\u591A\u64CD\u4F5C");
+        const moreIcon = node("span", "vw-ico");
+        setIcon2(moreIcon, "more-horizontal");
+        more.appendChild(moreIcon);
+        more.addEventListener("click", (event) => this.showMoreMenu(event));
+        actions.appendChild(more);
+        head.appendChild(actions);
+        return head;
+      }
+      /** 唯一的「...」按钮收纳排序与多选，和文件树顶部菜单一致。 */
+      showMoreMenu(event) {
+        const menu = new Menu2();
+        const options = [
+          ["created", "\u6309\u521B\u5EFA\u65F6\u95F4"],
+          ["modified", "\u6309\u4FEE\u6539\u65F6\u95F4"],
+          ["name", "\u6309\u540D\u79F0"]
+        ];
+        for (const [value, label] of options) {
+          menu.addItem(
+            (item) => item.setTitle(label).setChecked(this.sortMode === value).onClick(() => this.setSort(value))
+          );
+        }
+        menu.addSeparator();
+        menu.addItem(
+          (item) => item.setTitle(this.multi ? "\u9000\u51FA\u591A\u9009" : "\u591A\u9009").setChecked(this.multi).onClick(() => this.setMulti(!this.multi))
+        );
+        anchorMenuBelow2(menu, event.currentTarget ?? event.target);
+      }
+      setSort(value) {
+        if (this.sortMode === value)
+          return;
+        this.sortMode = value;
+        void this.loadItems();
+      }
+      buildCard(item) {
+        const card = node("div", "vw-card");
+        card.setAttribute("data-path", item.file.path);
+        if (this.multi && this.selected.has(item.file.path))
+          card.classList.add("is-selected");
+        card.appendChild(this.buildCover(item));
+        if (this.multi) {
+          const check = node("span", "vw-check");
+          setIcon2(check, "check");
+          card.appendChild(check);
+        }
+        const del = document.createElement("button");
+        del.className = "vw-card-del";
+        del.setAttribute("title", "\u5220\u9664\u753B\u5E03");
+        setIcon2(del, "trash-2");
+        del.addEventListener("click", (event) => {
+          event.stopPropagation();
+          this.confirmDelete([item]);
+        });
+        card.appendChild(del);
+        const body = node("div", "vw-card-body");
+        const title = node("div", "vw-card-title");
+        title.textContent = item.title;
+        body.appendChild(title);
+        const meta = node("div", "vw-card-meta");
+        const count = node("span", "vw-card-count");
+        count.textContent = item.nodes ? `${item.nodes} \u4E2A\u8282\u70B9` : "\u7A7A\u767D\u753B\u5E03";
+        const date = node("span", "vw-card-date");
+        date.textContent = item.updated;
+        meta.appendChild(count);
+        meta.appendChild(date);
+        body.appendChild(meta);
+        card.appendChild(body);
+        card.addEventListener("click", () => {
+          if (this.multi)
+            this.toggleSelected(item.file.path);
+          else
+            this.openBoard(item);
+        });
+        return card;
+      }
+      /** 封面是画布的真实微缩图：同样的布局、颜色和节点文字。 */
+      buildCover(item) {
+        const cover = node("div", "vw-cover");
+        const { nodes, edges } = item.cover;
+        if (!nodes.length) {
+          cover.classList.add("is-blank");
+          const ghost = node("span", "vw-cover-ghost");
+          ghost.appendChild(collisMark());
+          cover.appendChild(ghost);
+          return cover;
+        }
+        if (edges.length)
+          cover.appendChild(edgeLayer(edges));
+        for (const box of nodes) {
+          const chip = node("span", "vw-chip");
+          applyBox(chip, box);
+          applyTone(chip, box.tone);
+          chip.setAttribute("data-kind", box.kind);
+          if (box.text && box.w >= 15 && box.h >= 13) {
+            const text = node("span", "vw-chip-text");
+            text.textContent = box.text;
+            chip.appendChild(text);
+          }
+          cover.appendChild(chip);
+        }
+        return cover;
+      }
+      openBoard(item) {
+        void this.collis.openBoardFile(item.file.path);
+      }
+      setMulti(on) {
+        this.multi = on;
+        if (!on)
+          this.selected.clear();
+        this.renderWall();
+      }
+      toggleSelected(path) {
+        if (this.selected.has(path))
+          this.selected.delete(path);
+        else
+          this.selected.add(path);
+        this.syncSelectionUI();
+      }
+      /** 选中只改相关属性，整墙重建会让卡片闪烁并吞掉下一次点击。 */
+      syncSelectionUI() {
+        const root = this.root;
+        if (!root)
+          return;
+        for (const card of Array.from(root.querySelectorAll("[data-path]"))) {
+          const path = card.getAttribute("data-path") ?? "";
+          card.classList.toggle("is-selected", this.selected.has(path));
+        }
+        const count = root.querySelector(".vw-multi-count");
+        if (count)
+          count.textContent = `\u5DF2\u9009 ${this.selected.size} \u5757`;
+        const remove = root.querySelector(".vw-danger");
+        if (remove)
+          remove.disabled = this.selected.size === 0;
+      }
+      confirmDelete(items, exitMulti = false) {
+        if (!items.length)
+          return;
+        new DeleteBoardsModal(this.app, items.map((item) => item.title), () => {
+          void this.deleteBoards(items.map((item) => item.file), exitMulti);
+        }).open();
+      }
+      async deleteBoards(files, exitMulti = false) {
+        let removed = 0;
+        for (const file of files) {
+          try {
+            await this.app.fileManager.trashFile(file);
+            removed += 1;
+          } catch {
+            try {
+              await this.app.vault.delete(file);
+              removed += 1;
+            } catch (error) {
+              new Notice2(error instanceof Error ? error.message : "\u5220\u9664\u753B\u5E03\u5931\u8D25");
+            }
+          }
+        }
+        for (const file of files)
+          this.selected.delete(file.path);
+        if (exitMulti && removed > 0) {
+          this.multi = false;
+          this.selected.clear();
+          this.signature = "";
+        }
+        await this.loadItems();
+      }
+      async createBoard() {
+        try {
+          await this.collis.createGalleryBoard();
+          await this.loadItems();
+        } catch (error) {
+          new Notice2(error instanceof Error ? error.message : "\u65B0\u5EFA\u753B\u5E03\u5931\u8D25");
+        }
+      }
+    };
+    module2.exports = { CollisGalleryPanel: CollisGalleryPanel2 };
+  }
+});
+
+// src/collis-notes.js
+var require_collis_notes = __commonJS({
+  "src/collis-notes.js"(exports2, module2) {
+    var { Notice: Notice2, setIcon: setIcon2, TFile } = require("obsidian");
+    var CollisBundle2 = require_collis_core();
+    var ICONS = {
+      search: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>',
+      review: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4.3l2.8 1.7"/></svg>',
+      filter: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h16"/><path d="M7 12h10"/><path d="M10 17h4"/></svg>',
+      more: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
+      back: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>'
+    };
+    function setIconHtml(parent, name) {
+      if (parent && ICONS[name])
+        parent.innerHTML = ICONS[name];
+    }
+    function daysAgo(date) {
+      const parts = String(date || "").split("-").map(Number);
+      if (parts.length !== 3 || !parts[0])
+        return 0;
+      const target = new Date(parts[0], parts[1] - 1, parts[2]);
+      const now = /* @__PURE__ */ new Date();
+      now.setHours(0, 0, 0, 0);
+      return Math.max(0, Math.round((now - target) / 864e5));
+    }
+    var TAG_RE = /#([^\s#\[\]()]+)/g;
+    var CollisNotesPanel2 = class {
+      constructor(app, collis, hostView) {
+        this.app = app;
+        this.collis = collis;
+        this.hostView = hostView || null;
+        this.container = null;
+        this.listWrap = null;
+        this.subEl = null;
+        this.pop = null;
+        this.popOwner = null;
+        this.cardMenu = null;
+        this.menuEl = null;
+        this.menuAnchor = null;
+        this._menuKey = null;
+        this.selectMode = false;
+        this.selected = /* @__PURE__ */ new Set();
+        this.selBarEl = null;
+        this._selInfoEl = null;
+        this._selDelEl = null;
+        this.editingKey = null;
+        this.editingDraft = null;
+        this.appendOpen = /* @__PURE__ */ new Set();
+        this.appendDrafting = null;
+        this.appendEditing = null;
+        this.cards = [];
+        this.query = "";
+        this.refFilter = "";
+        this.tags = [];
+        this.untagged = false;
+        this.expanded = {};
+        this.collapsed = /* @__PURE__ */ new Set();
+        this._loading = false;
+        this._pending = false;
+        this._outside = null;
+        this.pendingFocus = null;
+      }
+      /* ---------------- 生命周期 ---------------- */
+      mount(containerEl) {
+        if (this._outside)
+          document.removeEventListener("mousedown", this._outside);
+        this._outside = null;
+        this.closeMenu();
+        this.closePop();
+        this.closeCardMenu();
+        this.container = containerEl;
+        this.container.empty();
+        this.container.addClass("wb-notes-panel");
+        this.container.addClass("qm-view");
+        this.buildHead();
+        this.buildBody();
+        this._outside = (ev) => {
+          const inPop = this.pop && this.pop.contains(ev.target);
+          const onOwner = this.popOwner && this.popOwner.contains(ev.target);
+          if (this.pop && !inPop && !onOwner)
+            this.closePop();
+          if (this.cardMenu && !this.cardMenu.contains(ev.target))
+            this.closeCardMenu();
+          const inMenu = this.menuEl && this.menuEl.contains(ev.target);
+          const onMenuAnchor = this.menuAnchor && this.menuAnchor.contains(ev.target);
+          if (this.menuEl && !inMenu && !onMenuAnchor)
+            this.closeMenu();
+        };
+        document.addEventListener("mousedown", this._outside);
+        this.load();
+      }
+      destroy() {
+        if (this._outside)
+          document.removeEventListener("mousedown", this._outside);
+        this._outside = null;
+        this.closeMenu();
+        this.closePop();
+        this.closeCardMenu();
+        if (this.container)
+          this.container.empty();
+        this.container = null;
+        this.listWrap = null;
+        this.subEl = null;
+        this.cards = [];
+      }
+      /* ---------------- 结构 ---------------- */
+      buildHead() {
+        const head = this.container.createDiv({ cls: "wb-notes-head" });
+        head.style.position = "relative";
+        const actions = head.createDiv({ cls: "wb-notes-actions wb-notes-toolrow" });
+        actions.style.position = "relative";
+        this.headEl = head;
+        this.toolrow = actions;
+        const box = actions.createDiv({ cls: "qm-searchbox wb-notes-search" });
+        const searchIcon = box.createDiv({ cls: "qm-search-ico" });
+        setIconHtml(searchIcon, "search");
+        const search = box.createEl("input", {
+          cls: "qm-search",
+          attr: { type: "text", placeholder: "\u641C\u7D22\u5361\u7247\u3001#\u6807\u7B7E\u3001\u65E5\u671F" }
+        });
+        this.search = search;
+        const clear = box.createEl("button", { cls: "qm-search-clear", text: "\xD7" });
+        this.clearBtn = clear;
+        search.addEventListener("input", () => {
+          this.query = search.value;
+          clear.classList.toggle("is-visible", !!search.value);
+          this.renderList();
+          if (this.pop)
+            this.renderFilterPanel();
+        });
+        clear.onclick = () => {
+          search.value = "";
+          this.query = "";
+          clear.classList.remove("is-visible");
+          search.focus();
+          this.renderList();
+        };
+        const reviewBtn = this.iconButton(actions, "review", "\u56DE\u770B", "\u56DE\u770B\uFF08\u7FFB\u51E0\u5F20\u65E7\u5361\u7247\uFF09");
+        reviewBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          this.openReview();
+        };
+        const filterBtn = this.iconButton(actions, "filter", "\u7B5B\u9009", "\u7B5B\u9009");
+        this.filterBtn = filterBtn;
+        this.filterDot = filterBtn.createSpan({ cls: "qm-filter-dot is-hidden" });
+        filterBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          this.openFilterPanel();
+        };
+        const moreBtn = this.iconButton(actions, "more", "\u66F4\u591A", "\u66F4\u591A");
+        this.moreBtn = moreBtn;
+        moreBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          this.openMoreMenu();
+        };
+      }
+      buildBody() {
+        const body = this.container.createDiv({ cls: "wb-notes-body" });
+        this.chipsEl = body.createDiv({ cls: "qm-chips" });
+        const composer = body.createDiv({ cls: "qm-composer" });
+        const input = composer.createEl("textarea", {
+          cls: "qm-input",
+          attr: { placeholder: "\u8BB0\u5F55\u4E00\u4E0B\u2026", rows: "1", spellcheck: "false" }
+        });
+        this.input = input;
+        const foot = composer.createDiv({ cls: "qm-composer-foot" });
+        foot.createDiv({ cls: "qm-kbd-hint", text: "Ctrl+Enter \u8BB0\u4E0B" });
+        const save = foot.createEl("button", { cls: "qm-save is-disabled", text: "\u8BB0\u4E0B" });
+        save.disabled = true;
+        this.saveBtn = save;
+        const autosize = () => {
+          input.style.height = "auto";
+          input.style.height = Math.min(input.scrollHeight, 320) + "px";
+        };
+        const syncSave = () => {
+          const empty = !input.value.trim();
+          save.disabled = empty;
+          save.classList.toggle("is-disabled", empty);
+        };
+        input.addEventListener("input", () => {
+          autosize();
+          syncSave();
+        });
+        input.addEventListener("keydown", (ev) => {
+          if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+            ev.preventDefault();
+            this.capture();
+          }
+        });
+        save.onclick = () => this.capture();
+        this.listWrap = body.createDiv({ cls: "wb-notes-listwrap" });
+        this.selBarEl = body.createDiv({ cls: "qm-selbar" });
+        this.reviewEl = body.createDiv({ cls: "qm-review" });
+      }
+      iconButton(parent, icon, label, title) {
+        const btn = parent.createEl("button", { cls: "qm-icon-btn" });
+        btn.setAttribute("type", "button");
+        btn.setAttribute("aria-label", label);
+        btn.setAttribute("title", title || label);
+        setIconHtml(btn, icon);
+        return btn;
+      }
+      /* ---------------- 数据 ---------------- */
+      async load() {
+        if (!this.container)
+          return;
+        if (this._loading) {
+          this._pending = true;
+          return;
+        }
+        if (!this.collis || typeof this.collis.readAllCards !== "function") {
+          if (this.subEl)
+            this.subEl.setText("Collis \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u67E5\u770B\u63A7\u5236\u53F0\u65E5\u5FD7\u3002");
+          return;
+        }
+        this._loading = true;
+        let cards = [];
+        try {
+          cards = await this.collis.readAllCards();
+        } catch (e) {
+          console.error("[workbench] \u8BFB\u53D6\u5361\u7247\u5931\u8D25", e);
+          cards = [];
+        }
+        this._loading = false;
+        if (!this.container)
+          return;
+        this.cards = Array.isArray(cards) ? cards : [];
+        this.renderList();
+        this.applyPendingFocus();
+        if (this.reviewEl && this.reviewEl.hasClass("show")) {
+          this.syncReviewCards();
+          this.renderReview();
+        }
+        if (this._pending) {
+          this._pending = false;
+          this.load();
+        }
+      }
+      refresh() {
+        this.load();
+      }
+      /** 首页点速记时调用：切到卡片笔记后定位到这一条。 */
+      focusCard(card) {
+        if (!card)
+          return;
+        this.pendingFocus = card;
+        if (this.container && !this._loading && this.cards.length)
+          this.applyPendingFocus();
+      }
+      applyPendingFocus() {
+        const card = this.pendingFocus;
+        if (!card || !this.listWrap || this._loading)
+          return;
+        let changed = false;
+        if (this.query) {
+          this.query = "";
+          if (this.search)
+            this.search.value = "";
+          if (this.clearBtn)
+            this.clearBtn.classList.remove("is-visible");
+          changed = true;
+        }
+        if (this.refFilter || this.tags && this.tags.length || this.untagged) {
+          this.refFilter = "";
+          this.tags = [];
+          this.untagged = false;
+          changed = true;
+        }
+        if (card.date && this.collapsed.has(card.date)) {
+          this.collapsed.delete(card.date);
+          changed = true;
+        }
+        if (changed)
+          this.renderList();
+        this.pendingFocus = null;
+        window.setTimeout(() => {
+          if (!this.listWrap)
+            return;
+          const nodes = this.listWrap.querySelectorAll(".qm-card");
+          let target = null;
+          for (const node of nodes) {
+            if (node.getAttribute("data-qm-date") !== (card.date || ""))
+              continue;
+            if (node.getAttribute("data-qm-time") !== (card.time || ""))
+              continue;
+            if (card.id && node.getAttribute("data-qm-id") !== card.id)
+              continue;
+            target = node;
+            break;
+          }
+          if (!target) {
+            new Notice2("\u8FD9\u6761\u901F\u8BB0\u5DF2\u4E0D\u5728\u5F53\u524D\u5361\u7247\u5217\u8868\u91CC\uFF0C\u53EF\u80FD\u521A\u88AB\u5220\u9664\u6216\u6539\u8FC7\u65F6\u95F4\u3002");
+            return;
+          }
+          target.scrollIntoView({ block: "center", behavior: "smooth" });
+          target.addClass("is-focused");
+          const badge = target.createDiv({ cls: "qm-focus-badge", text: "\u5DF2\u5B9A\u4F4D" });
+          new Notice2(
+            "\u5DF2\u5B9A\u4F4D\u5230 " + (card.date ? card.date.slice(5) + " " : "") + (card.time || "") + " \u7684\u901F\u8BB0"
+          );
+          window.setTimeout(() => {
+            target.removeClass("is-focused");
+            badge.remove();
+          }, 3600);
+        }, 60);
+      }
+      filteredCards() {
+        const raw = String(this.query || "").trim().toLowerCase();
+        const tagQuery = raw.startsWith("#") ? raw.slice(1) : "";
+        const ref = this.effectiveRefFilter();
+        return this.cards.filter((card) => {
+          if (ref) {
+            const n = this.refCount(card);
+            if (ref === "has" && n === 0)
+              return false;
+            if (ref === "none" && n > 0)
+              return false;
+          }
+          const tags = (card.tags || []).map((t) => String(t).replace(/^#/, ""));
+          if (this.untagged && tags.length)
+            return false;
+          if (this.tags.length) {
+            const hit = tags.some((t) => {
+              const low = t.toLowerCase();
+              return this.tags.some((sel) => {
+                const key = String(sel).toLowerCase();
+                return low === key || low.indexOf(key + "/") === 0;
+              });
+            });
+            if (!hit)
+              return false;
+          }
+          if (!raw)
+            return true;
+          const lowerTags = tags.map((t) => t.toLowerCase());
+          if (tagQuery)
+            return lowerTags.some((t) => t.includes(tagQuery));
+          return String(card.bodyLower || "").includes(raw) || lowerTags.some((t) => t.includes(raw)) || String(card.date || "").includes(raw);
+        });
+      }
+      /** 生效条件数：搜索词也算一条，和 Collis 一致 */
+      activeFilterCount() {
+        return (String(this.query || "").trim() ? 1 : 0) + (this.refFilter ? 1 : 0) + this.tags.length + (this.untagged ? 1 : 0);
+      }
+      /** 引用筛选实际生效值：索引没建好时按「全部」 */
+      effectiveRefFilter() {
+        if (!this.refFilter)
+          return "";
+        if (!this.collis || typeof this.collis.refsReady !== "function")
+          return "";
+        return this.collis.refsReady() ? this.refFilter : "";
+      }
+      refCount(card) {
+        if (!this.collis || typeof this.collis.refCount !== "function")
+          return 0;
+        try {
+          return this.collis.refCount(card) || 0;
+        } catch (e) {
+          return 0;
+        }
+      }
+      renderFilterBtnState() {
+        if (!this.filterBtn)
+          return;
+        const n = this.activeFilterCount();
+        this.filterBtn.classList.toggle("is-active", n > 0);
+        if (this.filterDot)
+          this.filterDot.classList.toggle("is-hidden", !n);
+      }
+      isTagSelected(keyLower) {
+        return this.tags.some((t) => String(t).toLowerCase() === keyLower);
+      }
+      selectedAncestorPath(keyLower) {
+        const parts = String(keyLower || "").split("/");
+        for (let i = parts.length - 1; i >= 1; i--) {
+          const p = parts.slice(0, i).join("/");
+          const hit = this.tags.find((t) => String(t).toLowerCase() === p);
+          if (hit)
+            return hit;
+        }
+        return "";
+      }
+      hasSelectedBelow(node) {
+        for (const ch of node.children || []) {
+          if (this.isTagSelected(ch.key) || this.hasSelectedBelow(ch))
+            return true;
+        }
+        return false;
+      }
+      toggleTagFilter(path) {
+        const key = String(path).toLowerCase();
+        if (!key)
+          return;
+        const anc = this.selectedAncestorPath(key);
+        if (anc) {
+          new Notice2("\u5DF2\u5305\u542B\u5728 #" + anc + " \u91CC");
+          return;
+        }
+        const cur = this.tags.slice();
+        const at = cur.findIndex((t) => String(t).toLowerCase() === key);
+        if (at >= 0)
+          cur.splice(at, 1);
+        else {
+          const rest = cur.filter((t) => String(t).toLowerCase().indexOf(key + "/") !== 0);
+          cur.length = 0;
+          for (const t of rest)
+            cur.push(t);
+          cur.push(path);
+          this.expanded[key] = true;
+        }
+        this.untagged = false;
+        this.tags = cur;
+        this.afterFilterChange();
+      }
+      /** 正文里点标签：只用这一个标签筛选，换掉原来的多选条件（与 Collis 侧栏一致） */
+      setFilterTags(list) {
+        this.tags = (list || []).filter(Boolean);
+        if (this.tags.length)
+          this.untagged = false;
+        if (this.selectMode)
+          this.selected.clear();
+        this.afterFilterChange();
+      }
+      setRefFilter(v) {
+        this.refFilter = v || "";
+        this.afterFilterChange();
+      }
+      clearFilters() {
+        this.refFilter = "";
+        this.tags = [];
+        this.untagged = false;
+        this.query = "";
+        if (this.search)
+          this.search.value = "";
+        if (this.clearBtn)
+          this.clearBtn.classList.remove("is-visible");
+        this.afterFilterChange();
+      }
+      /** 筛选变化后统一刷新列表、按钮状态与已打开的面板 */
+      afterFilterChange() {
+        this.renderFilterBtnState();
+        if (this.pop) {
+          const keepTop = this.treeEl ? this.treeEl.scrollTop || 0 : 0;
+          this.renderFilterPanel(keepTop);
+          this.fitPopHeight();
+        }
+        this.renderList();
+      }
+      /* ---------------- 标签森林 ---------------- */
+      tagForest() {
+        const root = /* @__PURE__ */ new Map();
+        let untagged = 0;
+        for (const card of this.cards) {
+          const tags = card.tags || [];
+          if (!tags.length) {
+            untagged += 1;
+            continue;
+          }
+          const seen = /* @__PURE__ */ new Set();
+          for (const raw of tags) {
+            const path = String(raw).replace(/^#/, "");
+            if (!path)
+              continue;
+            const parts = path.split("/");
+            let level = root;
+            let acc = "";
+            for (const part of parts) {
+              acc = acc ? acc + "/" + part : part;
+              const key = acc.toLowerCase();
+              let node = level.get(key);
+              if (!node) {
+                node = { key, label: part, path: acc, count: 0, children: /* @__PURE__ */ new Map() };
+                level.set(key, node);
+              }
+              if (!seen.has(key)) {
+                node.count += 1;
+                seen.add(key);
+              }
+              level = node.children;
+            }
+          }
+        }
+        const toArray = (map) => [...map.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)).map((n) => ({ ...n, children: toArray(n.children) }));
+        return { tree: toArray(root), untagged };
+      }
+      /* ---------------- 生效条件 chips ---------------- */
+      countDescendants(node) {
+        let n = 0;
+        for (const ch of node && node.children || []) {
+          n += 1 + this.countDescendants(ch);
+        }
+        return n;
+      }
+      chipParts() {
+        const parts = [];
+        const kw = String(this.query || "").trim();
+        if (kw) {
+          parts.push({
+            text: "\u201C" + kw + "\u201D",
+            sub: "",
+            clear: () => {
+              this.query = "";
+              if (this.search)
+                this.search.value = "";
+              if (this.clearBtn)
+                this.clearBtn.classList.remove("is-visible");
+              this.afterFilterChange();
+            }
+          });
+        }
+        if (this.refFilter) {
+          parts.push({
+            text: this.refFilter === "has" ? "\u5DF2\u5F15\u7528" : "\u672A\u5F15\u7528",
+            sub: "",
+            clear: () => this.setRefFilter("")
+          });
+        }
+        if (this.untagged) {
+          parts.push({
+            text: "\u65E0\u6807\u7B7E",
+            sub: "",
+            clear: () => {
+              this.untagged = false;
+              this.afterFilterChange();
+            }
+          });
+        }
+        const forest = this.tagForest();
+        const index = /* @__PURE__ */ new Map();
+        const walk = (arr) => {
+          for (const n of arr) {
+            index.set(n.key, n);
+            walk(n.children);
+          }
+        };
+        walk(forest.tree);
+        for (const t of this.tags) {
+          const node = index.get(String(t).toLowerCase());
+          const kids = node ? this.countDescendants(node) : 0;
+          parts.push({
+            text: "#" + t,
+            sub: kids ? "\u542B " + kids : "",
+            clear: () => {
+              this.tags = this.tags.filter((x) => x !== t);
+              this.afterFilterChange();
+            }
+          });
+        }
+        return parts;
+      }
+      renderChips() {
+        const el = this.chipsEl;
+        if (!el)
+          return;
+        el.empty();
+        const parts = this.chipParts();
+        if (!parts.length) {
+          el.removeClass("show");
+          this.positionFilterPop();
+          return;
+        }
+        el.addClass("show");
+        const MAX = 5;
+        const shown = parts.slice(0, MAX);
+        for (const p of shown) {
+          const chip = el.createSpan({ cls: "qm-chip" });
+          chip.createSpan({ text: p.text });
+          if (p.sub)
+            chip.createEl("em", { text: p.sub });
+          const x = chip.createEl("button", { text: "\xD7" });
+          x.setAttribute("type", "button");
+          x.setAttribute("aria-label", "\u6E05\u9664");
+          x.onclick = (e) => {
+            e.stopPropagation();
+            p.clear();
+          };
+        }
+        const rest = parts.length - shown.length;
+        if (rest > 0) {
+          const more = el.createSpan({ cls: "qm-chip qm-chip-more", text: "+" + rest });
+          more.setAttribute("title", "\u8FD8\u6709 " + rest + " \u4E2A\u6761\u4EF6");
+          more.onclick = (e) => {
+            e.stopPropagation();
+            if (!this.pop)
+              this.openFilterPanel();
+          };
+        }
+        this.positionFilterPop();
+      }
+      /** 筛选浮层跟着工具行与 chips 一起下移 */
+      positionFilterPop() {
+        const pop = this.pop;
+        if (!pop || this.popOwner !== this.filterBtn)
+          return;
+        let top = (this.toolrow.offsetTop || 0) + (this.toolrow.offsetHeight || 30) + 6;
+        if (this.chipsEl && this.chipsEl.classList.contains("show")) {
+          top += (this.chipsEl.offsetHeight || 0) + 7;
+        }
+        pop.style.top = Math.max(0, Math.round(top)) + "px";
+      }
+      /* ---------------- 渲染 ---------------- */
+      renderList() {
+        if (!this.listWrap)
+          return;
+        this.closeCardMenu();
+        this.closeMenu();
+        const cards = this.filteredCards();
+        this.renderFilterBtnState();
+        this.renderChips();
+        this.renderSelectBar();
+        const keepScroll = this.listWrap.scrollTop;
+        this.listWrap.empty();
+        if (!cards.length) {
+          const empty = this.listWrap.createDiv({ cls: "qm-empty" });
+          empty.setText(
+            this.cards.length ? "\u6CA1\u6709\u5339\u914D\u7684\u5361\u7247\u3002\u6362\u4E2A\u8BCD\uFF0C\u6216\u8005\u6E05\u9664\u7B5B\u9009\u3002" : "\u8FD8\u6CA1\u6709\u5361\u7247\u3002\u5728\u4E0A\u9762\u5199\u70B9\u4EC0\u4E48\uFF0CCtrl+Enter \u8BB0\u4E0B\u3002"
+          );
+          return;
+        }
+        this.renderCards(cards);
+        this.listWrap.scrollTop = keepScroll;
+      }
+      renderCards(cards) {
+        const list = this.listWrap.createDiv({ cls: "qm-list" });
+        const searching = !!this.query.trim();
+        let i = 0;
+        while (i < cards.length) {
+          const date = cards[i].date;
+          const group = [];
+          while (i < cards.length && cards[i].date === date) {
+            group.push(cards[i]);
+            i++;
+          }
+          const collapsed = !searching && this.collapsed.has(date);
+          const day = list.createDiv({ cls: "qm-day" + (collapsed ? " is-collapsed" : "") });
+          day.createSpan({ cls: "qm-day-arrow", text: collapsed ? "\u25B6" : "\u25BC" });
+          day.createSpan({ cls: "qm-day-text", text: date });
+          day.createSpan({ cls: "qm-day-count", text: String(group.length) });
+          day.onclick = () => {
+            if (this.collapsed.has(date))
+              this.collapsed.delete(date);
+            else
+              this.collapsed.add(date);
+            this.renderList();
+          };
+          if (collapsed)
+            continue;
+          for (const card of group)
+            this.renderCard(list, card);
+        }
+      }
+      renderCard(list, card) {
+        const key = this.cardKey(card);
+        const picked = this.selectMode && this.selected.has(key);
+        const editing = this.editingKey === key;
+        const sections = CollisBundle2.qmCardSections(card.body);
+        const el = list.createDiv({ cls: "qm-card" + (picked ? " is-picked" : "") });
+        el.setAttribute("data-qm-date", card.date || "");
+        el.setAttribute("data-qm-time", card.time || "");
+        el.setAttribute("data-qm-id", card.id || "");
+        if (this.selectMode)
+          el.addClass("is-selectable");
+        const head = el.createDiv({ cls: "qm-card-head" });
+        if (this.selectMode)
+          head.createSpan({ cls: "qm-tick", text: "\u2713" });
+        head.createSpan({ cls: "qm-time", text: card.time || "" });
+        const refDot = head.createSpan({ cls: "qm-ref" });
+        this.paintRefDot(refDot, card);
+        if (sections.appends.length) {
+          const badge = head.createSpan({
+            cls: "qm-append-badge",
+            text: "\u8FFD\u52A0 " + sections.appends.length
+          });
+          badge.setAttribute("role", "button");
+          badge.onclick = (ev) => {
+            ev.stopPropagation();
+            if (this.appendOpen.has(key))
+              this.appendOpen.delete(key);
+            else
+              this.appendOpen.add(key);
+            this.renderList();
+          };
+        }
+        const more = head.createEl("button", { cls: "qm-more" });
+        more.setAttribute("type", "button");
+        more.setAttribute("aria-label", "\u66F4\u591A\u64CD\u4F5C");
+        more.setAttribute("title", "\u66F4\u591A\u64CD\u4F5C");
+        setIconHtml(more, "more");
+        more.onclick = (ev) => {
+          ev.stopPropagation();
+          this.openCardMenu(el, card, ev.currentTarget || more);
+        };
+        if (editing) {
+          this.renderEditBox(el, card, key, sections.original);
+          el.onclick = (e) => e.stopPropagation();
+          return;
+        }
+        const bodyEl = el.createDiv({ cls: "qm-body" });
+        this.renderCardBody(bodyEl, card, sections.original);
+        if (sections.appends.length && this.appendOpen.has(key)) {
+          this.renderAppendList(el, card, sections, key);
+        }
+        if (this.appendDrafting && this.appendDrafting.key === key) {
+          this.renderAppendComposer(el, card, key);
+        }
+        el.onclick = () => {
+          if (this.selectMode)
+            this.toggleSelected(card, el);
+        };
+        el.addEventListener("dblclick", (e) => {
+          if (this.selectMode)
+            return;
+          const t = e.target;
+          if (t && typeof t.closest === "function" && t.closest("a, .qm-tag, .qm-more, .qm-ref, .qm-append-badge, button, textarea")) {
+            return;
+          }
+          if (e.preventDefault)
+            e.preventDefault();
+          this.beginEdit(card);
+        });
+      }
+      /* ---------------- 编辑原始内容区（列表 / 回看共用） ---------------- */
+      renderEditBox(el, card, key, original) {
+        const ta = el.createEl("textarea", { cls: "qm-edit" });
+        const draft = this.editingDraft;
+        ta.value = draft && draft.key === key ? draft.text : String(original || "");
+        ta.rows = Math.min(12, Math.max(2, ta.value.split("\n").length + 1));
+        ta.addEventListener("input", () => {
+          this.editingDraft = { key, text: ta.value };
+        });
+        window.setTimeout(() => {
+          ta.focus();
+          ta.setSelectionRange(ta.value.length, ta.value.length);
+        }, 20);
+        const bar = el.createDiv({ cls: "qm-edit-bar" });
+        const cancel = bar.createEl("button", { cls: "qm-mini-btn", text: "\u53D6\u6D88" });
+        cancel.onclick = (e) => {
+          e.stopPropagation();
+          this.cancelEdit();
+        };
+        const save = bar.createEl("button", { cls: "qm-mini-btn is-primary", text: "\u4FDD\u5B58" });
+        save.onclick = async (e) => {
+          e.stopPropagation();
+          const text = this.editingDraft && this.editingDraft.key === key ? this.editingDraft.text : ta.value;
+          if (!String(text || "").trim()) {
+            new Notice2("\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A");
+            return;
+          }
+          const ok = await this.collis.updateCard(card, text);
+          if (!ok) {
+            new Notice2("\u4FDD\u5B58\u5931\u8D25\uFF0C\u5361\u7247\u4F4D\u7F6E\u53EF\u80FD\u5DF2\u53D8\u5316");
+            return;
+          }
+          this.editingKey = null;
+          this.editingDraft = null;
+          await this.load();
+        };
+        ta.addEventListener("keydown", (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            save.onclick(e);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            this.cancelEdit();
+          }
+        });
+      }
+      /* ---------------- 追加区（列表 / 回看共用） ---------------- */
+      renderAppendList(el, card, sections, key) {
+        const wrap = el.createDiv({ cls: "qm-append-list" });
+        sections.appends.forEach((item, index) => {
+          const row = wrap.createDiv({ cls: "qm-append-item" });
+          const bar = row.createDiv({ cls: "qm-append-head" });
+          bar.createSpan({ cls: "qm-append-time", text: item.label });
+          const editing = this.appendEditing && this.appendEditing.key === key && this.appendEditing.index === index;
+          if (editing) {
+            const ta = row.createEl("textarea", { cls: "qm-edit qm-append-edit" });
+            ta.value = this.appendEditing.text;
+            window.setTimeout(() => {
+              ta.focus();
+              ta.setSelectionRange(ta.value.length, ta.value.length);
+            }, 20);
+            ta.addEventListener("input", () => {
+              if (this.appendEditing && this.appendEditing.key === key) {
+                this.appendEditing.text = ta.value;
+              }
+            });
+            const editBar = row.createDiv({ cls: "qm-edit-bar" });
+            const cancel = editBar.createEl("button", { cls: "qm-mini-btn", text: "\u53D6\u6D88" });
+            cancel.onclick = (ev) => {
+              ev.stopPropagation();
+              this.appendEditing = null;
+              this.renderAll();
+            };
+            const save = editBar.createEl("button", { cls: "qm-mini-btn is-primary", text: "\u4FDD\u5B58" });
+            save.onclick = async (ev) => {
+              ev.stopPropagation();
+              const text = this.appendEditing && this.appendEditing.key === key ? this.appendEditing.text : ta.value;
+              const ok = await this.collis.updateAppend(card, index, text);
+              if (!ok)
+                return;
+              this.appendEditing = null;
+              await this.load();
+            };
+            return;
+          }
+          const acts = bar.createDiv({ cls: "qm-append-acts" });
+          const edit = acts.createEl("button", { cls: "qm-mini-btn", text: "\u7F16\u8F91" });
+          edit.onclick = (ev) => {
+            ev.stopPropagation();
+            this.beginAppendEdit(card, index, item.text);
+          };
+          const del = acts.createEl("button", {
+            cls: "qm-mini-btn qm-mini-btn-danger",
+            text: "\u5220\u9664"
+          });
+          del.onclick = (ev) => {
+            ev.stopPropagation();
+            this.confirmDeleteAppend(card, index);
+          };
+          const textEl = row.createDiv({ cls: "qm-append-text" });
+          this.renderCardBody(textEl, card, item.text);
+        });
+      }
+      beginAppendEdit(card, index, text) {
+        const key = this.cardKey(card);
+        this.appendEditing = { key, index, text: String(text || "") };
+        this.appendOpen.add(key);
+        this.renderAll();
+      }
+      confirmDeleteAppend(card, index) {
+        new CollisBundle2.ConfirmModal(this.app, "\u5220\u9664\u8FD9\u6761\u8FFD\u52A0\uFF1F", async () => {
+          const ok = await this.collis.deleteAppend(card, index);
+          if (!ok)
+            return;
+          this.appendEditing = null;
+          await this.load();
+        }).open();
+      }
+      /** 从「···」进追加：展开这张卡并就地放一个输入框 */
+      beginAppend(card) {
+        const key = this.cardKey(card);
+        this.appendDrafting = { key, text: "" };
+        this.appendOpen.add(key);
+        this.renderAll();
+      }
+      renderAppendComposer(el, card, key) {
+        const wrap = el.createDiv({ cls: "qm-append-composer" });
+        const ta = wrap.createEl("textarea", {
+          cls: "qm-input qm-append-input",
+          attr: { rows: "2", placeholder: "\u8FFD\u52A0\u4E00\u6BB5\u2026" }
+        });
+        ta.value = this.appendDrafting && this.appendDrafting.key === key ? this.appendDrafting.text : "";
+        ta.addEventListener("input", () => {
+          if (this.appendDrafting && this.appendDrafting.key === key) {
+            this.appendDrafting.text = ta.value;
+          }
+        });
+        window.setTimeout(() => ta.focus(), 20);
+        const bar = wrap.createDiv({ cls: "qm-append-bar" });
+        bar.createDiv({ cls: "qm-kbd-hint", text: "Ctrl+Enter \u8FFD\u52A0" });
+        const cancel = () => {
+          this.appendDrafting = null;
+          this.renderAll();
+        };
+        const cancelBtn = bar.createEl("button", { cls: "qm-mini-btn", text: "\u53D6\u6D88" });
+        cancelBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          cancel();
+        };
+        const save = bar.createEl("button", { cls: "qm-mini-btn is-primary", text: "\u8FFD\u52A0" });
+        save.onclick = async (ev) => {
+          ev.stopPropagation();
+          const text = this.appendDrafting && this.appendDrafting.key === key ? this.appendDrafting.text : ta.value;
+          if (!String(text || "").trim()) {
+            new Notice2("\u5199\u70B9\u4EC0\u4E48\u518D\u8FFD\u52A0\u5427");
+            return;
+          }
+          const ok = await this.collis.appendToCard(card, text);
+          if (!ok)
+            return;
+          this.appendDrafting = null;
+          this.appendOpen.add(key);
+          await this.load();
+        };
+        ta.addEventListener("keydown", (ev) => {
+          if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+            ev.preventDefault();
+            save.onclick(ev);
+          } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            cancel();
+          }
+        });
+      }
+      /** 引用小红点：数字与提示文案都与 Collis 的 paintRefDot 一致 */
+      paintRefDot(el, card) {
+        if (!el)
+          return;
+        const info = this.collis.refSummary ? this.collis.refSummary(card) : null;
+        const n = info ? info.notes : 0;
+        if (!n) {
+          el.addClass("is-hidden");
+          el.setAttribute("title", "");
+          return;
+        }
+        el.removeClass("is-hidden");
+        const places = info.places || n;
+        const lines = [
+          "\u88AB " + n + " \u7BC7\u7B14\u8BB0\u5F15\u7528" + (places > n ? " \xB7 \u5171 " + places + " \u5904" : "")
+        ];
+        const names = info.names || [];
+        for (const nm of names.slice(0, 8))
+          lines.push("\xB7 " + nm);
+        if (names.length > 8)
+          lines.push("\xB7 \u2026\u8FD8\u6709 " + (names.length - 8) + " \u7BC7");
+        if (info.ambiguous)
+          lines.push("\uFF08\u6709\u540C\u540D\u6587\u4EF6\uFF0C\u94FE\u63A5\u53EF\u80FD\u6307\u9519\uFF0C\u6CE8\u610F\uFF09");
+        el.setAttribute("title", lines.join("\n"));
+      }
+      renderCardBody(bodyEl, card, textOverride) {
+        const text = textOverride != null ? String(textOverride) : CollisBundle2.qmCardSections(String(card.body || "")).original;
+        TAG_RE.lastIndex = 0;
+        let last = 0;
+        let match;
+        while ((match = TAG_RE.exec(text)) !== null) {
+          if (match.index > last) {
+            bodyEl.appendChild(document.createTextNode(text.slice(last, match.index)));
+          }
+          const tagValue = match[1];
+          const tag = bodyEl.createSpan({ cls: "qm-tag", text: match[0] });
+          if (!this.selectMode) {
+            tag.onclick = (ev) => {
+              ev.stopPropagation();
+              this.setFilterTags([tagValue]);
+            };
+          }
+          last = match.index + match[0].length;
+        }
+        if (last < text.length) {
+          bodyEl.appendChild(document.createTextNode(text.slice(last)));
+        }
+      }
+      /* ---------------- 弹层 ---------------- */
+      showPop(owner, build) {
+        this.closePop();
+        const pop = this.toolrow.createDiv({ cls: "wb-notes-pop" });
+        build(pop);
+        this.pop = pop;
+        this.popOwner = owner;
+        owner.classList.add("is-pop-open");
+      }
+      closePop() {
+        if (this.pop)
+          this.pop.remove();
+        if (this.popOwner)
+          this.popOwner.classList.remove("is-pop-open");
+        this.pop = null;
+        this.popOwner = null;
+        this.treeEl = null;
+        this.renderFilterBtnState();
+      }
+      /* ---------------- 筛选浮层（与 Collis 同一套 DOM / 逻辑） ---------------- */
+      openFilterPanel() {
+        if (this.pop && this.popOwner === this.filterBtn) {
+          this.closePop();
+          return;
+        }
+        this.closeMenu();
+        this.closePop();
+        const pop = this.headEl.createDiv({ cls: "qm-pop" });
+        this.pop = pop;
+        this.popOwner = this.filterBtn;
+        this.filterBtn.classList.add("is-pop-open");
+        this.renderFilterPanel(0);
+        this.positionFilterPop();
+        pop.addClass("show");
+        this.fitPopHeight();
+      }
+      renderFilterPanel(keepTop) {
+        const el = this.pop;
+        if (!el)
+          return;
+        if (keepTop == null)
+          keepTop = this.treeEl ? this.treeEl.scrollTop || 0 : 0;
+        el.empty();
+        el.createDiv({ cls: "qm-pop-title", text: "\u7B5B\u9009" });
+        el.createDiv({ cls: "qm-pop-label", text: "\u5F15\u7528\u60C5\u51B5" });
+        const seg = el.createDiv({ cls: "qm-seg" });
+        const refOpts = [["", "\u5168\u90E8"], ["has", "\u5DF2\u5F15\u7528"], ["none", "\u672A\u5F15\u7528"]];
+        for (const [v, label] of refOpts) {
+          const b = seg.createEl("button", {
+            text: label,
+            cls: this.refFilter === v ? "on" : ""
+          });
+          b.setAttribute("type", "button");
+          b.onclick = (e) => {
+            e.stopPropagation();
+            this.setRefFilter(v);
+          };
+        }
+        const lab = el.createDiv({ cls: "qm-pop-label" });
+        lab.createSpan({ text: "\u6807\u7B7E" });
+        if (this.tags.length) {
+          lab.createSpan({ cls: "qm-pop-sel", text: "\u5DF2\u9009 " + this.tags.length });
+        }
+        const treeWrap = el.createDiv({ cls: "qm-tree-wrap" });
+        const tree = treeWrap.createDiv({ cls: "qm-tagtree" });
+        this.treeEl = tree;
+        tree.addEventListener("scroll", () => this.updateTreeMore());
+        const forest = this.tagForest();
+        const un = tree.createDiv({
+          cls: "qm-tnode qm-tnode-untagged" + (this.untagged ? " is-on" : "")
+        });
+        un.setAttribute("title", "\u53EA\u770B\u6CA1\u6709\u5199\u6807\u7B7E\u7684\u5361\u7247");
+        un.createSpan({ cls: "qm-caret is-blank" });
+        un.createSpan({ cls: "qm-tname", text: "\u65E0\u6807\u7B7E" });
+        un.createSpan({ cls: "qm-tcount", text: String(forest.untagged) });
+        un.createSpan({ cls: "qm-tmark", text: "\u2713" });
+        un.onclick = () => {
+          this.untagged = !this.untagged;
+          if (this.untagged)
+            this.tags = [];
+          this.afterFilterChange();
+        };
+        for (const node of forest.tree)
+          this.renderTagNode(tree, node, 0);
+        const foot = el.createDiv({ cls: "qm-pop-foot" });
+        const clear = foot.createEl("button", { cls: "qm-link-btn", text: "\u6E05\u9664\u7B5B\u9009" });
+        clear.setAttribute("type", "button");
+        clear.onclick = (e) => {
+          e.stopPropagation();
+          this.clearFilters();
+        };
+        const n = this.activeFilterCount();
+        foot.createSpan({
+          cls: "qm-pop-note",
+          text: n ? "\u5DF2\u751F\u6548 " + n + " \u9879" : "\u6CA1\u6709\u751F\u6548\u7684\u7B5B\u9009"
+        });
+        this.updateTreeMore();
+        if (keepTop && tree.scrollTop !== keepTop)
+          tree.scrollTop = keepTop;
+      }
+      renderTagNode(parent, node, depth) {
+        const key = node.key;
+        const sel = this.isTagSelected(key);
+        const covered = !sel && !!this.selectedAncestorPath(key);
+        const some = !sel && !covered && this.hasSelectedBelow(node);
+        const open = !!this.expanded[key];
+        const kids = node.children.length > 0;
+        const row = parent.createDiv({
+          cls: "qm-tnode" + (sel ? " is-on" : "") + (some ? " is-some" : "") + (covered ? " is-inherit" : "") + (depth ? " is-child" : "")
+        });
+        row.setAttribute("title", "#" + node.path + " \xB7 " + node.count + " \u6761");
+        const caret = row.createSpan({
+          cls: "qm-caret" + (kids ? "" : " is-blank"),
+          text: kids ? open ? "\u25BE" : "\u25B8" : ""
+        });
+        caret.onclick = (e) => {
+          e.stopPropagation();
+          if (!kids)
+            return;
+          if (this.expanded[key])
+            delete this.expanded[key];
+          else
+            this.expanded[key] = true;
+          this.renderFilterPanel();
+        };
+        row.createSpan({ cls: "qm-tname", text: (depth ? "" : "#") + node.label });
+        row.createSpan({ cls: "qm-tcount", text: String(node.count) });
+        row.createSpan({ cls: "qm-tmark", text: "\u2713" });
+        row.onclick = () => {
+          if (covered) {
+            new Notice2("\u5DF2\u5305\u542B\u5728 #" + this.selectedAncestorPath(key) + " \u91CC");
+            return;
+          }
+          this.toggleTagFilter(node.path);
+        };
+        if (kids && open) {
+          const box = parent.createDiv({ cls: "qm-tchildren" });
+          for (const ch of node.children)
+            this.renderTagNode(box, ch, depth + 1);
+        }
+      }
+      /** 侧栏不高时收一点标签窗口，保证底部按钮可见 */
+      fitPopHeight() {
+        const pop = this.pop;
+        const tree = this.treeEl;
+        if (!pop || !tree || !this.container)
+          return;
+        tree.style.height = "";
+        if (!this.container.clientHeight)
+          return;
+        const avail = this.container.clientHeight - pop.offsetTop - 10;
+        const need = pop.offsetHeight;
+        if (need > avail) {
+          tree.style.height = Math.max(88, 200 - (need - avail)) + "px";
+        }
+      }
+      updateTreeMore() {
+        const tree = this.treeEl;
+        if (!tree)
+          return;
+        const wrap = tree.parentNode;
+        const rest = (tree.scrollHeight || 0) - (tree.scrollTop || 0) - (tree.clientHeight || 0);
+        if (wrap && wrap.classList)
+          wrap.classList.toggle("more", rest > 0.5);
+      }
+      openMoreMenu() {
+        const hit = this.filteredCards().length;
+        const total = this.cards.length;
+        const cap = this.collis.settings && this.collis.settings.maxCards || 0;
+        const capNote = cap > 0 && hit > cap ? " \xB7 \u663E\u793A\u6700\u8FD1 " + cap : "";
+        const countLine = (hit === total ? "\u5171 " + total + " \u6761\u5361\u7247" : "\u5171 " + total + " \u6761 \xB7 \u547D\u4E2D " + hit + " \u6761") + capNote;
+        const n = (this.collis.settings && this.collis.settings.trash || []).length;
+        const items = [
+          { title: countLine, icon: "arrow-right", disabled: true },
+          { separator: true },
+          {
+            title: this.selectMode ? "\u9000\u51FA\u591A\u9009" : "\u591A\u9009",
+            icon: "list-checks",
+            onClick: () => this.toggleSelectMode()
+          },
+          {
+            title: n ? "\u6700\u8FD1\u5220\u9664 " + n : "\u6700\u8FD1\u5220\u9664",
+            icon: "trash-2",
+            onClick: () => new CollisBundle2.TrashModal(this.app, this.collis).open()
+          },
+          {
+            title: "\u6253\u5F00\u672C\u6708\u6587\u4EF6",
+            icon: "file-text",
+            onClick: () => this.collis.openCurrentMonthFile()
+          },
+          {
+            title: "\u68C0\u67E5\u5B64\u513F\u5361\u7247",
+            icon: "search-check",
+            onClick: () => new CollisBundle2.OrphanModal(this.app, this.collis).open()
+          },
+          { separator: true },
+          {
+            title: "\u5728\u53F3\u4FA7\u680F\u6253\u5F00",
+            icon: "panel-right",
+            onClick: () => this.openSidebar()
+          }
+        ];
+        return this.showMenu(items, this.moreBtn);
+      }
+      /* ---------------- 「更多」菜单（复刻 Collis 的 showMenu） ---------------- */
+      showMenu(items, anchor) {
+        if (this.menuEl && this.menuAnchor === anchor) {
+          this.closeMenu();
+          return;
+        }
+        this.closeMenu();
+        this.closePop();
+        const menu = this.toolrow.createDiv({ cls: "qm-menu" });
+        for (const it of items) {
+          if (it.separator) {
+            menu.createDiv({ cls: "qm-menu-sep" });
+            continue;
+          }
+          const row = menu.createDiv({
+            cls: "qm-menu-item" + (it.disabled ? " is-disabled" : "") + (it.danger ? " is-danger" : "")
+          });
+          const ico = row.createSpan({ cls: "qm-menu-ico" });
+          if (it.icon)
+            setIcon2(ico, it.icon);
+          row.createSpan({ cls: "qm-menu-label", text: it.title });
+          if (!it.disabled) {
+            row.onclick = (e) => {
+              if (e && e.stopPropagation)
+                e.stopPropagation();
+              const fn = it.onClick;
+              this.closeMenu();
+              if (fn)
+                fn();
+            };
+          }
+        }
+        const ar = anchor.getBoundingClientRect();
+        const rr = this.toolrow.getBoundingClientRect();
+        const menuH = menu.offsetHeight || 0;
+        const below = ar.bottom - rr.top + 6;
+        const above = ar.top - rr.top - menuH - 6;
+        const spaceBelow = window.innerHeight - ar.bottom - 10;
+        const spaceAbove = ar.top - 10;
+        const top = menuH > spaceBelow && spaceAbove > spaceBelow ? above : below;
+        menu.style.top = Math.max(0, Math.round(top)) + "px";
+        menu.style.right = Math.max(0, Math.round(rr.right - ar.right)) + "px";
+        this.menuEl = menu;
+        this.menuAnchor = anchor;
+        anchor.classList.add("is-pop-open");
+        this._menuKey = (ev) => {
+          if (ev.key === "Escape")
+            this.closeMenu();
+        };
+        document.addEventListener("keydown", this._menuKey, true);
+      }
+      closeMenu() {
+        if (this._menuKey) {
+          document.removeEventListener("keydown", this._menuKey, true);
+          this._menuKey = null;
+        }
+        if (this.menuEl) {
+          this.menuEl.remove();
+          this.menuEl = null;
+        }
+        if (this.menuAnchor) {
+          this.menuAnchor.classList.remove("is-pop-open");
+          this.menuAnchor = null;
+        }
+      }
+      /* ---------------- 多选（与 Collis 同一套交互） ---------------- */
+      cardKey(card) {
+        return (card.file ? card.file.path : "") + "|" + card.date + "|" + card.time + "|" + (card.id || String(card.body || "").slice(0, 24));
+      }
+      toggleSelectMode(force) {
+        this.selectMode = typeof force === "boolean" ? force : !this.selectMode;
+        this.selected.clear();
+        this.renderList();
+      }
+      toggleSelected(card, box) {
+        const key = this.cardKey(card);
+        const on = !this.selected.has(key);
+        if (on)
+          this.selected.add(key);
+        else
+          this.selected.delete(key);
+        if (box)
+          box.classList.toggle("is-picked", on);
+        const n = this.selected.size;
+        if (this._selInfoEl)
+          this._selInfoEl.setText("\u5DF2\u9009 " + n + " \u6761");
+        if (this._selDelEl) {
+          this._selDelEl.setText(n ? "\u5220\u9664\u6240\u9009 " + n : "\u5220\u9664\u6240\u9009");
+          this._selDelEl.disabled = !n;
+        }
+      }
+      renderSelectBar() {
+        const el = this.selBarEl;
+        if (!el)
+          return;
+        el.empty();
+        if (!this.selectMode) {
+          el.removeClass("show");
+          if (this.listWrap)
+            this.listWrap.removeClass("has-selbar");
+          this._selInfoEl = null;
+          this._selDelEl = null;
+          return;
+        }
+        el.addClass("show");
+        if (this.listWrap)
+          this.listWrap.addClass("has-selbar");
+        const n = this.selected.size;
+        this._selInfoEl = el.createSpan({ cls: "qm-selbar-info", text: "\u5DF2\u9009 " + n + " \u6761" });
+        const acts = el.createDiv({ cls: "qm-selbar-acts" });
+        const cancel = acts.createEl("button", { text: "\u53D6\u6D88" });
+        cancel.onclick = (e) => {
+          if (e && e.stopPropagation)
+            e.stopPropagation();
+          this.toggleSelectMode(false);
+        };
+        const del = acts.createEl("button", {
+          cls: "is-danger",
+          text: n ? "\u5220\u9664\u6240\u9009 " + n : "\u5220\u9664\u6240\u9009"
+        });
+        del.disabled = !n;
+        del.onclick = (e) => {
+          if (e && e.stopPropagation)
+            e.stopPropagation();
+          if (!this.selected.size)
+            return;
+          this.deleteSelected();
+        };
+        this._selDelEl = del;
+      }
+      deleteSelected() {
+        const picked = this.cards.filter((c) => this.selected.has(this.cardKey(c)));
+        if (!picked.length)
+          return;
+        new CollisBundle2.ConfirmModal(
+          this.app,
+          "\u5220\u9664\u9009\u4E2D\u7684 " + picked.length + " \u6761\u5361\u7247\uFF1F",
+          async () => {
+            const res = await this.collis.deleteCards(picked);
+            this.selectMode = false;
+            this.selected.clear();
+            await this.load();
+            if (res && res.deleted && res.failed) {
+              new Notice2("\u5DF2\u5220\u9664 " + res.deleted + " \u6761\uFF0C" + res.failed + " \u6761\u6CA1\u627E\u5230\u5DF2\u8DF3\u8FC7", 9e3);
+            } else if (res && res.deleted) {
+              new Notice2("\u5DF2\u5220\u9664 " + res.deleted + " \u6761\uFF0C\u53EF\u5728\u300C\u6700\u8FD1\u5220\u9664\u300D\u6062\u590D", 9e3);
+            } else {
+              new Notice2("\u6CA1\u6709\u5220\u9664\uFF1A\u5361\u7247\u4F4D\u7F6E\u5DF2\u53D8\u5316\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5", 9e3);
+            }
+          },
+          ""
+        ).open();
+      }
+      /* ---------------- 回看（复刻 Collis 的覆盖视图） ---------------- */
+      openReview() {
+        if (!this.reviewEl)
+          return;
+        this.pickReview();
+        this.reviewEl.addClass("show");
+        this.renderReview();
+      }
+      closeReview() {
+        if (!this.reviewEl)
+          return;
+        this.reviewEl.removeClass("show");
+        this.reviewEl.empty();
+      }
+      pickReview() {
+        const pool = this.cards.slice();
+        for (let i = pool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const t = pool[i];
+          pool[i] = pool[j];
+          pool[j] = t;
+        }
+        this.reviewCards = pool.slice(0, 5);
+      }
+      renderReview() {
+        const el = this.reviewEl;
+        if (!el)
+          return;
+        el.empty();
+        const head = el.createDiv({ cls: "qm-review-head" });
+        const back = head.createEl("button", { cls: "qm-review-back" });
+        back.setAttribute("aria-label", "\u8FD4\u56DE\u5361\u7247");
+        back.setAttribute("title", "\u8FD4\u56DE\u5361\u7247");
+        setIconHtml(back, "back");
+        back.onclick = () => this.closeReview();
+        head.createSpan({ cls: "qm-review-title", text: "\u56DE\u770B" });
+        const shuffle = head.createEl("button", { cls: "qm-review-shuffle", text: "\u6362\u4E00\u6279" });
+        shuffle.onclick = () => {
+          this.pickReview();
+          this.renderReview();
+        };
+        el.createDiv({
+          cls: "qm-review-sub",
+          text: this.reviewCards.length ? "\u968F\u673A\u7FFB " + this.reviewCards.length + " \u5F20\u65E7\u5361\u7247" : "\u5361\u7247\u8FD8\u4E0D\u591F\uFF0C\u5148\u53BB\u8BB0\u51E0\u6761\u5427"
+        });
+        const list = el.createDiv({ cls: "qm-review-list" });
+        for (const card of this.reviewCards) {
+          const key = this.cardKey(card);
+          const sections = CollisBundle2.qmCardSections(card.body);
+          const box = list.createDiv({ cls: "qm-rv-card" });
+          const rhead = box.createDiv({ cls: "qm-rv-head" });
+          const meta = rhead.createDiv({ cls: "qm-rv-meta" });
+          meta.createSpan({ text: String(card.date || "").slice(5) + " " + card.time });
+          meta.createSpan({ cls: "qm-rv-sep", text: "\xB7" });
+          meta.createSpan({ text: daysAgo(card.date) + " \u5929\u524D" });
+          if (sections.appends.length) {
+            const badge = rhead.createSpan({
+              cls: "qm-append-badge",
+              text: "\u8FFD\u52A0 " + sections.appends.length
+            });
+            badge.onclick = (ev) => {
+              ev.stopPropagation();
+              if (this.appendOpen.has(key))
+                this.appendOpen.delete(key);
+              else
+                this.appendOpen.add(key);
+              this.renderReview();
+            };
+          }
+          const more = rhead.createEl("button", { cls: "qm-rv-more" });
+          more.setAttribute("type", "button");
+          more.setAttribute("aria-label", "\u66F4\u591A\u64CD\u4F5C");
+          setIconHtml(more, "more");
+          more.onclick = (ev) => {
+            ev.stopPropagation();
+            this.openCardMenu(box, card, more);
+          };
+          box.addEventListener("dblclick", (e) => {
+            const t = e.target;
+            if (t && typeof t.closest === "function" && t.closest("a, .qm-tag, .qm-more, .qm-rv-more, .qm-append-badge, button, textarea")) {
+              return;
+            }
+            if (e.preventDefault)
+              e.preventDefault();
+            this.beginEdit(card);
+          });
+          if (this.editingKey === key) {
+            this.renderEditBox(box, card, key, sections.original);
+            continue;
+          }
+          const bodyEl = box.createDiv({ cls: "qm-rv-body" });
+          this.renderCardBody(bodyEl, card, sections.original);
+          if (sections.appends.length && this.appendOpen.has(key)) {
+            this.renderAppendList(box, card, sections, key);
+          }
+          if (this.appendDrafting && this.appendDrafting.key === key) {
+            this.renderAppendComposer(box, card, key);
+          }
+        }
+      }
+      /** 回看里存的是一批旧对象：卡片被改 / 删后换成本轮的新对象，找不到就移除 */
+      syncReviewCards() {
+        if (!Array.isArray(this.reviewCards))
+          return;
+        const used = /* @__PURE__ */ new Set();
+        const next = [];
+        for (const old of this.reviewCards) {
+          const want = this.cardKey(old);
+          let hit = this.cards.find((c) => !used.has(this.cardKey(c)) && this.cardKey(c) === want);
+          if (!hit) {
+            hit = this.cards.find(
+              (c) => !used.has(this.cardKey(c)) && c.filePath === old.filePath && c.date === old.date && c.time === old.time
+            );
+          }
+          if (!hit)
+            continue;
+          used.add(this.cardKey(hit));
+          next.push(hit);
+        }
+        this.reviewCards = next;
+      }
+      openCardMenu(cardEl, card, anchorBtn) {
+        const info = this.collis.refSummary ? this.collis.refSummary(card) : null;
+        const n = info ? info.notes : 0;
+        const anchor = anchorBtn || cardEl.querySelector(".qm-more");
+        const items = [
+          {
+            title: "\u590D\u5236\u5168\u6587",
+            icon: "copy",
+            onClick: async () => {
+              await this.collis.copy(CollisBundle2.qmPasteText(card.body));
+              new Notice2("\u5DF2\u590D\u5236\u5361\u7247\u5168\u6587");
+            }
+          },
+          { title: "\u590D\u5236\u94FE\u63A5", icon: "link", onClick: () => this.copyRef(card) },
+          { title: "\u7F16\u8F91", icon: "pencil", onClick: () => this.beginEdit(card) },
+          { title: "\u8FFD\u52A0", icon: "plus", onClick: () => this.beginAppend(card) },
+          { separator: true }
+        ];
+        if (this.collis.refsReady && !this.collis.refsReady()) {
+          items.push({ title: "\u5F15\u7528\u7EDF\u8BA1\u51C6\u5907\u4E2D\u2026", icon: "corner-down-right", disabled: true });
+        } else if (n) {
+          items.push({
+            title: "\u88AB " + n + " \u7BC7\u7B14\u8BB0\u5F15\u7528\u2026",
+            icon: "corner-down-right",
+            onClick: () => new CollisBundle2.RefListModal(this.app, info, (r) => this.openRef(r.path, r.line)).open()
+          });
+        } else {
+          items.push({
+            title: "\u8FD8\u6CA1\u6709\u7B14\u8BB0\u5F15\u7528\u8FD9\u5F20\u5361\u7247",
+            icon: "corner-down-right",
+            disabled: true
+          });
+        }
+        items.push({
+          title: "\u5728\u6587\u4EF6\u4E2D\u5B9A\u4F4D",
+          icon: "file-search",
+          onClick: () => this.locateCard(card)
+        });
+        items.push({ separator: true });
+        items.push({
+          title: "\u5220\u9664",
+          icon: "trash-2",
+          danger: true,
+          onClick: () => this.confirmDelete(card)
+        });
+        return this.showMenu(items, anchor);
+      }
+      /** 复制块链接：跟随「嵌入」开关，与 Collis 一致 */
+      async copyRef(card) {
+        const hadId = !!card.id && card.idOnLastLine;
+        const id = await this.collis.ensureId(card);
+        if (!id) {
+          new Notice2("\u6CA1\u627E\u5230\u8FD9\u5F20\u5361\u7247\uFF0C\u8BF7\u6539\u7528\u300C\u590D\u5236\u5168\u6587\u300D");
+          return;
+        }
+        const bang = this.collis.settings.blockRefEmbed ? "!" : "";
+        const ref = bang + "[[" + this.collis.linkTarget(card) + "#^" + id + "]]";
+        await this.collis.copy(ref);
+        new Notice2(
+          (hadId ? "\u5DF2\u590D\u5236\uFF1A" : "\u5DF2\u4E3A\u8FD9\u6761\u5361\u7247\u8865\u4E0A\u5757 ID\uFF0C\u5DF2\u590D\u5236\uFF1A") + ref,
+          7e3
+        );
+      }
+      /** 跳到引用这张卡片的那篇笔记（新标签页打开） */
+      async openRef(path, line) {
+        const file = this.app.vault.getAbstractFileByPath(String(path || ""));
+        if (!(file instanceof TFile)) {
+          new Notice2("\u8FD9\u7BC7\u7B14\u8BB0\u627E\u4E0D\u5230\u4E86\uFF0C\u53EF\u80FD\u5DF2\u5220\u9664\u6216\u6539\u540D");
+          return;
+        }
+        try {
+          const leaf = this.app.workspace.getLeaf("tab");
+          const opts = typeof line === "number" && line >= 0 ? { eState: { line } } : void 0;
+          await leaf.openFile(file, opts);
+        } catch (e) {
+          new Notice2("\u6253\u4E0D\u5F00\u8FD9\u7BC7\u7B14\u8BB0\uFF1A" + (e && e.message ? e.message : "\u672A\u77E5\u539F\u56E0"));
+        }
+      }
+      beginEdit(card) {
+        if (this.selectMode) {
+          new Notice2("\u5148\u9000\u51FA\u591A\u9009\uFF0C\u518D\u7F16\u8F91\u5361\u7247");
+          return;
+        }
+        const key = this.cardKey(card);
+        if (this.editingKey === key)
+          return;
+        this.editingKey = key;
+        this.editingDraft = {
+          key,
+          text: CollisBundle2.qmCardSections(String(card.body || "")).original
+        };
+        this.renderAll();
+      }
+      cancelEdit() {
+        this.editingKey = null;
+        this.editingDraft = null;
+        this.renderAll();
+      }
+      /** 列表与回看共用一次刷新：回看打开时两个都要重画 */
+      renderAll() {
+        this.renderList();
+        if (this.reviewEl && this.reviewEl.hasClass("show"))
+          this.renderReview();
+      }
+      /** 在月份文件里定位到这张卡所在的那一行 */
+      async locateCard(card) {
+        const file = this.app.vault.getAbstractFileByPath(card.filePath);
+        if (!(file instanceof TFile)) {
+          new Notice2("\u8FD9\u5F20\u5361\u7247\u6240\u5728\u7684\u6587\u4EF6\u627E\u4E0D\u5230\u4E86");
+          return;
+        }
+        let hit = null;
+        try {
+          const text = String(await this.app.vault.read(file) || "").replace(/\r\n?/g, "\n");
+          hit = CollisBundle2.qmLocateCard(text, card, {
+            strict: this.collis.settings.strictCardId !== false
+          });
+        } catch (e) {
+          hit = null;
+        }
+        if (!hit) {
+          new Notice2("\u5361\u7247\u4F4D\u7F6E\u5DF2\u53D8\u5316\uFF0C\u5237\u65B0\u540E\u518D\u8BD5");
+          return;
+        }
+        const leaf = this.app.workspace.getLeaf(false);
+        if (!leaf || typeof leaf.openFile !== "function") {
+          new Notice2("\u6253\u4E0D\u5F00\u8FD9\u4E2A\u6587\u4EF6");
+          return;
+        }
+        await leaf.openFile(file, { eState: { line: hit.lineIndex } });
+        const view = leaf.view;
+        if (view && view.editor) {
+          const from = { line: hit.lineIndex, ch: 0 };
+          const to = { line: hit.lineEnd, ch: 0 };
+          view.editor.setCursor(from);
+          view.editor.scrollIntoView({ from, to }, true);
+          view.editor.focus();
+        }
+      }
+      confirmDelete(card) {
+        const info = this.collis.refSummary ? this.collis.refSummary(card) : null;
+        const n = info ? info.notes : 0;
+        const detail = n ? "\u8FD9\u5F20\u5361\u8FD8\u88AB " + n + " \u7BC7\u7B14\u8BB0\u5F15\u7528\uFF0C\u5220\u9664\u540E\u8FD9\u4E9B\u5F15\u7528\u4F1A\u5931\u6548\u3002" : "";
+        new CollisBundle2.ConfirmModal(
+          this.app,
+          "\u5220\u9664\u8FD9\u6761\u5361\u7247\uFF1F",
+          async () => {
+            await this.collis.deleteCard(card);
+            await this.load();
+          },
+          detail
+        ).open();
+      }
+      closeCardMenu() {
+        if (this.cardMenu)
+          this.cardMenu.remove();
+        this.cardMenu = null;
+      }
+      /* ---------------- 动作 ---------------- */
+      async capture() {
+        const text = this.input ? this.input.value.trim() : "";
+        if (!text)
+          return;
+        if (!this.collis || typeof this.collis.appendCard !== "function") {
+          new Notice2("Collis \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u6682\u65F6\u4E0D\u80FD\u8BB0\u5F55");
+          return;
+        }
+        this.saveBtn.disabled = true;
+        this.saveBtn.classList.add("is-disabled");
+        let ok = false;
+        try {
+          ok = await this.collis.appendCard(text);
+        } catch (e) {
+          console.error("[workbench] \u5199\u5165\u5361\u7247\u5931\u8D25", e);
+        }
+        if (ok) {
+          this.input.value = "";
+          this.input.style.height = "";
+        }
+        this.saveBtn.disabled = false;
+        this.saveBtn.classList.remove("is-disabled");
+        if (!this.input.value.trim()) {
+          this.saveBtn.disabled = true;
+          this.saveBtn.classList.add("is-disabled");
+        }
+        this.load();
+      }
+      openCard(card, newLeaf) {
+        if (!card || !card.filePath)
+          return;
+        const ref = card.id ? card.filePath + "#^" + card.id : card.filePath;
+        try {
+          this.app.workspace.openLinkText(ref, "", "tab");
+        } catch (e) {
+          this.app.workspace.openLinkText(card.filePath, "", "tab");
+        }
+      }
+      openSidebar() {
+        if (this.hostView && this.hostView.openCollis) {
+          this.hostView.openCollis();
+          return;
+        }
+        this.app.commands.executeCommandById("collis:open-cards");
+      }
+    };
+    module2.exports = { CollisNotesPanel: CollisNotesPanel2 };
+  }
+});
+
+// src/main.js
+var {
+  Plugin,
+  ItemView,
+  PluginSettingTab,
+  Setting,
+  Notice,
+  Modal,
+  Menu,
+  debounce,
+  setIcon,
+  addIcon
+} = require("obsidian");
+var CollisBundle = require_collis_core();
+var CollisBoardBundle = require_collis_board_core();
+var { CollisGalleryPanel } = require_collis_gallery();
+var { CollisNotesPanel } = require_collis_notes();
+function resolvePluginClass(bundle, fallbackName) {
+  if (typeof bundle === "function")
+    return bundle;
+  if (bundle && typeof bundle.default === "function")
+    return bundle.default;
+  if (bundle && typeof bundle[fallbackName] === "function")
+    return bundle[fallbackName];
+  return null;
+}
+var BUNDLED_PLUGINS = [
+  {
+    id: "collis",
+    className: "QuickMemoPlugin",
+    bundle: CollisBundle,
+    manifest: {
+      id: "collis",
+      name: "Collis",
+      version: "2.0.5",
+      minAppVersion: "1.4.0",
+      description: "\u5728\u77E5\u8BC6\u5E93\u91CC\u901F\u8BB0\uFF1A\u4E0D\u5EFA\u6587\u4EF6\u3001\u4E0D\u8D77\u6807\u9898\uFF0C\u6309\u6708\u5B58\u8FDB\u672C\u5730 Markdown\u3002",
+      author: "Lak",
+      isDesktopOnly: false
+    }
+  },
+  {
+    id: "collis-board",
+    className: "CollisBoardPlugin",
+    bundle: CollisBoardBundle,
+    manifest: {
+      id: "collis-board",
+      name: "Collis",
+      version: "0.6.2",
+      minAppVersion: "1.13.0",
+      description: "Canvas \u601D\u8003\u5DE5\u4F5C\u53F0\uFF1A\u753B\u5E03\u96C6\u3001\u8BED\u4E49\u8FDE\u7EBF\u3001\u5927\u7EB2\u3001Markdown \u5BFC\u51FA\u4E0E AI\u3002",
+      author: "Lak",
+      isDesktopOnly: true
+    }
+  }
+];
+var VIEW_TYPE = "workbench-view";
+var QM_VIEW_TYPE = "qm-cards-view";
+var PLUGIN_ICON_ID = CollisBundle && CollisBundle.ICON_ID || "collis-mark";
+var PLUGIN_ICON_SVG = CollisBundle && CollisBundle.ICON_MARK || "";
+var CARD_FOLDER = "00-Inbox/\u901F\u8BB0";
+var BOARD_EXT = "collis";
+var ATTACHMENT_EXTENSIONS = /* @__PURE__ */ new Set([
+  // 图片
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "svg",
+  "bmp",
+  "avif",
+  "heic",
+  "heif",
+  "ico",
+  "tif",
+  "tiff",
+  // 视频
+  "mp4",
+  "mov",
+  "webm",
+  "mkv",
+  "avi",
+  "m4v",
+  "flv",
+  "wmv",
+  "mpeg",
+  "mpg",
+  // 音频
+  "mp3",
+  "wav",
+  "m4a",
+  "ogg",
+  "flac",
+  "aac",
+  "opus",
+  "wma",
+  "aiff",
+  // 文档
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "ppt",
+  "pptx",
+  "epub",
+  "odt",
+  "ods",
+  "odp",
+  "rtf",
+  "txt",
+  // 压缩包
+  "zip",
+  "rar",
+  "7z",
+  "tar",
+  "gz",
+  "bz2",
+  "xz",
+  // 其他常见素材
+  "excalidraw",
+  "base"
+]);
+var EXCLUDED_DIR_NAMES = /* @__PURE__ */ new Set([
+  // AI / 编辑器 / 版本控制的工作目录
+  ".git",
+  ".github",
+  ".gitee",
+  ".obsidian",
+  ".trash",
+  ".claude",
+  ".cursor",
+  ".codex",
+  ".trae",
+  ".aider",
+  ".continue",
+  ".windsurf",
+  ".cline",
+  ".roo",
+  ".vscode",
+  ".idea",
+  ".specstory",
+  // 脚本 / 依赖 / 构建产物
+  "vault-scripts",
+  "node_modules",
+  "dist",
+  "build",
+  "__pycache__",
+  ".venv",
+  "venv"
+]);
+var EXCLUDED_FILE_NAMES = /* @__PURE__ */ new Set([
+  // 仓库说明类
+  "readme",
+  "license",
+  "licence",
+  "changelog",
+  "contributing",
+  "code_of_conduct",
+  "security",
+  // AI 代理 / 编辑器说明文件（CLAUDE.md、AGENTS.md、GEMINI.md …）
+  "claude",
+  "agents",
+  "agent",
+  "gemini",
+  "copilot",
+  "cursor",
+  "windsurf",
+  "cline",
+  "aider",
+  "roo",
+  // 构建 / 包管理说明
+  "package",
+  "package-lock",
+  "pnpm-lock",
+  "yarn",
+  "makefile",
+  "dockerfile",
+  "install",
+  "api",
+  // 系统垃圾文件
+  "thumbs",
+  "desktop"
+]);
+function isIgnoredPath(filePath) {
+  const parts = String(filePath || "").split("/");
+  if (!parts.length)
+    return false;
+  if (parts.some((part) => part.startsWith(".")))
+    return true;
+  const dirs = parts.slice(0, -1).map((p) => p.toLowerCase());
+  if (dirs.some((d) => EXCLUDED_DIR_NAMES.has(d)))
+    return true;
+  const base = parts[parts.length - 1];
+  const name = base.replace(/\.[^.]+$/, "").toLowerCase();
+  return EXCLUDED_FILE_NAMES.has(name);
+}
+var DEFAULT_MODULES = [
+  {
+    id: "learning",
+    name: "\u5B66\u4E60\u63D0\u5347",
+    icon: "graduation-cap",
+    module: "learning",
+    types: ["topic", "course", "lesson"],
+    keywords: ["\u5B66\u4E60", "\u8BFE\u7A0B", "\u4E13\u9898", "\u77E5\u8BC6"]
+  },
+  {
+    id: "reading",
+    name: "\u8BFB\u4E66\u9605\u89C8",
+    icon: "book-open",
+    module: "reading",
+    types: ["book", "highlight"],
+    folder: "Clippings",
+    keywords: ["\u8BFB\u4E66", "\u9605\u8BFB", "\u4E66\u6458", "\u4E66\u8BC4", "\u6458\u5F55"]
+  },
+  {
+    id: "media",
+    name: "\u81EA\u5A92\u4F53\u521B\u4F5C",
+    icon: "pen-line",
+    module: "media",
+    types: ["idea", "script", "post"],
+    keywords: ["\u81EA\u5A92\u4F53", "\u521B\u4F5C", "\u9009\u9898", "\u811A\u672C", "\u516C\u4F17\u53F7", "\u89C6\u9891"]
+  },
+  {
+    id: "invest",
+    name: "\u6295\u8D44\u5B66\u4E60",
+    icon: "trending-up",
+    module: "invest",
+    types: ["company", "investment", "thesis"],
+    keywords: ["\u6295\u8D44", "\u7406\u8D22", "\u516C\u53F8", "\u884C\u4E1A", "\u8D22\u62A5"]
+  },
+  {
+    id: "writing",
+    name: "\u6587\u7AE0\u5199\u4F5C",
+    icon: "file-text",
+    module: "writing",
+    types: ["article", "draft"],
+    keywords: ["\u5199\u4F5C", "\u6587\u7AE0", "\u8349\u7A3F", "\u957F\u6587"]
+  }
+];
+var DEFAULT_SETTINGS = {
+  modules: DEFAULT_MODULES,
+  focusOnOpen: false,
+  workspaceName: "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0",
+  navCollapsed: false,
+  // 上次退出时卡片笔记右侧栏是否开着，用于重启后恢复
+  collisSidebarOpen: false,
+  // 用户点过“忽略”的未知 module 值，避免同一提示反复出现
+  ignoredModuleValues: []
+};
+var ACTIVE_STATUSES = [
+  "active",
+  "reading",
+  "draft",
+  "idea",
+  "doing",
+  "in-progress",
+  "\u8FDB\u884C\u4E2D",
+  "\u5728\u8BFB",
+  "\u8349\u7A3F"
+];
+function getFm(app, file) {
+  try {
+    const cache = app.metadataCache.getFileCache(file);
+    return cache && cache.frontmatter || {};
+  } catch (e) {
+    return {};
+  }
+}
+function getTags(fm) {
+  let tags = fm && fm.tags;
+  if (Array.isArray(tags)) {
+    return tags.map((t) => String(t).replace(/^#/, "")).filter(Boolean);
+  }
+  if (typeof tags === "string") {
+    return tags.split(/[,\s]+/).map((t) => t.replace(/^#/, "")).filter(Boolean);
+  }
+  return [];
+}
+function formatTime(ts) {
+  const diff = (Date.now() - ts) / 1e3;
+  if (diff < 60)
+    return "\u521A\u521A";
+  if (diff < 3600)
+    return Math.floor(diff / 60) + " \u5206\u949F\u524D";
+  if (diff < 86400)
+    return Math.floor(diff / 3600) + " \u5C0F\u65F6\u524D";
+  if (diff < 86400 * 7)
+    return Math.floor(diff / 86400) + " \u5929\u524D";
+  const d = new Date(ts);
+  return d.getMonth() + 1 + "-" + d.getDate();
+}
+function hmRgba(hex, alpha) {
+  const value = String(hex || "").replace("#", "");
+  if (value.length !== 6)
+    return "rgba(255,255,255," + alpha + ")";
+  const n = parseInt(value, 16);
+  return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + alpha + ")";
+}
+function isContentFile(file) {
+  return !isIgnoredPath(file.path);
+}
+var THUMB_IMAGE_EXT = /* @__PURE__ */ new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "svg",
+  "bmp",
+  "avif",
+  "heic",
+  "heif",
+  "ico",
+  "tif",
+  "tiff"
+]);
+var THUMB_VIDEO_EXT = /* @__PURE__ */ new Set([
+  "mp4",
+  "mov",
+  "webm",
+  "mkv",
+  "avi",
+  "m4v",
+  "flv",
+  "wmv",
+  "mpeg",
+  "mpg"
+]);
+var THUMB_AUDIO_EXT = /* @__PURE__ */ new Set([
+  "mp3",
+  "wav",
+  "m4a",
+  "ogg",
+  "flac",
+  "aac",
+  "opus",
+  "wma",
+  "aiff"
+]);
+var THUMB_DOC_EXT = /* @__PURE__ */ new Set([
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "csv",
+  "ppt",
+  "pptx",
+  "epub",
+  "odt",
+  "ods",
+  "odp",
+  "rtf",
+  "txt"
+]);
+var THUMB_KIND_LABELS = {
+  note: "\u7B14\u8BB0",
+  image: "\u56FE\u7247",
+  video: "\u89C6\u9891",
+  audio: "\u97F3\u9891",
+  doc: "\u6587\u6863",
+  other: "\u6587\u4EF6"
+};
+function fileKind(file) {
+  const ext = String(file && file.extension || "").toLowerCase();
+  if (ext === "md")
+    return "note";
+  if (THUMB_IMAGE_EXT.has(ext))
+    return "image";
+  if (THUMB_VIDEO_EXT.has(ext))
+    return "video";
+  if (THUMB_AUDIO_EXT.has(ext))
+    return "audio";
+  if (THUMB_DOC_EXT.has(ext))
+    return "doc";
+  return "other";
+}
+function stripNoteBody(raw) {
+  const text = String(raw || "").replace(/^\uFEFF/, "");
+  const fm = text.match(/^---\r?\n[\s\S]*?\r?\n---[ \t]*\r?\n?/);
+  return fm ? text.slice(fm[0].length) : text;
+}
+function noteSnippet(body) {
+  let text = String(body || "");
+  text = text.replace(/```[\s\S]*?```/g, " ");
+  text = text.replace(/<!--[\s\S]*?-->/g, " ");
+  text = text.replace(/!\[\[[^\]]*\]\]/g, " ");
+  text = text.replace(/!\[[^\]]*\]\([^)]*\)/g, " ");
+  text = text.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (match, path, alias) => alias || path);
+  text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+  text = text.replace(/^#{1,6}[ \t]+/gm, "");
+  text = text.replace(/^[ \t]*>[ \t]?/gm, "");
+  text = text.replace(/^[ \t]*([-*+]|\d+\.)[ \t]+/gm, "");
+  text = text.replace(/[*_~`]/g, "");
+  text = text.replace(/\|/g, " ");
+  text = text.replace(/\s+/g, " ").trim();
+  return text.slice(0, 220);
+}
+function findNoteMedia(app, body, sourcePath) {
+  const re = /!\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]|!\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)/g;
+  let m;
+  while (m = re.exec(body)) {
+    let link = String(m[1] || m[2] || "").trim();
+    if (!link)
+      continue;
+    if (m[2]) {
+      try {
+        link = decodeURI(link);
+      } catch (e) {
+      }
+    }
+    let target = null;
+    try {
+      target = app.metadataCache.getFirstLinkpathDest(link, sourcePath);
+    } catch (e) {
+      target = null;
+    }
+    if (!target)
+      continue;
+    const kind = fileKind(target);
+    if (kind === "image" || kind === "video")
+      return { file: target, kind };
+  }
+  return null;
+}
+function paintMediaThumb(app, thumb, file, kind) {
+  let src = "";
+  try {
+    src = app.vault.getResourcePath(file) || "";
+  } catch (e) {
+    src = "";
+  }
+  if (!src)
+    return false;
+  thumb.addClass("wb-md-thumb-media");
+  if (kind === "image") {
+    const img = thumb.createEl("img", { cls: "wb-md-media" });
+    img.setAttribute("alt", file.basename);
+    img.setAttribute("loading", "lazy");
+    img.onerror = () => {
+      img.remove();
+      thumb.removeClass("wb-md-thumb-media");
+      setIcon(thumb, "image");
+    };
+    img.setAttribute("src", src);
+    return true;
+  }
+  if (kind === "video") {
+    const video = thumb.createEl("video", { cls: "wb-md-media" });
+    video.setAttribute("preload", "metadata");
+    video.setAttribute("muted", "");
+    video.setAttribute("playsinline", "");
+    video.onerror = () => {
+      video.remove();
+      thumb.removeClass("wb-md-thumb-media");
+      setIcon(thumb, "video");
+    };
+    video.setAttribute("src", src + "#t=0.1");
+    const play = thumb.createDiv({ cls: "wb-md-play" });
+    setIcon(play, "play");
+    return true;
+  }
+  thumb.removeClass("wb-md-thumb-media");
+  return false;
+}
+function paintNoteThumb(app, thumb, file) {
+  app.vault.cachedRead(file).then((raw) => {
+    if (!thumb.isConnected)
+      return;
+    const body = stripNoteBody(raw);
+    const media = findNoteMedia(app, body, file.path);
+    if (media && paintMediaThumb(app, thumb, media.file, media.kind))
+      return;
+    const snippet = noteSnippet(body);
+    if (!snippet) {
+      setIcon(thumb, "file-text");
+      return;
+    }
+    thumb.addClass("wb-md-thumb-note");
+    thumb.createDiv({ cls: "wb-md-snippet", text: snippet });
+  }).catch(() => {
+    if (thumb.isConnected)
+      setIcon(thumb, "file-text");
+  });
+}
+var WB_TOOLTIP_SCOPE = [
+  ".workbench-view",
+  ".qm-view",
+  ".qm-root",
+  ".collis-board-leaf",
+  ".collis-board-host",
+  ".collis-board",
+  ".wb-root",
+  ".vw-frame",
+  ".collis-doctor-content",
+  ".collis-export-content",
+  ".collis-ai-modal",
+  ".collis-settings"
+].join(",");
+function wbInTooltipScope(el) {
+  try {
+    return !!(el && el.closest && el.closest(WB_TOOLTIP_SCOPE));
+  } catch (e) {
+    return false;
+  }
+}
+function wbNormalizeTitle(el) {
+  if (!el || el.nodeType !== 1 || !el.hasAttribute || !el.hasAttribute("title"))
+    return;
+  if (!wbInTooltipScope(el))
+    return;
+  const t = el.getAttribute("title") || "";
+  if (!el.hasAttribute("aria-label")) {
+    el.setAttribute("aria-label", t);
+    el.setAttribute("data-wb-tt", "1");
+  } else if (el.getAttribute("data-wb-tt") === "1") {
+    el.setAttribute("aria-label", t);
+  }
+  el.removeAttribute("title");
+}
+function wbNormalizeTree(root) {
+  if (!root || root.nodeType !== 1)
+    return;
+  wbNormalizeTitle(root);
+  const list = root.querySelectorAll("[title]");
+  for (let i = 0; i < list.length; i++)
+    wbNormalizeTitle(list[i]);
+}
+function anchorMenuBelow(menu, anchor) {
+  if (!anchor || typeof anchor.getBoundingClientRect !== "function") {
+    menu.showAtPosition({ x: 8, y: 8 });
+    return;
+  }
+  const rect = anchor.getBoundingClientRect();
+  menu.showAtPosition({ x: rect.left, y: rect.bottom });
+  const dom = menu.dom;
+  if (dom) {
+    const mw = dom.offsetWidth;
+    const vw = window.innerWidth;
+    let left = rect.left;
+    if (left + mw > vw - 4)
+      left = Math.max(4, rect.right - mw);
+    dom.style.left = Math.round(left) + "px";
+    dom.style.top = Math.round(rect.bottom) + "px";
+  }
+}
+var MODULE_ICONS = [
+  "file-text",
+  "graduation-cap",
+  "book-open",
+  "pen-line",
+  "trending-up",
+  "briefcase",
+  "code",
+  "flask-conical",
+  "palette",
+  "music",
+  "camera",
+  "heart",
+  "dumbbell",
+  "home",
+  "map",
+  "coffee"
+];
+var MODULE_COLORS = [
+  "#7c6df2",
+  "#3f9c6d",
+  "#d9834a",
+  "#3f7fd1",
+  "#c2568a",
+  "#8a6d3b"
+];
+var ModuleEditorModal = class extends Modal {
+  constructor(app, options) {
+    super(app);
+    this.options = options || {};
+    this.module = this.options.module || null;
+    this.initialName = this.options.initialName || "";
+    this.icon = this.module && this.module.icon || MODULE_ICONS[0];
+    this.color = this.module && this.module.color || this.options.initialColor || MODULE_COLORS[0];
+    this.deleteArmed = false;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("wb-modaleditor");
+    contentEl.createEl("h2", { text: this.module ? "\u7F16\u8F91\u6A21\u5757" : "\u65B0\u5EFA\u6A21\u5757" });
+    contentEl.createDiv({
+      cls: "wb-modal-hint",
+      text: "\u6A21\u5757\u53EA\u662F\u4E00\u4E2A\u7B5B\u9009\u5165\u53E3\uFF0C\u4E0D\u4F1A\u642C\u52A8\u6216\u590D\u5236\u4F60\u7684\u6587\u4EF6\u3002"
+    });
+    let name = this.module ? this.module.name || "" : this.initialName;
+    let folder = this.module && this.module.folder || "";
+    let keywords = this.module && Array.isArray(this.module.keywords) ? this.module.keywords.join("\u3001") : "";
+    new Setting(contentEl).setName("\u540D\u79F0").setDesc("\u663E\u793A\u5728\u5BFC\u822A\u91CC\u7684\u540D\u5B57").addText(
+      (t) => t.setValue(name).setPlaceholder("\u4F8B\u5982\uFF1A\u5065\u8EAB\u8BB0\u5F55").onChange((v) => {
+        name = v;
+      })
+    );
+    const iconRow = contentEl.createDiv({ cls: "wb-modalfield" });
+    iconRow.createDiv({ cls: "wb-modalfield-label", text: "\u56FE\u6807" });
+    const iconGrid = iconRow.createDiv({ cls: "wb-iconpick" });
+    const iconButtons = [];
+    MODULE_ICONS.forEach((name2) => {
+      const btn = iconGrid.createDiv({
+        cls: "wb-iconpick-item" + (name2 === this.icon ? " is-active" : "")
+      });
+      setIcon(btn, name2);
+      btn.onclick = () => {
+        this.icon = name2;
+        iconButtons.forEach((b) => b.removeClass("is-active"));
+        btn.addClass("is-active");
+      };
+      iconButtons.push(btn);
+    });
+    const colorRow = contentEl.createDiv({ cls: "wb-modalfield" });
+    colorRow.createDiv({ cls: "wb-modalfield-label", text: "\u989C\u8272" });
+    const swatches = colorRow.createDiv({ cls: "wb-colorpick" });
+    const colorDots = [];
+    MODULE_COLORS.forEach((color) => {
+      const dot = swatches.createDiv({
+        cls: "wb-colorpick-dot" + (color === this.color ? " is-active" : "")
+      });
+      dot.style.setProperty("--dot-color", color);
+      dot.onclick = () => {
+        this.color = color;
+        colorDots.forEach((d) => d.removeClass("is-active"));
+        dot.addClass("is-active");
+      };
+      colorDots.push(dot);
+    });
+    let folderInput = null;
+    new Setting(contentEl).setName("\u4FDD\u5B58\u6587\u4EF6\u5939").setDesc("\u65B0\u5EFA\u7B14\u8BB0\u4FDD\u5B58\u5230\u8FD9\u91CC\uFF1B\u4E0D\u9009\u5219\u6BCF\u6B21\u65B0\u5EFA\u65F6\u5148\u6311\u3002\u6587\u4EF6\u5939\u53EF\u4EE5\u73B0\u573A\u65B0\u5EFA\u3002").addText((t) => {
+      folderInput = t;
+      t.setValue(folder).setPlaceholder("\u672A\u9009\u62E9").onChange((v) => {
+        folder = v;
+      });
+    }).addButton((b) => {
+      b.setButtonText("\u9009\u62E9").onClick(() => {
+        new FolderPickerModal(this.app, {
+          current: String(folder || "").trim(),
+          onPick: (path) => {
+            folder = path;
+            if (folderInput)
+              folderInput.setValue(path);
+          }
+        }).open();
+      });
+    });
+    new Setting(contentEl).setName("\u7B5B\u9009\u6807\u7B7E").setDesc("\u53EF\u9009\u3002\u7528\u9017\u53F7\u6216\u987F\u53F7\u5206\u9694\uFF1B\u6CA1\u6709 module \u5B57\u6BB5\u7684\u7B14\u8BB0\u4F1A\u6309\u8FD9\u4E9B\u6807\u7B7E\u515C\u5E95\u5F52\u7C7B").addText(
+      (t) => t.setValue(keywords).setPlaceholder("\u4F8B\u5982\uFF1A\u5065\u8EAB\u3001\u8FD0\u52A8").onChange((v) => {
+        keywords = v;
+      })
+    );
+    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
+    if (this.module && this.options.onDelete) {
+      const del = foot.createEl("button", { cls: "wb-btn wb-btn-danger", text: "\u5220\u9664\u6A21\u5757" });
+      del.onclick = () => {
+        if (!this.deleteArmed) {
+          this.deleteArmed = true;
+          del.setText("\u518D\u70B9\u4E00\u6B21\u786E\u8BA4\u5220\u9664");
+          setTimeout(() => {
+            this.deleteArmed = false;
+            del.setText("\u5220\u9664\u6A21\u5757");
+          }, 3e3);
+          return;
+        }
+        this.close();
+        this.options.onDelete(this.module);
+      };
+    }
+    const cancel = foot.createEl("button", { cls: "wb-btn", text: "\u53D6\u6D88" });
+    cancel.onclick = () => this.close();
+    const save = foot.createEl("button", { cls: "wb-btn wb-btn-accent", text: "\u4FDD\u5B58" });
+    save.onclick = () => {
+      const finalName = String(name || "").trim();
+      if (!finalName) {
+        new Notice("\u8BF7\u5148\u586B\u5199\u6A21\u5757\u540D\u79F0");
+        return;
+      }
+      const folderValue = String(folder || "").trim().replace(/^\/+|\/+$/g, "");
+      if (folderValue && !this.app.vault.getAbstractFileByPath(folderValue)) {
+        new Notice("\u6587\u4EF6\u5939\u300C" + folderValue + "\u300D\u4E0D\u5B58\u5728\uFF0C\u8BF7\u70B9\u300C\u9009\u62E9\u300D\u6311\u4E00\u4E2A\u6216\u65B0\u5EFA");
+        return;
+      }
+      const id = this.module && this.module.id ? this.module.id : "mod-" + Date.now().toString(36);
+      const next = Object.assign({}, this.module || {}, {
+        id,
+        module: this.module && this.module.module ? this.module.module : id,
+        name: finalName,
+        icon: this.icon,
+        color: this.color,
+        folder: folderValue,
+        keywords: String(keywords || "").split(/[,，、\s]+/).map((v) => v.trim()).filter(Boolean)
+      });
+      this.close();
+      if (this.options.onSave)
+        this.options.onSave(next);
+    };
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var DeleteFilesModal = class extends Modal {
+  constructor(app, files, onConfirm) {
+    super(app);
+    this.files = files || [];
+    this.onConfirm = onConfirm;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("wb-modaleditor");
+    contentEl.createEl("h2", {
+      text: this.files.length === 1 ? "\u5220\u9664\u8FD9\u4E2A\u6587\u4EF6\uFF1F" : "\u5220\u9664\u8FD9 " + this.files.length + " \u4E2A\u6587\u4EF6\uFF1F"
+    });
+    const names = this.files.slice(0, 3).map((f) => f.basename).join("\u3001");
+    contentEl.createDiv({
+      cls: "wb-modal-hint",
+      text: this.files.length > 3 ? "\u4F1A\u79FB\u5230\u7CFB\u7EDF\u56DE\u6536\u7AD9\uFF1A" + names + " \u7B49 " + this.files.length + " \u4E2A\u6587\u4EF6\u3002" : "\u4F1A\u79FB\u5230\u7CFB\u7EDF\u56DE\u6536\u7AD9\uFF1A" + names + "\u3002"
+    });
+    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
+    const cancel = foot.createEl("button", { cls: "wb-btn", text: "\u53D6\u6D88" });
+    cancel.onclick = () => this.close();
+    const remove = foot.createEl("button", { cls: "wb-btn wb-btn-danger", text: "\u5220\u9664" });
+    remove.onclick = () => {
+      this.close();
+      if (this.onConfirm)
+        this.onConfirm();
+    };
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var FolderPickerModal = class extends Modal {
+  constructor(app, options) {
+    super(app);
+    this.options = options || {};
+  }
+  listFolders() {
+    const out = [];
+    const walk = (folder) => {
+      for (const child of folder.children || []) {
+        if (!Array.isArray(child.children))
+          continue;
+        if (!isIgnoredPath(child.path + "/"))
+          out.push(child.path);
+        walk(child);
+      }
+    };
+    const root = this.app.vault.getRoot();
+    if (root)
+      walk(root);
+    return out.sort((a, b) => a.localeCompare(b, "zh"));
+  }
+  // 逐级建目录，父级不存在时一并补上；创建后文件树会自动出现
+  async ensureFolder(path) {
+    const parts = String(path).split("/").filter(Boolean);
+    let cur = "";
+    for (const part of parts) {
+      cur = cur ? cur + "/" + part : part;
+      const found = this.app.vault.getAbstractFileByPath(cur);
+      if (!found)
+        await this.app.vault.createFolder(cur);
+      else if (!Array.isArray(found.children))
+        throw new Error("\u300C" + cur + "\u300D\u5DF2\u88AB\u540C\u540D\u6587\u4EF6\u5360\u7528");
+    }
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("wb-modaleditor");
+    contentEl.createEl("h2", { text: "\u9009\u62E9\u4FDD\u5B58\u6587\u4EF6\u5939" });
+    contentEl.createDiv({
+      cls: "wb-modal-hint",
+      text: "\u9009\u4E00\u4E2A\u5DF2\u6709\u7684\u6587\u4EF6\u5939\uFF0C\u6216\u70B9\u4E0B\u9762\u7684\u300C\u65B0\u5EFA\u6587\u4EF6\u5939\u300D\u76F4\u63A5\u5EFA\u4E00\u4E2A\u3002"
+    });
+    const pickWrap = contentEl.createDiv();
+    const input = pickWrap.createEl("input", {
+      cls: "wb-modalfilter",
+      attr: { type: "text", placeholder: "\u7B5B\u9009\u6587\u4EF6\u5939\u2026" }
+    });
+    const listEl = pickWrap.createDiv({ cls: "wb-picklist" });
+    const empty = pickWrap.createDiv({ cls: "wb-modal-hint" });
+    const folders = this.listFolders();
+    const draw = () => {
+      const q = String(input.value || "").trim().toLowerCase();
+      const rows = folders.filter((p) => !q || p.toLowerCase().includes(q));
+      listEl.empty();
+      empty.setText(
+        folders.length ? "\u6CA1\u6709\u5339\u914D\u7684\u6587\u4EF6\u5939\u3002" : "\u5E93\u91CC\u8FD8\u6CA1\u6709\u6587\u4EF6\u5939\uFF0C\u70B9\u4E0B\u9762\u7684\u300C\u65B0\u5EFA\u6587\u4EF6\u5939\u300D\u5EFA\u4E00\u4E2A\u3002"
+      );
+      empty.toggle(rows.length === 0);
+      rows.forEach((path) => {
+        const row = listEl.createDiv({ cls: "wb-pickitem" });
+        if (path === this.options.current)
+          row.addClass("is-active");
+        const icon = row.createDiv({ cls: "wb-pickicon" });
+        setIcon(icon, "folder");
+        row.createDiv({ cls: "wb-pickname", text: path });
+        row.onclick = () => {
+          this.close();
+          if (this.options.onPick)
+            this.options.onPick(path);
+        };
+      });
+    };
+    input.addEventListener("input", draw);
+    draw();
+    const form = contentEl.createDiv({ cls: "wb-foldernew is-hidden" });
+    form.createDiv({ cls: "wb-modalfield-label", text: "\u65B0\u6587\u4EF6\u5939\u8DEF\u5F84" });
+    const nameInput = form.createEl("input", {
+      cls: "wb-modalfilter",
+      attr: { type: "text", placeholder: "\u4F8B\u5982\uFF1A01-Notes \u6216 10-Modules/\u5065\u8EAB\u8BB0\u5F55" }
+    });
+    form.createDiv({
+      cls: "wb-modal-hint",
+      text: "\u652F\u6301\u591A\u7EA7\u8DEF\u5F84\uFF0C\u521B\u5EFA\u540E\u4F1A\u7ACB\u5373\u51FA\u73B0\u5728 Obsidian \u6587\u4EF6\u6811\u91CC\u3002"
+    });
+    const formFoot = form.createDiv({ cls: "wb-modalfoot" });
+    const backBtn = formFoot.createEl("button", { cls: "wb-btn", text: "\u8FD4\u56DE" });
+    const okBtn = formFoot.createEl("button", {
+      cls: "wb-btn wb-btn-accent",
+      text: "\u521B\u5EFA\u5E76\u4F7F\u7528"
+    });
+    const showForm = (on) => {
+      form.classList.toggle("is-hidden", !on);
+      pickWrap.classList.toggle("is-hidden", on);
+      if (on)
+        nameInput.focus();
+    };
+    backBtn.onclick = () => showForm(false);
+    okBtn.onclick = async () => {
+      const value = String(nameInput.value || "").trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+      if (!value) {
+        new Notice("\u8BF7\u8F93\u5165\u6587\u4EF6\u5939\u540D\u79F0");
+        return;
+      }
+      if (value.split("/").some((part) => !part || part === "." || part === "..")) {
+        new Notice("\u8DEF\u5F84\u4E0D\u5408\u6CD5\uFF0C\u8BF7\u91CD\u65B0\u586B\u5199");
+        return;
+      }
+      const found = this.app.vault.getAbstractFileByPath(value);
+      if (found && !Array.isArray(found.children)) {
+        new Notice("\u300C" + value + "\u300D\u5DF2\u88AB\u540C\u540D\u6587\u4EF6\u5360\u7528");
+        return;
+      }
+      if (!found) {
+        try {
+          await this.ensureFolder(value);
+        } catch (error) {
+          new Notice("\u521B\u5EFA\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
+          return;
+        }
+      }
+      this.close();
+      if (this.options.onPick)
+        this.options.onPick(value);
+    };
+    nameInput.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter")
+        okBtn.click();
+    });
+    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
+    const create = foot.createEl("button", {
+      cls: "wb-btn wb-btn-accent wb-foldernew-btn",
+      text: "\u65B0\u5EFA\u6587\u4EF6\u5939"
+    });
+    create.onclick = () => {
+      showForm(true);
+      nameInput.focus();
+    };
+    const cancel = foot.createEl("button", { cls: "wb-btn", text: "\u53D6\u6D88" });
+    cancel.onclick = () => this.close();
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var ModulePickerModal = class extends Modal {
+  constructor(app, modules, onPick, onCreate) {
+    super(app);
+    this.modules = modules || [];
+    this.onPick = onPick;
+    this.onCreate = onCreate;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("wb-modaleditor");
+    contentEl.createEl("h2", { text: "\u5F52\u5165\u6A21\u5757" });
+    contentEl.createDiv({
+      cls: "wb-modal-hint",
+      text: "\u53EA\u4F1A\u5199\u5165 module \u5B57\u6BB5\uFF0C\u6587\u4EF6\u4F4D\u7F6E\u4E0D\u53D8\u3002"
+    });
+    const list = contentEl.createDiv({ cls: "wb-picklist" });
+    this.modules.forEach((mod) => {
+      const item = list.createDiv({ cls: "wb-pickitem" });
+      const iconEl = item.createDiv({ cls: "wb-pickicon" });
+      iconEl.style.setProperty("--dot-color", mod.color || "var(--interactive-accent)");
+      setIcon(iconEl, mod.icon || "file-text");
+      item.createDiv({ cls: "wb-pickname", text: mod.name });
+      item.onclick = () => {
+        this.close();
+        if (this.onPick)
+          this.onPick(mod);
+      };
+    });
+    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
+    const create = foot.createEl("button", { cls: "wb-btn", text: "\u65B0\u5EFA\u6A21\u5757\u2026" });
+    create.onclick = () => {
+      this.close();
+      if (this.onCreate)
+        this.onCreate();
+    };
+    const cancel = foot.createEl("button", { cls: "wb-btn", text: "\u53D6\u6D88" });
+    cancel.onclick = () => this.close();
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var ModuleManagerModal = class extends Modal {
+  constructor(app, options) {
+    super(app);
+    this.options = options || {};
+    this.armedId = null;
+    this.dragEl = null;
+    this.dragBlocked = false;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("wb-modaleditor");
+    contentEl.createEl("h2", { text: "\u7BA1\u7406\u6A21\u5757" });
+    contentEl.createDiv({
+      cls: "wb-modal-hint",
+      text: "\u62D6\u52A8\u5DE6\u4FA7\u628A\u624B\u53EF\u4EE5\u6392\u5E8F\uFF0C\u987A\u5E8F\u4F1A\u540C\u6B65\u5230\u5DE6\u8FB9\u5BFC\u822A\u3002\u5220\u9664\u6A21\u5757\u53EA\u4F1A\u79FB\u9664\u7B5B\u9009\u5165\u53E3\uFF0C\u4E0D\u4F1A\u5220\u9664\u7B14\u8BB0\u6587\u4EF6\u3002"
+    });
+    this.listEl = contentEl.createDiv({ cls: "wb-picklist" });
+    this.renderList();
+    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
+    const create = foot.createEl("button", { cls: "wb-btn wb-btn-accent", text: "\u65B0\u5EFA\u6A21\u5757" });
+    create.onclick = () => {
+      this.close();
+      if (this.options.onCreate)
+        this.options.onCreate();
+    };
+    const close = foot.createEl("button", { cls: "wb-btn", text: "\u5173\u95ED" });
+    close.onclick = () => this.close();
+  }
+  renderList() {
+    const list = this.listEl;
+    list.empty();
+    const mods = this.options.getModules ? this.options.getModules() : [];
+    if (!mods.length) {
+      list.createDiv({ cls: "wb-modal-hint", text: "\u8FD8\u6CA1\u6709\u6A21\u5757\uFF0C\u70B9\u4E0B\u9762\u7684\u300C\u65B0\u5EFA\u6A21\u5757\u300D\u3002" });
+      return;
+    }
+    mods.forEach((mod) => {
+      const row = list.createDiv({ cls: "wb-modrow" });
+      row.dataset.modId = mod.id;
+      row.setAttribute("draggable", "true");
+      const grip = row.createDiv({ cls: "wb-modrow-grip" });
+      setIcon(grip, "grip-vertical");
+      const iconEl = row.createDiv({ cls: "wb-pickicon" });
+      iconEl.style.setProperty("--dot-color", mod.color || "var(--interactive-accent)");
+      setIcon(iconEl, mod.icon || "file-text");
+      row.createDiv({ cls: "wb-modrow-name", text: mod.name });
+      row.addEventListener("mousedown", (evt) => {
+        this.dragBlocked = !!(evt.target.closest && evt.target.closest("button"));
+      });
+      row.addEventListener("dragstart", (evt) => {
+        if (this.dragBlocked) {
+          evt.preventDefault();
+          return;
+        }
+        this.dragEl = row;
+        row.addClass("is-dragging");
+        if (evt.dataTransfer) {
+          evt.dataTransfer.effectAllowed = "move";
+          evt.dataTransfer.setData("text/plain", mod.id);
+        }
+      });
+      row.addEventListener("dragover", (evt) => {
+        if (!this.dragEl || this.dragEl === row)
+          return;
+        evt.preventDefault();
+        if (evt.dataTransfer)
+          evt.dataTransfer.dropEffect = "move";
+        const rect = row.getBoundingClientRect();
+        const after = evt.clientY > rect.top + rect.height / 2;
+        list.insertBefore(this.dragEl, after ? row.nextSibling : row);
+      });
+      row.addEventListener("dragend", () => {
+        row.removeClass("is-dragging");
+        this.dragEl = null;
+        this.dragBlocked = false;
+        this.commitOrder();
+      });
+      const edit = row.createEl("button", { cls: "wb-btn", text: "\u7F16\u8F91" });
+      edit.onclick = () => {
+        this.close();
+        if (this.options.onEdit)
+          this.options.onEdit(mod);
+      };
+      const armed = this.armedId === mod.id;
+      const del = row.createEl("button", {
+        cls: "wb-btn wb-btn-danger",
+        text: armed ? "\u786E\u8BA4\u5220\u9664" : "\u5220\u9664"
+      });
+      del.onclick = () => {
+        if (this.armedId !== mod.id) {
+          this.armedId = mod.id;
+          this.renderList();
+          return;
+        }
+        this.armedId = null;
+        if (this.options.onDelete)
+          this.options.onDelete(mod);
+        this.renderList();
+      };
+    });
+  }
+  // 按当前 DOM 顺序回写模块顺序，导航会同步更新
+  commitOrder() {
+    if (!this.listEl)
+      return;
+    const order = Array.from(this.listEl.querySelectorAll(".wb-modrow")).map((row) => row.dataset.modId).filter(Boolean);
+    if (this.options.onReorder)
+      this.options.onReorder(order);
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var WorkbenchView = class extends ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.plugin = plugin;
+    this.active = "home";
+    this.focus = false;
+    this.navCollapsed = !!(plugin && plugin.settings && plugin.settings.navCollapsed);
+    this._mdFiles = [];
+    this._contentFiles = [];
+    this._ownership = null;
+    this._needsRefresh = false;
+    this.gallery = null;
+    this.notes = null;
+  }
+  getViewType() {
+    return VIEW_TYPE;
+  }
+  getDisplayText() {
+    return "Collis";
+  }
+  getIcon() {
+    return PLUGIN_ICON_ID;
+  }
+  async onOpen() {
+    this.containerEl.addClass("workbench-view");
+    this.contentEl.addClass("wb-content");
+    this.render();
+    this.watchWidth();
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        if (leaf === this.leaf && this._needsRefresh)
+          this.refresh();
+      })
+    );
+  }
+  async onClose() {
+    if (this._ro) {
+      this._ro.disconnect();
+      this._ro = null;
+    }
+    document.body.classList.remove("workbench-focus");
+    this.focus = false;
+    this.destroyGallery();
+    this.destroyNotes();
+  }
+  /* 侧栏一展开，视图宽度就变，但窗口宽度不变，所以断点必须量视图自身。
+     ResizeObserver 盯着视图容器，实时把宽度换算成三档类名和一个留白变量。 */
+  watchWidth() {
+    if (this._ro)
+      this._ro.disconnect();
+    if (typeof ResizeObserver !== "function")
+      return;
+    this._ro = new ResizeObserver(() => this.applyLayout());
+    this._ro.observe(this.containerEl);
+  }
+  applyLayout() {
+    const app = this.appEl;
+    if (!app)
+      return;
+    let w = 0;
+    try {
+      w = this.containerEl.clientWidth || 0;
+    } catch (e) {
+      w = 0;
+    }
+    if (w < 40)
+      return;
+    app.classList.toggle("is-compact", w < 1120);
+    app.classList.toggle("is-mini", w < 940);
+    app.classList.toggle("is-nav-collapsed", !!this.navCollapsed);
+    const pad = Math.max(12, Math.min(28, Math.round(w * 0.026)));
+    app.style.setProperty("--wb-pad", pad + "px");
+  }
+  getModules() {
+    const list = this.plugin.settings.modules;
+    if (Array.isArray(list))
+      return list;
+    return DEFAULT_MODULES;
+  }
+  contentFiles() {
+    return this._contentFiles.length ? this._contentFiles : this.app.vault.getMarkdownFiles().filter(isContentFile);
+  }
+  /* 收件箱 / 模块归属用的全量清单：
+   * 整个 vault 的 Markdown 都算，只排除卡片笔记的月度聚合文件。
+   * 白板是 .collis，不在 getMarkdownFiles() 里，天然被排除。
+   * 不再按顶层文件夹白名单过滤，避免文件在文件树里一挪位置就“消失”。 */
+  vaultFiles() {
+    return this.app.vault.getMarkdownFiles().filter(
+      (file) => !isIgnoredPath(file.path) && !file.path.startsWith(CARD_FOLDER + "/")
+    );
+  }
+  moduleKeys(mod) {
+    return [mod.id, mod.module, mod.name].filter(Boolean).map((v) => String(v).trim().toLowerCase()).filter(Boolean);
+  }
+  // frontmatter 的 module 字段：英文 id 和中文名都认，数组写法也认。
+  explicitModule(fm) {
+    const raw = fm ? fm.module : null;
+    if (Array.isArray(raw)) {
+      return raw.map((v) => String(v).trim().toLowerCase()).filter(Boolean);
+    }
+    const value = raw === null || raw === void 0 ? "" : String(raw).trim().toLowerCase();
+    return value ? [value] : [];
+  }
+  // 旧数据的兜底规则：文件夹前缀、type、标签。
+  // 只在文件头没有写 module 时使用，保证升级后老笔记不会突然“消失”。
+  fileFitsModule(file, fm, mod) {
+    if (Array.isArray(mod.types) && fm && mod.types.includes(fm.type))
+      return true;
+    if (mod.folder && file.path.startsWith(mod.folder + "/"))
+      return true;
+    if (Array.isArray(mod.keywords) && mod.keywords.length) {
+      const tags = getTags(fm).map((t) => t.toLowerCase());
+      return tags.some(
+        (tag) => mod.keywords.some((k) => tag.includes(String(k).toLowerCase()))
+      );
+    }
+    return false;
+  }
+  /* 归属表：一篇笔记只归一个模块。
+   * 顺序是“显式字段 → 兜底规则”，多个模块都命中时按导航里的先后顺序取第一个，
+   * 这样统计数字不会再因为模糊标签而翻倍。卡片笔记的月度聚合文件不参与。 */
+  buildOwnership(files) {
+    const mods = this.getModules().map((mod) => ({
+      mod,
+      id: String(mod.id || mod.module || mod.name || ""),
+      keys: this.moduleKeys(mod)
+    }));
+    const own = /* @__PURE__ */ new Map();
+    for (const file of files) {
+      if (file.path.startsWith(CARD_FOLDER + "/"))
+        continue;
+      const fm = getFm(this.app, file);
+      const explicit = this.explicitModule(fm);
+      let hit = null;
+      if (explicit.length) {
+        hit = mods.find((entry) => explicit.some((v) => entry.keys.includes(v)));
+      }
+      if (!hit)
+        hit = mods.find((entry) => this.fileFitsModule(file, fm, entry.mod));
+      if (hit)
+        own.set(file.path, hit.id);
+    }
+    this._ownership = own;
+    return own;
+  }
+  filesFor(mod) {
+    const files = this.vaultFiles();
+    const own = this._ownership || this.buildOwnership(files);
+    const id = String(mod.id || mod.module || mod.name || "");
+    return files.filter((file) => own.get(file.path) === id);
+  }
+  /* 模块页收录范围：
+   *   - 按 frontmatter / type / 标签归属到本模块的笔记；
+   *   - 模块保存文件夹里的图片、视频、PDF、音频等素材附件。
+   * 附件没有 frontmatter，只能按文件夹认领；导航计数仍只统计笔记，
+   * 不影响首页和收集箱的现有口径。 */
+  moduleFiles(mod) {
+    const notes = this.filesFor(mod);
+    const seen = new Set(notes.map((file) => file.path));
+    const out = notes.slice();
+    const dir = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
+    if (dir) {
+      this.vaultAttachments().forEach((file) => {
+        if (seen.has(file.path))
+          return;
+        if (file.path.indexOf(dir + "/") !== 0)
+          return;
+        seen.add(file.path);
+        out.push(file);
+      });
+    }
+    return out;
+  }
+  // 收件箱也收录附件：图片 / 视频 / PDF / 音频等，排除白板和隐藏目录。
+  // 只收白名单里的扩展名，白板的历史备份（xxx.volis.json、xxx.collis.bak）
+  // 这类复合后缀不会再混进来。
+  vaultAttachments() {
+    return this.app.vault.getFiles().filter((file) => {
+      if (file.extension === "md")
+        return false;
+      if (["collis", "volis", "canvas"].includes(file.extension.toLowerCase()))
+        return false;
+      const lower = file.path.toLowerCase();
+      if (lower.includes(".volis.") || lower.includes(".collis."))
+        return false;
+      if (!ATTACHMENT_EXTENSIONS.has(file.extension.toLowerCase()))
+        return false;
+      return !isIgnoredPath(file.path);
+    });
+  }
+  /* 收集箱 = 待处理队列，不是某个文件夹。
+   * 判断依据只看 frontmatter 里有没有写下被认可的 module：
+   *   - 没写 module → 进收件箱；
+   *   - 写了但没有任何模块认领（拼错/旧值）→ 也进收件箱，方便修正；
+   *   - 写了且能对应上模块 → 已归属，离开收件箱。
+   * 不再用文件夹 / 标签 / type 的兜底规则判断收件箱归属，
+   * 否则 Clippings 这类默认文件夹里的新文件会被自动“认领”，
+   * 导致文件树里有文件、收件箱却是空的。
+   */
+  inboxFiles() {
+    const md = this.vaultFiles();
+    const known = /* @__PURE__ */ new Set();
+    this.getModules().forEach((mod) => {
+      this.moduleKeys(mod).forEach((k) => known.add(k));
+    });
+    const pending = md.filter((file) => {
+      const explicit = this.explicitModule(getFm(this.app, file));
+      if (!explicit.length)
+        return true;
+      return !explicit.some((v) => known.has(v));
+    });
+    return pending.concat(this.vaultAttachments()).sort((a, b) => b.stat.mtime - a.stat.mtime);
+  }
+  // 文件里写了 module，但没有任何模块配置认领这个值（且用户没点过忽略）。
+  unknownModuleValues() {
+    const known = /* @__PURE__ */ new Set();
+    this.getModules().forEach((mod) => this.moduleKeys(mod).forEach((k) => known.add(k)));
+    const ignored = new Set(
+      (this.plugin.settings.ignoredModuleValues || []).map((v) => String(v).toLowerCase())
+    );
+    const groups = /* @__PURE__ */ new Map();
+    for (const file of this.vaultFiles()) {
+      const values = this.explicitModule(getFm(this.app, file));
+      values.forEach((value) => {
+        if (known.has(value) || ignored.has(value))
+          return;
+        if (!groups.has(value))
+          groups.set(value, []);
+        groups.get(value).push(file);
+      });
+    }
+    return groups;
+  }
+  openFile(file) {
+    if (!file)
+      return;
+    this.app.workspace.getLeaf("tab").openFile(file);
+  }
+  openModuleEditor(mod, initialName) {
+    const mods = this.getModules();
+    const index = mod ? mods.findIndex((m) => m.id === mod.id) : -1;
+    new ModuleEditorModal(this.app, {
+      module: mod,
+      initialName: initialName || "",
+      // 内置模块没有 color 字段，打开编辑器时用它在导航里的预设色，避免一编辑就变色
+      initialColor: index >= 0 ? MODULE_COLORS[index % MODULE_COLORS.length] : MODULE_COLORS[0],
+      onSave: async (next) => {
+        const list = this.getModules().slice();
+        const idx = list.findIndex((m) => m.id === next.id);
+        if (idx >= 0)
+          list[idx] = next;
+        else
+          list.push(next);
+        this.plugin.settings.modules = list;
+        this._ownership = null;
+        await this.plugin.saveSettings();
+        new Notice("\u5DF2\u4FDD\u5B58\u6A21\u5757\u300C" + next.name + "\u300D");
+        const pending = this._pendingAssign;
+        this._pendingAssign = null;
+        if (pending && pending.length)
+          this.assignToModule(pending, next);
+      },
+      onDelete: mod ? async (target) => {
+        const list = this.getModules().filter((m) => m.id !== target.id);
+        this.plugin.settings.modules = list;
+        if (this.active === target.id)
+          this.active = "home";
+        this._ownership = null;
+        await this.plugin.saveSettings();
+        new Notice("\u5DF2\u5220\u9664\u6A21\u5757\u300C" + target.name + "\u300D\uFF0C\u7B14\u8BB0\u6587\u4EF6\u672A\u53D7\u5F71\u54CD");
+      } : null
+    }).open();
+  }
+  openModuleManager() {
+    new ModuleManagerModal(this.app, {
+      getModules: () => this.getModules(),
+      onCreate: () => this.openModuleEditor(null),
+      onEdit: (mod) => this.openModuleEditor(mod),
+      onReorder: async (orderIds) => {
+        const byId = new Map(this.getModules().map((m) => [m.id, m]));
+        const list = orderIds.map((id) => byId.get(id)).filter(Boolean);
+        if (!list.length || list.length !== byId.size)
+          return;
+        this.plugin.settings.modules = list;
+        this._ownership = null;
+        await this.plugin.saveSettings();
+      },
+      onDelete: async (mod) => {
+        const list = this.getModules().filter((m) => m.id !== mod.id);
+        this.plugin.settings.modules = list;
+        if (this.active === mod.id)
+          this.active = "home";
+        this._ownership = null;
+        await this.plugin.saveSettings();
+        new Notice("\u5DF2\u5220\u9664\u6A21\u5757\u300C" + mod.name + "\u300D\uFF0C\u7B14\u8BB0\u6587\u4EF6\u672A\u53D7\u5F71\u54CD");
+      }
+    }).open();
+  }
+  openModulePicker(files) {
+    if (!files || !files.length)
+      return;
+    new ModulePickerModal(
+      this.app,
+      this.getModules(),
+      (mod) => this.assignToModule(files, mod),
+      () => {
+        this._pendingAssign = files;
+        this.openModuleEditor(null);
+      }
+    ).open();
+  }
+  // 等 Obsidian 的元数据缓存刷新，避免刚写完 module 又被旧缓存判成未归类
+  waitForMetadata(file, timeout = 800) {
+    const cache = this.app.metadataCache;
+    return new Promise((resolve) => {
+      let done = false;
+      let ref = null;
+      const finish = () => {
+        if (done)
+          return;
+        done = true;
+        try {
+          if (ref)
+            cache.offref(ref);
+        } catch (e) {
+        }
+        resolve();
+      };
+      ref = cache.on("changed", (changed) => {
+        if (changed && changed.path === file.path)
+          finish();
+      });
+      setTimeout(finish, timeout);
+    });
+  }
+  // 归入模块 = 只写 module 字段，不移动文件。
+  async assignToModule(files, mod) {
+    const value = String(mod.module || mod.id);
+    let done = 0;
+    for (const file of files) {
+      try {
+        await this.app.fileManager.processFrontMatter(file, (fm) => {
+          fm.module = value;
+        });
+        await this.waitForMetadata(file);
+        done += 1;
+      } catch (e) {
+      }
+    }
+    this._ownership = null;
+    this._inboxSel = /* @__PURE__ */ new Set();
+    new Notice("\u5DF2\u5F52\u5165\u300C" + mod.name + "\u300D\uFF1A" + done + " \u7BC7");
+    this.render();
+  }
+  // 按标签 / 文件夹名 / 文件名给未归类笔记猜一个模块，只做建议，不自动改文件
+  suggestModuleFor(file) {
+    if (file.extension !== "md")
+      return null;
+    const fm = getFm(this.app, file);
+    const tags = getTags(fm).map((t) => t.toLowerCase());
+    const segs = file.parent ? file.parent.path.split("/").map((s) => s.toLowerCase()) : [];
+    const base = file.basename.toLowerCase();
+    for (const mod of this.getModules()) {
+      const names = [mod.name, mod.id, mod.module].filter(Boolean).map((s) => String(s).toLowerCase());
+      if (tags.some((t) => names.some((n) => t === n || t.startsWith(n + "/"))))
+        return mod;
+      if (segs.some((s) => names.some((n) => s === n)))
+        return mod;
+      const keywords = (mod.keywords || []).map((k) => String(k).toLowerCase()).filter(Boolean);
+      if (tags.some((t) => keywords.some((k) => t === k || t.startsWith(k + "/"))))
+        return mod;
+      if (keywords.some((k) => k.length >= 2 && base.includes(k)))
+        return mod;
+    }
+    return null;
+  }
+  // 一次性采纳收集箱里的全部归属建议
+  async applyAllSuggestions(files) {
+    let total = 0;
+    for (const file of files) {
+      if (file.extension !== "md")
+        continue;
+      const mod = this.suggestModuleFor(file);
+      if (!mod)
+        continue;
+      const value = String(mod.module || mod.id);
+      try {
+        await this.app.fileManager.processFrontMatter(file, (fm) => {
+          fm.module = value;
+        });
+        await this.waitForMetadata(file);
+        total += 1;
+      } catch (e) {
+      }
+    }
+    this._ownership = null;
+    this._inboxSel = /* @__PURE__ */ new Set();
+    new Notice(total ? "\u6309\u5EFA\u8BAE\u5F52\u5165 " + total + " \u7BC7" : "\u6CA1\u6709\u53EF\u5F52\u5165\u7684\u7B14\u8BB0");
+    this.render();
+  }
+  // 删除收集箱条目：笔记和附件都移入系统回收站，可随时恢复
+  deleteFiles(files, onDone) {
+    if (!files || !files.length)
+      return;
+    new DeleteFilesModal(this.app, files, async () => {
+      let done = 0;
+      for (const file of files) {
+        try {
+          if (this.app.fileManager && this.app.fileManager.trashFile) {
+            await this.app.fileManager.trashFile(file);
+          } else {
+            await this.app.vault.trash(file, true);
+          }
+          done += 1;
+          if (this._inboxSel)
+            this._inboxSel.delete(file.path);
+        } catch (e) {
+        }
+      }
+      this._ownership = null;
+      new Notice("\u5DF2\u5220\u9664 " + done + " \u4E2A\u6587\u4EF6\uFF0C\u53EF\u5728\u56DE\u6536\u7AD9\u6062\u590D");
+      if (typeof onDone === "function")
+        onDone(done);
+      else
+        this.render();
+    }).open();
+  }
+  ignoreModuleValue(value) {
+    const list = (this.plugin.settings.ignoredModuleValues || []).slice();
+    if (!list.includes(value))
+      list.push(value);
+    this.plugin.settings.ignoredModuleValues = list;
+    this.plugin.saveSettings();
+  }
+  runCommand(id) {
+    try {
+      return this.app.commands.executeCommandById(id);
+    } catch (e) {
+      return false;
+    }
+  }
+  openCollis() {
+    const ok = this.runCommand("collis:open-cards");
+    if (ok)
+      return;
+    const leaf = this.app.workspace.getRightLeaf(false);
+    if (leaf) {
+      leaf.setViewState({ type: "qm-cards-view", active: true });
+      this.app.workspace.revealLeaf(leaf);
+    } else {
+      new Notice("\u6CA1\u6709\u627E\u5230 Collis \u89C6\u56FE");
+    }
+  }
+  quickCapture() {
+    if (!this.runCommand("collis:quick-capture")) {
+      new Notice("\u672A\u627E\u5230 Collis \u7684\u5FEB\u901F\u8BB0\u5F55\u547D\u4EE4");
+    }
+  }
+  // 画布集现在就是「白板」页本身，所有入口都切到这一页，不再开新标签。
+  openCollisGallery() {
+    this.go("canvas");
+  }
+  openSettings() {
+    try {
+      this.app.setting.open();
+      this.app.setting.openTabById(this.plugin.manifest.id);
+    } catch (e) {
+      new Notice("\u8BF7\u624B\u52A8\u6253\u5F00\u8BBE\u7F6E \u2192 Collis");
+    }
+  }
+  setFocus(on) {
+    this.focus = on;
+    document.body.classList.toggle("workbench-focus", on);
+    this.render();
+  }
+  setNavCollapsed(on) {
+    this.navCollapsed = !!on;
+    this.plugin.settings.navCollapsed = this.navCollapsed;
+    if (this.plugin.persistSettings)
+      this.plugin.persistSettings();
+    this.applyLayout();
+  }
+  refresh() {
+    if (!this.containerEl)
+      return;
+    const shown = typeof this.containerEl.isShown === "function" ? this.containerEl.isShown() : this.containerEl.offsetParent !== null;
+    if (!shown) {
+      this._needsRefresh = true;
+      return;
+    }
+    this._needsRefresh = false;
+    this._ownership = null;
+    if (this.active === "canvas" && this.gallery) {
+      this.gallery.refresh();
+      return;
+    }
+    if (this.active === "notes" && this.notes) {
+      this.notes.refresh();
+      return;
+    }
+    this.render();
+  }
+  go(id) {
+    if (this.active === "canvas" && id !== "canvas")
+      this.destroyGallery();
+    if (this.active === "notes" && id !== "notes")
+      this.destroyNotes();
+    this.active = id;
+    this.render();
+  }
+  destroyGallery() {
+    if (this.gallery)
+      this.gallery.destroy();
+  }
+  destroyNotes() {
+    if (this.notes)
+      this.notes.destroy();
+  }
+  getBoardFiles() {
+    return this.app.vault.getFiles().filter((f) => f.extension === BOARD_EXT).sort((a, b) => b.stat.mtime - a.stat.mtime);
+  }
+  getCardFiles() {
+    return this.app.vault.getFiles().filter((f) => f.extension === "md" && f.path.startsWith(CARD_FOLDER + "/")).sort((a, b) => b.stat.mtime - a.stat.mtime);
+  }
+  // 卡片总数只有读文件才知道，导航先渲染，数字到了再补进徽标。
+  fillCardCount(item) {
+    const collis = this.plugin.childPlugins && this.plugin.childPlugins.collis || this.app.plugins.plugins && this.app.plugins.plugins.collis;
+    if (!collis || typeof collis.readAllCards !== "function")
+      return;
+    collis.readAllCards().then((cards) => {
+      const total = Array.isArray(cards) ? cards.length : 0;
+      this._cardCount = total;
+      if (!item.isConnected)
+        return;
+      let badge = item.querySelector(".wb-navcount");
+      if (!total) {
+        if (badge)
+          badge.remove();
+        return;
+      }
+      if (!badge)
+        badge = item.createDiv({ cls: "wb-navcount" });
+      badge.setText(String(total));
+    }).catch(() => {
+    });
+  }
+  parseCards(text, file) {
+    const lines = text.split(/\r?\n/);
+    const cards = [];
+    let date = "";
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const heading = line.match(/^##\s+(\d{4}-\d{2}-\d{2})/);
+      if (heading) {
+        date = heading[1];
+        continue;
+      }
+      const start = line.match(/^-\s+(\d{2}:\d{2})\s+(.*)$/);
+      if (!start)
+        continue;
+      let body = start[2];
+      let j = i + 1;
+      while (j < lines.length && !/^-\s+\d{2}:\d{2}\s+/.test(lines[j]) && !/^##\s+/.test(lines[j])) {
+        body += "\n" + lines[j];
+        j++;
+      }
+      i = j - 1;
+      let id = "";
+      const idMatch = body.match(/\s\^([A-Za-z0-9]+)\s*$/);
+      if (idMatch) {
+        id = idMatch[1];
+        body = body.replace(/\s*\^[A-Za-z0-9]+\s*$/, "");
+      }
+      const tags = [];
+      body = body.replace(/#([^\s#]+)/g, (all, tag) => {
+        tags.push(tag);
+        return "";
+      }).replace(/\n{3,}/g, "\n\n").trim();
+      cards.push({
+        date,
+        time: start[1],
+        text: body,
+        tags,
+        id,
+        file,
+        sortKey: date + " " + start[1]
+      });
+    }
+    return cards;
+  }
+  async getRecentCards(limit) {
+    const files = this.getCardFiles().slice(0, 3);
+    let cards = [];
+    for (const file of files) {
+      let text = "";
+      try {
+        text = await this.app.vault.cachedRead(file);
+      } catch (e) {
+        continue;
+      }
+      cards = cards.concat(this.parseCards(text, file));
+    }
+    cards.sort((a, b) => a.sortKey < b.sortKey ? 1 : -1);
+    return cards.slice(0, limit || 6);
+  }
+  openCard(card) {
+    if (!card)
+      return;
+    const sub = card.id ? "#^" + card.id : "";
+    this.app.workspace.openLinkText(card.file.path + sub, "", true);
+  }
+  /** 首页速记卡片：切到卡片笔记页，并定位到具体这一条。 */
+  openCardInNotes(card) {
+    if (!card)
+      return;
+    this.go("notes");
+    if (this.notes)
+      this.notes.focusCard(card);
+  }
+  async readBoard(file) {
+    try {
+      const text = await this.app.vault.cachedRead(file);
+      const data = JSON.parse(text);
+      const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+      const edges = Array.isArray(data.edges) ? data.edges : [];
+      const first = nodes.find((n) => n && n.type === "text" && n.text);
+      const preview = first ? String(first.text).replace(/\s+/g, " ").slice(0, 26) : "\u7A7A\u767D\u767D\u677F";
+      return {
+        nodes: nodes.length,
+        edges: edges.length,
+        summary: nodes.length + " \u4E2A\u8282\u70B9 \xB7 " + preview
+      };
+    } catch (e) {
+      return { nodes: 0, edges: 0, summary: "\u65E0\u6CD5\u8BFB\u53D6\u767D\u677F" };
+    }
+  }
+  render() {
+    this._mdFiles = this.app.vault.getMarkdownFiles();
+    this._contentFiles = this._mdFiles.filter(isContentFile);
+    this.buildOwnership(this.vaultFiles());
+    if (this.active !== "canvas")
+      this.destroyGallery();
+    if (this.active !== "notes")
+      this.destroyNotes();
+    this.contentEl.empty();
+    this.contentEl.addClass("wb-content");
+    const root = this.contentEl.createDiv({ cls: "wb-app" });
+    this.appEl = root;
+    this.renderNav(root);
+    const main = root.createDiv({ cls: "wb-main" });
+    const restore = main.createDiv({ cls: "wb-navrestore" });
+    restore.setAttribute("aria-label", "\u5C55\u5F00 Collis \u4FA7\u680F");
+    setIcon(restore, "chevrons-right");
+    restore.onclick = () => this.setNavCollapsed(false);
+    const scroll = main.createDiv({ cls: "wb-scroll" });
+    if (this.active === "inbox") {
+      this.renderInbox(scroll);
+    } else if (this.active === "canvas") {
+      this.renderCanvas(scroll);
+    } else if (this.active === "notes") {
+      this.renderNotes(scroll);
+    } else if (this.active === "home") {
+      this.renderHome(scroll);
+    } else {
+      const mod = this.getModules().find((m) => m.id === this.active);
+      if (mod)
+        this.renderModule(scroll, mod);
+      else
+        this.renderHome(scroll);
+    }
+    this.applyLayout();
+  }
+  renderNav(root) {
+    const nav = root.createDiv({ cls: "wb-nav" });
+    const brand = nav.createDiv({ cls: "wb-brand" });
+    brand.createDiv({ cls: "wb-mark", text: "C" });
+    const brandName = this.plugin.settings.workspaceName || "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0";
+    const brandText = brand.createDiv({ cls: "wb-brand-txt" });
+    brandText.createDiv({ cls: "wb-brand-name", text: brandName });
+    brandText.createDiv({
+      cls: "wb-brand-sub",
+      text: brandName === "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0" ? "Collis Workspace" : "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0"
+    });
+    const collapseBtn = brand.createDiv({ cls: "wb-navtoggle" });
+    collapseBtn.setAttribute("aria-label", "\u6536\u8D77 Collis \u4FA7\u680F");
+    setIcon(collapseBtn, "chevrons-left");
+    collapseBtn.onclick = () => this.setNavCollapsed(true);
+    const navList = nav.createDiv({ cls: "wb-navlist" });
+    const group = (caption) => {
+      const g = navList.createDiv({ cls: "wb-navgroup" });
+      g.createDiv({ cls: "wb-navcap", text: caption });
+      return g;
+    };
+    const addItem = (parent, { label, icon, tile, color, active, count, onClick }) => {
+      const item = parent.createDiv({
+        cls: "wb-navitem" + (active ? " is-active" : "")
+      });
+      item.setAttribute("aria-label", label);
+      const iconEl = item.createDiv({
+        cls: "wb-navicon" + (tile ? " wb-navtile " + tile : "")
+      });
+      if (color)
+        iconEl.style.setProperty("--tint", color);
+      setIcon(iconEl, icon);
+      item.createDiv({ cls: "wb-navlabel", text: label });
+      if (count > 0)
+        item.createDiv({ cls: "wb-navcount", text: String(count) });
+      item.onclick = onClick;
+      return item;
+    };
+    const overview = group("OVERVIEW");
+    addItem(overview, {
+      label: "\u9996\u9875",
+      icon: "home",
+      active: this.active === "home",
+      onClick: () => this.go("home")
+    });
+    addItem(overview, {
+      label: "\u6536\u96C6\u7BB1",
+      icon: "inbox",
+      active: this.active === "inbox",
+      count: this.inboxFiles().length,
+      onClick: () => this.go("inbox")
+    });
+    const modules = navList.createDiv({ cls: "wb-navgroup" });
+    const capRow = modules.createDiv({ cls: "wb-navcap-row" });
+    capRow.createDiv({ cls: "wb-navcap", text: "MODULES" });
+    const capActs = capRow.createDiv({ cls: "wb-navcap-acts" });
+    const addModule = capActs.createDiv({ cls: "wb-navcap-btn" });
+    addModule.setAttribute("aria-label", "\u65B0\u5EFA\u6A21\u5757");
+    setIcon(addModule, "plus");
+    addModule.onclick = () => this.openModuleEditor(null);
+    const manageModule = capActs.createDiv({ cls: "wb-navcap-btn" });
+    manageModule.setAttribute("aria-label", "\u7BA1\u7406\u6A21\u5757");
+    setIcon(manageModule, "more-horizontal");
+    manageModule.onclick = () => this.openModuleManager();
+    this.getModules().forEach((mod, index) => {
+      addItem(modules, {
+        label: mod.name,
+        icon: mod.icon || "file",
+        tile: "wb-tint-" + index % 5,
+        color: mod.color,
+        active: this.active === mod.id,
+        count: this.moduleFiles(mod).length,
+        onClick: () => this.go(mod.id)
+      });
+    });
+    const workspace = group("WORKSPACE");
+    addItem(workspace, {
+      label: "\u767D\u677F",
+      icon: "presentation",
+      active: this.active === "canvas",
+      count: this.getBoardFiles().length,
+      onClick: () => this.go("canvas")
+    });
+    const cardsItem = addItem(workspace, {
+      label: "\u5361\u7247\u7B14\u8BB0",
+      icon: "sticky-note",
+      active: this.active === "notes",
+      count: this._cardCount || 0,
+      onClick: () => this.go("notes")
+    });
+    this.fillCardCount(cardsItem);
+    const foot = nav.createDiv({ cls: "wb-navfoot" });
+    const focusBtn = foot.createDiv({ cls: "wb-navitem" });
+    focusBtn.setAttribute("aria-label", this.focus ? "\u9000\u51FA\u4E13\u6CE8" : "\u4E13\u6CE8\u6A21\u5F0F");
+    const focusIcon = focusBtn.createDiv({ cls: "wb-navicon" });
+    setIcon(focusIcon, this.focus ? "minimize" : "maximize");
+    focusBtn.createDiv({ cls: "wb-navlabel", text: this.focus ? "\u9000\u51FA\u4E13\u6CE8" : "\u4E13\u6CE8\u6A21\u5F0F" });
+    focusBtn.onclick = () => this.setFocus(!this.focus);
+    const settingsBtn = foot.createDiv({ cls: "wb-navitem" });
+    settingsBtn.setAttribute("aria-label", "\u8BBE\u7F6E");
+    const settingsIcon = settingsBtn.createDiv({ cls: "wb-navicon" });
+    setIcon(settingsIcon, "settings");
+    settingsBtn.createDiv({ cls: "wb-navlabel", text: "\u8BBE\u7F6E" });
+    settingsBtn.onclick = () => this.openSettings();
+    foot.createDiv({ cls: "wb-navversion", text: "v" + this.plugin.manifest.version });
+  }
+  renderHome(el) {
+    el.addClass("wb-hm-scroll");
+    const page = el.createDiv({ cls: "wb-hm-page" });
+    const aurora = page.createDiv({ cls: "wb-hm-aurora" });
+    aurora.createEl("i", { cls: "wb-hm-a1" });
+    aurora.createEl("i", { cls: "wb-hm-a2" });
+    aurora.createEl("i", { cls: "wb-hm-a3" });
+    const boards = this.getBoardFiles();
+    const inbox = this.inboxFiles();
+    const modules = this.getModules();
+    const workspaceName = this.plugin.settings.workspaceName || "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0";
+    const now = /* @__PURE__ */ new Date();
+    const hour = now.getHours();
+    const greet = hour < 5 ? "\u51CC\u6668\u597D" : hour < 9 ? "\u65E9\u4E0A\u597D" : hour < 12 ? "\u4E0A\u5348\u597D" : hour < 14 ? "\u4E2D\u5348\u597D" : hour < 18 ? "\u4E0B\u5348\u597D" : "\u665A\u4E0A\u597D";
+    const WEEKNAMES = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+    const MONTHNAMES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    let captureInput = null;
+    const top = page.createDiv({ cls: "wb-hm-top" });
+    const crumb = top.createDiv({ cls: "wb-hm-crumb" });
+    crumb.createEl("b", { text: "\u603B\u89C8" });
+    crumb.createSpan({ text: " / \u9996\u9875" });
+    top.createDiv({ cls: "wb-hm-topspace" });
+    const cmd = top.createDiv({ cls: "wb-hm-cmd" });
+    setIcon(cmd.createDiv({ cls: "wb-hm-cmdico" }), "search");
+    cmd.createSpan({ text: "\u5FEB\u901F\u8BB0\u4E00\u6761" });
+    cmd.createDiv({ cls: "wb-hm-kbd", text: "\u21B5" });
+    cmd.onclick = () => {
+      if (captureInput)
+        captureInput.focus();
+    };
+    const gear = top.createDiv({ cls: "wb-hm-iconbtn" });
+    gear.setAttribute("aria-label", "\u8BBE\u7F6E");
+    setIcon(gear, "settings");
+    gear.onclick = () => this.openSettings();
+    top.createDiv({
+      cls: "wb-hm-avatar",
+      text: workspaceName.slice(0, 2) || "C"
+    });
+    const grid = page.createDiv({ cls: "wb-hm-bento" });
+    const hero = grid.createDiv({ cls: "wb-hm-card wb-hm-hero wb-hm-s5" });
+    hero.createDiv({ cls: "wb-hm-bigdate", text: String(now.getDate()) });
+    const heroTop = hero.createDiv({ cls: "wb-hm-herotop" });
+    heroTop.createDiv({ cls: "wb-hm-live" });
+    heroTop.createSpan({ text: WEEKNAMES[now.getDay()] + " \xB7 " + MONTHNAMES[now.getMonth()] + " " + now.getDate() });
+    const heroMid = hero.createDiv({ cls: "wb-hm-heromid" });
+    const hello = heroMid.createEl("h1", { cls: "wb-hm-hello" });
+    hello.createSpan({ text: greet + "\uFF0C" });
+    hello.createSpan({ cls: "wb-hm-gradtext", text: workspaceName });
+    const meta = heroMid.createDiv({ cls: "wb-hm-herometa" });
+    const metaPart = (value, label) => {
+      meta.createSpan({ text: "" }).createEl("b", { text: String(value) });
+      meta.createSpan({ text: " " + label });
+    };
+    metaPart(modules.length, "\u4E2A\u6A21\u5757");
+    meta.createDiv({ cls: "wb-hm-sep" });
+    metaPart(boards.length, "\u5757\u767D\u677F");
+    meta.createDiv({ cls: "wb-hm-sep" });
+    metaPart(inbox.length, "\u6761\u5F85\u6574\u7406");
+    const capture = hero.createDiv({ cls: "wb-hm-capture" });
+    setIcon(capture.createDiv({ cls: "wb-hm-captico" }), "plus");
+    captureInput = capture.createEl("input", {
+      cls: "wb-hm-captinput",
+      attr: { type: "text", placeholder: "\u8BB0\u4E00\u6761\u901F\u8BB0\uFF0C\u56DE\u8F66\u4FDD\u5B58\u2026" }
+    });
+    const sendBtn = capture.createDiv({ cls: "wb-hm-go" });
+    setIcon(sendBtn, "arrow-right");
+    const submitCapture = async () => {
+      const text = String(captureInput.value || "").trim();
+      if (!text) {
+        captureInput.focus();
+        return;
+      }
+      const collis = this.plugin.childPlugins && this.plugin.childPlugins.collis;
+      if (collis && typeof collis.appendCard === "function") {
+        const ok = await collis.appendCard(text);
+        if (ok) {
+          captureInput.value = "";
+          window.setTimeout(() => {
+            if (this.active === "home")
+              this.refresh();
+          }, 320);
+        }
+      } else {
+        this.quickCapture();
+      }
+    };
+    captureInput.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter") {
+        evt.preventDefault();
+        submitCapture();
+      }
+    });
+    sendBtn.onclick = submitCapture;
+    const weekCard = grid.createDiv({ cls: "wb-hm-card wb-hm-week wb-hm-s4" });
+    const weekHead = weekCard.createDiv({ cls: "wb-hm-head" });
+    weekHead.createDiv({ cls: "wb-hm-title", text: "\u672C\u5468\u8282\u594F" });
+    weekHead.createDiv({ cls: "wb-hm-sub", text: "\u8FC7\u53BB 12 \u5468" });
+    const dayMs = 864e5;
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTime = today.getTime();
+    const monday = todayTime - (today.getDay() + 6) % 7 * dayMs;
+    const buckets = /* @__PURE__ */ new Map();
+    let recentCount = 0;
+    let prevCount = 0;
+    const recentFrom = todayTime - 6 * dayMs;
+    const prevFrom = todayTime - 13 * dayMs;
+    for (const file of [...this._contentFiles, ...boards]) {
+      const d = new Date(file.stat.mtime);
+      d.setHours(0, 0, 0, 0);
+      const key = d.getTime();
+      buckets.set(key, (buckets.get(key) || 0) + 1);
+      if (key >= recentFrom)
+        recentCount += 1;
+      else if (key >= prevFrom)
+        prevCount += 1;
+    }
+    const trend = prevCount ? Math.round((recentCount - prevCount) / prevCount * 100) : null;
+    const weekNum = weekCard.createDiv({ cls: "wb-hm-weeknum" });
+    weekNum.createEl("strong", { text: String(recentCount) });
+    weekNum.createSpan({ text: "\u6B21\u7F16\u8F91" });
+    const trendEl = weekNum.createDiv({
+      cls: "wb-hm-trend" + (trend !== null && trend < 0 ? " is-down" : ""),
+      text: trend === null ? "\u2014" : (trend > 0 ? "+" : "") + trend + "%"
+    });
+    const heat = weekCard.createDiv({ cls: "wb-hm-heat" });
+    const levels = [0, 1, 2, 4, 6];
+    for (let i = 0; i < 84; i++) {
+      const weekIndex = Math.floor(i / 7);
+      const weekday = i % 7;
+      const time = monday - (11 - weekIndex) * 7 * dayMs + weekday * dayMs;
+      const cell = heat.createEl("i");
+      if (time > todayTime) {
+        cell.addClass("is-future");
+      } else {
+        const count = buckets.get(time) || 0;
+        let level = 0;
+        for (let k = 1; k < levels.length; k++) {
+          if (count >= levels[k])
+            level = k;
+        }
+        if (level)
+          cell.addClass("l" + level);
+      }
+    }
+    const heatFoot = weekCard.createDiv({ cls: "wb-hm-heatfoot" });
+    heatFoot.createSpan({ text: "\u5C11" });
+    const legend = heatFoot.createDiv({ cls: "wb-hm-legend" });
+    for (let i = 0; i < 5; i++)
+      legend.createEl("i", { cls: "l" + i });
+    heatFoot.createSpan({ text: "\u591A" });
+    const inboxCard = grid.createDiv({ cls: "wb-hm-card wb-hm-inbox wb-hm-s3" });
+    const inboxHead = inboxCard.createDiv({ cls: "wb-hm-head" });
+    inboxHead.createDiv({ cls: "wb-hm-title", text: "\u6536\u4EF6\u7BB1" });
+    inboxHead.createDiv({ cls: "wb-hm-sub", text: "\u672A\u5F52\u5C5E" });
+    const inboxMore = inboxHead.createDiv({ cls: "wb-hm-more", text: "\u5168\u90E8 \u203A" });
+    inboxMore.onclick = () => this.go("inbox");
+    const mdTotal = this.vaultFiles().length;
+    const inboxMd = inbox.filter((f) => f.extension === "md").length;
+    const handled = Math.max(0, mdTotal - inboxMd);
+    const pct = mdTotal ? Math.max(6, Math.round(handled / mdTotal * 100)) : 100;
+    const ringWrap = inboxCard.createDiv({ cls: "wb-hm-ringwrap" });
+    const ring = ringWrap.createDiv({ cls: "wb-hm-ring" });
+    ring.style.setProperty("--p", pct + "%");
+    ring.createEl("b", { text: String(inbox.length) });
+    const ringSide = ringWrap.createDiv({ cls: "wb-hm-ringside" });
+    const ringK = ringSide.createDiv({ cls: "wb-hm-ringk" });
+    ringK.createDiv({ text: "\u6761\u7B14\u8BB0" });
+    ringK.createEl("strong", { text: "\u7B49\u4F60\u51B3\u5B9A\u53BB\u5411" });
+    const first = inbox[0];
+    const firstMod = first ? this.suggestModuleFor(first) : null;
+    if (first) {
+      const item = inboxCard.createDiv({ cls: "wb-hm-inboxitem" });
+      item.createDiv({ cls: "wb-hm-inboxname", text: first.basename });
+      if (firstMod) {
+        const pill = item.createDiv({ cls: "wb-hm-pill" });
+        pill.createDiv({ cls: "wb-hm-pilldot" });
+        pill.createSpan({ text: firstMod.name });
+      }
+      item.onclick = () => this.go("inbox");
+    } else {
+      inboxCard.createDiv({ cls: "wb-hm-inboxempty", text: "\u6536\u4EF6\u7BB1\u5DF2\u6E05\u7A7A\uFF0C\u4ECA\u5929\u5F88\u5E72\u51C0\u3002" });
+    }
+    const inboxLink = inboxCard.createDiv({ cls: "wb-hm-inboxlink" });
+    if (inbox.length) {
+      inboxLink.createSpan({ text: "\u6309\u5EFA\u8BAE\u5F52\u5165 " });
+      inboxLink.createEl("b", { text: inbox.length + " \u6761" });
+      inboxLink.createSpan({ text: " \u2192" });
+      inboxLink.onclick = () => {
+        const list = inbox.slice();
+        const suggestions = list.filter((f) => this.suggestModuleFor(f));
+        if (suggestions.length)
+          this.applyAllSuggestions(suggestions);
+        else
+          this.go("inbox");
+      };
+    } else {
+      inboxLink.createSpan({ text: "\u6253\u5F00\u6536\u96C6\u7BB1 \u2192" });
+      inboxLink.onclick = () => this.go("inbox");
+    }
+    const resumeCard = grid.createDiv({ cls: "wb-hm-card wb-hm-s6" });
+    const resumeHead = resumeCard.createDiv({ cls: "wb-hm-head" });
+    resumeHead.createDiv({ cls: "wb-hm-title", text: "\u7EE7\u7EED" });
+    resumeHead.createDiv({ cls: "wb-hm-sub", text: "\u6700\u8FD1\u7F16\u8F91" });
+    const resumeGrid = resumeCard.createDiv({ cls: "wb-hm-resumes" });
+    const recentFiles = [...this._contentFiles, ...boards].filter((file) => !/^未命名笔记/.test(file.basename)).filter((file) => !file.path.startsWith(CARD_FOLDER + "/")).sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, 4);
+    if (!recentFiles.length) {
+      resumeGrid.createDiv({ cls: "wb-hm-empty", text: "\u8FD8\u6CA1\u6709\u53EF\u7EE7\u7EED\u7684\u5185\u5BB9\u3002" });
+    }
+    for (const file of recentFiles) {
+      const isBoard = file.extension === "collis";
+      const ownId = this._ownership ? this._ownership.get(file.path) : null;
+      const mod = ownId ? modules.find((m) => String(m.id || m.module || m.name || "") === ownId) : null;
+      const color = isBoard ? "#9b8cff" : mod && mod.color || "#3f7fd1";
+      const fm = isBoard ? {} : getFm(this.app, file);
+      const typeText = isBoard ? "BOARD" : fm && fm.status ? String(fm.status).toUpperCase() : "NOTE";
+      const cell = resumeGrid.createDiv({ cls: "wb-hm-file" });
+      cell.style.setProperty("--hm-c", color);
+      cell.style.setProperty("--hm-cb", hmRgba(color, 0.16));
+      const cellTop = cell.createDiv({ cls: "wb-hm-filetop" });
+      const iconWrap = cellTop.createDiv({ cls: "wb-hm-fileico" });
+      setIcon(iconWrap, isBoard ? "presentation" : "file-text");
+      cellTop.createDiv({ cls: "wb-hm-filetype", text: typeText });
+      cell.createDiv({ cls: "wb-hm-filetree", text: file.basename });
+      const fileMeta = cell.createDiv({ cls: "wb-hm-filemeta" });
+      const modSpan = fileMeta.createDiv({ cls: "wb-hm-filemod" });
+      const dot = modSpan.createDiv({ cls: "wb-hm-filedot" });
+      dot.style.background = color;
+      modSpan.createSpan({ text: isBoard ? "\u767D\u677F" : mod && mod.name || "\u672A\u5F52\u5C5E" });
+      fileMeta.createDiv({ cls: "wb-hm-filedtime", text: formatTime(file.stat.mtime) });
+      cell.onclick = () => this.openFile(file);
+    }
+    const modCard = grid.createDiv({ cls: "wb-hm-card wb-hm-s6" });
+    const modHead = modCard.createDiv({ cls: "wb-hm-head" });
+    modHead.createDiv({ cls: "wb-hm-title", text: "\u6A21\u5757\u8109\u640F" });
+    modHead.createDiv({ cls: "wb-hm-sub", text: "\u6309\u6D3B\u8DC3\u5EA6" });
+    const modMore = modHead.createDiv({ cls: "wb-hm-more", text: "\u7BA1\u7406 \u203A" });
+    modMore.onclick = () => this.openSettings();
+    const modGrid = modCard.createDiv({ cls: "wb-hm-mods" });
+    const ranked = modules.map((mod) => {
+      const files = this.filesFor(mod);
+      const active = files.filter(
+        (f) => ACTIVE_STATUSES.includes(String(getFm(this.app, f).status || "").toLowerCase())
+      ).length;
+      return { mod, total: files.length, active };
+    }).sort((a, b) => b.active - a.active || b.total - a.total).slice(0, 5);
+    ranked.forEach((entry, index) => {
+      const color = entry.mod.color || MODULE_COLORS[index % MODULE_COLORS.length];
+      const tile = modGrid.createDiv({ cls: "wb-hm-mod" });
+      tile.style.setProperty("--hm-c", color);
+      tile.style.setProperty("--hm-wash", hmRgba(color, 0.16));
+      const icon = tile.createDiv({ cls: "wb-hm-modico" });
+      setIcon(icon, entry.mod.icon || "file");
+      tile.createDiv({ cls: "wb-hm-modname", text: entry.mod.name });
+      const row = tile.createDiv({ cls: "wb-hm-modrow" });
+      row.createEl("span", {
+        cls: "wb-hm-modcount",
+        text: String(entry.total).padStart(2, "0")
+      });
+      row.createSpan({ cls: "wb-hm-modunit", text: "\u7BC7" });
+      row.createSpan({ cls: "wb-hm-modlive", text: entry.active + " \u8FDB\u884C\u4E2D" });
+      const bar = tile.createDiv({ cls: "wb-hm-modbar" });
+      const fill = bar.createEl("i");
+      fill.style.width = (entry.total ? Math.round(entry.active / entry.total * 100) : 0) + "%";
+      tile.onclick = () => this.go(entry.mod.id);
+    });
+    const addTile = modGrid.createDiv({ cls: "wb-hm-mod wb-hm-modadd" });
+    setIcon(addTile.createDiv(), "plus");
+    addTile.createSpan({ text: "\u65B0\u5EFA\u6A21\u5757" });
+    addTile.onclick = () => this.openModuleEditor(null);
+    const boardCard = grid.createDiv({ cls: "wb-hm-card wb-hm-s7" });
+    const boardHead = boardCard.createDiv({ cls: "wb-hm-head" });
+    boardHead.createDiv({ cls: "wb-hm-title", text: "\u6700\u8FD1\u767D\u677F" });
+    boardHead.createDiv({ cls: "wb-hm-sub", text: boards.length + " \u5757" });
+    const boardMore = boardHead.createDiv({ cls: "wb-hm-more", text: "\u753B\u5E03\u96C6 \u203A" });
+    boardMore.onclick = () => this.openCollisGallery();
+    const boardGrid = boardCard.createDiv({ cls: "wb-hm-boards" });
+    const boardEls = [];
+    boards.slice(0, 3).forEach((file, index) => {
+      const board = boardGrid.createDiv({ cls: "wb-hm-board" });
+      const art = board.createDiv({ cls: "wb-hm-art" });
+      this.renderBoardArt(art, index % 3);
+      board.createDiv({ cls: "wb-hm-shade" });
+      const badge = board.createDiv({ cls: "wb-hm-badge", text: "\u8BFB\u53D6\u4E2D\u2026" });
+      const info = board.createDiv({ cls: "wb-hm-boardinfo" });
+      info.createDiv({ cls: "wb-hm-boardname", text: file.basename });
+      const metaEl = info.createDiv({ cls: "wb-hm-boardmeta", text: "\u8BFB\u53D6\u4E2D\u2026" });
+      board.onclick = () => this.openFile(file);
+      boardEls.push({ file, badge, metaEl });
+    });
+    if (!boards.length) {
+      boardGrid.createDiv({ cls: "wb-hm-empty", text: "\u8FD8\u6CA1\u6709\u767D\u677F\uFF0C\u53BB\u753B\u5E03\u96C6\u65B0\u5EFA\u4E00\u5F20\u3002" });
+    }
+    const noteCard = grid.createDiv({ cls: "wb-hm-card wb-hm-s5" });
+    const noteHead = noteCard.createDiv({ cls: "wb-hm-head" });
+    noteHead.createDiv({ cls: "wb-hm-title", text: "\u901F\u8BB0" });
+    noteHead.createDiv({ cls: "wb-hm-sub", text: (this._cardCount || 0) + " \u6761\u5361\u7247" });
+    const noteMore = noteHead.createDiv({ cls: "wb-hm-more", text: "\u6253\u5F00 \u203A" });
+    noteMore.onclick = () => this.go("notes");
+    const noteWrap = noteCard.createDiv({ cls: "wb-hm-notes" });
+    page.createDiv({ cls: "wb-hm-foot", text: "\u6570\u636E\u5B9E\u65F6\u8BFB\u53D6 \xB7 Collis v" + this.plugin.manifest.version });
+    this.fillHomeBoards(boardEls);
+    this.fillHomeCards(noteWrap);
+  }
+  /* 白板封面：三种抽象画布缩略图，纯 SVG，不依赖外部资源。 */
+  renderBoardArt(wrap, variant) {
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 160 100");
+    svg.setAttribute("preserveAspectRatio", "none");
+    const art = [
+      `<defs>
+        <linearGradient id="hmg0" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#1b2a24"/><stop offset="1" stop-color="#0d1113"/>
+        </linearGradient>
+        <linearGradient id="hmn0" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#9fe870"/><stop offset="1" stop-color="#7de3c3"/>
+        </linearGradient>
+      </defs>
+      <rect width="160" height="100" fill="url(#hmg0)"/>
+      <circle cx="132" cy="18" r="34" fill="rgba(125,227,195,.16)"/>
+      <rect x="18" y="20" width="56" height="26" rx="6" fill="rgba(255,255,255,.07)" stroke="url(#hmn0)" stroke-width=".8"/>
+      <rect x="84" y="30" width="40" height="20" rx="5" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.18)" stroke-width=".7"/>
+      <rect x="34" y="58" width="40" height="18" rx="5" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.14)" stroke-width=".7"/>
+      <path d="M74 33 L84 38" stroke="rgba(125,227,195,.5)" stroke-width="1"/>
+      <path d="M56 46 L50 58" stroke="rgba(255,255,255,.2)" stroke-width="1"/>`,
+      `<defs>
+        <linearGradient id="hmg1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#221a2e"/><stop offset="1" stop-color="#0c0d12"/>
+        </linearGradient>
+      </defs>
+      <rect width="160" height="100" fill="url(#hmg1)"/>
+      <circle cx="26" cy="26" r="30" fill="rgba(155,140,255,.18)"/>
+      <circle cx="48" cy="34" r="15" fill="rgba(155,140,255,.12)" stroke="rgba(155,140,255,.5)" stroke-width=".8"/>
+      <rect x="76" y="18" width="50" height="24" rx="6" fill="rgba(255,255,255,.05)" stroke="rgba(217,131,74,.55)" stroke-width=".8"/>
+      <rect x="66" y="58" width="60" height="18" rx="5" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.15)" stroke-width=".7"/>
+      <path d="M63 34 L76 28" stroke="rgba(255,255,255,.2)" stroke-width="1"/>
+      <path d="M101 42 L98 58" stroke="rgba(255,255,255,.2)" stroke-width="1"/>`,
+      `<defs>
+        <linearGradient id="hmg2" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#13202c"/><stop offset="1" stop-color="#0b0e11"/>
+        </linearGradient>
+      </defs>
+      <rect width="160" height="100" fill="url(#hmg2)"/>
+      <circle cx="126" cy="70" r="30" fill="rgba(63,127,209,.18)"/>
+      <rect x="14" y="38" width="38" height="30" rx="6" fill="rgba(63,127,209,.16)" stroke="rgba(63,127,209,.5)" stroke-width=".8"/>
+      <rect x="64" y="18" width="38" height="22" rx="5" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.16)" stroke-width=".7"/>
+      <rect x="108" y="34" width="34" height="26" rx="5" fill="rgba(159,232,112,.12)" stroke="rgba(159,232,112,.4)" stroke-width=".8"/>
+      <path d="M52 50 L64 30" stroke="rgba(255,255,255,.18)" stroke-width="1"/>
+      <path d="M102 33 L108 42" stroke="rgba(255,255,255,.18)" stroke-width="1"/>`
+    ];
+    svg.innerHTML = art[variant % art.length];
+    wrap.appendChild(svg);
+  }
+  async fillHomeBoards(items) {
+    for (const item of items) {
+      const data = await this.readBoard(item.file);
+      if (!item.metaEl.isConnected)
+        return;
+      item.badge.setText(data.nodes + " \u8282\u70B9");
+      item.metaEl.setText(
+        (data.edges ? data.edges + " \u6761\u8FDE\u7EBF \xB7 " : "") + formatTime(item.file.stat.mtime)
+      );
+    }
+  }
+  async fillHomeCards(container) {
+    const cards = await this.getRecentCards(2);
+    if (!container.isConnected || this.active !== "home")
+      return;
+    container.empty();
+    if (!cards.length) {
+      container.createDiv({
+        cls: "wb-hm-empty",
+        text: "\u8FD8\u6CA1\u6709\u901F\u8BB0\u5361\u7247\u3002\u5728\u4E0A\u9762\u8BB0\u4E00\u6761\uFF0C\u5B83\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC\u3002"
+      });
+      return;
+    }
+    for (const card of cards) {
+      const row = container.createDiv({ cls: "wb-hm-note" });
+      const meta = row.createDiv({ cls: "wb-hm-notedate" });
+      meta.createSpan({ text: card.date ? card.date.slice(5) : "" });
+      if (card.time)
+        meta.createSpan({ text: " " + card.time });
+      row.createDiv({ cls: "wb-hm-notetext", text: card.text });
+      if (card.tags && card.tags.length) {
+        row.createDiv({ cls: "wb-hm-notetag", text: "#" + card.tags[0] });
+      }
+      row.onclick = () => this.openCardInNotes(card);
+    }
+  }
+  makePanel(parent, title, actionText, onAction) {
+    const panel = parent.createDiv({ cls: "wb-panel" });
+    const head = panel.createDiv({ cls: "wb-panel-head" });
+    head.createDiv({ cls: "wb-panel-title", text: title });
+    head.createDiv({ cls: "wb-spacer" });
+    if (actionText) {
+      const action = head.createDiv({ cls: "wb-panel-action", text: actionText });
+      if (onAction)
+        action.onclick = onAction;
+    }
+    return panel;
+  }
+  async fillTasks(container) {
+    const app = this.app;
+    let files = this._contentFiles.filter((f) => f.path.startsWith("00-Inbox/")).sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, 15);
+    if (!files.length) {
+      files = [...this._contentFiles].sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, 15);
+    }
+    const tasks = [];
+    for (const file of files) {
+      let text = "";
+      try {
+        text = await app.vault.cachedRead(file);
+      } catch (e) {
+        continue;
+      }
+      for (const line of text.split(/\r?\n/)) {
+        const m = line.match(/^\s*[-*]\s*\[ \]\s+(.+)/);
+        if (m) {
+          tasks.push({ text: m[1].trim(), file });
+          if (tasks.length >= 6)
+            break;
+        }
+      }
+      if (tasks.length >= 6)
+        break;
+    }
+    if (!container.isConnected || this.active !== "home")
+      return;
+    container.empty();
+    if (!tasks.length) {
+      container.createDiv({ cls: "wb-empty", text: "\u6CA1\u6709\u672A\u5B8C\u6210\u4EFB\u52A1\uFF0C\u6536\u4EF6\u7BB1\u662F\u7A7A\u7684\u3002" });
+      return;
+    }
+    for (const task of tasks) {
+      const row = container.createDiv({ cls: "wb-task" });
+      row.createDiv({ cls: "wb-check" });
+      row.createDiv({ cls: "wb-task-text", text: task.text });
+      row.onclick = () => this.openFile(task.file);
+    }
+  }
+  async fillCards(container) {
+    const cards = await this.getRecentCards(6);
+    if (!container.isConnected || this.active !== "home")
+      return;
+    container.empty();
+    if (!cards.length) {
+      container.createDiv({
+        cls: "wb-empty",
+        text: "\u8FD8\u6CA1\u6709\u901F\u8BB0\u5361\u7247\u3002\u7528 Collis \u8BB0\u4E00\u6761\uFF0C\u5B83\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC\u3002"
+      });
+      return;
+    }
+    for (const card of cards) {
+      const row = container.createDiv({ cls: "wb-feed" });
+      const meta = row.createDiv({ cls: "wb-feed-meta" });
+      meta.createSpan({ cls: "wb-feed-date", text: card.date ? card.date.slice(5) : "" });
+      meta.createSpan({ cls: "wb-feed-time", text: card.time });
+      row.createDiv({ cls: "wb-feed-text", text: card.text });
+      if (card.tags.length) {
+        const tagRow = row.createDiv({ cls: "wb-feed-tags" });
+        card.tags.slice(0, 3).forEach((tag) => {
+          tagRow.createSpan({ cls: "wb-tag", text: "#" + tag });
+        });
+      }
+      row.onclick = () => this.openCard(card);
+    }
+  }
+  fillBoards(container, limit) {
+    const boards = this.getBoardFiles().slice(0, limit || 6);
+    container.empty();
+    if (!boards.length) {
+      container.createDiv({
+        cls: "wb-empty",
+        text: "\u8FD8\u6CA1\u6709 .collis \u767D\u677F\u3002\u53BB\u753B\u5E03\u96C6\u65B0\u5EFA\u4E00\u5F20\u3002"
+      });
+      return;
+    }
+    for (const file of boards) {
+      const row = container.createDiv({ cls: "wb-board-row" });
+      const icon = row.createDiv({ cls: "wb-board-icon" });
+      setIcon(icon, "presentation");
+      const info = row.createDiv({ cls: "wb-board-info" });
+      info.createDiv({ cls: "wb-board-name", text: file.basename });
+      const sub = info.createDiv({ cls: "wb-board-sub", text: "\u8BFB\u53D6\u4E2D\u2026" });
+      row.onclick = () => this.openFile(file);
+      this.readBoard(file).then((data) => {
+        if (sub.isConnected)
+          sub.setText(data.summary);
+      });
+    }
+  }
+  renderInbox(el) {
+    const files = this.inboxFiles();
+    if (!this._inboxSel)
+      this._inboxSel = /* @__PURE__ */ new Set();
+    const alive = new Set(files.map((f) => f.path));
+    Array.from(this._inboxSel).forEach((p) => {
+      if (!alive.has(p))
+        this._inboxSel.delete(p);
+    });
+    const suggestions = /* @__PURE__ */ new Map();
+    files.forEach((f) => {
+      const mod = this.suggestModuleFor(f);
+      if (mod)
+        suggestions.set(f.path, mod);
+    });
+    el.addClass("wb-inbox-scroll");
+    const page = el.createDiv({ cls: "wb-inbox-page" });
+    const head = page.createDiv({ cls: "wb-inbox-head" });
+    const headMain = head.createDiv({ cls: "wb-inbox-head-main" });
+    const titleRow = headMain.createDiv({ cls: "wb-inbox-title-row" });
+    titleRow.createEl("h1", { text: "\u6536\u4EF6\u7BB1" });
+    if (files.length) {
+      titleRow.createDiv({ cls: "wb-inbox-count", text: files.length + " \u5F85\u5904\u7406" });
+    }
+    headMain.createDiv({
+      cls: "wb-inbox-sub",
+      text: "\u6563\u843D\u5728\u5E93\u91CC\u7684\u7B14\u8BB0\u548C\u7D20\u6750\uFF0C\u5F52\u5165\u6A21\u5757\u540E\u81EA\u52A8\u79BB\u5F00"
+    });
+    const headActions = head.createDiv({ cls: "wb-inbox-head-actions" });
+    const refreshBtn = headActions.createEl("button", { cls: "wb-inbox-refresh" });
+    setIcon(refreshBtn, "refresh-cw");
+    refreshBtn.setAttribute("aria-label", "\u5237\u65B0\u6536\u4EF6\u7BB1");
+    refreshBtn.onclick = () => this.refresh();
+    const weekCount = files.filter(
+      (f) => Date.now() - f.stat.mtime < 7 * 864e5
+    ).length;
+    const stats = page.createDiv({ cls: "wb-inbox-stats" });
+    [
+      ["\u5F85\u5F52\u5C5E", files.length],
+      ["\u6709\u5F52\u5C5E\u5EFA\u8BAE", suggestions.size],
+      ["\u672C\u5468\u65B0\u589E", weekCount]
+    ].forEach(([label, value]) => {
+      const cell = stats.createDiv({ cls: "wb-inbox-stat" });
+      cell.createDiv({ cls: "wb-inbox-stat-value", text: String(value) });
+      cell.createDiv({ cls: "wb-inbox-stat-label", text: label });
+    });
+    const controls = page.createDiv({ cls: "wb-inbox-controls" });
+    const search = controls.createDiv({ cls: "wb-inbox-search" });
+    setIcon(search.createDiv({ cls: "wb-inbox-searchico" }), "search");
+    const query = search.createEl("input", {
+      cls: "wb-inbox-query",
+      attr: { type: "text", placeholder: "\u7B5B\u9009\u6807\u9898\u6216\u8DEF\u5F84" }
+    });
+    query.value = this._inboxQuery || "";
+    const seg = controls.createDiv({ cls: "wb-inbox-seg" });
+    const kinds = [
+      ["all", "\u5168\u90E8"],
+      ["note", "\u7B14\u8BB0"],
+      ["image", "\u56FE\u7247"],
+      ["video", "\u89C6\u9891"],
+      ["doc", "\u6587\u6863"],
+      ["audio", "\u97F3\u9891"],
+      ["other", "\u5176\u4ED6"]
+    ];
+    const segButtons = /* @__PURE__ */ new Map();
+    kinds.forEach(([key, label]) => {
+      const btn = seg.createEl("button", { cls: "wb-inbox-segbtn", text: label });
+      btn.onclick = () => {
+        this._inboxFilter = key;
+        segButtons.forEach((b, k) => b.classList.toggle("is-active", k === key));
+        paint();
+      };
+      segButtons.set(key, btn);
+    });
+    if (!this._inboxFilter)
+      this._inboxFilter = "all";
+    segButtons.get(this._inboxFilter).classList.add("is-active");
+    const viewSeg = controls.createDiv({ cls: "wb-inbox-viewseg" });
+    const viewButtons = /* @__PURE__ */ new Map();
+    [
+      ["list", "\u5217\u8868"],
+      ["grid", "\u7F51\u683C"]
+    ].forEach(([key, label]) => {
+      const btn = viewSeg.createEl("button", { cls: "wb-inbox-segbtn", text: label });
+      btn.onclick = () => {
+        this._inboxView = key;
+        syncView();
+        paint();
+      };
+      viewButtons.set(key, btn);
+    });
+    if (!this._inboxView)
+      this._inboxView = "list";
+    const syncView = () => {
+      const mode = this._inboxView || "list";
+      viewButtons.forEach((btn, key) => btn.classList.toggle("is-active", key === mode));
+    };
+    syncView();
+    const sortWrap = controls.createDiv({ cls: "wb-inbox-sort" });
+    const sortBtn = sortWrap.createEl("button", { cls: "wb-inbox-sortbtn" });
+    const sortLabel = sortBtn.createSpan({
+      text: (this._inboxSort || "recent") === "name" ? "\u540D\u79F0" : "\u6700\u8FD1\u66F4\u65B0"
+    });
+    setIcon(sortBtn.createSpan({ cls: "wb-inbox-sortico" }), "chevron-down");
+    sortBtn.onclick = () => {
+      const menu = new Menu();
+      [["recent", "\u6700\u8FD1\u66F4\u65B0"], ["name", "\u540D\u79F0"]].forEach(([value, label]) => {
+        menu.addItem((item) => {
+          item.setTitle(label).setChecked((this._inboxSort || "recent") === value).onClick(() => {
+            this._inboxSort = value;
+            sortLabel.setText(label);
+            paint();
+          });
+        });
+      });
+      anchorMenuBelow(menu, sortBtn);
+    };
+    const banners = page.createDiv({ cls: "wb-inbox-banners" });
+    const bulk = page.createDiv({ cls: "wb-inbox-bulk" });
+    bulk.hidden = true;
+    const bulkLabel = bulk.createSpan({ cls: "wb-inbox-bulkcount" });
+    setIcon(bulkLabel.createSpan({ cls: "wb-inbox-bulkico" }), "check");
+    bulkLabel.createSpan({ text: "\u5DF2\u9009 " });
+    const bulkNum = bulkLabel.createEl("b", { text: "0" });
+    bulkLabel.createSpan({ text: " \u9879" });
+    bulk.createDiv({ cls: "wb-inbox-bulkspace" });
+    const bulkAssign = bulk.createEl("button", {
+      cls: "wb-btn wb-btn-accent",
+      text: "\u5F52\u5165\u9009\u4E2D"
+    });
+    const bulkDelete = bulk.createEl("button", {
+      cls: "wb-btn wb-inbox-danger",
+      text: "\u5220\u9664\u9009\u4E2D"
+    });
+    const list = page.createDiv({ cls: "wb-inbox-list" });
+    const foot = page.createDiv({ cls: "wb-inbox-foot" });
+    foot.createSpan({
+      text: "\u5168\u5E93\u626B\u63CF " + (this.vaultFiles().length + this.vaultAttachments().length) + " \u4E2A\u6587\u4EF6 \xB7 \u81EA\u52A8\u6392\u9664\u767D\u677F\u3001\u5361\u7247\u7B14\u8BB0\u4E0E\u6280\u672F\u76EE\u5F55"
+    });
+    foot.createSpan({
+      cls: "wb-inbox-footright",
+      text: "\u5171 " + files.length + " \u6761\u5F85\u5904\u7406"
+    });
+    const selectedFiles = () => files.filter((f) => this._inboxSel.has(f.path));
+    const selectedNotes = () => selectedFiles().filter((f) => f.extension === "md");
+    bulkAssign.onclick = () => {
+      const chosen = selectedNotes();
+      if (chosen.length)
+        this.openModulePicker(chosen);
+    };
+    bulkDelete.onclick = () => this.deleteFiles(selectedFiles());
+    query.oninput = () => {
+      this._inboxQuery = query.value;
+      paint();
+    };
+    this.renderUnknownBanners(banners);
+    if (!files.length)
+      bulk.remove();
+    const typeInfo = (file) => {
+      const key = fileKind(file);
+      const ext = String(file.extension || "").toLowerCase();
+      let icon = {
+        note: "file-text",
+        image: "image",
+        video: "video",
+        audio: "music",
+        doc: "file-text",
+        other: "file"
+      }[key] || "file";
+      if (["zip", "rar", "7z", "tar", "gz"].includes(ext))
+        icon = "archive";
+      return { key, icon };
+    };
+    const groupFor = (ts) => {
+      const now = /* @__PURE__ */ new Date();
+      const date = new Date(ts);
+      if (date.toDateString() === now.toDateString())
+        return "\u4ECA\u5929";
+      if (now.getTime() - ts < 7 * 864e5)
+        return "\u672C\u5468";
+      return "\u66F4\u65E9";
+    };
+    let current = [];
+    const matches = (file) => {
+      const kind = this._inboxFilter || "all";
+      if (kind !== "all" && typeInfo(file).key !== kind)
+        return false;
+      const q = String(this._inboxQuery || "").trim().toLowerCase();
+      if (!q)
+        return true;
+      return file.basename.toLowerCase().includes(q) || file.path.toLowerCase().includes(q);
+    };
+    const updateBulk = () => {
+      const n = this._inboxSel.size;
+      bulk.hidden = n === 0;
+      bulkNum.setText(String(n));
+      bulkAssign.disabled = selectedNotes().length === 0;
+      bulkDelete.disabled = n === 0;
+    };
+    const renderGrid = (parent, items) => {
+      const grid = parent.createDiv({ cls: "wb-md-grid" });
+      items.forEach((file) => {
+        const info = typeInfo(file);
+        const selected = this._inboxSel.has(file.path);
+        const tile = grid.createDiv({
+          cls: "wb-md-tile wb-inbox-tile wb-md-kind-" + info.key + (selected ? " is-selected" : "")
+        });
+        const thumb = tile.createDiv({ cls: "wb-md-thumb" });
+        if (info.key === "note") {
+          paintNoteThumb(this.app, thumb, file);
+        } else if (info.key === "image" || info.key === "video") {
+          paintMediaThumb(this.app, thumb, file, info.key);
+        } else {
+          setIcon(thumb, info.icon);
+        }
+        const check = tile.createDiv({ cls: "wb-inbox-tilecheck" });
+        const box = check.createEl("input", {
+          attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + file.basename }
+        });
+        box.checked = selected;
+        box.onclick = (evt) => {
+          evt.stopPropagation();
+          if (box.checked)
+            this._inboxSel.add(file.path);
+          else
+            this._inboxSel.delete(file.path);
+          tile.classList.toggle("is-selected", box.checked);
+          updateBulk();
+        };
+        tile.createDiv({ cls: "wb-md-tilename", text: file.basename });
+        const tileMeta = tile.createDiv({ cls: "wb-md-tilemeta" });
+        tileMeta.createSpan({ text: THUMB_KIND_LABELS[info.key] || "\u6587\u4EF6" });
+        tileMeta.createSpan({ text: formatTime(file.stat.mtime) });
+        const suggest = suggestions.get(file.path);
+        if (suggest) {
+          const sug = tile.createDiv({ cls: "wb-inbox-tilesug" });
+          const chip = sug.createSpan({ cls: "wb-inbox-suggest" });
+          const dot = chip.createSpan({ cls: "wb-inbox-dot" });
+          dot.style.setProperty("--dot", suggest.color || "var(--interactive-accent)");
+          chip.createSpan({ text: "\u5EFA\u8BAE \xB7 " + suggest.name });
+          const accept = sug.createEl("button", {
+            cls: "wb-inbox-adopt",
+            attr: { "aria-label": "\u91C7\u7EB3\u5EFA\u8BAE\uFF1A" + suggest.name }
+          });
+          setIcon(accept, "check");
+          accept.onclick = (evt) => {
+            evt.stopPropagation();
+            this.assignToModule([file], suggest);
+          };
+        }
+        const acts = tile.createDiv({ cls: "wb-inbox-tileacts" });
+        if (file.extension === "md") {
+          const assign = acts.createEl("button", { cls: "wb-inbox-act" });
+          setIcon(assign, "folder");
+          assign.setAttribute("aria-label", "\u5F52\u5165\u6A21\u5757");
+          assign.onclick = (evt) => {
+            evt.stopPropagation();
+            this.openModulePicker([file]);
+          };
+        }
+        const open = acts.createEl("button", { cls: "wb-inbox-act" });
+        setIcon(open, "corner-up-right");
+        open.setAttribute("aria-label", "\u6253\u5F00");
+        open.onclick = (evt) => {
+          evt.stopPropagation();
+          this.openFile(file);
+        };
+        const remove = acts.createEl("button", { cls: "wb-inbox-act is-danger" });
+        setIcon(remove, "trash-2");
+        remove.setAttribute("aria-label", "\u5220\u9664");
+        remove.onclick = (evt) => {
+          evt.stopPropagation();
+          this.deleteFiles([file]);
+        };
+        tile.onclick = () => this.openFile(file);
+      });
+    };
+    const paint = () => {
+      current = files.filter(matches).slice();
+      const sortBy = this._inboxSort || "recent";
+      current.sort(
+        (a, b) => sortBy === "name" ? a.basename.localeCompare(b.basename, "zh") : b.stat.mtime - a.stat.mtime
+      );
+      while (list.firstChild)
+        list.removeChild(list.firstChild);
+      const gridMode = (this._inboxView || "list") === "grid";
+      list.classList.toggle("is-grid", gridMode);
+      if (!files.length) {
+        const empty = list.createDiv({ cls: "wb-inbox-empty" });
+        const art = empty.createDiv({ cls: "wb-inbox-emptyart" });
+        setIcon(art, "inbox");
+        empty.createEl("h2", { text: "\u6536\u4EF6\u7BB1\u5DF2\u6E05\u7A7A" });
+        empty.createDiv({
+          cls: "wb-inbox-emptysub",
+          text: "\u6240\u6709\u7B14\u8BB0\u90FD\u5DF2\u5F52\u5165\u6A21\u5757\u3002\u65B0\u7684\u6563\u843D\u6587\u4EF6\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u8FD9\u91CC\u3002"
+        });
+        const acts = empty.createDiv({ cls: "wb-inbox-emptyacts" });
+        const home = acts.createEl("button", { cls: "wb-btn wb-btn-accent", text: "\u56DE\u5230\u9996\u9875" });
+        home.onclick = () => this.go("home");
+        const again = acts.createEl("button", { cls: "wb-btn", text: "\u5237\u65B0" });
+        again.onclick = () => this.refresh();
+        updateBulk();
+        return;
+      }
+      if (!current.length) {
+        const none = list.createDiv({ cls: "wb-inbox-nomatch" });
+        none.createSpan({ text: "\u6CA1\u6709\u5339\u914D\u7684\u6761\u76EE" });
+        const clear = none.createEl("button", { cls: "wb-inbox-clear", text: "\u6E05\u9664\u7B5B\u9009" });
+        clear.onclick = () => {
+          this._inboxQuery = "";
+          this._inboxFilter = "all";
+          this.render();
+        };
+        updateBulk();
+        return;
+      }
+      if (gridMode) {
+        renderGrid(list, current);
+        updateBulk();
+        return;
+      }
+      const buckets = [["\u4ECA\u5929", []], ["\u672C\u5468", []], ["\u66F4\u65E9", []]];
+      current.forEach((file) => {
+        const bucket = buckets.find((b) => b[0] === groupFor(file.stat.mtime));
+        if (bucket)
+          bucket[1].push(file);
+      });
+      buckets.forEach(([label, items]) => {
+        if (!items.length)
+          return;
+        const group = list.createDiv({ cls: "wb-inbox-group" });
+        const groupHead = group.createDiv({ cls: "wb-inbox-group-head" });
+        groupHead.createSpan({ cls: "wb-inbox-group-name", text: label });
+        groupHead.createSpan({ cls: "wb-inbox-group-count", text: String(items.length) });
+        groupHead.createSpan({ cls: "wb-inbox-group-line" });
+        items.forEach((file) => {
+          const selected = this._inboxSel.has(file.path);
+          const card = group.createDiv({
+            cls: "wb-inbox-card" + (selected ? " is-selected" : "")
+          });
+          const check = card.createDiv({ cls: "wb-inbox-check" });
+          const box = check.createEl("input", {
+            attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + file.basename }
+          });
+          box.checked = selected;
+          box.onclick = (evt) => {
+            evt.stopPropagation();
+            if (box.checked)
+              this._inboxSel.add(file.path);
+            else
+              this._inboxSel.delete(file.path);
+            card.classList.toggle("is-selected", box.checked);
+            updateBulk();
+          };
+          const info = typeInfo(file);
+          const ico = card.createDiv({ cls: "wb-inbox-type is-" + info.key });
+          setIcon(ico, info.icon);
+          const main = card.createDiv({ cls: "wb-inbox-main" });
+          main.createDiv({ cls: "wb-inbox-name", text: file.basename });
+          main.createDiv({ cls: "wb-inbox-path", text: file.path });
+          const swap = card.createDiv({ cls: "wb-inbox-suggestwrap" });
+          const suggest = suggestions.get(file.path);
+          if (suggest) {
+            const chip = swap.createSpan({ cls: "wb-inbox-suggest" });
+            const dot = chip.createSpan({ cls: "wb-inbox-dot" });
+            dot.style.setProperty("--dot", suggest.color || "var(--interactive-accent)");
+            chip.createSpan({ text: "\u5EFA\u8BAE \xB7 " + suggest.name });
+            const accept = swap.createEl("button", {
+              cls: "wb-inbox-adopt",
+              attr: { "aria-label": "\u91C7\u7EB3\u5EFA\u8BAE\uFF1A" + suggest.name }
+            });
+            setIcon(accept, "check");
+            accept.onclick = (evt) => {
+              evt.stopPropagation();
+              this.assignToModule([file], suggest);
+            };
+          } else {
+            swap.createSpan({ cls: "wb-inbox-nosug", text: "\u6682\u65E0\u5EFA\u8BAE" });
+          }
+          card.createDiv({ cls: "wb-inbox-time", text: formatTime(file.stat.mtime) });
+          const acts = card.createDiv({ cls: "wb-inbox-actions" });
+          if (file.extension === "md") {
+            const assign = acts.createEl("button", { cls: "wb-inbox-act" });
+            setIcon(assign, "folder");
+            assign.setAttribute("aria-label", "\u5F52\u5165\u6A21\u5757");
+            assign.onclick = (evt) => {
+              evt.stopPropagation();
+              this.openModulePicker([file]);
+            };
+          }
+          const open = acts.createEl("button", { cls: "wb-inbox-act" });
+          setIcon(open, "corner-up-right");
+          open.setAttribute("aria-label", "\u6253\u5F00");
+          open.onclick = (evt) => {
+            evt.stopPropagation();
+            this.openFile(file);
+          };
+          const remove = acts.createEl("button", { cls: "wb-inbox-act is-danger" });
+          setIcon(remove, "trash-2");
+          remove.setAttribute("aria-label", "\u5220\u9664");
+          remove.onclick = (evt) => {
+            evt.stopPropagation();
+            this.deleteFiles([file]);
+          };
+          card.onclick = () => this.openFile(file);
+        });
+      });
+      updateBulk();
+    };
+    paint();
+  }
+  // 未知 module 值：不自动建导航，只在这里提示，让用户显式决定。
+  renderUnknownBanners(el) {
+    const groups = this.unknownModuleValues();
+    groups.forEach((groupFiles, value) => {
+      const banner = el.createDiv({ cls: "wb-banner" });
+      banner.createDiv({
+        cls: "wb-banner-text",
+        text: "\u672A\u77E5\u6A21\u5757\u503C\u300C" + value + "\u300D\xB7 " + groupFiles.length + " \u7BC7"
+      });
+      const actions = banner.createDiv({ cls: "wb-banner-actions" });
+      const create = actions.createEl("button", {
+        cls: "wb-btn wb-btn-accent",
+        text: "\u65B0\u5EFA\u6A21\u5757"
+      });
+      create.onclick = () => this.openModuleEditor(null, value);
+      const pick = actions.createEl("button", { cls: "wb-btn", text: "\u5F52\u5165\u73B0\u6709\u6A21\u5757" });
+      pick.onclick = () => this.openModulePicker(groupFiles);
+      const ignore = actions.createEl("button", { cls: "wb-btn", text: "\u5FFD\u7565" });
+      ignore.onclick = () => {
+        this.ignoreModuleValue(value);
+        this.render();
+      };
+    });
+  }
+  renderModule(el, mod) {
+    const files = this.moduleFiles(mod).sort((a, b) => b.stat.mtime - a.stat.mtime);
+    const dir = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
+    const tintPalette = ["#b394af", "#e9c77e", "#ce7379", "#7fa9b6", "#5d86a4"];
+    const mods = this.getModules();
+    const modIndex = mods.findIndex((m) => m.id === mod.id);
+    const tint = mod.color || tintPalette[(modIndex < 0 ? 0 : modIndex) % tintPalette.length];
+    const TYPE_LABELS = {
+      pdf: "PDF",
+      doc: "Word",
+      docx: "Word",
+      xls: "\u8868\u683C",
+      xlsx: "\u8868\u683C",
+      csv: "\u8868\u683C",
+      ppt: "\u6F14\u793A",
+      pptx: "\u6F14\u793A",
+      epub: "\u7535\u5B50\u4E66",
+      txt: "\u6587\u672C",
+      rtf: "\u6587\u672C",
+      zip: "\u538B\u7F29\u5305",
+      rar: "\u538B\u7F29\u5305",
+      "7z": "\u538B\u7F29\u5305",
+      tar: "\u538B\u7F29\u5305",
+      gz: "\u538B\u7F29\u5305",
+      bz2: "\u538B\u7F29\u5305",
+      xz: "\u538B\u7F29\u5305"
+    };
+    const kindOf = (file) => fileKind(file);
+    const labelOf = (file) => {
+      const ext = String(file.extension || "").toLowerCase();
+      if (TYPE_LABELS[ext])
+        return TYPE_LABELS[ext];
+      return THUMB_KIND_LABELS[kindOf(file)];
+    };
+    const iconOf = (kind) => ({
+      note: "file-text",
+      image: "image",
+      video: "video",
+      audio: "music",
+      doc: "file-text",
+      other: "file"
+    })[kind] || "file";
+    const fmtSize = (bytes) => {
+      const n = Number(bytes || 0);
+      if (!n)
+        return "\u2014";
+      if (n < 1024)
+        return n + " B";
+      const units = ["KB", "MB", "GB", "TB"];
+      let value = n / 1024;
+      let i = 0;
+      while (value >= 1024 && i < units.length - 1) {
+        value /= 1024;
+        i++;
+      }
+      return (value >= 10 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, "")) + " " + units[i];
+    };
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTs = today.getTime();
+    const weekTs = todayTs - 6 * 864e5;
+    const groupOf = (ts) => ts >= todayTs ? "\u4ECA\u5929" : ts >= weekTs ? "\u672C\u5468" : "\u66F4\u65E9";
+    let mode = mod.view === "grid" ? "grid" : "list";
+    let filter = "all";
+    let sort = "recent";
+    let query = "";
+    if (this._mdSelModule !== mod.id) {
+      this._mdSelModule = mod.id;
+      this._mdMulti = false;
+      this._mdSel = /* @__PURE__ */ new Set();
+    }
+    const selected = this._mdSel;
+    const toggleSelect = (path) => {
+      if (selected.has(path))
+        selected.delete(path);
+      else
+        selected.add(path);
+      draw();
+    };
+    el.empty();
+    el.addClass("wb-md-scroll");
+    const page = el.createDiv({ cls: "wb-md-page" });
+    const head = page.createDiv({ cls: "wb-md-head" });
+    const headMain = head.createDiv({ cls: "wb-md-head-main" });
+    const titleRow = headMain.createDiv({ cls: "wb-md-title-row" });
+    const modtile = titleRow.createDiv({ cls: "wb-md-modtile" });
+    modtile.style.setProperty("--tint", tint);
+    setIcon(modtile, mod.icon || "file-text");
+    titleRow.createEl("h1", { text: mod.name });
+    const countPill = titleRow.createSpan({ cls: "wb-md-count" });
+    headMain.createEl("p", {
+      cls: "wb-md-desc",
+      text: dir ? dir + " \xB7 \u7B14\u8BB0\u6309 frontmatter \u805A\u5408\uFF0C\u56FE\u7247 / \u89C6\u9891 / \u6587\u6863\u7B49\u6309\u6587\u4EF6\u5939\u6536\u5F55" : "\u5C1A\u672A\u8BBE\u7F6E\u4FDD\u5B58\u6587\u4EF6\u5939 \xB7 \u65B0\u5EFA\u7B14\u8BB0\u65F6\u4F1A\u5148\u9009\u62E9\u4F4D\u7F6E"
+    });
+    const headActs = head.createDiv({ cls: "wb-md-head-actions" });
+    const addBtn = headActs.createEl("button", { cls: "wb-md-btn wb-md-btn-primary" });
+    setIcon(addBtn, "plus");
+    addBtn.appendText("\u65B0\u5EFA\u7B14\u8BB0");
+    addBtn.onclick = () => this.createModuleNote(mod);
+    const moreBtn = headActs.createEl("button", { cls: "wb-md-btn wb-md-more", attr: { "aria-label": "\u66F4\u591A\u64CD\u4F5C" } });
+    setIcon(moreBtn, "more-horizontal");
+    moreBtn.appendText("\u66F4\u591A");
+    moreBtn.onclick = (event) => {
+      const menu = new Menu();
+      menu.addItem(
+        (item) => item.setTitle("\u7F16\u8F91\u6A21\u5757").setIcon("settings").onClick(() => this.openModuleEditor(mod))
+      );
+      menu.addItem(
+        (item) => item.setTitle(this._mdMulti ? "\u9000\u51FA\u591A\u9009" : "\u591A\u9009\u5220\u9664").setIcon("list-checks").setChecked(this._mdMulti).onClick(() => {
+          this._mdMulti = !this._mdMulti;
+          if (!this._mdMulti)
+            this._mdSel.clear();
+          draw();
+        })
+      );
+      anchorMenuBelow(menu, moreBtn);
+    };
+    const stats = page.createDiv({ cls: "wb-md-stats" });
+    const addStat = (num, label) => {
+      const cell = stats.createDiv({ cls: "wb-md-stat" });
+      cell.createSpan({ cls: "wb-md-stat-num", text: String(num) });
+      cell.createSpan({ cls: "wb-md-stat-label", text: label });
+    };
+    const noteCount = files.filter((file) => kindOf(file) === "note").length;
+    addStat(files.length, "\u5168\u90E8\u6587\u4EF6");
+    addStat(noteCount, "\u7B14\u8BB0");
+    addStat(files.length - noteCount, "\u7D20\u6750\uFF08\u56FE\u7247 / \u89C6\u9891 / \u97F3\u9891 / \u6587\u6863\uFF09");
+    const controls = page.createDiv({ cls: "wb-md-controls" });
+    const search = controls.createDiv({ cls: "wb-md-search" });
+    const searchIcon = search.createSpan({ cls: "wb-md-searchico" });
+    setIcon(searchIcon, "search");
+    const input = search.createEl("input", {
+      cls: "wb-md-query",
+      attr: { placeholder: "\u7B5B\u9009\u6807\u9898\u6216\u8DEF\u5F84", type: "text" }
+    });
+    const typeSeg = controls.createDiv({ cls: "wb-md-seg" });
+    [
+      ["all", "\u5168\u90E8"],
+      ["note", "\u7B14\u8BB0"],
+      ["image", "\u56FE\u7247"],
+      ["video", "\u89C6\u9891"],
+      ["doc", "\u6587\u6863"],
+      ["audio", "\u97F3\u9891"],
+      ["other", "\u5176\u4ED6"]
+    ].forEach(([key, label]) => {
+      const btn = typeSeg.createEl("button", { cls: "wb-md-segbtn", text: label });
+      btn.dataset.kind = key;
+      if (key === filter)
+        btn.addClass("is-active");
+    });
+    const viewSeg = controls.createDiv({ cls: "wb-md-viewseg" });
+    const listBtn = viewSeg.createEl("button", { cls: "wb-md-segbtn", text: "\u5217\u8868" });
+    listBtn.dataset.view = "list";
+    const gridBtn = viewSeg.createEl("button", { cls: "wb-md-segbtn", text: "\u7F51\u683C" });
+    gridBtn.dataset.view = "grid";
+    const sortWrap = controls.createDiv({ cls: "wb-md-sort" });
+    const sortBtn = sortWrap.createEl("button", { cls: "wb-md-sortbtn" });
+    const sortText = sortBtn.createSpan({ text: "\u6700\u8FD1\u66F4\u65B0" });
+    const sortIcon = sortBtn.createSpan({ cls: "wb-md-sortico" });
+    setIcon(sortIcon, "chevron-down");
+    const body = page.createDiv({ cls: "wb-md-body" });
+    const selBar = page.createDiv({ cls: "wb-md-selbar" });
+    const selCount = selBar.createSpan({ cls: "wb-md-selcount" });
+    const selCancel = selBar.createEl("button", { cls: "wb-md-btn", text: "\u53D6\u6D88" });
+    selCancel.onclick = () => {
+      this._mdMulti = false;
+      this._mdSel.clear();
+      draw();
+    };
+    const selDelete = selBar.createEl("button", { cls: "wb-md-btn wb-md-btn-danger", text: "\u5220\u9664\u6240\u9009" });
+    selDelete.onclick = () => {
+      const chosen = files.filter((file) => this._mdSel.has(file.path));
+      if (!chosen.length)
+        return;
+      this.deleteFiles(chosen, () => {
+        this._mdMulti = false;
+        this._mdSel.clear();
+        this.refresh();
+      });
+    };
+    const foot = page.createDiv({ cls: "wb-md-foot" });
+    const footLeft = foot.createSpan();
+    const footRight = foot.createSpan({ cls: "wb-md-footright" });
+    const sortItems = (items) => {
+      if (sort === "name") {
+        items.sort((a, b) => a.file.basename.localeCompare(b.file.basename, "zh"));
+      } else if (sort === "size") {
+        items.sort((a, b) => (b.file.stat.size || 0) - (a.file.stat.size || 0));
+      } else {
+        items.sort((a, b) => b.file.stat.mtime - a.file.stat.mtime);
+      }
+    };
+    const renderList = (parent, items) => {
+      const groups = /* @__PURE__ */ new Map([["\u4ECA\u5929", []], ["\u672C\u5468", []], ["\u66F4\u65E9", []]]);
+      items.forEach((item) => {
+        groups.get(groupOf(item.file.stat.mtime)).push(item);
+      });
+      groups.forEach((list, name) => {
+        if (!list.length)
+          return;
+        const section = parent.createDiv({ cls: "wb-md-group" });
+        const groupHead = section.createDiv({ cls: "wb-md-group-head" });
+        groupHead.createSpan({ cls: "wb-md-group-name", text: name });
+        groupHead.createSpan({ cls: "wb-md-group-count", text: String(list.length) });
+        groupHead.createSpan({ cls: "wb-md-group-line" });
+        list.forEach((item) => {
+          const picked = this._mdSel.has(item.file.path);
+          const card = section.createDiv({ cls: "wb-md-card wb-md-kind-" + item.kind });
+          if (this._mdMulti) {
+            card.addClass("is-multi");
+            if (picked)
+              card.addClass("is-selected");
+            const check = card.createDiv({ cls: "wb-md-check" });
+            const box = check.createEl("input", {
+              attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + item.file.basename }
+            });
+            box.checked = picked;
+            box.onclick = (event) => {
+              event.stopPropagation();
+              toggleSelect(item.file.path);
+            };
+          }
+          const type = card.createDiv({ cls: "wb-md-type" });
+          setIcon(type, item.icon);
+          const main = card.createDiv({ cls: "wb-md-main" });
+          main.createDiv({ cls: "wb-md-name", text: item.file.basename });
+          main.createDiv({ cls: "wb-md-path", text: item.file.path });
+          const meta = card.createDiv({ cls: "wb-md-meta" });
+          meta.createEl("b", { text: item.label });
+          meta.createSpan({ cls: "wb-md-metadot" });
+          meta.createSpan({ cls: "wb-md-size", text: fmtSize(item.file.stat.size) });
+          card.createDiv({ cls: "wb-md-time", text: formatTime(item.file.stat.mtime) });
+          if (!this._mdMulti) {
+            const acts = card.createDiv({ cls: "wb-md-actions" });
+            const openBtn = acts.createEl("button", { cls: "wb-md-act" });
+            openBtn.setAttribute("aria-label", "\u6253\u5F00");
+            setIcon(openBtn, "external-link");
+            openBtn.onclick = (event) => {
+              event.stopPropagation();
+              this.openFile(item.file);
+            };
+            const delBtn = acts.createEl("button", { cls: "wb-md-act is-danger" });
+            delBtn.setAttribute("aria-label", "\u5220\u9664");
+            setIcon(delBtn, "trash-2");
+            delBtn.onclick = (event) => {
+              event.stopPropagation();
+              this.deleteFiles([item.file]);
+            };
+          }
+          card.onclick = () => {
+            if (this._mdMulti)
+              toggleSelect(item.file.path);
+            else
+              this.openFile(item.file);
+          };
+        });
+      });
+    };
+    const renderGrid = (parent, items) => {
+      const grid = parent.createDiv({ cls: "wb-md-grid" });
+      items.forEach((item) => {
+        const picked = this._mdSel.has(item.file.path);
+        const tile = grid.createDiv({
+          cls: "wb-md-tile wb-md-kind-" + item.kind + (this._mdMulti && picked ? " is-selected" : "")
+        });
+        const thumb = tile.createDiv({ cls: "wb-md-thumb" });
+        if (item.kind === "note") {
+          paintNoteThumb(this.app, thumb, item.file);
+        } else if (item.kind === "image" || item.kind === "video") {
+          paintMediaThumb(this.app, thumb, item.file, item.kind);
+        } else {
+          setIcon(thumb, item.icon);
+        }
+        if (this._mdMulti) {
+          const check = tile.createDiv({ cls: "wb-md-tilecheck" });
+          const box = check.createEl("input", {
+            attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + item.file.basename }
+          });
+          box.checked = picked;
+          box.onclick = (event) => {
+            event.stopPropagation();
+            toggleSelect(item.file.path);
+          };
+        }
+        tile.createDiv({ cls: "wb-md-tilename", text: item.file.basename });
+        const tileMeta = tile.createDiv({ cls: "wb-md-tilemeta" });
+        tileMeta.createSpan({ text: item.label });
+        tileMeta.createSpan({ text: fmtSize(item.file.stat.size) });
+        if (!this._mdMulti) {
+          const del = tile.createEl("button", {
+            cls: "wb-md-tiledel",
+            attr: { "aria-label": "\u5220\u9664 " + item.file.basename }
+          });
+          setIcon(del, "trash-2");
+          del.onclick = (event) => {
+            event.stopPropagation();
+            this.deleteFiles([item.file]);
+          };
+        }
+        tile.onclick = () => {
+          if (this._mdMulti)
+            toggleSelect(item.file.path);
+          else
+            this.openFile(item.file);
+        };
+      });
+    };
+    const updateFoot = () => {
+      footLeft.setText("\u5171 " + files.length + " \u4E2A\u6587\u4EF6 \xB7 \u7B14\u8BB0\u6309 frontmatter \u805A\u5408\uFF0C\u7D20\u6750\u6309\u6A21\u5757\u6587\u4EF6\u5939\u6536\u5F55");
+      if (!files.length) {
+        footRight.setText("");
+        return;
+      }
+      const newest = files.reduce((max, file) => Math.max(max, file.stat.mtime), 0);
+      footRight.setText("\u6700\u8FD1\u66F4\u65B0 " + formatTime(newest));
+    };
+    const renderEmpty = () => {
+      stats.style.display = "none";
+      controls.style.display = "none";
+      foot.style.display = "none";
+      const empty = body.createDiv({ cls: "wb-md-empty" });
+      empty.style.setProperty("--tint", tint);
+      const art = empty.createDiv({ cls: "wb-md-emptyart" });
+      setIcon(art, "file-text");
+      empty.createEl("h2", { text: "\u8FD9\u4E2A\u6A21\u5757\u8FD8\u6CA1\u6709\u6587\u4EF6" });
+      empty.createEl("p", {
+        cls: "wb-md-emptysub",
+        text: "\u70B9\u300C\u65B0\u5EFA\u7B14\u8BB0\u300D\u4F1A\u5728\u8FD9\u91CC\u751F\u6210\u7B2C\u4E00\u7BC7\u7B14\u8BB0\uFF1B\u56FE\u7247\u3001\u89C6\u9891\u3001PDF\u3001\u97F3\u9891\u653E\u8FDB\u6A21\u5757\u6587\u4EF6\u5939\u540E\uFF0C\u4E5F\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u8FD9\u4E00\u9875\u3002"
+      });
+      const acts = empty.createDiv({ cls: "wb-md-emptyacts" });
+      const newBtn = acts.createEl("button", { cls: "wb-md-btn wb-md-btn-primary" });
+      setIcon(newBtn, "plus");
+      newBtn.appendText("\u65B0\u5EFA\u7B14\u8BB0");
+      newBtn.onclick = () => this.createModuleNote(mod);
+      if (dir) {
+        empty.createDiv({ cls: "wb-md-emptymeta", text: "\u4FDD\u5B58\u4F4D\u7F6E " + dir });
+      }
+    };
+    const draw = () => {
+      listBtn.classList.toggle("is-active", mode === "list");
+      gridBtn.classList.toggle("is-active", mode === "grid");
+      const segBtns = typeSeg.querySelectorAll("[data-kind]");
+      for (let i = 0; i < segBtns.length; i++) {
+        segBtns[i].classList.toggle("is-active", segBtns[i].dataset.kind === filter);
+      }
+      sortText.setText(sort === "name" ? "\u540D\u79F0" : sort === "size" ? "\u5927\u5C0F" : "\u6700\u8FD1\u66F4\u65B0");
+      selBar.classList.toggle("is-on", !!this._mdMulti && files.length > 0);
+      selCount.setText("\u5DF2\u9009 " + selected.size + " \u9879");
+      selDelete.disabled = selected.size === 0;
+      const q = query.trim().toLowerCase();
+      const items = files.filter((file) => filter === "all" || kindOf(file) === filter).filter((file) => !q || file.path.toLowerCase().includes(q)).map((file) => ({ file, kind: kindOf(file), label: labelOf(file), icon: iconOf(kindOf(file)) }));
+      sortItems(items);
+      countPill.setText(files.length + " \u4E2A\u6587\u4EF6");
+      body.empty();
+      if (!files.length) {
+        renderEmpty();
+        return;
+      }
+      stats.style.display = "";
+      controls.style.display = "";
+      foot.style.display = "";
+      if (!items.length) {
+        body.createDiv({ cls: "wb-md-nomatch", text: "\u6CA1\u6709\u5339\u914D\u7684\u6587\u4EF6" });
+      } else if (mode === "grid") {
+        renderGrid(body, items);
+      } else {
+        renderList(body, items);
+      }
+      updateFoot();
+    };
+    typeSeg.querySelectorAll("[data-kind]").forEach((btn) => {
+      btn.onclick = () => {
+        filter = btn.dataset.kind;
+        draw();
+      };
+    });
+    listBtn.onclick = () => {
+      mode = "list";
+      mod.view = "list";
+      this.plugin.persistSettings();
+      draw();
+    };
+    gridBtn.onclick = () => {
+      mode = "grid";
+      mod.view = "grid";
+      this.plugin.persistSettings();
+      draw();
+    };
+    input.addEventListener("input", () => {
+      query = input.value;
+      draw();
+    });
+    sortBtn.onclick = (event) => {
+      const menu = new Menu();
+      [
+        ["recent", "\u6700\u8FD1\u66F4\u65B0"],
+        ["name", "\u540D\u79F0"],
+        ["size", "\u5927\u5C0F"]
+      ].forEach(([key, label]) => {
+        menu.addItem((item) => {
+          item.setTitle(label).setChecked(sort === key).onClick(() => {
+            sort = key;
+            draw();
+          });
+        });
+      });
+      anchorMenuBelow(menu, sortBtn);
+    };
+    draw();
+  }
+  // 在模块里新建笔记：用模块的保存文件夹；没设置就先让用户挑。
+  // 不再自动创建目录，避免又冒出一个和已有文件夹编号不同的副本。
+  createModuleNote(mod) {
+    const dir = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
+    if (!dir) {
+      this.pickModuleFolder(mod);
+      return;
+    }
+    if (!this.app.vault.getAbstractFileByPath(dir)) {
+      new Notice("\u6A21\u5757\u7684\u4FDD\u5B58\u6587\u4EF6\u5939\u300C" + dir + "\u300D\u4E0D\u5B58\u5728\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9");
+      this.pickModuleFolder(mod);
+      return;
+    }
+    this.createNoteInFolder(mod, dir);
+  }
+  pickModuleFolder(mod) {
+    new FolderPickerModal(this.app, {
+      current: String(mod.folder || ""),
+      onPick: (path) => {
+        mod.folder = path;
+        this.plugin.persistSettings();
+        this.createNoteInFolder(mod, path);
+      }
+    }).open();
+  }
+  async createNoteInFolder(mod, dir) {
+    const folder = String(dir || "").replace(/^\/+|\/+$/g, "");
+    const now = /* @__PURE__ */ new Date();
+    const stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, "0") + String(now.getDate()).padStart(2, "0") + "-" + String(now.getHours()).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0");
+    let path = folder + "/\u672A\u547D\u540D\u7B14\u8BB0 " + stamp + ".md";
+    let n = 1;
+    while (this.app.vault.getAbstractFileByPath(path)) {
+      path = folder + "/\u672A\u547D\u540D\u7B14\u8BB0 " + stamp + "-" + n + ".md";
+      n += 1;
+    }
+    const moduleValue = mod.id || mod.name;
+    const content = "---\nmodule: " + moduleValue + "\nstatus: \u8349\u7A3F\ncreated: " + now.toISOString().slice(0, 10) + "\n---\n\n";
+    try {
+      const file = await this.app.vault.create(path, content);
+      this._ownership = null;
+      await this.app.workspace.getLeaf("tab").openFile(file);
+      setTimeout(() => this.refresh(), 350);
+    } catch (e) {
+      new Notice("\u65B0\u5EFA\u7B14\u8BB0\u5931\u8D25\uFF1A" + (e && e.message ? e.message : e));
+    }
+  }
+  renderCanvas(el) {
+    el.addClass("wb-scroll-canvas");
+    const collisBoard = this.plugin.childPlugins && this.plugin.childPlugins["collis-board"];
+    if (!collisBoard) {
+      const head = el.createDiv({ cls: "wb-pagehead" });
+      head.createEl("h1", { text: "\u767D\u677F" });
+      head.createDiv({
+        cls: "wb-sub",
+        text: "Collis \u753B\u5E03\u96C6\u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u6253\u5F00\u63A7\u5236\u53F0\u67E5\u770B [workbench] \u65E5\u5FD7\u3002"
+      });
+      return;
+    }
+    if (!this.gallery)
+      this.gallery = new CollisGalleryPanel(this.app, collisBoard);
+    this.gallery.mount(el);
+  }
+  renderNotes(el) {
+    el.addClass("wb-scroll-notes");
+    const collis = this.plugin.childPlugins && this.plugin.childPlugins.collis || this.app.plugins.plugins && this.app.plugins.plugins.collis;
+    if (!collis) {
+      const head = el.createDiv({ cls: "wb-pagehead" });
+      head.createEl("h1", { text: "\u5361\u7247\u7B14\u8BB0" });
+      head.createDiv({
+        cls: "wb-sub",
+        text: "Collis \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u6253\u5F00\u63A7\u5236\u53F0\u67E5\u770B [workbench] \u65E5\u5FD7\u3002"
+      });
+      return;
+    }
+    if (!this.notes)
+      this.notes = new CollisNotesPanel(this.app, collis, this);
+    this.notes.mount(el);
+  }
+};
+var WorkbenchSettingTab = class extends PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+  display() {
+    const { containerEl } = this;
+    containerEl.empty();
+    containerEl.createEl("h2", { text: "Collis \u8BBE\u7F6E" });
+    new Setting(containerEl).setName("\u5DE5\u4F5C\u53F0\u540D\u79F0").setDesc("\u663E\u793A\u5728\u5DE6\u4FA7\u5BFC\u822A\u9876\u90E8\u7684\u540D\u5B57\uFF0C\u7559\u7A7A\u5219\u7528\u300C\u4E2A\u4EBA\u5DE5\u4F5C\u53F0\u300D\u3002").addText(
+      (text) => text.setPlaceholder("\u4E2A\u4EBA\u5DE5\u4F5C\u53F0").setValue(this.plugin.settings.workspaceName || "").onChange(async (value) => {
+        this.plugin.settings.workspaceName = value.trim() || "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0";
+        await this.plugin.persistSettings();
+        this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach((leaf) => {
+          if (leaf.view && leaf.view.render)
+            leaf.view.render();
+        });
+      })
+    );
+    new Setting(containerEl).setName("\u6253\u5F00 Collis \u65F6\u8FDB\u5165\u4E13\u6CE8\u6A21\u5F0F").setDesc("\u9690\u85CF\u5DE6\u4FA7\u680F\u3001\u6807\u7B7E\u680F\u548C\u72B6\u6001\u680F\uFF1B\u53F3\u4FA7\u680F\u4FDD\u7559\uFF0C\u65B9\u4FBF\u540C\u65F6\u4F7F\u7528 Collis \u548C Claudian\u3002").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.focusOnOpen).onChange(async (value) => {
+        this.plugin.settings.focusOnOpen = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    containerEl.createEl("p", {
+      cls: "wb-settings-hint",
+      text: "\u6A21\u5757\u914D\u7F6E\u662F JSON \u6570\u7EC4\u3002\u6BCF\u9879\u652F\u6301 id\u3001name\u3001icon\u3001color\u3001module\u3001types\u3001folder\u3001keywords\u3002\u4E5F\u53EF\u4EE5\u5728\u5BFC\u822A\u91CC\u70B9\u300C\u65B0\u5EFA\u6A21\u5757\u300D\u7528\u56FE\u5F62\u754C\u9762\u6DFB\u52A0\u3002"
+    });
+    const textarea = containerEl.createEl("textarea", { cls: "wb-settings-json" });
+    textarea.value = JSON.stringify(this.plugin.settings.modules, null, 2);
+    new Setting(containerEl).addButton(
+      (button) => button.setButtonText("\u4FDD\u5B58\u6A21\u5757\u914D\u7F6E").setCta().onClick(async () => {
+        try {
+          const parsed = JSON.parse(textarea.value);
+          if (!Array.isArray(parsed)) {
+            throw new Error("\u5FC5\u987B\u662F\u4E00\u4E2A\u6570\u7EC4");
+          }
+          if (parsed.some((m) => !m || !m.id || !m.name)) {
+            throw new Error("\u6BCF\u4E2A\u6A21\u5757\u5FC5\u987B\u6709 id \u548C name");
+          }
+          this.plugin.settings.modules = parsed;
+          await this.plugin.saveSettings();
+          new Notice("\u6A21\u5757\u914D\u7F6E\u5DF2\u4FDD\u5B58");
+        } catch (e) {
+          new Notice("JSON \u9519\u8BEF\uFF1A" + e.message, 6e3);
+        }
+      })
+    );
+    containerEl.createEl("p", {
+      cls: "wb-settings-hint",
+      text: "\u5339\u914D\u987A\u5E8F\uFF1Amodule \u5B57\u6BB5\uFF08\u4E2D\u82F1\u6587\u90FD\u8BA4\uFF09\u2192 type \u2192 folder \u524D\u7F00 \u2192 \u6807\u7B7E\u5173\u952E\u8BCD\u3002\u4E00\u7BC7\u7B14\u8BB0\u53EA\u5F52\u4E00\u4E2A\u6A21\u5757\uFF0C\u6309\u5BFC\u822A\u987A\u5E8F\u5148\u547D\u4E2D\u5148\u5F97\uFF1B\u90FD\u4E0D\u547D\u4E2D\u4F1A\u8FDB\u6536\u96C6\u7BB1\u7684\u5F85\u5904\u7406\u961F\u5217\u3002"
+    });
+  }
+};
+module.exports = class WorkbenchPlugin extends Plugin {
+  async onload() {
+    const saved = await this.readHostData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
+    if (!Array.isArray(this.settings.modules)) {
+      this.settings.modules = DEFAULT_MODULES;
+    } else {
+      this.settings.modules = this.settings.modules.map((mod) => {
+        const base = DEFAULT_MODULES.find((d) => d.id === mod.id);
+        return Object.assign({}, base || {}, mod);
+      });
+    }
+    this.requestRefresh = debounce(() => this.refreshAll(), 700, true);
+    this.registerView(VIEW_TYPE, (leaf) => new WorkbenchView(leaf, this));
+    if (PLUGIN_ICON_SVG)
+      addIcon(PLUGIN_ICON_ID, PLUGIN_ICON_SVG);
+    this.addRibbonIcon(PLUGIN_ICON_ID, "\u6253\u5F00 Collis", () => this.activateView());
+    this.addCommand({
+      id: "open-workbench",
+      name: "\u6253\u5F00 Collis",
+      callback: () => this.activateView()
+    });
+    this.addCommand({
+      id: "open-workbench-focus",
+      name: "\u6253\u5F00 Collis\uFF08\u4E13\u6CE8\u6A21\u5F0F\uFF09",
+      callback: () => this.activateView(true)
+    });
+    this.addCommand({
+      id: "toggle-workbench-focus",
+      name: "\u5207\u6362 Collis \u4E13\u6CE8\u6A21\u5F0F",
+      callback: () => {
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+        if (leaf && leaf.view && leaf.view.setFocus) {
+          leaf.view.setFocus(!leaf.view.focus);
+        }
+      }
+    });
+    this.addCommand({
+      id: "toggle-workbench-nav",
+      name: "\u5207\u6362 Collis \u4FA7\u680F",
+      callback: () => {
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+        if (leaf && leaf.view && leaf.view.setNavCollapsed) {
+          leaf.view.setNavCollapsed(!leaf.view.navCollapsed);
+        }
+      }
+    });
+    this.addCommand({
+      id: "open-collis",
+      name: "\u6253\u5F00\u5361\u7247\u7B14\u8BB0",
+      callback: async () => {
+        await this.activateView();
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+        if (leaf && leaf.view && leaf.view.go)
+          leaf.view.go("notes");
+      }
+    });
+    this.addCommand({
+      id: "quick-capture",
+      name: "\u5FEB\u901F\u8BB0\u4E00\u6761\uFF08Collis\uFF09",
+      callback: () => {
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+        if (leaf && leaf.view && leaf.view.quickCapture)
+          leaf.view.quickCapture();
+      }
+    });
+    this.addCommand({
+      id: "open-canvas-gallery",
+      name: "\u6253\u5F00 Collis \u753B\u5E03\u96C6",
+      callback: async () => {
+        await this.activateView();
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+        if (leaf && leaf.view && leaf.view.go)
+          leaf.view.go("canvas");
+      }
+    });
+    this.addSettingTab(new WorkbenchSettingTab(this.app, this));
+    await this.loadBundledPlugins();
+    this._ttObserver = new MutationObserver((mutations) => {
+      for (let i = 0; i < mutations.length; i++) {
+        const m = mutations[i];
+        if (m.type === "attributes") {
+          wbNormalizeTitle(m.target);
+        } else if (m.type === "childList" && m.addedNodes) {
+          const nodes = m.addedNodes;
+          for (let j = 0; j < nodes.length; j++) {
+            const n = nodes[j];
+            if (n && n.nodeType === 1)
+              wbNormalizeTree(n);
+          }
+        }
+      }
+    });
+    this._ttObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["title"]
+    });
+    this.register(() => {
+      if (this._ttObserver) {
+        this._ttObserver.disconnect();
+        this._ttObserver = null;
+      }
+    });
+    this.app.workspace.onLayoutReady(() => wbNormalizeTree(document.body));
+    this.app.workspace.onLayoutReady(() => this.closeLegacyViews());
+    this.app.workspace.onLayoutReady(() => this.migrateBoardExtension());
+    this.registerEvent(
+      this.app.workspace.on("layout-change", () => this.syncCollisSidebarState())
+    );
+    this.app.workspace.onLayoutReady(() => this.restoreCollisSidebar());
+    this.registerEvent(this.app.vault.on("modify", () => this.requestRefresh()));
+    this.registerEvent(this.app.vault.on("create", () => this.requestRefresh()));
+    this.registerEvent(this.app.vault.on("delete", () => this.requestRefresh()));
+    this.registerEvent(this.app.vault.on("rename", () => this.requestRefresh()));
+    this.registerEvent(this.app.metadataCache.on("resolved", () => this.requestRefresh()));
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        const type = leaf && leaf.view ? leaf.view.getViewType() : null;
+        if (type === VIEW_TYPE) {
+          if (leaf.view.focus)
+            document.body.classList.add("workbench-focus");
+        } else {
+          document.body.classList.remove("workbench-focus");
+        }
+      })
+    );
+  }
+  onunload() {
+    document.body.classList.remove("workbench-focus");
+    this.unloadBundledPlugins();
+  }
+  // 清理旧版插件残留的独立视图，避免启动后右侧栏还挂着旧画布视图。
+  // 注意：qm-cards-view 现在是内置 Collis 的正式右侧栏，不能再当旧视图清掉，
+  // 否则每次启动都会把上次开着的卡片笔记关掉。
+  closeLegacyViews() {
+    const types = ["volis-board", "volis-workbench"];
+    for (const type of types) {
+      try {
+        this.app.workspace.detachLeavesOfType(type);
+      } catch (error) {
+        console.error("[workbench] \u6E05\u7406\u65E7\u89C6\u56FE\u5931\u8D25: " + type, error);
+      }
+    }
+  }
+  /* 卡片笔记右侧栏的启动恢复。
+   * Obsidian 本身会保存工作区布局，但自定义视图注册较晚时可能被丢掉，
+   * 所以这里再用一个布尔标记兜底：上次开着就恢复，上次关了就不动。 */
+  restoreCollisSidebar() {
+    this._collisLayoutReady = true;
+    const leaves = this.app.workspace.getLeavesOfType(QM_VIEW_TYPE);
+    if (leaves.length) {
+      if (!this.settings.collisSidebarOpen) {
+        this.settings.collisSidebarOpen = true;
+        this.persistSettings();
+      }
+      this.app.workspace.revealLeaf(leaves[0]);
+      return;
+    }
+    if (!this.settings.collisSidebarOpen)
+      return;
+    this.openCollisSidebar();
+  }
+  syncCollisSidebarState() {
+    if (!this._collisLayoutReady)
+      return;
+    const open = this.app.workspace.getLeavesOfType(QM_VIEW_TYPE).length > 0;
+    if (open === !!this.settings.collisSidebarOpen)
+      return;
+    this.settings.collisSidebarOpen = open;
+    this.persistSettings();
+  }
+  openCollisSidebar() {
+    try {
+      if (this.app.commands.executeCommandById("collis:open-cards"))
+        return;
+    } catch (error) {
+    }
+    const leaf = this.app.workspace.getRightLeaf(false);
+    if (!leaf)
+      return;
+    leaf.setViewState({ type: QM_VIEW_TYPE, active: true });
+    this.app.workspace.revealLeaf(leaf);
+  }
+  /* 一次性迁移：插件更名为 Collis 后，白板后缀从 .volis 改成 .collis。
+   * 只改扩展名，不碰文件内容；目标同名文件已存在时跳过，避免覆盖。 */
+  async migrateBoardExtension() {
+    const legacy = this.app.vault.getFiles().filter((file) => file.extension.toLowerCase() === "volis");
+    if (!legacy.length)
+      return;
+    let moved = 0;
+    let skipped = 0;
+    for (const file of legacy) {
+      const next = file.path.replace(/\.volis$/i, ".collis");
+      if (this.app.vault.getAbstractFileByPath(next)) {
+        skipped += 1;
+        continue;
+      }
+      try {
+        await this.app.fileManager.renameFile(file, next);
+        moved += 1;
+      } catch (error) {
+        skipped += 1;
+        console.error("[workbench] \u767D\u677F\u540E\u7F00\u8FC1\u79FB\u5931\u8D25: " + file.path, error);
+      }
+    }
+    if (moved) {
+      new Notice("\u5DF2\u628A " + moved + " \u5F20\u767D\u677F\u7684\u6269\u5C55\u540D\u66F4\u65B0\u4E3A .collis");
+    }
+    if (skipped) {
+      console.warn("[workbench] \u6709 " + skipped + " \u5F20\u767D\u677F\u672A\u80FD\u8FC1\u79FB\uFF0C\u8BF7\u68C0\u67E5\u540C\u540D\u6587\u4EF6");
+    }
+  }
+  async readHostData() {
+    if (!this.hostData)
+      this.hostData = await this.loadData() || {};
+    return this.hostData;
+  }
+  async writeHostData() {
+    await this.saveData(this.hostData || {});
+  }
+  async loadBundledPlugins() {
+    this.bundled = [];
+    await this.migrateLegacySettings();
+    for (const spec of BUNDLED_PLUGINS) {
+      await this.loadBundledPlugin(spec);
+    }
+  }
+  // 旧版独立插件的设置分别在各自文件夹的 data.json。
+  // 第一次启动时搬进 workbench/data.json，搬完后那两个文件夹可以随时删掉。
+  async migrateLegacySettings() {
+    const data = await this.readHostData();
+    let dirty = false;
+    if (!data["collis-board"] && data.volis) {
+      data["collis-board"] = data.volis;
+      delete data.volis;
+      dirty = true;
+    }
+    for (const spec of BUNDLED_PLUGINS) {
+      if (data[spec.id])
+        continue;
+      const path = this.app.vault.configDir + "/plugins/" + spec.id + "/data.json";
+      try {
+        const raw = await this.app.vault.adapter.read(path);
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          data[spec.id] = parsed;
+          dirty = true;
+        }
+      } catch (error) {
+      }
+    }
+    if (dirty)
+      await this.writeHostData();
+  }
+  isStandaloneEnabled(id) {
+    try {
+      return !!(this.app.plugins && this.app.plugins.plugins && this.app.plugins.plugins[id]);
+    } catch (error) {
+      return false;
+    }
+  }
+  // 子插件的读写重定向到 workbench 的 data.json，键名分别是 collis / collis-board。
+  attachChildSettings(child, id) {
+    child.loadData = async () => {
+      const data = await this.readHostData();
+      return data[id] || null;
+    };
+    child.saveData = async (value) => {
+      const data = await this.readHostData();
+      data[id] = value;
+      await this.writeHostData();
+    };
+  }
+  async loadBundledPlugin(spec) {
+    if (this.isStandaloneEnabled(spec.id)) {
+      console.log("[workbench] \u72EC\u7ACB\u63D2\u4EF6\u5DF2\u542F\u7528\uFF0C\u8DF3\u8FC7\u5185\u7F6E " + spec.id);
+      return;
+    }
+    try {
+      const PluginClass = resolvePluginClass(spec.bundle, spec.className);
+      if (typeof PluginClass !== "function") {
+        throw new Error("\u672A\u627E\u5230\u53EF\u7528\u7684\u63D2\u4EF6\u7C7B");
+      }
+      const manifest = Object.assign({}, spec.manifest);
+      manifest.dir = this.manifest.dir || this.app.vault.configDir + "/plugins/workbench";
+      const child = new PluginClass(this.app, manifest);
+      this.attachChildSettings(child, spec.id);
+      const noElement = () => document.createElement("div");
+      child.addRibbonIcon = noElement;
+      child.addStatusBarItem = noElement;
+      child.addSettingTab = () => {
+      };
+      child._loaded = true;
+      this.bundled.push(child);
+      await child.onload();
+      this.childPlugins = this.childPlugins || {};
+      this.childPlugins[spec.id] = child;
+      console.log("[workbench] \u5DF2\u52A0\u8F7D\u5185\u7F6E\u63D2\u4EF6 " + manifest.id);
+    } catch (error) {
+      console.error("[workbench] \u5185\u7F6E\u63D2\u4EF6\u542F\u52A8\u5931\u8D25: " + spec.id, error);
+      new Notice("Collis\uFF1A\u5185\u7F6E " + spec.id + " \u542F\u52A8\u5931\u8D25\uFF0C\u8BF7\u67E5\u770B\u63A7\u5236\u53F0");
+    }
+  }
+  unloadBundledPlugins() {
+    const list = this.bundled || [];
+    this.bundled = [];
+    for (const child of list) {
+      try {
+        child.unload();
+      } catch (error) {
+        console.error("[workbench] \u5185\u7F6E\u63D2\u4EF6\u5378\u8F7D\u5931\u8D25", error);
+      }
+    }
+  }
+  async persistSettings() {
+    const data = await this.readHostData();
+    data.modules = this.settings.modules;
+    data.focusOnOpen = this.settings.focusOnOpen;
+    data.workspaceName = this.settings.workspaceName;
+    data.navCollapsed = !!this.settings.navCollapsed;
+    data.collisSidebarOpen = !!this.settings.collisSidebarOpen;
+    data.ignoredModuleValues = this.settings.ignoredModuleValues || [];
+    await this.writeHostData();
+  }
+  async saveSettings() {
+    await this.persistSettings();
+    this.refreshAll();
+  }
+  refreshAll() {
+    this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach((leaf) => {
+      if (leaf.view && leaf.view.refresh)
+        leaf.view.refresh();
+    });
+  }
+  async activateView(forceFocus) {
+    let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+    if (!leaf) {
+      leaf = this.app.workspace.getLeaf("tab");
+      await leaf.setViewState({ type: VIEW_TYPE, active: true });
+    }
+    this.app.workspace.revealLeaf(leaf);
+    if ((forceFocus || this.settings.focusOnOpen) && leaf.view && leaf.view.setFocus) {
+      leaf.view.setFocus(true);
+    }
+  }
+};

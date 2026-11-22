@@ -1,0 +1,1949 @@
+/* Collis - 轻量卡片笔记插件样式
+ *
+ * 这份样式按手绘原型逐条复刻：
+ * 所有尺寸、圆角、间距、字号、行高都照抄原型，只有颜色换成 Obsidian 自己的变量，
+ * 这样才能跟着用户的主题（浅色 / 深色 / 第三方主题）走。
+ *
+ * 布局约定（别轻易加第三层）：
+ *   第一层 输入块（composer）
+ *   第二层 工具行（搜索框 + 回看 / 筛选 / 更多）
+ * 标签筛选是浮层、多选是浮条、回看是覆盖层，它们都不占常态布局。
+ */
+
+/* ============ 主题令牌（映射到 Obsidian 变量） ============ */
+
+/* 令牌要同时挂到侧栏视图和插件自己的弹窗上。
+ * 弹窗是挂在 body 下的，根本不在 .qm-view 里面：只写在视图上，弹窗里的按钮就
+ * 取不到 --qm-accent —— background 失效成透明、文字仍是 --text-on-accent 的白，
+ * 「删除」按钮看着就是一片空白，只有悬停时用了全局的 --interactive-accent-hover
+ * 才显出来。所以弹窗必须带上同一份令牌（main.js 里给 modalEl 加 qm-modal 类）。 */
+.view-content.qm-view,
+.modal.qm-modal,
+.modal.qm-modal-wide,
+.modal.qm-picker-modal,
+.modal.qm-trash-modal,
+.modal.qm-orphan-modal {
+  /* 侧栏底色：有的主题把 secondary 也设成接近纯白（Lomes 就是一例），
+     白面板就浮不起来。这里混 4% 文字色，压出原型那种米灰底。 */
+  --qm-pane-bg: var(--background-secondary);
+  --qm-pane-bg: color-mix(in srgb, var(--background-secondary) 96%, var(--text-normal) 4%);
+  --qm-card-bg: var(--background-primary);
+  --qm-card-hover: var(--background-primary-alt);
+  /* 输入框 / 悬停底色：比卡片深一点点，又不像边框那样抢眼。
+     先给一个老版本也能用的近似值，浏览器支持 color-mix 时再按主题算精确值。 */
+  --qm-field-bg: var(--background-modifier-hover);
+  --qm-field-bg: color-mix(in srgb, var(--text-normal) 13%, var(--background-primary));
+  /* 分割线原来直接用主题的 border 色，浅色主题下几乎看不见，白面板就成了没边的一块白 */
+  --qm-line: var(--background-modifier-border);
+  --qm-line: color-mix(in srgb, var(--text-normal) 13%, transparent);
+  --qm-text: var(--text-normal);
+  --qm-muted: var(--text-muted);
+  --qm-faint: var(--text-faint);
+  --qm-accent: var(--interactive-accent);
+  --qm-accent-soft: rgba(var(--interactive-accent-rgb, 127, 109, 242), 0.1);
+  --qm-accent-soft: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  --qm-accent-weak: color-mix(in srgb, var(--interactive-accent) 5.5%, transparent);
+  --qm-danger: var(--text-error);
+  --qm-dot: var(--color-red, #d9534f);
+  --qm-shadow-card: 0 1px 2px rgba(40, 30, 20, 0.05);
+  --qm-shadow-pop: 0 12px 28px rgba(30, 22, 12, 0.14), 0 2px 5px rgba(30, 22, 12, 0.05);
+}
+
+/* 只有侧栏视图才有的排版（弹窗不需要，也不该被套上 flex:1 这些） */
+.view-content.qm-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 6px 12px 0 12px;
+  overflow: hidden;
+  /* 面板底色用侧栏色：卡片与输入块是 primary，浮在上面才有层次 */
+  background: var(--qm-pane-bg);
+  color: var(--qm-text);
+  font-family: var(--font-interface);
+}
+
+.theme-dark .qm-view,
+.theme-dark .modal.qm-modal,
+.theme-dark .modal.qm-modal-wide,
+.theme-dark .modal.qm-picker-modal,
+.theme-dark .modal.qm-trash-modal,
+.modal.qm-orphan-modal {
+  --qm-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.18);
+  --qm-shadow-pop: 0 14px 36px rgba(0, 0, 0, 0.5);
+}
+
+/* Obsidian 给按钮 / 输入框自带一套外观，这里统一压掉，否则跟原型差一大截 */
+.qm-view button,
+.qm-view input,
+.qm-view textarea {
+  font-family: var(--font-interface);
+  box-sizing: border-box;
+}
+
+.qm-view button {
+  box-shadow: none;
+  text-shadow: none;
+}
+
+.qm-view input[type='text'] {
+  height: auto;
+  min-height: 0;
+}
+
+.qm-root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ---------- 第一层：输入块 ---------- */
+
+.qm-composer {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 7px 10px 5px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--qm-card-bg);
+  box-shadow: var(--qm-shadow-card);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.qm-composer:focus-within {
+  border-color: var(--qm-accent);
+  box-shadow: 0 0 0 3px var(--qm-accent-soft);
+}
+
+.qm-input {
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  max-height: 320px;
+  padding: 0;
+  border: 0 !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  /* 长高手柄自己做（见 .qm-grip）：浏览器自带那个会画在文本区右下角，
+     正好落在「记下」上面，跟原型的卡片格格不入 */
+  resize: none;
+  overflow-y: auto;
+  color: var(--qm-text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.qm-input::placeholder {
+  color: var(--qm-faint);
+}
+
+/* 输入块的拉高手柄：平时不显形，鼠标进到输入块里才浮出来，不破坏原型的卡片感 */
+.qm-grip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  color: var(--qm-faint);
+  opacity: 0;
+  cursor: ns-resize;
+  touch-action: none;
+  transition: opacity 0.12s;
+}
+
+.qm-composer:hover .qm-grip,
+.qm-composer:focus-within .qm-grip {
+  opacity: 0.7;
+}
+
+.qm-grip:hover {
+  opacity: 1;
+}
+
+.qm-grip svg {
+  width: 12px;
+  height: 12px;
+}
+
+.qm-composer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.qm-kbd-hint {
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+  color: var(--qm-faint);
+}
+
+/* 注意选择器里的 .qm-view 前缀，不能省。
+ * Obsidian 自带的按钮规则是 0,1,1（`button:not(.clickable-icon)`），会给所有按钮刷
+ * background-color: var(--interactive-normal)。单靠 `.qm-save`（0,1,0）压不过它：
+ * 空输入时靠 `.qm-save.is-disabled`（0,2,0）赢，看着是灰的；一旦有内容退回 0,1,0
+ * 就被主题的灰白底盖掉，只剩「记下」两个字，悬停又因为 :hover 提到 0,2,0 才显色。
+ * 前缀把基础规则也抬到 0,2,0，和 :hover / .is-disabled 持平，靠文件顺序让状态生效。 */
+.qm-view .qm-save {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--qm-accent);
+  color: var(--text-on-accent);
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.qm-save:hover {
+  background: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+}
+
+.qm-save.is-disabled,
+.qm-save:disabled {
+  background: var(--qm-field-bg);
+  color: var(--qm-faint);
+  cursor: default;
+}
+
+/* 上次没记完的内容被填回来了 */
+.qm-draft-hint {
+  margin: 4px 0 0 0;
+  font-size: 10.5px;
+  color: var(--qm-faint);
+}
+
+/* ---------- 第二层：工具行 ---------- */
+
+.qm-toolrow {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 7px;
+}
+
+.qm-searchbox {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--qm-field-bg);
+  /* 底色之外再压一圈内描边：侧栏底色和输入底色接近时，只靠填充还是看不出来 */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-normal) 9%, transparent);
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.qm-searchbox:focus-within {
+  background: var(--qm-card-bg);
+  border-color: var(--qm-accent);
+  box-shadow: none;
+}
+.qm-search-ico {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--qm-faint);
+}
+
+.qm-search-ico svg {
+  width: 13px;
+  height: 13px;
+}
+
+.qm-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0 !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--qm-text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.qm-search::placeholder {
+  color: var(--qm-faint);
+}
+
+.qm-view .qm-search-clear {
+  display: none;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--qm-line);
+  color: var(--qm-muted);
+  font-size: 11px;
+  line-height: 1;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.qm-search-clear.is-visible {
+  display: block;
+}
+
+/* 以下每条按钮规则都带 .qm-view 前缀，原因同 .qm-save：
+ * Obsidian 的 `button:not(.clickable-icon)` 是 0,1,1，会给所有按钮刷上
+ * background-color: var(--interactive-normal)（浅色主题下接近白）。
+ * 单类选择器（0,1,0）压不过它，按钮就丢了"透明 / 描边"的原型外观。
+ * 前缀只加到 0,2,0，和 :hover / .is-xxx（同为 0,2,0）持平，靠文件顺序让状态规则生效。 */
+.qm-view .qm-icon-btn {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--qm-muted);
+  box-shadow: none;
+  cursor: pointer;
+  transition: background 0.13s, color 0.13s;
+}
+
+.qm-icon-btn:hover {
+  background: var(--qm-field-bg);
+  color: var(--qm-text);
+}
+
+/* 打开筛选时按钮外面套一圈强调色描边（截图里就是这个样子） */
+.qm-icon-btn.is-active {
+  background: var(--qm-card-bg);
+  color: var(--qm-accent);
+  box-shadow: inset 0 0 0 1.5px var(--qm-accent);
+}
+
+.qm-icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* 有筛选生效时的小圆点：只是提示，不放数字 */
+.qm-filter-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--qm-accent);
+}
+
+.qm-filter-dot.is-hidden {
+  display: none;
+}
+
+/* ---------- 筛选浮层（不占列表高度） ---------- */
+
+.qm-pop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: none;
+  padding: 13px 14px;
+  border: 1px solid var(--qm-line);
+  border-radius: 14px;
+  background: var(--qm-card-bg);
+  box-shadow: var(--qm-shadow-pop);
+}
+
+.qm-pop.show {
+  display: block;
+}
+
+.qm-pop-title {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--qm-text);
+}
+
+.qm-pop-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 6px;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--qm-muted);
+}
+
+.qm-pop-label:first-of-type {
+  margin-top: 0;
+}
+
+.qm-pop-sel {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--qm-accent);
+}
+
+.qm-seg {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--qm-field-bg);
+}
+
+.qm-seg button {
+  flex: 1;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--qm-muted);
+  font-size: 12.5px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.qm-seg button:hover {
+  color: var(--qm-text);
+}
+
+.qm-seg button.on {
+  background: var(--qm-card-bg);
+  color: var(--qm-text);
+  box-shadow: inset 0 0 0 1px var(--qm-line), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* 固定高度的标签窗口：标签再多也只在这里滚，面板不会跟着长高 */
+.qm-tree-wrap {
+  position: relative;
+}
+
+.qm-tagtree {
+  height: 252px;
+  margin: 0 -6px;
+  padding: 1px 6px 3px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--qm-line) transparent;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.qm-tagtree::-webkit-scrollbar {
+  width: 7px;
+}
+
+.qm-tagtree::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+}
+
+.qm-tagtree::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.qm-tagtree::-webkit-scrollbar-thumb {
+  background: var(--qm-line);
+  border-radius: 4px;
+}
+
+.qm-tagtree::-webkit-scrollbar-thumb:hover {
+  background: var(--qm-faint);
+}
+
+/* 还有内容没露出来时，底部压一条渐隐，提示可以继续滚。
+   窗口高度不是行高的整数倍时，最下面会露出半行，靠这条渐变把它吃掉。 */
+.qm-tree-wrap::after {
+  content: '';
+  position: absolute;
+  /* 标签窗自己带 -6px 的负外边距，渐隐要跟着它一起外扩，
+     否则最右边那一小条（正好是勾选框所在的列）盖不住 */
+  left: -6px;
+  right: -6px;
+  bottom: 0;
+  height: 24px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0,
+    var(--qm-card-bg) 62%,
+    var(--qm-card-bg) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.qm-tree-wrap.more::after {
+  opacity: 1;
+}
+
+.qm-tnode {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  height: 31px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--qm-text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qm-tnode:hover {
+  background: var(--qm-field-bg);
+  color: var(--qm-text);
+}
+
+.qm-tnode .qm-caret {
+  flex: 0 0 auto;
+  width: 15px;
+  font-size: 9.5px;
+  line-height: 15px;
+  text-align: center;
+  color: var(--qm-faint);
+  border-radius: 3px;
+}
+
+.qm-tnode .qm-caret:hover {
+  color: var(--qm-text);
+  background: var(--qm-line);
+}
+
+.qm-tnode .qm-caret.is-blank {
+  visibility: hidden;
+}
+
+.qm-tnode .qm-tname {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qm-tnode .qm-tcount {
+  flex: 0 0 auto;
+  min-width: 15px;
+  margin-left: 6px;
+  text-align: right;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--qm-faint);
+}
+
+.qm-tnode .qm-tmark {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--qm-line);
+  border-radius: 4.5px;
+  color: transparent;
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* 选中 / 半选 / 被祖先覆盖：三种状态互斥 */
+.qm-tnode.is-on {
+  background: var(--qm-accent-soft);
+  color: var(--qm-accent);
+}
+
+.qm-tnode.is-on .qm-tcount {
+  color: var(--qm-accent);
+  opacity: 0.65;
+}
+
+.qm-tnode.is-on .qm-tmark {
+  border-color: transparent;
+  background: var(--qm-accent);
+  color: var(--text-on-accent);
+}
+
+.qm-tnode.is-some {
+  color: var(--qm-text);
+}
+
+.qm-tnode.is-some .qm-tcount {
+  color: var(--qm-accent);
+  opacity: 0.8;
+}
+
+.qm-tnode.is-some .qm-tmark {
+  border-color: var(--qm-accent);
+}
+
+.qm-tnode.is-some .qm-tmark::after {
+  content: '';
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--qm-accent);
+}
+
+.theme-dark .qm-tnode.is-inherit {
+  opacity: 0.72;
+}
+
+.qm-tnode.is-inherit {
+  color: var(--qm-accent);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.qm-tnode.is-inherit .qm-tmark {
+  border-color: transparent;
+  background: var(--qm-accent);
+  color: var(--text-on-accent);
+  opacity: 0.45;
+}
+
+.qm-tnode.is-child {
+  height: 30px;
+}
+
+.qm-tnode-untagged .qm-tname {
+  color: var(--qm-text);
+}
+
+.qm-tnode-untagged .qm-tcount {
+  opacity: 0.85;
+}
+
+.qm-tchildren {
+  margin: 0 0 1px 16px;
+  padding-left: 6px;
+  border-left: 1px solid var(--qm-line);
+}
+
+.qm-pop-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid var(--qm-line);
+}
+
+.qm-pop-note {
+  font-size: 11.5px;
+  color: var(--qm-faint);
+}
+
+.qm-view .qm-link-btn {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--qm-muted);
+  font-size: 12px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.qm-link-btn:hover {
+  color: var(--qm-accent);
+}
+
+/* ---------- 下拉菜单（自绘，「···」点开的那一层） ---------- */
+
+.qm-menu {
+  position: absolute;
+  z-index: 60;
+  min-width: 186px;
+  max-width: 268px;
+  padding: 6px;
+  border: 1px solid var(--qm-line);
+  border-radius: 12px;
+  background: var(--qm-card-bg);
+  box-shadow: var(--qm-shadow-pop);
+}
+
+.qm-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 34px;
+  padding: 0 9px;
+  border-radius: 7px;
+  color: var(--qm-text);
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.qm-menu-item:hover {
+  background: var(--qm-field-bg);
+}
+
+.qm-menu-item .qm-menu-ico {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  color: var(--qm-muted);
+}
+
+.qm-menu-item .qm-menu-ico svg {
+  width: 15px;
+  height: 15px;
+}
+
+.qm-menu-item .qm-menu-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qm-menu-item.is-disabled {
+  color: var(--qm-faint);
+  cursor: default;
+}
+
+.qm-menu-item.is-disabled:hover {
+  background: transparent;
+}
+
+.qm-menu-item.is-disabled .qm-menu-ico {
+  color: var(--qm-faint);
+}
+
+.qm-menu-item.is-danger,
+.qm-menu-item.is-danger .qm-menu-ico {
+  color: var(--qm-danger);
+}
+
+.qm-menu-sep {
+  height: 1px;
+  margin: 5px 7px;
+  background: var(--qm-line);
+}
+
+
+/* ---------- 生效条件 chips ---------- */
+
+.qm-chips {
+  flex: 0 0 auto;
+  display: none;
+  flex-wrap: nowrap;
+  gap: 5px;
+  margin-top: 7px;
+  overflow: hidden;
+}
+
+.qm-chips.show {
+  display: flex;
+}
+
+.qm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  max-width: 128px;
+  height: 21px;
+  padding: 0 3px 0 8px;
+  border-radius: 11px;
+  background: var(--qm-accent-soft);
+  color: var(--qm-accent);
+  font-size: 10.5px;
+}
+
+.qm-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qm-chip em {
+  flex: 0 0 auto;
+  margin-right: 1px;
+  font-style: normal;
+  font-size: 9.5px;
+  opacity: 0.6;
+}
+
+.qm-chip button {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  line-height: 1;
+  box-shadow: none;
+  opacity: 0.65;
+  cursor: pointer;
+}
+
+.qm-chip button:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.qm-chip-more {
+  padding: 0 8px;
+  background: var(--qm-field-bg);
+  color: var(--qm-muted);
+  cursor: pointer;
+}
+
+/* 「记一条」弹窗里的常用标签快选（README 里承诺过，之前一直没写样式，
+   显示成一排挤在一起的纯文字）。点一下就往输入框里补一个 #标签。 */
+.qm-quick-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 2px;
+}
+
+.qm-quick-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 11px;
+  background: var(--qm-accent-soft);
+  color: var(--qm-accent);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.qm-quick-tag:hover {
+  background: color-mix(in srgb, var(--qm-accent) 20%, transparent);
+}
+
+/* ---------- 列表 ---------- */
+
+.qm-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 4px;
+  /* 状态栏（反链数 / 字数）是浮在工作区上的，视图底边在它下面，
+     最后一张卡会被它盖住。--qm-status-h 由 syncSelbarGap() 量出来写进来。 */
+  padding-bottom: calc(6px + var(--qm-status-h, 0px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+/* 浮条 38 高 + 上下留白，都跟着 --qm-selbar-gap 一起走，别写死 56 */
+.qm-list.has-selbar {
+  padding-bottom: calc(var(--qm-selbar-gap, 10px) + 46px);
+}
+
+.qm-day {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 27px;
+  margin: 0;
+  background: var(--qm-pane-bg);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--qm-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.qm-list > .qm-day:not(:first-child) {
+  margin-top: 12px;
+}
+
+.qm-day-arrow {
+  flex: 0 0 auto;
+  width: 10px;
+  font-size: 8px;
+  line-height: 1;
+  text-align: center;
+  color: var(--qm-faint);
+}
+
+.qm-day-count {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--qm-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.qm-day:hover .qm-day-text {
+  color: var(--qm-text);
+}
+
+.qm-day.is-locked {
+  cursor: default;
+}
+
+/* ---------- 卡片 ---------- */
+
+.qm-card {
+  position: relative;
+  margin-bottom: 6px;
+  padding: 8px 10px 9px;
+  border-radius: 10px;
+  background: var(--qm-card-bg);
+  box-shadow: var(--qm-shadow-card);
+  /* 手指连点两下也要能进编辑，别让浏览器当成双击缩放 */
+  touch-action: manipulation;
+  transition: background 0.13s, box-shadow 0.13s;
+}
+
+.qm-card:hover {
+  background: var(--qm-card-hover);
+}
+
+.qm-card-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 18px;
+  margin-bottom: 2px;
+}
+
+.qm-time {
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--qm-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 时间后面的小圆点：只表示「被笔记引用过」，次数与来源在「···」里看
+   纯提示，不响应点击，所以不加 cursor / hover 态 */
+.qm-ref {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--qm-dot);
+  cursor: default;
+}
+
+.qm-ref.is-hidden {
+  display: none;
+}
+
+/* 卡片右上角的「···」：悬停才显形，平时不抢正文 */
+.qm-view .qm-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -3px -3px -3px auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--qm-faint);
+  box-shadow: none;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+
+.qm-card:hover .qm-more,
+.qm-card:focus-within .qm-more {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .qm-view .qm-more {
+    opacity: 0.55;
+  }
+}
+
+.qm-more:hover {
+  color: var(--qm-text);
+  background: var(--qm-field-bg);
+}
+
+.qm-more svg {
+  width: 15px;
+  height: 15px;
+}
+
+.qm-card.is-dragging {
+  opacity: 0.55;
+}
+
+.qm-tag {
+  color: var(--qm-accent);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.qm-tag:hover {
+  background: var(--qm-accent-soft);
+}
+
+/* 卡片正文里的裸网址：可点，长网址在原位折行 */
+.qm-url {
+  color: var(--qm-accent);
+  text-decoration: none;
+  word-break: break-all;
+  cursor: pointer;
+}
+
+.qm-url:hover {
+  text-decoration: underline;
+}
+
+.qm-body {
+  font-size: 12.8px;
+  line-height: 1.68;
+  color: var(--qm-text);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.qm-body mark {
+  padding: 0 1px;
+  border-radius: 2px;
+  background: rgba(var(--interactive-accent-rgb, 127, 109, 242), 0.26);
+  background: color-mix(in srgb, var(--interactive-accent) 26%, transparent);
+  color: inherit;
+}
+
+/* ---------- 编辑态 ---------- */
+
+.qm-edit {
+  display: block;
+  width: 100%;
+  min-height: 74px;
+  max-height: 210px;
+  padding: 6px 8px;
+  border: 1px solid var(--qm-line);
+  border-radius: 8px;
+  outline: none;
+  resize: vertical;
+  background: var(--qm-field-bg);
+  color: var(--qm-text);
+  font-size: 12.8px;
+  line-height: 1.65;
+  box-shadow: none;
+}
+
+.qm-edit:focus {
+  border-color: var(--qm-accent);
+}
+
+.qm-edit-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* ---------- 小按钮（弹窗、编辑态共用） ---------- */
+
+/* 小按钮在弹窗和卡片编辑态都用。两个作用域都带上，原因同 .qm-save：
+ * Obsidian 的 `button:not(.clickable-icon)`（0,1,1）会给按钮刷浅灰底，
+ * 单类（0,1,0）压不过，描边按钮会变成实心灰块。抬到 0,2,0 后，
+ * 下面的 :hover / .is-primary（同为 0,2,0）靠文件顺序继续生效。 */
+.qm-view .qm-mini-btn,
+.modal .qm-mini-btn {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--qm-line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--qm-muted);
+  font-size: 11.5px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.qm-mini-btn:hover {
+  background: var(--qm-field-bg);
+  color: var(--qm-text);
+}
+
+.qm-mini-btn.is-primary {
+  border-color: transparent;
+  background: var(--qm-accent);
+  color: var(--text-on-accent);
+}
+
+.qm-mini-btn.is-primary:hover {
+  background: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+}
+
+.qm-mini-btn.qm-mini-btn-danger {
+  border-color: transparent;
+  background: var(--qm-danger);
+  color: var(--text-on-accent);
+}
+
+.qm-mini-btn.qm-mini-btn-danger:hover {
+  background: var(--qm-danger);
+  color: var(--text-on-accent);
+  opacity: 0.9;
+}
+
+.qm-mini-btn.is-danger {
+  color: var(--qm-danger);
+  border-color: var(--qm-line);
+}
+
+.qm-mini-btn.is-danger:hover {
+  border-color: var(--qm-danger);
+  background: transparent;
+  color: var(--qm-danger);
+}
+
+.qm-mini-btn.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ---------- 空状态 ---------- */
+
+.qm-empty {
+  padding: 26px 10px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--qm-faint);
+}
+
+/* ---------- 多选浮条 ---------- */
+
+.qm-selbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* 状态栏（反链数 / 字数）盖在侧栏底部上头，浮条按 10px 落下去会和它叠住。
+     实际值由 syncSelbarGap() 量出来写进 --qm-selbar-gap。 */
+  bottom: var(--qm-selbar-gap, 10px);
+  z-index: 25;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 38px;
+  padding: 0 6px 0 11px;
+  border: 1px solid var(--qm-line);
+  border-radius: 10px;
+  background: var(--qm-card-bg);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  font-size: 11.5px;
+  color: var(--qm-muted);
+}
+
+.qm-selbar.show {
+  display: flex;
+}
+
+/* 计数文字：条数多了别把浮条挤变形 */
+.qm-selbar-info {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qm-selbar-acts {
+  display: flex;
+  gap: 6px;
+}
+
+/* 加 .qm-view 前缀的原因同上面的按钮：`.qm-selbar button` 是 0,1,1，
+   和 Obsidian 的 `button:not(.clickable-icon)` 打平，只靠样式表加载顺序取胜。 */
+.qm-view .qm-selbar button {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--qm-line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--qm-muted);
+  font-size: 11px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.qm-view .qm-selbar button:hover {
+  background: var(--qm-field-bg);
+  color: var(--qm-text);
+}
+
+.qm-view .qm-selbar button.is-danger {
+  border-color: transparent;
+  background: var(--qm-danger);
+  color: var(--text-on-accent);
+}
+
+.qm-view .qm-selbar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.qm-card.is-selectable {
+  cursor: pointer;
+}
+
+.qm-card.is-picked {
+  box-shadow: 0 0 0 1.5px var(--qm-accent), var(--qm-shadow-card);
+}
+
+.qm-tick {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin-left: -2px;
+  border: 1.5px solid var(--qm-line);
+  border-radius: 50%;
+  background: transparent;
+  color: transparent;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.qm-card.is-picked .qm-tick {
+  border-color: var(--qm-accent);
+  background: var(--qm-accent);
+  color: var(--text-on-accent);
+}
+
+/* ---------- 回看（覆盖式视图） ---------- */
+
+.qm-review {
+  position: absolute;
+  inset: 0 -12px 0 -12px;
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  padding: 6px 12px 0 12px;
+  background: var(--qm-pane-bg);
+}
+
+.qm-review.show {
+  display: flex;
+}
+
+.qm-review-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+}
+
+.qm-view .qm-review-back {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--qm-muted);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.qm-review-back:hover {
+  background: var(--qm-field-bg);
+  color: var(--qm-text);
+}
+
+.qm-review-back svg {
+  width: 15px;
+  height: 15px;
+}
+
+.qm-review-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--qm-text);
+}
+
+.qm-view .qm-review-shuffle {
+  margin-left: auto;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--qm-line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--qm-muted);
+  font-size: 11px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.qm-review-shuffle:hover {
+  color: var(--qm-accent);
+  border-color: var(--qm-accent);
+}
+
+.qm-review-sub {
+  flex: 0 0 auto;
+  padding: 1px 0 9px;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--qm-faint);
+}
+
+.qm-review-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* 同 .qm-list：回看最后一张卡的「插入到这篇」就在卡片底部，不加会被状态栏盖住 */
+  padding-bottom: calc(10px + var(--qm-status-h, 0px));
+  overflow-y: auto;
+}
+
+.qm-rv-card {
+  margin-bottom: 7px;
+  padding: 9px 10px 8px;
+  border-radius: 10px;
+  background: var(--qm-card-bg);
+  box-shadow: var(--qm-shadow-card);
+}
+
+.qm-rv-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: var(--qm-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.qm-rv-sep {
+  color: var(--qm-line);
+}
+
+.qm-rv-body {
+  margin: 5px 0 7px;
+  font-size: 12.8px;
+  line-height: 1.68;
+  color: var(--qm-text);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.qm-rv-url {
+  color: var(--qm-accent);
+  word-break: break-all;
+}
+
+.qm-rv-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.qm-view .qm-rv-insert {
+  height: 23px;
+  padding: 0 9px;
+  border: 1px solid var(--qm-line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--qm-muted);
+  font-size: 11px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.qm-rv-insert:hover {
+  border-color: var(--qm-accent);
+  color: var(--qm-accent);
+}
+
+.qm-rv-insert.is-done {
+  border-color: transparent;
+  background: var(--qm-accent-soft);
+  color: var(--qm-accent);
+}
+
+/* ---------- 追加区（列表 / 回看共用） ---------- */
+
+/* 时间后面的「追加 N」：只有存在追加时才出现，点它展开 / 收起 */
+.qm-append-badge {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--qm-accent-soft);
+  color: var(--qm-accent);
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.qm-append-badge:hover {
+  background: var(--qm-accent);
+  color: var(--text-on-accent, #fff);
+}
+
+.qm-append-list {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--qm-line);
+}
+
+.qm-append-item + .qm-append-item {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--qm-line);
+}
+
+.qm-append-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 18px;
+}
+
+.qm-append-time {
+  font-size: 10px;
+  color: var(--qm-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.qm-append-acts {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.qm-view .qm-append-acts .qm-mini-btn {
+  height: 18px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+
+.qm-append-text {
+  margin-top: 2px;
+  font-size: 12.4px;
+  line-height: 1.64;
+  color: var(--qm-text);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.qm-append-composer {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--qm-line);
+}
+
+.qm-append-composer .qm-append-input {
+  min-height: 46px;
+}
+
+.qm-append-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.qm-append-bar .qm-kbd-hint {
+  margin-right: auto;
+}
+
+/* 回看卡片顶部：元信息 + 追加徽标 + 「···」 */
+.qm-rv-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qm-rv-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--qm-faint);
+  box-shadow: none;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+
+.qm-rv-card:hover .qm-rv-more,
+.qm-rv-more:focus-visible {
+  opacity: 1;
+}
+
+.qm-rv-more:hover {
+  color: var(--qm-text);
+  background: var(--qm-field-bg);
+}
+
+.qm-rv-more svg {
+  width: 15px;
+  height: 15px;
+}
+
+@media (hover: none) {
+  .qm-rv-more {
+    opacity: 1;
+  }
+}
+
+/* ---------- 弹窗通用 ---------- */
+
+.qm-modal-title {
+  margin-bottom: 3px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-normal);
+}
+
+.qm-modal-wrap {
+  position: relative;
+}
+
+.qm-modal-input {
+  width: 100%;
+  min-height: 110px;
+  margin-bottom: 8px;
+}
+
+.qm-hint {
+  margin: 4px 0 8px 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-faint);
+}
+
+.qm-confirm-text {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-normal);
+  line-height: 1.5;
+}
+
+/* 删除确认里的补充说明：引用情况 / 不能撤销 */
+.qm-confirm-detail {
+  margin-top: -2px;
+  margin-bottom: 12px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* ---------- 最近删除 ---------- */
+
+.modal.qm-trash-modal,
+.modal.qm-orphan-modal {
+  width: 480px;
+  max-width: 92vw;
+}
+
+.qm-trash-list {
+  max-height: 46vh;
+  margin: 2px 0 8px 0;
+  overflow-y: auto;
+}
+
+.qm-trash-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.qm-trash-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.qm-trash-body {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.3px;
+  line-height: 1.55;
+  color: var(--text-normal);
+}
+
+.qm-trash-meta {
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.qm-trash-acts {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+}
+
+/* ---------- 孤儿卡片检查 ---------- */
+
+.qm-orphan-list {
+  max-height: 46vh;
+  margin: 2px 0 8px 0;
+  overflow-y: auto;
+}
+
+.qm-orphan-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.qm-orphan-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.qm-orphan-body {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.3px;
+  line-height: 1.55;
+  color: var(--text-normal);
+}
+
+.qm-orphan-meta {
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.qm-orphan-acts {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+}
+
+.qm-trash-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+/* 清空靠左、关闭靠右：清空是危险动作，别跟「关闭」贴在一起 */
+.qm-trash-clear {
+  margin-right: auto;
+}
+
+.qm-undo-toast {
+  cursor: pointer;
+}
+
+/* ---------- 标签联想 ---------- */
+
+.qm-suggest {
+  position: absolute;
+  z-index: 60;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary);
+  box-shadow: var(--shadow-s);
+}
+
+.qm-suggest-item {
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-normal);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qm-suggest-item.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.qm-suggest-item.is-create {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ---------- 引用面板 ---------- */
+
+.modal.qm-modal-wide {
+  width: 620px;
+  max-width: 92vw;
+}
+
+.qm-refpanel-title {
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-medium);
+  color: var(--text-normal);
+}
+
+.qm-refpanel-sub {
+  margin-top: 3px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+.qm-reflist {
+  max-height: 58vh;
+  margin-top: 14px;
+  padding-top: 6px;
+  overflow-y: auto;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.qm-reflist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 9px;
+  border-radius: 6px;
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.qm-reflist-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.qm-reflist-row:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.qm-reflist-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.qm-reflist-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+.qm-reflist-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+.qm-reflist-n {
+  flex: none;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 卡片候选：正文最多两行，一条长卡片不该把候选列表撑开 */
+.qm-suggest-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qm-suggest-when {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.qm-suggest-ref {
+  position: relative;
+  top: 1px;
+  flex: none;
+  width: 5px;
+  height: 5px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: var(--color-red, #c0392b);
+}
+
+.qm-suggest-tags {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-accent);
+}
+
+.qm-suggest-body {
+  max-height: 3.1em;
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+  color: var(--text-normal);
+  word-break: break-word;
+}
+
+/* 命中的字标出来，代替「相似度百分比」这种没意义的数字 */
+.qm-hit {
+  border-radius: 2px;
+  background: var(--text-highlight-bg);
+}
+
+/* ---------- 选卡片面板（Ctrl+Shift+K） ---------- */
+
+.modal.qm-picker-modal {
+  max-width: 92vw;
+}
+
+.qm-picker-modal .prompt-results {
+  padding: 6px 8px 8px;
+}
+
+/* 列表项必须走正常文档流：一行一张卡，高度由内容决定。
+   （早期这里误套了 .qm-suggest，那是浮动联想框的类，带 position:absolute，
+   结果所有行叠在同一个位置——这就是「卡片重叠」的根因。） */
+.qm-picker-modal .suggestion-item {
+  display: block;
+  position: static;
+  height: auto;
+  min-height: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-s, 6px);
+  white-space: normal;
+  overflow: hidden;
+}
+
+.qm-picker-modal .suggestion-item + .suggestion-item {
+  margin-top: 1px;
+  /* 发丝线：不占布局高度，选中底色盖上来时也还看得见分隔 */
+  box-shadow: inset 0 1px 0 var(--background-modifier-border);
+}
+
+/* ↑↓ 选到哪一行要一眼看得出来：淡底色 + 左边缘一道强调色 */
+.qm-picker-modal .suggestion-item.is-selected {
+  background: var(--background-modifier-hover);
+  box-shadow: inset 2px 0 0 var(--interactive-accent);
+}
+
+/* 空查询时列的是最近卡片，加一行表头说清楚这是什么 */
+.qm-picker-modal.is-recent .prompt-results::before {
+  content: '最近卡片';
+  display: block;
+  padding: 4px 10px 8px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+/* ==========================================================================
+   深色 / 浅色主题卡片层次修正（2026-11-17 追加，勿删）
+
+   起因：Collis 原来的变量映射假设了两件事——
+     ① --background-primary 与 --background-secondary 有可见差值（卡片才能浮起来）
+     ② --background-primary-alt 与 primary 有差值（悬停才有反馈）
+   Lomes 主题把这两处差值都抹平了：
+     · 深色  primary #485452 / secondary #404B49 → 卡片与侧栏底色仅 1.04:1，几乎同色
+     · 深浅两色的 primary-alt 与 primary 完全同值    → 悬停是空操作（1.000:1）
+   所以深色下卡片既浮不起来、悬停也毫无反馈。
+
+   修法：不再依赖主题的 -alt，改用「侧栏底色 + 正文色」按比例混出层次。
+   好处是不写死色值，换别的深色 / 浅色主题也能自动跟着走，
+   且只覆盖卡片相关的两个变量，不碰 --qm-field-bg（搜索框、按钮）等其他令牌。
+   ========================================================================== */
+
+.theme-dark .view-content.qm-view,
+.theme-dark .modal.qm-modal,
+.theme-dark .modal.qm-modal-wide,
+.theme-dark .modal.qm-picker-modal,
+.theme-dark .modal.qm-trash-modal,
+.modal.qm-orphan-modal {
+  /* 卡片比侧栏底色亮一档：1.04:1 → 1.21:1，深色下才有「浮起来」的层次 */
+  --qm-card-bg: color-mix(in srgb, var(--text-normal) 8%, var(--qm-pane-bg));
+  /* 悬停再亮一档：相对卡片 1.11:1，相对底色 1.34:1 */
+  --qm-card-hover: color-mix(in srgb, var(--text-normal) 12%, var(--qm-pane-bg));
+}
+
+/* 浅色只补悬停：卡片 #FEFEFE 已接近纯白，往上提没有空间，改为微微压暗。
+   4% 是上限——再深到 6% 时卡片与侧栏底色只剩 1.05:1，卡片反而会陷进背景。 */
+.theme-light .view-content.qm-view,
+.theme-light .modal.qm-modal,
+.theme-light .modal.qm-modal-wide,
+.theme-light .modal.qm-picker-modal,
+.theme-light .modal.qm-trash-modal,
+.modal.qm-orphan-modal {
+  --qm-card-hover: color-mix(in srgb, var(--text-normal) 4%, var(--qm-card-bg));
+}
+
+/* 深色下投影 rgba(0,0,0,0.18) 落在深色底上基本看不见，单独描一条 1px 内线把边界画出来。
+   用 ::after 叠一层，而不是去改 box-shadow / border——否则会压过
+   .qm-card.is-picked 的选中环 和 .qm-composer:focus-within 的聚焦高亮。 */
+.theme-dark .qm-view .qm-card::after,
+.theme-dark .qm-view .qm-composer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-normal) 9%, transparent);
+  pointer-events: none;
+}
