@@ -270,10 +270,10 @@ function firstNumber(values) {
   return null;
 }
 
-// src/workbench/config.ts
-var WORKBENCH_FOLDER = "\u753B\u5E03";
-var DEFAULT_WORKBENCH_SETTINGS = {
-  boardFolder: WORKBENCH_FOLDER
+// src/collis/config.ts
+var GALLERY_FOLDER = "\u753B\u5E03";
+var DEFAULT_GALLERY_SETTINGS = {
+  boardFolder: GALLERY_FOLDER
 };
 
 // src/settings.ts
@@ -299,17 +299,17 @@ var DEFAULT_SETTINGS = {
     policy: { ...DEFAULT_CONTEXT_POLICY }
   },
   conversations: [],
-  workbench: { ...DEFAULT_WORKBENCH_SETTINGS }
+  collis: { ...DEFAULT_GALLERY_SETTINGS }
 };
 function activeProfile(ai) {
   var _a, _b;
   return (_b = (_a = ai.profiles.find((profile) => profile.id === ai.activeId)) != null ? _a : ai.profiles[0]) != null ? _b : null;
 }
-function normalizeWorkbenchSettings(raw) {
+function normalizeCollisSettings(raw) {
   const value = raw != null ? raw : {};
   const folder = typeof value.boardFolder === "string" ? value.boardFolder.trim() : "";
   return {
-    boardFolder: folder || DEFAULT_WORKBENCH_SETTINGS.boardFolder
+    boardFolder: folder || DEFAULT_GALLERY_SETTINGS.boardFolder
   };
 }
 function normalizeAISettings(raw) {
@@ -397,10 +397,10 @@ function thinkingOr(value, fallback) {
   return value === "on" || value === "off" ? value : fallback;
 }
 
-// src/workbench/BoardGalleryView.ts
+// src/collis/BoardGalleryView.ts
 var import_obsidian3 = require("obsidian");
 
-// src/workbench/boardGalleryData.ts
+// src/collis/boardGalleryData.ts
 var import_obsidian2 = require("obsidian");
 
 // src/board/boardStore.ts
@@ -426,7 +426,7 @@ function listBoards(app) {
   return app.vault.getFiles().filter((file) => file.extension.toLowerCase() === BOARD_EXTENSION).sort((a, b) => b.stat.mtime - a.stat.mtime);
 }
 
-// src/workbench/boardGalleryData.ts
+// src/collis/boardGalleryData.ts
 var PAD = 7;
 var MAX_NODES = 14;
 var MAX_CARDS = 6;
@@ -627,8 +627,8 @@ function listSignature(items, sort) {
   ].join("|");
 }
 
-// src/workbench/BoardGalleryView.ts
-var VIEW_TYPE_WORKBENCH = "collis-workbench";
+// src/collis/BoardGalleryView.ts
+var VIEW_TYPE_GALLERY = "collis-gallery";
 var SVG_NS = "http://www.w3.org/2000/svg";
 var BoardGalleryView = class extends import_obsidian3.ItemView {
   constructor(leaf, plugin) {
@@ -646,7 +646,7 @@ var BoardGalleryView = class extends import_obsidian3.ItemView {
     this.plugin = plugin;
   }
   getViewType() {
-    return VIEW_TYPE_WORKBENCH;
+    return VIEW_TYPE_GALLERY;
   }
   getDisplayText() {
     return "\u753B\u5E03\u96C6";
@@ -687,7 +687,7 @@ var BoardGalleryView = class extends import_obsidian3.ItemView {
     if (this.watching)
       return;
     this.watching = true;
-    const inFolder = (path) => isBoardPath(path, this.plugin.workbenchFolder);
+    const inFolder = (path) => isBoardPath(path, this.plugin.collisFolder);
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
         if (inFolder(file.path))
@@ -764,7 +764,7 @@ var BoardGalleryView = class extends import_obsidian3.ItemView {
   async loadItems() {
     let items = [];
     try {
-      items = await listBoardItems(this.app, this.plugin.workbenchFolder);
+      items = await listBoardItems(this.app, this.plugin.collisFolder);
     } catch (e) {
       new import_obsidian3.Notice("\u8BFB\u53D6\u753B\u5E03\u5217\u8868\u5931\u8D25");
     }
@@ -787,7 +787,7 @@ var BoardGalleryView = class extends import_obsidian3.ItemView {
     const scrolled = root.querySelector(".vw-scroll");
     const scroll = scrolled ? scrolled.scrollTop : 0;
     this.clearRoot(root);
-    root.classList.add("wb-root");
+    root.classList.add("cl-root");
     const frame = node("div", "vw-frame");
     const toolbar = node("div", "vw-toolbar");
     toolbar.appendChild(this.buildHead());
@@ -10172,7 +10172,7 @@ var CollisBoardSettingTab = class extends import_obsidian20.PluginSettingTab {
 
 // src/main.ts
 var SVG_NS2 = "http://www.w3.org/2000/svg";
-var LEGACY_WORKBENCH_FOLDER = "\u767D\u677F";
+var LEGACY_GALLERY_FOLDER = "\u767D\u677F";
 var RenameBoardFolderModal = class extends import_obsidian21.Modal {
   constructor(app, from, to, count2, onResult) {
     super(app);
@@ -10259,7 +10259,7 @@ function paintRibbonIcon(host) {
 var CollisBoardPlugin = class extends import_obsidian21.Plugin {
   constructor() {
     super(...arguments);
-    this.workbenchViewRef = null;
+    this.collisViewRef = null;
     this.observer = null;
     this.observedContainer = null;
     this.timer = null;
@@ -10289,7 +10289,7 @@ var CollisBoardPlugin = class extends import_obsidian21.Plugin {
     this.installInlineEditing();
     this.registerView(VIEW_TYPE_COLLIS_BOARD, (leaf) => new BoardView(leaf, this));
     this.registerExtensions(["collis"], VIEW_TYPE_COLLIS_BOARD);
-    this.installWorkbench();
+    this.installCollis();
     const ribbon = this.addRibbonIcon("dot", "Collis", () => {
       void this.openBoardGallery();
     });
@@ -10300,14 +10300,14 @@ var CollisBoardPlugin = class extends import_obsidian21.Plugin {
   }
   /** Installs the board wall. collis's own board view, paths and commands stay
    *  exactly as they were; this only adds one view and one folder entry point. */
-  installWorkbench() {
-    this.registerView(VIEW_TYPE_WORKBENCH, (leaf) => {
+  installCollis() {
+    this.registerView(VIEW_TYPE_GALLERY, (leaf) => {
       const view = new BoardGalleryView(leaf, this);
-      this.workbenchViewRef = view;
+      this.collisViewRef = view;
       return view;
     });
     this.addCommand({
-      id: "open-workbench",
+      id: "open-collis-gallery",
       name: "\u6253\u5F00\u753B\u5E03\u96C6",
       callback: () => {
         void this.openBoardGallery();
@@ -10315,12 +10315,12 @@ var CollisBoardPlugin = class extends import_obsidian21.Plugin {
     });
   }
   /** Single folder used by the wall. Users can change it in data.json. */
-  get workbenchFolder() {
+  get collisFolder() {
     var _a;
-    return ((_a = this.settings.workbench) == null ? void 0 : _a.boardFolder) || "\u753B\u5E03";
+    return ((_a = this.settings.collis) == null ? void 0 : _a.boardFolder) || "\u753B\u5E03";
   }
   async ensureBoardFolder() {
-    const path = this.workbenchFolder;
+    const path = this.collisFolder;
     const existing = this.app.vault.getAbstractFileByPath(path);
     if (existing instanceof import_obsidian21.TFolder)
       return;
@@ -10328,12 +10328,12 @@ var CollisBoardPlugin = class extends import_obsidian21.Plugin {
       new import_obsidian21.Notice(`\u300C${path}\u300D\u5DF2\u662F\u4E00\u4E2A\u6587\u4EF6\uFF0C\u4E0D\u80FD\u4F5C\u4E3A\u753B\u5E03\u6587\u4EF6\u5939\u3002`);
       return;
     }
-    const legacy = this.app.vault.getAbstractFileByPath(LEGACY_WORKBENCH_FOLDER);
-    if (legacy instanceof import_obsidian21.TFolder && path !== LEGACY_WORKBENCH_FOLDER) {
+    const legacy = this.app.vault.getAbstractFileByPath(LEGACY_GALLERY_FOLDER);
+    if (legacy instanceof import_obsidian21.TFolder && path !== LEGACY_GALLERY_FOLDER) {
       const confirmed = await new Promise((resolve) => {
         new RenameBoardFolderModal(
           this.app,
-          LEGACY_WORKBENCH_FOLDER,
+          LEGACY_GALLERY_FOLDER,
           path,
           legacy.children.length,
           resolve
@@ -10358,66 +10358,40 @@ var CollisBoardPlugin = class extends import_obsidian21.Plugin {
    *  one board wall on the right. Never creates a second one. */
   async openBoardGallery() {
     var _a, _b, _c;
-    this.debugLog("openBoardGallery: start");
     await this.ensureBoardFolder();
-    this.debugLog(`openBoardGallery: folder="${this.workbenchFolder}"`);
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_WORKBENCH);
-    this.debugLog(`openBoardGallery: existing leaves=${leaves.length}`);
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_GALLERY);
     const existing = leaves[0];
     if (existing) {
       await this.app.workspace.revealLeaf(existing);
       this.app.workspace.setActiveLeaf(existing, { focus: true });
       if (existing.view instanceof BoardGalleryView) {
         existing.view.refreshWall();
-        this.debugLog("openBoardGallery: repainted existing view");
       } else {
-        this.debugLog(
-          `openBoardGallery: existing view is ${(_c = (_b = (_a = existing.view) == null ? void 0 : _a.getViewType) == null ? void 0 : _b.call(_a)) != null ? _c : "unknown"}`
-        );
-        await existing.setViewState({ type: VIEW_TYPE_WORKBENCH, active: true });
+        await existing.setViewState({ type: VIEW_TYPE_GALLERY, active: true });
       }
       return;
     }
     const leaf = this.app.workspace.getLeaf("tab");
     try {
-      await leaf.setViewState({ type: VIEW_TYPE_WORKBENCH, active: true });
+      await leaf.setViewState({ type: VIEW_TYPE_GALLERY, active: true });
       await this.app.workspace.revealLeaf(leaf);
       this.app.workspace.setActiveLeaf(leaf, { focus: true });
-      this.debugLog("openBoardGallery: new tab created");
     } catch (error) {
-      this.debugLog(`openBoardGallery: setViewState failed ${String(error)}`);
       new import_obsidian21.Notice(
         `\u65E0\u6CD5\u6253\u5F00\u753B\u5E03\u96C6\uFF1A${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
-  /** Temporary runtime trace for the board wall. Writes inside the plugin
-   *  folder, never into notes, and never throws. */
-  debugLog(message) {
-    const line = `${(/* @__PURE__ */ new Date()).toISOString()} ${message}
-`;
-    const path = ".obsidian/plugins/workbench/collis-board-debug.log";
-    const adapter = this.app.vault.adapter;
-    void (async () => {
-      try {
-        if (await adapter.exists(path))
-          await adapter.append(path, line);
-        else
-          await adapter.write(path, line);
-      } catch (e) {
-      }
-    })();
-  }
   /** Create from inside the wall, so the file always lands in its folder. */
   async createGalleryBoard() {
     await this.ensureBoardFolder();
-    const file = await createBoardItem(this.app, this.workbenchFolder);
+    const file = await createBoardItem(this.app, this.collisFolder);
     await this.openBoardFile(file.path);
-    this.refreshWorkbench();
+    this.refreshCollis();
   }
-  refreshWorkbench() {
+  refreshCollis() {
     var _a;
-    (_a = this.workbenchViewRef) == null ? void 0 : _a.refreshWall();
+    (_a = this.collisViewRef) == null ? void 0 : _a.refreshWall();
   }
   async openBoard() {
     const boards = listBoards(this.app);
@@ -10475,7 +10449,9 @@ var CollisBoardPlugin = class extends import_obsidian21.Plugin {
       ...loaded != null ? loaded : {},
       ai: normalizeAISettings(loaded == null ? void 0 : loaded.ai),
       conversations: Array.isArray(loaded == null ? void 0 : loaded.conversations) ? loaded.conversations : [],
-      workbench: normalizeWorkbenchSettings(loaded == null ? void 0 : loaded.workbench)
+      collis: normalizeCollisSettings(
+        (loaded == null ? void 0 : loaded.collis) ?? (loaded == null ? void 0 : loaded.workbench)
+      )
     };
   }
   async saveSettings() {

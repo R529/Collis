@@ -6582,7 +6582,7 @@ module.exports.qmOrphanFingerprint = qmOrphanFingerprint;
 module.exports.qmSuggestOrphanTime = qmSuggestOrphanTime;
 module.exports.qmRebuildOrphanLines = qmRebuildOrphanLines;
 
-// Workbench 本地补充：把弹窗类暴露出来，供内嵌的卡片笔记页复用
+// Collis 本地补充：把弹窗类暴露出来，供内嵌的卡片笔记页复用
 module.exports.TrashModal = TrashModal;
 module.exports.OrphanModal = OrphanModal;
 module.exports.ConfirmModal = ConfirmModal;

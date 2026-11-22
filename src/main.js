@@ -12,7 +12,7 @@ const {
 } = require("obsidian");
 
 // 内置子插件：Collis（速记卡片）与 Collis（画布工作台）。
-// 代码在打包时并入本插件，设置统一存进 workbench/data.json 的 collis / collis-board 键，
+// 代码在打包时并入本插件，设置统一存进 collis/data.json 的 collis / collis-board 键，
 // 不再依赖单独的插件文件夹。
 const CollisBundle = require("../vendor/collis-core.js");
 const CollisBoardBundle = require("../vendor/collis-board-core.js");
@@ -57,7 +57,7 @@ const BUNDLED_PLUGINS = [
   }
 ];
 
-const VIEW_TYPE = "workbench-view";
+const VIEW_TYPE = "collis-view";
 // 卡片笔记右侧栏视图，由内置 Collis 注册；主插件需要用它判断/恢复侧栏
 const QM_VIEW_TYPE = "qm-cards-view";
 // 插件图标沿用 Collis 画布标志；图形从内置 Collis 模块里取，保证
@@ -277,15 +277,15 @@ function hmRgba(hex, alpha) {
 function statusClass(status) {
   const v = String(status || "").toLowerCase();
   if (["done", "published", "finished", "已读", "已发布", "完成", "归档"].includes(v)) {
-    return "wb-done";
+    return "cl-done";
   }
   if (["reading", "active", "draft", "doing", "in-progress", "进行中", "在读", "草稿"].includes(v)) {
-    return "wb-reading";
+    return "cl-reading";
   }
   if (["want", "todo", "planned", "想读", "计划中", "待办"].includes(v)) {
-    return "wb-want";
+    return "cl-want";
   }
-  return "wb-pause";
+  return "cl-pause";
 }
 
 function isContentFile(file) {
@@ -390,36 +390,36 @@ function paintMediaThumb(app, thumb, file, kind) {
     src = "";
   }
   if (!src) return false;
-  thumb.addClass("wb-md-thumb-media");
+  thumb.addClass("cl-md-thumb-media");
   if (kind === "image") {
-    const img = thumb.createEl("img", { cls: "wb-md-media" });
+    const img = thumb.createEl("img", { cls: "cl-md-media" });
     img.setAttribute("alt", file.basename);
     img.setAttribute("loading", "lazy");
     img.onerror = () => {
       img.remove();
-      thumb.removeClass("wb-md-thumb-media");
+      thumb.removeClass("cl-md-thumb-media");
       setIcon(thumb, "image");
     };
     img.setAttribute("src", src);
     return true;
   }
   if (kind === "video") {
-    const video = thumb.createEl("video", { cls: "wb-md-media" });
+    const video = thumb.createEl("video", { cls: "cl-md-media" });
     video.setAttribute("preload", "metadata");
     video.setAttribute("muted", "");
     video.setAttribute("playsinline", "");
     video.onerror = () => {
       video.remove();
-      thumb.removeClass("wb-md-thumb-media");
+      thumb.removeClass("cl-md-thumb-media");
       setIcon(thumb, "video");
     };
     // #t=0.1 让浏览器把第一帧解出来，否则某些视频只显示黑底
     video.setAttribute("src", src + "#t=0.1");
-    const play = thumb.createDiv({ cls: "wb-md-play" });
+    const play = thumb.createDiv({ cls: "cl-md-play" });
     setIcon(play, "play");
     return true;
   }
-  thumb.removeClass("wb-md-thumb-media");
+  thumb.removeClass("cl-md-thumb-media");
   return false;
 }
 
@@ -435,8 +435,8 @@ function paintNoteThumb(app, thumb, file) {
       setIcon(thumb, "file-text");
       return;
     }
-    thumb.addClass("wb-md-thumb-note");
-    thumb.createDiv({ cls: "wb-md-snippet", text: snippet });
+    thumb.addClass("cl-md-thumb-note");
+    thumb.createDiv({ cls: "cl-md-snippet", text: snippet });
   }).catch(() => {
     if (thumb.isConnected) setIcon(thumb, "file-text");
   });
@@ -456,13 +456,13 @@ function paintNoteThumb(app, thumb, file) {
  * 的视图容器内，不碰 Obsidian 核心和其他插件。
  */
 const WB_TOOLTIP_SCOPE = [
-  ".workbench-view",
+  ".collis-view",
   ".qm-view",
   ".qm-root",
   ".collis-board-leaf",
   ".collis-board-host",
   ".collis-board",
-  ".wb-root",
+  ".cl-root",
   ".vw-frame",
   ".collis-doctor-content",
   ".collis-export-content",
@@ -486,8 +486,8 @@ function wbNormalizeTitle(el) {
     // 原本只有 title：把提示文案搬到 aria-label，并标记是我们派生的，
     // 之后若 title 被代码原地更新，aria-label 也跟着同步。
     el.setAttribute("aria-label", t);
-    el.setAttribute("data-wb-tt", "1");
-  } else if (el.getAttribute("data-wb-tt") === "1") {
+    el.setAttribute("data-cl-tt", "1");
+  } else if (el.getAttribute("data-cl-tt") === "1") {
     el.setAttribute("aria-label", t);
   }
   // 已有自己 aria-label 的元素（如回看按钮 aria-label="回看"）不动其文案，
@@ -566,10 +566,10 @@ class ModuleEditorModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("wb-modaleditor");
+    contentEl.addClass("cl-modaleditor");
     contentEl.createEl("h2", { text: this.module ? "编辑模块" : "新建模块" });
     contentEl.createDiv({
-      cls: "wb-modal-hint",
+      cls: "cl-modal-hint",
       text: "模块只是一个筛选入口，不会搬动或复制你的文件。"
     });
 
@@ -591,13 +591,13 @@ class ModuleEditorModal extends Modal {
           })
       );
 
-    const iconRow = contentEl.createDiv({ cls: "wb-modalfield" });
-    iconRow.createDiv({ cls: "wb-modalfield-label", text: "图标" });
-    const iconGrid = iconRow.createDiv({ cls: "wb-iconpick" });
+    const iconRow = contentEl.createDiv({ cls: "cl-modalfield" });
+    iconRow.createDiv({ cls: "cl-modalfield-label", text: "图标" });
+    const iconGrid = iconRow.createDiv({ cls: "cl-iconpick" });
     const iconButtons = [];
     MODULE_ICONS.forEach((name2) => {
       const btn = iconGrid.createDiv({
-        cls: "wb-iconpick-item" + (name2 === this.icon ? " is-active" : "")
+        cls: "cl-iconpick-item" + (name2 === this.icon ? " is-active" : "")
       });
       setIcon(btn, name2);
       btn.onclick = () => {
@@ -608,13 +608,13 @@ class ModuleEditorModal extends Modal {
       iconButtons.push(btn);
     });
 
-    const colorRow = contentEl.createDiv({ cls: "wb-modalfield" });
-    colorRow.createDiv({ cls: "wb-modalfield-label", text: "颜色" });
-    const swatches = colorRow.createDiv({ cls: "wb-colorpick" });
+    const colorRow = contentEl.createDiv({ cls: "cl-modalfield" });
+    colorRow.createDiv({ cls: "cl-modalfield-label", text: "颜色" });
+    const swatches = colorRow.createDiv({ cls: "cl-colorpick" });
     const colorDots = [];
     MODULE_COLORS.forEach((color) => {
       const dot = swatches.createDiv({
-        cls: "wb-colorpick-dot" + (color === this.color ? " is-active" : "")
+        cls: "cl-colorpick-dot" + (color === this.color ? " is-active" : "")
       });
       dot.style.setProperty("--dot-color", color);
       dot.onclick = () => {
@@ -661,10 +661,10 @@ class ModuleEditorModal extends Modal {
           })
       );
 
-    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
 
     if (this.module && this.options.onDelete) {
-      const del = foot.createEl("button", { cls: "wb-btn wb-btn-danger", text: "删除模块" });
+      const del = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "删除模块" });
       del.onclick = () => {
         if (!this.deleteArmed) {
           this.deleteArmed = true;
@@ -680,10 +680,10 @@ class ModuleEditorModal extends Modal {
       };
     }
 
-    const cancel = foot.createEl("button", { cls: "wb-btn", text: "取消" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
     cancel.onclick = () => this.close();
 
-    const save = foot.createEl("button", { cls: "wb-btn wb-btn-accent", text: "保存" });
+    const save = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "保存" });
     save.onclick = () => {
       const finalName = String(name || "").trim();
       if (!finalName) {
@@ -729,23 +729,23 @@ class DeleteFilesModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("wb-modaleditor");
+    contentEl.addClass("cl-modaleditor");
     contentEl.createEl("h2", {
       text: this.files.length === 1 ? "删除这个文件？" : "删除这 " + this.files.length + " 个文件？"
     });
     const names = this.files.slice(0, 3).map((f) => f.basename).join("、");
     contentEl.createDiv({
-      cls: "wb-modal-hint",
+      cls: "cl-modal-hint",
       text:
         this.files.length > 3
           ? "会移到系统回收站：" + names + " 等 " + this.files.length + " 个文件。"
           : "会移到系统回收站：" + names + "。"
     });
 
-    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
-    const cancel = foot.createEl("button", { cls: "wb-btn", text: "取消" });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
     cancel.onclick = () => this.close();
-    const remove = foot.createEl("button", { cls: "wb-btn wb-btn-danger", text: "删除" });
+    const remove = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "删除" });
     remove.onclick = () => {
       this.close();
       if (this.onConfirm) this.onConfirm();
@@ -792,20 +792,20 @@ class FolderPickerModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("wb-modaleditor");
+    contentEl.addClass("cl-modaleditor");
     contentEl.createEl("h2", { text: "选择保存文件夹" });
     contentEl.createDiv({
-      cls: "wb-modal-hint",
+      cls: "cl-modal-hint",
       text: "选一个已有的文件夹，或点下面的「新建文件夹」直接建一个。"
     });
 
     const pickWrap = contentEl.createDiv();
     const input = pickWrap.createEl("input", {
-      cls: "wb-modalfilter",
+      cls: "cl-modalfilter",
       attr: { type: "text", placeholder: "筛选文件夹…" }
     });
-    const listEl = pickWrap.createDiv({ cls: "wb-picklist" });
-    const empty = pickWrap.createDiv({ cls: "wb-modal-hint" });
+    const listEl = pickWrap.createDiv({ cls: "cl-picklist" });
+    const empty = pickWrap.createDiv({ cls: "cl-modal-hint" });
 
     const folders = this.listFolders();
     const draw = () => {
@@ -817,11 +817,11 @@ class FolderPickerModal extends Modal {
       );
       empty.toggle(rows.length === 0);
       rows.forEach((path) => {
-        const row = listEl.createDiv({ cls: "wb-pickitem" });
+        const row = listEl.createDiv({ cls: "cl-pickitem" });
         if (path === this.options.current) row.addClass("is-active");
-        const icon = row.createDiv({ cls: "wb-pickicon" });
+        const icon = row.createDiv({ cls: "cl-pickicon" });
         setIcon(icon, "folder");
-        row.createDiv({ cls: "wb-pickname", text: path });
+        row.createDiv({ cls: "cl-pickname", text: path });
         row.onclick = () => {
           this.close();
           if (this.options.onPick) this.options.onPick(path);
@@ -832,20 +832,20 @@ class FolderPickerModal extends Modal {
     draw();
 
     // 新建文件夹：内联展开，创建成功后直接选中它的路径
-    const form = contentEl.createDiv({ cls: "wb-foldernew is-hidden" });
-    form.createDiv({ cls: "wb-modalfield-label", text: "新文件夹路径" });
+    const form = contentEl.createDiv({ cls: "cl-foldernew is-hidden" });
+    form.createDiv({ cls: "cl-modalfield-label", text: "新文件夹路径" });
     const nameInput = form.createEl("input", {
-      cls: "wb-modalfilter",
+      cls: "cl-modalfilter",
       attr: { type: "text", placeholder: "例如：01-Notes 或 10-Modules/健身记录" }
     });
     form.createDiv({
-      cls: "wb-modal-hint",
+      cls: "cl-modal-hint",
       text: "支持多级路径，创建后会立即出现在 Obsidian 文件树里。"
     });
-    const formFoot = form.createDiv({ cls: "wb-modalfoot" });
-    const backBtn = formFoot.createEl("button", { cls: "wb-btn", text: "返回" });
+    const formFoot = form.createDiv({ cls: "cl-modalfoot" });
+    const backBtn = formFoot.createEl("button", { cls: "cl-btn", text: "返回" });
     const okBtn = formFoot.createEl("button", {
-      cls: "wb-btn wb-btn-accent",
+      cls: "cl-btn cl-btn-accent",
       text: "创建并使用"
     });
 
@@ -889,16 +889,16 @@ class FolderPickerModal extends Modal {
       if (evt.key === "Enter") okBtn.click();
     });
 
-    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
     const create = foot.createEl("button", {
-      cls: "wb-btn wb-btn-accent wb-foldernew-btn",
+      cls: "cl-btn cl-btn-accent cl-foldernew-btn",
       text: "新建文件夹"
     });
     create.onclick = () => {
       showForm(true);
       nameInput.focus();
     };
-    const cancel = foot.createEl("button", { cls: "wb-btn", text: "取消" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
     cancel.onclick = () => this.close();
   }
 
@@ -918,33 +918,33 @@ class ModulePickerModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("wb-modaleditor");
+    contentEl.addClass("cl-modaleditor");
     contentEl.createEl("h2", { text: "归入模块" });
     contentEl.createDiv({
-      cls: "wb-modal-hint",
+      cls: "cl-modal-hint",
       text: "只会写入 module 字段，文件位置不变。"
     });
 
-    const list = contentEl.createDiv({ cls: "wb-picklist" });
+    const list = contentEl.createDiv({ cls: "cl-picklist" });
     this.modules.forEach((mod) => {
-      const item = list.createDiv({ cls: "wb-pickitem" });
-      const iconEl = item.createDiv({ cls: "wb-pickicon" });
+      const item = list.createDiv({ cls: "cl-pickitem" });
+      const iconEl = item.createDiv({ cls: "cl-pickicon" });
       iconEl.style.setProperty("--dot-color", mod.color || "var(--interactive-accent)");
       setIcon(iconEl, mod.icon || "file-text");
-      item.createDiv({ cls: "wb-pickname", text: mod.name });
+      item.createDiv({ cls: "cl-pickname", text: mod.name });
       item.onclick = () => {
         this.close();
         if (this.onPick) this.onPick(mod);
       };
     });
 
-    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
-    const create = foot.createEl("button", { cls: "wb-btn", text: "新建模块…" });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const create = foot.createEl("button", { cls: "cl-btn", text: "新建模块…" });
     create.onclick = () => {
       this.close();
       if (this.onCreate) this.onCreate();
     };
-    const cancel = foot.createEl("button", { cls: "wb-btn", text: "取消" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
     cancel.onclick = () => this.close();
   }
 
@@ -966,23 +966,23 @@ class ModuleManagerModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("wb-modaleditor");
+    contentEl.addClass("cl-modaleditor");
     contentEl.createEl("h2", { text: "管理模块" });
     contentEl.createDiv({
-      cls: "wb-modal-hint",
+      cls: "cl-modal-hint",
       text: "拖动左侧把手可以排序，顺序会同步到左边导航。删除模块只会移除筛选入口，不会删除笔记文件。"
     });
 
-    this.listEl = contentEl.createDiv({ cls: "wb-picklist" });
+    this.listEl = contentEl.createDiv({ cls: "cl-picklist" });
     this.renderList();
 
-    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
-    const create = foot.createEl("button", { cls: "wb-btn wb-btn-accent", text: "新建模块" });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const create = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "新建模块" });
     create.onclick = () => {
       this.close();
       if (this.options.onCreate) this.options.onCreate();
     };
-    const close = foot.createEl("button", { cls: "wb-btn", text: "关闭" });
+    const close = foot.createEl("button", { cls: "cl-btn", text: "关闭" });
     close.onclick = () => this.close();
   }
 
@@ -991,22 +991,22 @@ class ModuleManagerModal extends Modal {
     list.empty();
     const mods = this.options.getModules ? this.options.getModules() : [];
     if (!mods.length) {
-      list.createDiv({ cls: "wb-modal-hint", text: "还没有模块，点下面的「新建模块」。" });
+      list.createDiv({ cls: "cl-modal-hint", text: "还没有模块，点下面的「新建模块」。" });
       return;
     }
 
     mods.forEach((mod) => {
-      const row = list.createDiv({ cls: "wb-modrow" });
+      const row = list.createDiv({ cls: "cl-modrow" });
       row.dataset.modId = mod.id;
       row.setAttribute("draggable", "true");
 
-      const grip = row.createDiv({ cls: "wb-modrow-grip" });
+      const grip = row.createDiv({ cls: "cl-modrow-grip" });
       setIcon(grip, "grip-vertical");
 
-      const iconEl = row.createDiv({ cls: "wb-pickicon" });
+      const iconEl = row.createDiv({ cls: "cl-pickicon" });
       iconEl.style.setProperty("--dot-color", mod.color || "var(--interactive-accent)");
       setIcon(iconEl, mod.icon || "file-text");
-      row.createDiv({ cls: "wb-modrow-name", text: mod.name });
+      row.createDiv({ cls: "cl-modrow-name", text: mod.name });
 
       // 从按钮上按下时不触发拖动，避免点编辑/删除时误拖整行
       row.addEventListener("mousedown", (evt) => {
@@ -1039,7 +1039,7 @@ class ModuleManagerModal extends Modal {
         this.commitOrder();
       });
 
-      const edit = row.createEl("button", { cls: "wb-btn", text: "编辑" });
+      const edit = row.createEl("button", { cls: "cl-btn", text: "编辑" });
       edit.onclick = () => {
         this.close();
         if (this.options.onEdit) this.options.onEdit(mod);
@@ -1047,7 +1047,7 @@ class ModuleManagerModal extends Modal {
 
       const armed = this.armedId === mod.id;
       const del = row.createEl("button", {
-        cls: "wb-btn wb-btn-danger",
+        cls: "cl-btn cl-btn-danger",
         text: armed ? "确认删除" : "删除"
       });
       del.onclick = () => {
@@ -1066,7 +1066,7 @@ class ModuleManagerModal extends Modal {
   // 按当前 DOM 顺序回写模块顺序，导航会同步更新
   commitOrder() {
     if (!this.listEl) return;
-    const order = Array.from(this.listEl.querySelectorAll(".wb-modrow"))
+    const order = Array.from(this.listEl.querySelectorAll(".cl-modrow"))
       .map((row) => row.dataset.modId)
       .filter(Boolean);
     if (this.options.onReorder) this.options.onReorder(order);
@@ -1077,7 +1077,7 @@ class ModuleManagerModal extends Modal {
   }
 }
 
-class WorkbenchView extends ItemView {
+class CollisView extends ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -1106,8 +1106,8 @@ class WorkbenchView extends ItemView {
   }
 
   async onOpen() {
-    this.containerEl.addClass("workbench-view");
-    this.contentEl.addClass("wb-content");
+    this.containerEl.addClass("collis-view");
+    this.contentEl.addClass("cl-content");
     this.render();
     this.watchWidth();
     // 新建笔记会打开一个新标签，本视图随即被隐藏，那时的刷新只能记成脏状态。
@@ -1124,7 +1124,7 @@ class WorkbenchView extends ItemView {
       this._ro.disconnect();
       this._ro = null;
     }
-    document.body.classList.remove("workbench-focus");
+    document.body.classList.remove("collis-focus");
     this.focus = false;
     this.destroyGallery();
     this.destroyNotes();
@@ -1154,7 +1154,7 @@ class WorkbenchView extends ItemView {
     app.classList.toggle("is-nav-collapsed", !!this.navCollapsed);
     // 左右留白跟着宽度连续变化：宽视图 28px，窄视图收到 12px，两边始终对称
     const pad = Math.max(12, Math.min(28, Math.round(w * 0.026)));
-    app.style.setProperty("--wb-pad", pad + "px");
+    app.style.setProperty("--cl-pad", pad + "px");
   }
 
   getModules() {
@@ -1569,7 +1569,7 @@ class WorkbenchView extends ItemView {
 
   setFocus(on) {
     this.focus = on;
-    document.body.classList.toggle("workbench-focus", on);
+    document.body.classList.toggle("collis-focus", on);
     this.render();
   }
 
@@ -1648,12 +1648,12 @@ class WorkbenchView extends ItemView {
         const total = Array.isArray(cards) ? cards.length : 0;
         this._cardCount = total;
         if (!item.isConnected) return;
-        let badge = item.querySelector(".wb-navcount");
+        let badge = item.querySelector(".cl-navcount");
         if (!total) {
           if (badge) badge.remove();
           return;
         }
-        if (!badge) badge = item.createDiv({ cls: "wb-navcount" });
+        if (!badge) badge = item.createDiv({ cls: "cl-navcount" });
         badge.setText(String(total));
       })
       .catch(() => {
@@ -1775,21 +1775,21 @@ class WorkbenchView extends ItemView {
     if (this.active !== "canvas") this.destroyGallery();
     if (this.active !== "notes") this.destroyNotes();
     this.contentEl.empty();
-    this.contentEl.addClass("wb-content");
+    this.contentEl.addClass("cl-content");
 
-    const root = this.contentEl.createDiv({ cls: "wb-app" });
+    const root = this.contentEl.createDiv({ cls: "cl-app" });
     this.appEl = root;
     this.renderNav(root);
 
-    const main = root.createDiv({ cls: "wb-main" });
+    const main = root.createDiv({ cls: "cl-main" });
 
     // 侧栏收起后从主区域左上角浮出，用来恢复导航
-    const restore = main.createDiv({ cls: "wb-navrestore" });
+    const restore = main.createDiv({ cls: "cl-navrestore" });
     restore.setAttribute("aria-label", "展开 Collis 侧栏");
     setIcon(restore, "chevrons-right");
     restore.onclick = () => this.setNavCollapsed(false);
 
-    const scroll = main.createDiv({ cls: "wb-scroll" });
+    const scroll = main.createDiv({ cls: "cl-scroll" });
     if (this.active === "inbox") {
       this.renderInbox(scroll);
     } else if (this.active === "canvas") {
@@ -1807,47 +1807,47 @@ class WorkbenchView extends ItemView {
   }
 
   renderNav(root) {
-    const nav = root.createDiv({ cls: "wb-nav" });
+    const nav = root.createDiv({ cls: "cl-nav" });
 
-    const brand = nav.createDiv({ cls: "wb-brand" });
-    brand.createDiv({ cls: "wb-mark", text: "C" });
+    const brand = nav.createDiv({ cls: "cl-brand" });
+    brand.createDiv({ cls: "cl-mark", text: "C" });
     const brandName = this.plugin.settings.workspaceName || "个人工作台";
-    const brandText = brand.createDiv({ cls: "wb-brand-txt" });
-    brandText.createDiv({ cls: "wb-brand-name", text: brandName });
+    const brandText = brand.createDiv({ cls: "cl-brand-txt" });
+    brandText.createDiv({ cls: "cl-brand-name", text: brandName });
     brandText.createDiv({
-      cls: "wb-brand-sub",
+      cls: "cl-brand-sub",
       text: brandName === "个人工作台" ? "Collis Workspace" : "个人工作台"
     });
 
     // 收起按钮固定在品牌行右侧：导航的开关放在导航的起始位置
-    const collapseBtn = brand.createDiv({ cls: "wb-navtoggle" });
+    const collapseBtn = brand.createDiv({ cls: "cl-navtoggle" });
     collapseBtn.setAttribute("aria-label", "收起 Collis 侧栏");
     setIcon(collapseBtn, "chevrons-left");
     collapseBtn.onclick = () => this.setNavCollapsed(true);
 
-    const navList = nav.createDiv({ cls: "wb-navlist" });
+    const navList = nav.createDiv({ cls: "cl-navlist" });
 
     // 分为三组：总览 / 模块 / 工作区。组标题只是视觉分层，不参与交互。
     const group = (caption) => {
-      const g = navList.createDiv({ cls: "wb-navgroup" });
-      g.createDiv({ cls: "wb-navcap", text: caption });
+      const g = navList.createDiv({ cls: "cl-navgroup" });
+      g.createDiv({ cls: "cl-navcap", text: caption });
       return g;
     };
 
     // 统一的行工厂：count 为 0 时不渲染数字，避免像文件树那样一列 0。
     const addItem = (parent, { label, icon, tile, color, active, count, onClick }) => {
       const item = parent.createDiv({
-        cls: "wb-navitem" + (active ? " is-active" : "")
+        cls: "cl-navitem" + (active ? " is-active" : "")
       });
       item.setAttribute("aria-label", label);
       const iconEl = item.createDiv({
-        cls: "wb-navicon" + (tile ? " wb-navtile " + tile : "")
+        cls: "cl-navicon" + (tile ? " cl-navtile " + tile : "")
       });
       // 自定义模块用自己选的颜色；内置模块仍按顺序取预设色
       if (color) iconEl.style.setProperty("--tint", color);
       setIcon(iconEl, icon);
-      item.createDiv({ cls: "wb-navlabel", text: label });
-      if (count > 0) item.createDiv({ cls: "wb-navcount", text: String(count) });
+      item.createDiv({ cls: "cl-navlabel", text: label });
+      if (count > 0) item.createDiv({ cls: "cl-navcount", text: String(count) });
       item.onclick = onClick;
       return item;
     };
@@ -1868,17 +1868,17 @@ class WorkbenchView extends ItemView {
     });
 
     // 模块组的标题行右侧放「新建」「管理」两个小按钮，像 Notion 一样收在标题里
-    const modules = navList.createDiv({ cls: "wb-navgroup" });
-    const capRow = modules.createDiv({ cls: "wb-navcap-row" });
-    capRow.createDiv({ cls: "wb-navcap", text: "MODULES" });
-    const capActs = capRow.createDiv({ cls: "wb-navcap-acts" });
+    const modules = navList.createDiv({ cls: "cl-navgroup" });
+    const capRow = modules.createDiv({ cls: "cl-navcap-row" });
+    capRow.createDiv({ cls: "cl-navcap", text: "MODULES" });
+    const capActs = capRow.createDiv({ cls: "cl-navcap-acts" });
 
-    const addModule = capActs.createDiv({ cls: "wb-navcap-btn" });
+    const addModule = capActs.createDiv({ cls: "cl-navcap-btn" });
     addModule.setAttribute("aria-label", "新建模块");
     setIcon(addModule, "plus");
     addModule.onclick = () => this.openModuleEditor(null);
 
-    const manageModule = capActs.createDiv({ cls: "wb-navcap-btn" });
+    const manageModule = capActs.createDiv({ cls: "cl-navcap-btn" });
     manageModule.setAttribute("aria-label", "管理模块");
     setIcon(manageModule, "more-horizontal");
     manageModule.onclick = () => this.openModuleManager();
@@ -1887,7 +1887,7 @@ class WorkbenchView extends ItemView {
       addItem(modules, {
         label: mod.name,
         icon: mod.icon || "file",
-        tile: "wb-tint-" + (index % 5),
+        tile: "cl-tint-" + (index % 5),
         color: mod.color,
         active: this.active === mod.id,
         count: this.moduleFiles(mod).length,
@@ -1912,32 +1912,32 @@ class WorkbenchView extends ItemView {
     });
     this.fillCardCount(cardsItem);
 
-    const foot = nav.createDiv({ cls: "wb-navfoot" });
+    const foot = nav.createDiv({ cls: "cl-navfoot" });
 
-    const focusBtn = foot.createDiv({ cls: "wb-navitem" });
+    const focusBtn = foot.createDiv({ cls: "cl-navitem" });
     focusBtn.setAttribute("aria-label", this.focus ? "退出专注" : "专注模式");
-    const focusIcon = focusBtn.createDiv({ cls: "wb-navicon" });
+    const focusIcon = focusBtn.createDiv({ cls: "cl-navicon" });
     setIcon(focusIcon, this.focus ? "minimize" : "maximize");
-    focusBtn.createDiv({ cls: "wb-navlabel", text: this.focus ? "退出专注" : "专注模式" });
+    focusBtn.createDiv({ cls: "cl-navlabel", text: this.focus ? "退出专注" : "专注模式" });
     focusBtn.onclick = () => this.setFocus(!this.focus);
 
-    const settingsBtn = foot.createDiv({ cls: "wb-navitem" });
+    const settingsBtn = foot.createDiv({ cls: "cl-navitem" });
     settingsBtn.setAttribute("aria-label", "设置");
-    const settingsIcon = settingsBtn.createDiv({ cls: "wb-navicon" });
+    const settingsIcon = settingsBtn.createDiv({ cls: "cl-navicon" });
     setIcon(settingsIcon, "settings");
-    settingsBtn.createDiv({ cls: "wb-navlabel", text: "设置" });
+    settingsBtn.createDiv({ cls: "cl-navlabel", text: "设置" });
     settingsBtn.onclick = () => this.openSettings();
 
-    foot.createDiv({ cls: "wb-navversion", text: "v" + this.plugin.manifest.version });
+    foot.createDiv({ cls: "cl-navversion", text: "v" + this.plugin.manifest.version });
   }
 
   renderHome(el) {
-    el.addClass("wb-hm-scroll");
-    const page = el.createDiv({ cls: "wb-hm-page" });
-    const aurora = page.createDiv({ cls: "wb-hm-aurora" });
-    aurora.createEl("i", { cls: "wb-hm-a1" });
-    aurora.createEl("i", { cls: "wb-hm-a2" });
-    aurora.createEl("i", { cls: "wb-hm-a3" });
+    el.addClass("cl-hm-scroll");
+    const page = el.createDiv({ cls: "cl-hm-page" });
+    const aurora = page.createDiv({ cls: "cl-hm-aurora" });
+    aurora.createEl("i", { cls: "cl-hm-a1" });
+    aurora.createEl("i", { cls: "cl-hm-a2" });
+    aurora.createEl("i", { cls: "cl-hm-a3" });
 
     const boards = this.getBoardFiles();
     const inbox = this.inboxFiles();
@@ -1958,63 +1958,63 @@ class WorkbenchView extends ItemView {
     let captureInput = null;
 
     /* 顶栏：面包屑 / 快速记录 / 设置 / 身份 */
-    const top = page.createDiv({ cls: "wb-hm-top" });
-    const crumb = top.createDiv({ cls: "wb-hm-crumb" });
+    const top = page.createDiv({ cls: "cl-hm-top" });
+    const crumb = top.createDiv({ cls: "cl-hm-crumb" });
     crumb.createEl("b", { text: "总览" });
     crumb.createSpan({ text: " / 首页" });
-    top.createDiv({ cls: "wb-hm-topspace" });
+    top.createDiv({ cls: "cl-hm-topspace" });
 
-    const cmd = top.createDiv({ cls: "wb-hm-cmd" });
-    setIcon(cmd.createDiv({ cls: "wb-hm-cmdico" }), "search");
+    const cmd = top.createDiv({ cls: "cl-hm-cmd" });
+    setIcon(cmd.createDiv({ cls: "cl-hm-cmdico" }), "search");
     cmd.createSpan({ text: "快速记一条" });
-    cmd.createDiv({ cls: "wb-hm-kbd", text: "↵" });
+    cmd.createDiv({ cls: "cl-hm-kbd", text: "↵" });
     cmd.onclick = () => {
       if (captureInput) captureInput.focus();
     };
 
-    const gear = top.createDiv({ cls: "wb-hm-iconbtn" });
+    const gear = top.createDiv({ cls: "cl-hm-iconbtn" });
     gear.setAttribute("aria-label", "设置");
     setIcon(gear, "settings");
     gear.onclick = () => this.openSettings();
 
     top.createDiv({
-      cls: "wb-hm-avatar",
+      cls: "cl-hm-avatar",
       text: workspaceName.slice(0, 2) || "C"
     });
 
-    const grid = page.createDiv({ cls: "wb-hm-bento" });
+    const grid = page.createDiv({ cls: "cl-hm-bento" });
 
     /* Hero：日期 + 问候 + 内联速记 */
-    const hero = grid.createDiv({ cls: "wb-hm-card wb-hm-hero wb-hm-s5" });
-    hero.createDiv({ cls: "wb-hm-bigdate", text: String(now.getDate()) });
+    const hero = grid.createDiv({ cls: "cl-hm-card cl-hm-hero cl-hm-s5" });
+    hero.createDiv({ cls: "cl-hm-bigdate", text: String(now.getDate()) });
 
-    const heroTop = hero.createDiv({ cls: "wb-hm-herotop" });
-    heroTop.createDiv({ cls: "wb-hm-live" });
+    const heroTop = hero.createDiv({ cls: "cl-hm-herotop" });
+    heroTop.createDiv({ cls: "cl-hm-live" });
     heroTop.createSpan({ text: WEEKNAMES[now.getDay()] + " · " + MONTHNAMES[now.getMonth()] + " " + now.getDate() });
 
-    const heroMid = hero.createDiv({ cls: "wb-hm-heromid" });
-    const hello = heroMid.createEl("h1", { cls: "wb-hm-hello" });
+    const heroMid = hero.createDiv({ cls: "cl-hm-heromid" });
+    const hello = heroMid.createEl("h1", { cls: "cl-hm-hello" });
     hello.createSpan({ text: greet + "，" });
-    hello.createSpan({ cls: "wb-hm-gradtext", text: workspaceName });
+    hello.createSpan({ cls: "cl-hm-gradtext", text: workspaceName });
 
-    const meta = heroMid.createDiv({ cls: "wb-hm-herometa" });
+    const meta = heroMid.createDiv({ cls: "cl-hm-herometa" });
     const metaPart = (value, label) => {
       meta.createSpan({ text: "" }).createEl("b", { text: String(value) });
       meta.createSpan({ text: " " + label });
     };
     metaPart(modules.length, "个模块");
-    meta.createDiv({ cls: "wb-hm-sep" });
+    meta.createDiv({ cls: "cl-hm-sep" });
     metaPart(boards.length, "块白板");
-    meta.createDiv({ cls: "wb-hm-sep" });
+    meta.createDiv({ cls: "cl-hm-sep" });
     metaPart(inbox.length, "条待整理");
 
-    const capture = hero.createDiv({ cls: "wb-hm-capture" });
-    setIcon(capture.createDiv({ cls: "wb-hm-captico" }), "plus");
+    const capture = hero.createDiv({ cls: "cl-hm-capture" });
+    setIcon(capture.createDiv({ cls: "cl-hm-captico" }), "plus");
     captureInput = capture.createEl("input", {
-      cls: "wb-hm-captinput",
+      cls: "cl-hm-captinput",
       attr: { type: "text", placeholder: "记一条速记，回车保存…" }
     });
-    const sendBtn = capture.createDiv({ cls: "wb-hm-go" });
+    const sendBtn = capture.createDiv({ cls: "cl-hm-go" });
     setIcon(sendBtn, "arrow-right");
 
     const submitCapture = async () => {
@@ -2045,10 +2045,10 @@ class WorkbenchView extends ItemView {
     sendBtn.onclick = submitCapture;
 
     /* 本周节奏：12 周热力图 */
-    const weekCard = grid.createDiv({ cls: "wb-hm-card wb-hm-week wb-hm-s4" });
-    const weekHead = weekCard.createDiv({ cls: "wb-hm-head" });
-    weekHead.createDiv({ cls: "wb-hm-title", text: "本周节奏" });
-    weekHead.createDiv({ cls: "wb-hm-sub", text: "过去 12 周" });
+    const weekCard = grid.createDiv({ cls: "cl-hm-card cl-hm-week cl-hm-s4" });
+    const weekHead = weekCard.createDiv({ cls: "cl-hm-head" });
+    weekHead.createDiv({ cls: "cl-hm-title", text: "本周节奏" });
+    weekHead.createDiv({ cls: "cl-hm-sub", text: "过去 12 周" });
 
     const dayMs = 86400000;
     const today = new Date();
@@ -2071,15 +2071,15 @@ class WorkbenchView extends ItemView {
     }
 
     const trend = prevCount ? Math.round(((recentCount - prevCount) / prevCount) * 100) : null;
-    const weekNum = weekCard.createDiv({ cls: "wb-hm-weeknum" });
+    const weekNum = weekCard.createDiv({ cls: "cl-hm-weeknum" });
     weekNum.createEl("strong", { text: String(recentCount) });
     weekNum.createSpan({ text: "次编辑" });
     const trendEl = weekNum.createDiv({
-      cls: "wb-hm-trend" + (trend !== null && trend < 0 ? " is-down" : ""),
+      cls: "cl-hm-trend" + (trend !== null && trend < 0 ? " is-down" : ""),
       text: trend === null ? "—" : (trend > 0 ? "+" : "") + trend + "%"
     });
 
-    const heat = weekCard.createDiv({ cls: "wb-hm-heat" });
+    const heat = weekCard.createDiv({ cls: "cl-hm-heat" });
     const levels = [0, 1, 2, 4, 6];
     for (let i = 0; i < 84; i++) {
       const weekIndex = Math.floor(i / 7);
@@ -2097,18 +2097,18 @@ class WorkbenchView extends ItemView {
         if (level) cell.addClass("l" + level);
       }
     }
-    const heatFoot = weekCard.createDiv({ cls: "wb-hm-heatfoot" });
+    const heatFoot = weekCard.createDiv({ cls: "cl-hm-heatfoot" });
     heatFoot.createSpan({ text: "少" });
-    const legend = heatFoot.createDiv({ cls: "wb-hm-legend" });
+    const legend = heatFoot.createDiv({ cls: "cl-hm-legend" });
     for (let i = 0; i < 5; i++) legend.createEl("i", { cls: "l" + i });
     heatFoot.createSpan({ text: "多" });
 
     /* 收件箱 */
-    const inboxCard = grid.createDiv({ cls: "wb-hm-card wb-hm-inbox wb-hm-s3" });
-    const inboxHead = inboxCard.createDiv({ cls: "wb-hm-head" });
-    inboxHead.createDiv({ cls: "wb-hm-title", text: "收件箱" });
-    inboxHead.createDiv({ cls: "wb-hm-sub", text: "未归属" });
-    const inboxMore = inboxHead.createDiv({ cls: "wb-hm-more", text: "全部 ›" });
+    const inboxCard = grid.createDiv({ cls: "cl-hm-card cl-hm-inbox cl-hm-s3" });
+    const inboxHead = inboxCard.createDiv({ cls: "cl-hm-head" });
+    inboxHead.createDiv({ cls: "cl-hm-title", text: "收件箱" });
+    inboxHead.createDiv({ cls: "cl-hm-sub", text: "未归属" });
+    const inboxMore = inboxHead.createDiv({ cls: "cl-hm-more", text: "全部 ›" });
     inboxMore.onclick = () => this.go("inbox");
 
     const mdTotal = this.vaultFiles().length;
@@ -2116,31 +2116,31 @@ class WorkbenchView extends ItemView {
     const handled = Math.max(0, mdTotal - inboxMd);
     const pct = mdTotal ? Math.max(6, Math.round((handled / mdTotal) * 100)) : 100;
 
-    const ringWrap = inboxCard.createDiv({ cls: "wb-hm-ringwrap" });
-    const ring = ringWrap.createDiv({ cls: "wb-hm-ring" });
+    const ringWrap = inboxCard.createDiv({ cls: "cl-hm-ringwrap" });
+    const ring = ringWrap.createDiv({ cls: "cl-hm-ring" });
     ring.style.setProperty("--p", pct + "%");
     ring.createEl("b", { text: String(inbox.length) });
-    const ringSide = ringWrap.createDiv({ cls: "wb-hm-ringside" });
-    const ringK = ringSide.createDiv({ cls: "wb-hm-ringk" });
+    const ringSide = ringWrap.createDiv({ cls: "cl-hm-ringside" });
+    const ringK = ringSide.createDiv({ cls: "cl-hm-ringk" });
     ringK.createDiv({ text: "条笔记" });
     ringK.createEl("strong", { text: "等你决定去向" });
 
     const first = inbox[0];
     const firstMod = first ? this.suggestModuleFor(first) : null;
     if (first) {
-      const item = inboxCard.createDiv({ cls: "wb-hm-inboxitem" });
-      item.createDiv({ cls: "wb-hm-inboxname", text: first.basename });
+      const item = inboxCard.createDiv({ cls: "cl-hm-inboxitem" });
+      item.createDiv({ cls: "cl-hm-inboxname", text: first.basename });
       if (firstMod) {
-        const pill = item.createDiv({ cls: "wb-hm-pill" });
-        pill.createDiv({ cls: "wb-hm-pilldot" });
+        const pill = item.createDiv({ cls: "cl-hm-pill" });
+        pill.createDiv({ cls: "cl-hm-pilldot" });
         pill.createSpan({ text: firstMod.name });
       }
       item.onclick = () => this.go("inbox");
     } else {
-      inboxCard.createDiv({ cls: "wb-hm-inboxempty", text: "收件箱已清空，今天很干净。" });
+      inboxCard.createDiv({ cls: "cl-hm-inboxempty", text: "收件箱已清空，今天很干净。" });
     }
 
-    const inboxLink = inboxCard.createDiv({ cls: "wb-hm-inboxlink" });
+    const inboxLink = inboxCard.createDiv({ cls: "cl-hm-inboxlink" });
     if (inbox.length) {
       inboxLink.createSpan({ text: "按建议归入 " });
       inboxLink.createEl("b", { text: inbox.length + " 条" });
@@ -2157,12 +2157,12 @@ class WorkbenchView extends ItemView {
     }
 
     /* 继续：2×2 文件卡 */
-    const resumeCard = grid.createDiv({ cls: "wb-hm-card wb-hm-s6" });
-    const resumeHead = resumeCard.createDiv({ cls: "wb-hm-head" });
-    resumeHead.createDiv({ cls: "wb-hm-title", text: "继续" });
-    resumeHead.createDiv({ cls: "wb-hm-sub", text: "最近编辑" });
+    const resumeCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s6" });
+    const resumeHead = resumeCard.createDiv({ cls: "cl-hm-head" });
+    resumeHead.createDiv({ cls: "cl-hm-title", text: "继续" });
+    resumeHead.createDiv({ cls: "cl-hm-sub", text: "最近编辑" });
 
-    const resumeGrid = resumeCard.createDiv({ cls: "wb-hm-resumes" });
+    const resumeGrid = resumeCard.createDiv({ cls: "cl-hm-resumes" });
     const recentFiles = [...this._contentFiles, ...boards]
       .filter((file) => !/^未命名笔记/.test(file.basename))
       .filter((file) => !file.path.startsWith(CARD_FOLDER + "/"))
@@ -2170,7 +2170,7 @@ class WorkbenchView extends ItemView {
       .slice(0, 4);
 
     if (!recentFiles.length) {
-      resumeGrid.createDiv({ cls: "wb-hm-empty", text: "还没有可继续的内容。" });
+      resumeGrid.createDiv({ cls: "cl-hm-empty", text: "还没有可继续的内容。" });
     }
 
     for (const file of recentFiles) {
@@ -2185,36 +2185,36 @@ class WorkbenchView extends ItemView {
         ? "BOARD"
         : fm && fm.status ? String(fm.status).toUpperCase() : "NOTE";
 
-      const cell = resumeGrid.createDiv({ cls: "wb-hm-file" });
+      const cell = resumeGrid.createDiv({ cls: "cl-hm-file" });
       cell.style.setProperty("--hm-c", color);
       cell.style.setProperty("--hm-cb", hmRgba(color, 0.16));
 
-      const cellTop = cell.createDiv({ cls: "wb-hm-filetop" });
-      const iconWrap = cellTop.createDiv({ cls: "wb-hm-fileico" });
+      const cellTop = cell.createDiv({ cls: "cl-hm-filetop" });
+      const iconWrap = cellTop.createDiv({ cls: "cl-hm-fileico" });
       setIcon(iconWrap, isBoard ? "presentation" : "file-text");
-      cellTop.createDiv({ cls: "wb-hm-filetype", text: typeText });
+      cellTop.createDiv({ cls: "cl-hm-filetype", text: typeText });
 
-      cell.createDiv({ cls: "wb-hm-filetree", text: file.basename });
+      cell.createDiv({ cls: "cl-hm-filetree", text: file.basename });
 
-      const fileMeta = cell.createDiv({ cls: "wb-hm-filemeta" });
-      const modSpan = fileMeta.createDiv({ cls: "wb-hm-filemod" });
-      const dot = modSpan.createDiv({ cls: "wb-hm-filedot" });
+      const fileMeta = cell.createDiv({ cls: "cl-hm-filemeta" });
+      const modSpan = fileMeta.createDiv({ cls: "cl-hm-filemod" });
+      const dot = modSpan.createDiv({ cls: "cl-hm-filedot" });
       dot.style.background = color;
       modSpan.createSpan({ text: isBoard ? "白板" : (mod && mod.name) || "未归属" });
-      fileMeta.createDiv({ cls: "wb-hm-filedtime", text: formatTime(file.stat.mtime) });
+      fileMeta.createDiv({ cls: "cl-hm-filedtime", text: formatTime(file.stat.mtime) });
 
       cell.onclick = () => this.openFile(file);
     }
 
     /* 模块脉搏：彩色拼图 */
-    const modCard = grid.createDiv({ cls: "wb-hm-card wb-hm-s6" });
-    const modHead = modCard.createDiv({ cls: "wb-hm-head" });
-    modHead.createDiv({ cls: "wb-hm-title", text: "模块脉搏" });
-    modHead.createDiv({ cls: "wb-hm-sub", text: "按活跃度" });
-    const modMore = modHead.createDiv({ cls: "wb-hm-more", text: "管理 ›" });
+    const modCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s6" });
+    const modHead = modCard.createDiv({ cls: "cl-hm-head" });
+    modHead.createDiv({ cls: "cl-hm-title", text: "模块脉搏" });
+    modHead.createDiv({ cls: "cl-hm-sub", text: "按活跃度" });
+    const modMore = modHead.createDiv({ cls: "cl-hm-more", text: "管理 ›" });
     modMore.onclick = () => this.openSettings();
 
-    const modGrid = modCard.createDiv({ cls: "wb-hm-mods" });
+    const modGrid = modCard.createDiv({ cls: "cl-hm-mods" });
     const ranked = modules
       .map((mod) => {
         const files = this.filesFor(mod);
@@ -2228,67 +2228,67 @@ class WorkbenchView extends ItemView {
 
     ranked.forEach((entry, index) => {
       const color = entry.mod.color || MODULE_COLORS[index % MODULE_COLORS.length];
-      const tile = modGrid.createDiv({ cls: "wb-hm-mod" });
+      const tile = modGrid.createDiv({ cls: "cl-hm-mod" });
       tile.style.setProperty("--hm-c", color);
       tile.style.setProperty("--hm-wash", hmRgba(color, 0.16));
-      const icon = tile.createDiv({ cls: "wb-hm-modico" });
+      const icon = tile.createDiv({ cls: "cl-hm-modico" });
       setIcon(icon, entry.mod.icon || "file");
-      tile.createDiv({ cls: "wb-hm-modname", text: entry.mod.name });
-      const row = tile.createDiv({ cls: "wb-hm-modrow" });
+      tile.createDiv({ cls: "cl-hm-modname", text: entry.mod.name });
+      const row = tile.createDiv({ cls: "cl-hm-modrow" });
       row.createEl("span", {
-        cls: "wb-hm-modcount",
+        cls: "cl-hm-modcount",
         text: String(entry.total).padStart(2, "0")
       });
-      row.createSpan({ cls: "wb-hm-modunit", text: "篇" });
-      row.createSpan({ cls: "wb-hm-modlive", text: entry.active + " 进行中" });
-      const bar = tile.createDiv({ cls: "wb-hm-modbar" });
+      row.createSpan({ cls: "cl-hm-modunit", text: "篇" });
+      row.createSpan({ cls: "cl-hm-modlive", text: entry.active + " 进行中" });
+      const bar = tile.createDiv({ cls: "cl-hm-modbar" });
       const fill = bar.createEl("i");
       fill.style.width = (entry.total ? Math.round((entry.active / entry.total) * 100) : 0) + "%";
       tile.onclick = () => this.go(entry.mod.id);
     });
 
-    const addTile = modGrid.createDiv({ cls: "wb-hm-mod wb-hm-modadd" });
+    const addTile = modGrid.createDiv({ cls: "cl-hm-mod cl-hm-modadd" });
     setIcon(addTile.createDiv(), "plus");
     addTile.createSpan({ text: "新建模块" });
     addTile.onclick = () => this.openModuleEditor(null);
 
     /* 最近白板 */
-    const boardCard = grid.createDiv({ cls: "wb-hm-card wb-hm-s7" });
-    const boardHead = boardCard.createDiv({ cls: "wb-hm-head" });
-    boardHead.createDiv({ cls: "wb-hm-title", text: "最近白板" });
-    boardHead.createDiv({ cls: "wb-hm-sub", text: boards.length + " 块" });
-    const boardMore = boardHead.createDiv({ cls: "wb-hm-more", text: "画布集 ›" });
+    const boardCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s7" });
+    const boardHead = boardCard.createDiv({ cls: "cl-hm-head" });
+    boardHead.createDiv({ cls: "cl-hm-title", text: "最近白板" });
+    boardHead.createDiv({ cls: "cl-hm-sub", text: boards.length + " 块" });
+    const boardMore = boardHead.createDiv({ cls: "cl-hm-more", text: "画布集 ›" });
     boardMore.onclick = () => this.openCollisGallery();
 
-    const boardGrid = boardCard.createDiv({ cls: "wb-hm-boards" });
+    const boardGrid = boardCard.createDiv({ cls: "cl-hm-boards" });
     const boardEls = [];
     boards.slice(0, 3).forEach((file, index) => {
-      const board = boardGrid.createDiv({ cls: "wb-hm-board" });
-      const art = board.createDiv({ cls: "wb-hm-art" });
+      const board = boardGrid.createDiv({ cls: "cl-hm-board" });
+      const art = board.createDiv({ cls: "cl-hm-art" });
       this.renderBoardArt(art, index % 3);
-      board.createDiv({ cls: "wb-hm-shade" });
-      const badge = board.createDiv({ cls: "wb-hm-badge", text: "读取中…" });
-      const info = board.createDiv({ cls: "wb-hm-boardinfo" });
-      info.createDiv({ cls: "wb-hm-boardname", text: file.basename });
-      const metaEl = info.createDiv({ cls: "wb-hm-boardmeta", text: "读取中…" });
+      board.createDiv({ cls: "cl-hm-shade" });
+      const badge = board.createDiv({ cls: "cl-hm-badge", text: "读取中…" });
+      const info = board.createDiv({ cls: "cl-hm-boardinfo" });
+      info.createDiv({ cls: "cl-hm-boardname", text: file.basename });
+      const metaEl = info.createDiv({ cls: "cl-hm-boardmeta", text: "读取中…" });
       board.onclick = () => this.openFile(file);
       boardEls.push({ file, badge, metaEl });
     });
 
     if (!boards.length) {
-      boardGrid.createDiv({ cls: "wb-hm-empty", text: "还没有白板，去画布集新建一张。" });
+      boardGrid.createDiv({ cls: "cl-hm-empty", text: "还没有白板，去画布集新建一张。" });
     }
 
     /* 速记卡片 */
-    const noteCard = grid.createDiv({ cls: "wb-hm-card wb-hm-s5" });
-    const noteHead = noteCard.createDiv({ cls: "wb-hm-head" });
-    noteHead.createDiv({ cls: "wb-hm-title", text: "速记" });
-    noteHead.createDiv({ cls: "wb-hm-sub", text: (this._cardCount || 0) + " 条卡片" });
-    const noteMore = noteHead.createDiv({ cls: "wb-hm-more", text: "打开 ›" });
+    const noteCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s5" });
+    const noteHead = noteCard.createDiv({ cls: "cl-hm-head" });
+    noteHead.createDiv({ cls: "cl-hm-title", text: "速记" });
+    noteHead.createDiv({ cls: "cl-hm-sub", text: (this._cardCount || 0) + " 条卡片" });
+    const noteMore = noteHead.createDiv({ cls: "cl-hm-more", text: "打开 ›" });
     noteMore.onclick = () => this.go("notes");
-    const noteWrap = noteCard.createDiv({ cls: "wb-hm-notes" });
+    const noteWrap = noteCard.createDiv({ cls: "cl-hm-notes" });
 
-    page.createDiv({ cls: "wb-hm-foot", text: "数据实时读取 · Collis v" + this.plugin.manifest.version });
+    page.createDiv({ cls: "cl-hm-foot", text: "数据实时读取 · Collis v" + this.plugin.manifest.version });
 
     this.fillHomeBoards(boardEls);
     this.fillHomeCards(noteWrap);
@@ -2363,32 +2363,32 @@ class WorkbenchView extends ItemView {
 
     if (!cards.length) {
       container.createDiv({
-        cls: "wb-hm-empty",
+        cls: "cl-hm-empty",
         text: "还没有速记卡片。在上面记一条，它会出现在这里。"
       });
       return;
     }
 
     for (const card of cards) {
-      const row = container.createDiv({ cls: "wb-hm-note" });
-      const meta = row.createDiv({ cls: "wb-hm-notedate" });
+      const row = container.createDiv({ cls: "cl-hm-note" });
+      const meta = row.createDiv({ cls: "cl-hm-notedate" });
       meta.createSpan({ text: card.date ? card.date.slice(5) : "" });
       if (card.time) meta.createSpan({ text: " " + card.time });
-      row.createDiv({ cls: "wb-hm-notetext", text: card.text });
+      row.createDiv({ cls: "cl-hm-notetext", text: card.text });
       if (card.tags && card.tags.length) {
-        row.createDiv({ cls: "wb-hm-notetag", text: "#" + card.tags[0] });
+        row.createDiv({ cls: "cl-hm-notetag", text: "#" + card.tags[0] });
       }
       row.onclick = () => this.openCardInNotes(card);
     }
   }
 
   makePanel(parent, title, actionText, onAction) {
-    const panel = parent.createDiv({ cls: "wb-panel" });
-    const head = panel.createDiv({ cls: "wb-panel-head" });
-    head.createDiv({ cls: "wb-panel-title", text: title });
-    head.createDiv({ cls: "wb-spacer" });
+    const panel = parent.createDiv({ cls: "cl-panel" });
+    const head = panel.createDiv({ cls: "cl-panel-head" });
+    head.createDiv({ cls: "cl-panel-title", text: title });
+    head.createDiv({ cls: "cl-spacer" });
     if (actionText) {
-      const action = head.createDiv({ cls: "wb-panel-action", text: actionText });
+      const action = head.createDiv({ cls: "cl-panel-action", text: actionText });
       if (onAction) action.onclick = onAction;
     }
     return panel;
@@ -2428,14 +2428,14 @@ class WorkbenchView extends ItemView {
     container.empty();
 
     if (!tasks.length) {
-      container.createDiv({ cls: "wb-empty", text: "没有未完成任务，收件箱是空的。" });
+      container.createDiv({ cls: "cl-empty", text: "没有未完成任务，收件箱是空的。" });
       return;
     }
 
     for (const task of tasks) {
-      const row = container.createDiv({ cls: "wb-task" });
-      row.createDiv({ cls: "wb-check" });
-      row.createDiv({ cls: "wb-task-text", text: task.text });
+      const row = container.createDiv({ cls: "cl-task" });
+      row.createDiv({ cls: "cl-check" });
+      row.createDiv({ cls: "cl-task-text", text: task.text });
       row.onclick = () => this.openFile(task.file);
     }
   }
@@ -2447,22 +2447,22 @@ class WorkbenchView extends ItemView {
 
     if (!cards.length) {
       container.createDiv({
-        cls: "wb-empty",
+        cls: "cl-empty",
         text: "还没有速记卡片。用 Collis 记一条，它会出现在这里。"
       });
       return;
     }
 
     for (const card of cards) {
-      const row = container.createDiv({ cls: "wb-feed" });
-      const meta = row.createDiv({ cls: "wb-feed-meta" });
-      meta.createSpan({ cls: "wb-feed-date", text: card.date ? card.date.slice(5) : "" });
-      meta.createSpan({ cls: "wb-feed-time", text: card.time });
-      row.createDiv({ cls: "wb-feed-text", text: card.text });
+      const row = container.createDiv({ cls: "cl-feed" });
+      const meta = row.createDiv({ cls: "cl-feed-meta" });
+      meta.createSpan({ cls: "cl-feed-date", text: card.date ? card.date.slice(5) : "" });
+      meta.createSpan({ cls: "cl-feed-time", text: card.time });
+      row.createDiv({ cls: "cl-feed-text", text: card.text });
       if (card.tags.length) {
-        const tagRow = row.createDiv({ cls: "wb-feed-tags" });
+        const tagRow = row.createDiv({ cls: "cl-feed-tags" });
         card.tags.slice(0, 3).forEach((tag) => {
-          tagRow.createSpan({ cls: "wb-tag", text: "#" + tag });
+          tagRow.createSpan({ cls: "cl-tag", text: "#" + tag });
         });
       }
       row.onclick = () => this.openCard(card);
@@ -2475,19 +2475,19 @@ class WorkbenchView extends ItemView {
 
     if (!boards.length) {
       container.createDiv({
-        cls: "wb-empty",
+        cls: "cl-empty",
         text: "还没有 .collis 白板。去画布集新建一张。"
       });
       return;
     }
 
     for (const file of boards) {
-      const row = container.createDiv({ cls: "wb-board-row" });
-      const icon = row.createDiv({ cls: "wb-board-icon" });
+      const row = container.createDiv({ cls: "cl-board-row" });
+      const icon = row.createDiv({ cls: "cl-board-icon" });
       setIcon(icon, "presentation");
-      const info = row.createDiv({ cls: "wb-board-info" });
-      info.createDiv({ cls: "wb-board-name", text: file.basename });
-      const sub = info.createDiv({ cls: "wb-board-sub", text: "读取中…" });
+      const info = row.createDiv({ cls: "cl-board-info" });
+      info.createDiv({ cls: "cl-board-name", text: file.basename });
+      const sub = info.createDiv({ cls: "cl-board-sub", text: "读取中…" });
       row.onclick = () => this.openFile(file);
       this.readBoard(file).then((data) => {
         if (sub.isConnected) sub.setText(data.summary);
@@ -2509,22 +2509,22 @@ class WorkbenchView extends ItemView {
       if (mod) suggestions.set(f.path, mod);
     });
 
-    el.addClass("wb-inbox-scroll");
-    const page = el.createDiv({ cls: "wb-inbox-page" });
+    el.addClass("cl-inbox-scroll");
+    const page = el.createDiv({ cls: "cl-inbox-page" });
 
-    const head = page.createDiv({ cls: "wb-inbox-head" });
-    const headMain = head.createDiv({ cls: "wb-inbox-head-main" });
-    const titleRow = headMain.createDiv({ cls: "wb-inbox-title-row" });
+    const head = page.createDiv({ cls: "cl-inbox-head" });
+    const headMain = head.createDiv({ cls: "cl-inbox-head-main" });
+    const titleRow = headMain.createDiv({ cls: "cl-inbox-title-row" });
     titleRow.createEl("h1", { text: "收件箱" });
     if (files.length) {
-      titleRow.createDiv({ cls: "wb-inbox-count", text: files.length + " 待处理" });
+      titleRow.createDiv({ cls: "cl-inbox-count", text: files.length + " 待处理" });
     }
     headMain.createDiv({
-      cls: "wb-inbox-sub",
+      cls: "cl-inbox-sub",
       text: "散落在库里的笔记和素材，归入模块后自动离开"
     });
-    const headActions = head.createDiv({ cls: "wb-inbox-head-actions" });
-    const refreshBtn = headActions.createEl("button", { cls: "wb-inbox-refresh" });
+    const headActions = head.createDiv({ cls: "cl-inbox-head-actions" });
+    const refreshBtn = headActions.createEl("button", { cls: "cl-inbox-refresh" });
     setIcon(refreshBtn, "refresh-cw");
     refreshBtn.setAttribute("aria-label", "刷新收件箱");
     refreshBtn.onclick = () => this.refresh();
@@ -2532,27 +2532,27 @@ class WorkbenchView extends ItemView {
     const weekCount = files.filter(
       (f) => Date.now() - f.stat.mtime < 7 * 86400000
     ).length;
-    const stats = page.createDiv({ cls: "wb-inbox-stats" });
+    const stats = page.createDiv({ cls: "cl-inbox-stats" });
     [
       ["待归属", files.length],
       ["有归属建议", suggestions.size],
       ["本周新增", weekCount]
     ].forEach(([label, value]) => {
-      const cell = stats.createDiv({ cls: "wb-inbox-stat" });
-      cell.createDiv({ cls: "wb-inbox-stat-value", text: String(value) });
-      cell.createDiv({ cls: "wb-inbox-stat-label", text: label });
+      const cell = stats.createDiv({ cls: "cl-inbox-stat" });
+      cell.createDiv({ cls: "cl-inbox-stat-value", text: String(value) });
+      cell.createDiv({ cls: "cl-inbox-stat-label", text: label });
     });
 
-    const controls = page.createDiv({ cls: "wb-inbox-controls" });
-    const search = controls.createDiv({ cls: "wb-inbox-search" });
-    setIcon(search.createDiv({ cls: "wb-inbox-searchico" }), "search");
+    const controls = page.createDiv({ cls: "cl-inbox-controls" });
+    const search = controls.createDiv({ cls: "cl-inbox-search" });
+    setIcon(search.createDiv({ cls: "cl-inbox-searchico" }), "search");
     const query = search.createEl("input", {
-      cls: "wb-inbox-query",
+      cls: "cl-inbox-query",
       attr: { type: "text", placeholder: "筛选标题或路径" }
     });
     query.value = this._inboxQuery || "";
 
-    const seg = controls.createDiv({ cls: "wb-inbox-seg" });
+    const seg = controls.createDiv({ cls: "cl-inbox-seg" });
     const kinds = [
       ["all", "全部"],
       ["note", "笔记"],
@@ -2564,7 +2564,7 @@ class WorkbenchView extends ItemView {
     ];
     const segButtons = new Map();
     kinds.forEach(([key, label]) => {
-      const btn = seg.createEl("button", { cls: "wb-inbox-segbtn", text: label });
+      const btn = seg.createEl("button", { cls: "cl-inbox-segbtn", text: label });
       btn.onclick = () => {
         this._inboxFilter = key;
         segButtons.forEach((b, k) => b.classList.toggle("is-active", k === key));
@@ -2576,13 +2576,13 @@ class WorkbenchView extends ItemView {
     segButtons.get(this._inboxFilter).classList.add("is-active");
 
     // 视图切换：和模块页保持一致，列表 / 网格
-    const viewSeg = controls.createDiv({ cls: "wb-inbox-viewseg" });
+    const viewSeg = controls.createDiv({ cls: "cl-inbox-viewseg" });
     const viewButtons = new Map();
     [
       ["list", "列表"],
       ["grid", "网格"]
     ].forEach(([key, label]) => {
-      const btn = viewSeg.createEl("button", { cls: "wb-inbox-segbtn", text: label });
+      const btn = viewSeg.createEl("button", { cls: "cl-inbox-segbtn", text: label });
       btn.onclick = () => {
         this._inboxView = key;
         syncView();
@@ -2597,12 +2597,12 @@ class WorkbenchView extends ItemView {
     };
     syncView();
 
-    const sortWrap = controls.createDiv({ cls: "wb-inbox-sort" });
-    const sortBtn = sortWrap.createEl("button", { cls: "wb-inbox-sortbtn" });
+    const sortWrap = controls.createDiv({ cls: "cl-inbox-sort" });
+    const sortBtn = sortWrap.createEl("button", { cls: "cl-inbox-sortbtn" });
     const sortLabel = sortBtn.createSpan({
       text: (this._inboxSort || "recent") === "name" ? "名称" : "最近更新"
     });
-    setIcon(sortBtn.createSpan({ cls: "wb-inbox-sortico" }), "chevron-down");
+    setIcon(sortBtn.createSpan({ cls: "cl-inbox-sortico" }), "chevron-down");
     sortBtn.onclick = () => {
       const menu = new Menu();
       [["recent", "最近更新"], ["name", "名称"]].forEach(([value, label]) => {
@@ -2620,27 +2620,27 @@ class WorkbenchView extends ItemView {
       anchorMenuBelow(menu, sortBtn);
     };
 
-    const banners = page.createDiv({ cls: "wb-inbox-banners" });
+    const banners = page.createDiv({ cls: "cl-inbox-banners" });
 
-    const bulk = page.createDiv({ cls: "wb-inbox-bulk" });
+    const bulk = page.createDiv({ cls: "cl-inbox-bulk" });
     bulk.hidden = true;
-    const bulkLabel = bulk.createSpan({ cls: "wb-inbox-bulkcount" });
-    setIcon(bulkLabel.createSpan({ cls: "wb-inbox-bulkico" }), "check");
+    const bulkLabel = bulk.createSpan({ cls: "cl-inbox-bulkcount" });
+    setIcon(bulkLabel.createSpan({ cls: "cl-inbox-bulkico" }), "check");
     bulkLabel.createSpan({ text: "已选 " });
     const bulkNum = bulkLabel.createEl("b", { text: "0" });
     bulkLabel.createSpan({ text: " 项" });
-    bulk.createDiv({ cls: "wb-inbox-bulkspace" });
+    bulk.createDiv({ cls: "cl-inbox-bulkspace" });
     const bulkAssign = bulk.createEl("button", {
-      cls: "wb-btn wb-btn-accent",
+      cls: "cl-btn cl-btn-accent",
       text: "归入选中"
     });
     const bulkDelete = bulk.createEl("button", {
-      cls: "wb-btn wb-inbox-danger",
+      cls: "cl-btn cl-inbox-danger",
       text: "删除选中"
     });
 
-    const list = page.createDiv({ cls: "wb-inbox-list" });
-    const foot = page.createDiv({ cls: "wb-inbox-foot" });
+    const list = page.createDiv({ cls: "cl-inbox-list" });
+    const foot = page.createDiv({ cls: "cl-inbox-foot" });
     foot.createSpan({
       text:
         "全库扫描 " +
@@ -2648,7 +2648,7 @@ class WorkbenchView extends ItemView {
         " 个文件 · 自动排除白板、卡片笔记与技术目录"
     });
     foot.createSpan({
-      cls: "wb-inbox-footright",
+      cls: "cl-inbox-footright",
       text: "共 " + files.length + " 条待处理"
     });
 
@@ -2711,14 +2711,14 @@ class WorkbenchView extends ItemView {
     // 网格视图：和模块页同一套缩略图与卡片结构，额外挂选择框、建议和建议采纳、
     // 悬停操作（归入 / 打开 / 删除），保证收件箱原有的操作在网格里也能完成。
     const renderGrid = (parent, items) => {
-      const grid = parent.createDiv({ cls: "wb-md-grid" });
+      const grid = parent.createDiv({ cls: "cl-md-grid" });
       items.forEach((file) => {
         const info = typeInfo(file);
         const selected = this._inboxSel.has(file.path);
         const tile = grid.createDiv({
-          cls: "wb-md-tile wb-inbox-tile wb-md-kind-" + info.key + (selected ? " is-selected" : "")
+          cls: "cl-md-tile cl-inbox-tile cl-md-kind-" + info.key + (selected ? " is-selected" : "")
         });
-        const thumb = tile.createDiv({ cls: "wb-md-thumb" });
+        const thumb = tile.createDiv({ cls: "cl-md-thumb" });
         if (info.key === "note") {
           paintNoteThumb(this.app, thumb, file);
         } else if (info.key === "image" || info.key === "video") {
@@ -2727,7 +2727,7 @@ class WorkbenchView extends ItemView {
           setIcon(thumb, info.icon);
         }
 
-        const check = tile.createDiv({ cls: "wb-inbox-tilecheck" });
+        const check = tile.createDiv({ cls: "cl-inbox-tilecheck" });
         const box = check.createEl("input", {
           attr: { type: "checkbox", "aria-label": "选择 " + file.basename }
         });
@@ -2740,20 +2740,20 @@ class WorkbenchView extends ItemView {
           updateBulk();
         };
 
-        tile.createDiv({ cls: "wb-md-tilename", text: file.basename });
-        const tileMeta = tile.createDiv({ cls: "wb-md-tilemeta" });
+        tile.createDiv({ cls: "cl-md-tilename", text: file.basename });
+        const tileMeta = tile.createDiv({ cls: "cl-md-tilemeta" });
         tileMeta.createSpan({ text: THUMB_KIND_LABELS[info.key] || "文件" });
         tileMeta.createSpan({ text: formatTime(file.stat.mtime) });
 
         const suggest = suggestions.get(file.path);
         if (suggest) {
-          const sug = tile.createDiv({ cls: "wb-inbox-tilesug" });
-          const chip = sug.createSpan({ cls: "wb-inbox-suggest" });
-          const dot = chip.createSpan({ cls: "wb-inbox-dot" });
+          const sug = tile.createDiv({ cls: "cl-inbox-tilesug" });
+          const chip = sug.createSpan({ cls: "cl-inbox-suggest" });
+          const dot = chip.createSpan({ cls: "cl-inbox-dot" });
           dot.style.setProperty("--dot", suggest.color || "var(--interactive-accent)");
           chip.createSpan({ text: "建议 · " + suggest.name });
           const accept = sug.createEl("button", {
-            cls: "wb-inbox-adopt",
+            cls: "cl-inbox-adopt",
             attr: { "aria-label": "采纳建议：" + suggest.name }
           });
           setIcon(accept, "check");
@@ -2763,9 +2763,9 @@ class WorkbenchView extends ItemView {
           };
         }
 
-        const acts = tile.createDiv({ cls: "wb-inbox-tileacts" });
+        const acts = tile.createDiv({ cls: "cl-inbox-tileacts" });
         if (file.extension === "md") {
-          const assign = acts.createEl("button", { cls: "wb-inbox-act" });
+          const assign = acts.createEl("button", { cls: "cl-inbox-act" });
           setIcon(assign, "folder");
           assign.setAttribute("aria-label", "归入模块");
           assign.onclick = (evt) => {
@@ -2773,14 +2773,14 @@ class WorkbenchView extends ItemView {
             this.openModulePicker([file]);
           };
         }
-        const open = acts.createEl("button", { cls: "wb-inbox-act" });
+        const open = acts.createEl("button", { cls: "cl-inbox-act" });
         setIcon(open, "corner-up-right");
         open.setAttribute("aria-label", "打开");
         open.onclick = (evt) => {
           evt.stopPropagation();
           this.openFile(file);
         };
-        const remove = acts.createEl("button", { cls: "wb-inbox-act is-danger" });
+        const remove = acts.createEl("button", { cls: "cl-inbox-act is-danger" });
         setIcon(remove, "trash-2");
         remove.setAttribute("aria-label", "删除");
         remove.onclick = (evt) => {
@@ -2805,27 +2805,27 @@ class WorkbenchView extends ItemView {
       list.classList.toggle("is-grid", gridMode);
 
       if (!files.length) {
-        const empty = list.createDiv({ cls: "wb-inbox-empty" });
-        const art = empty.createDiv({ cls: "wb-inbox-emptyart" });
+        const empty = list.createDiv({ cls: "cl-inbox-empty" });
+        const art = empty.createDiv({ cls: "cl-inbox-emptyart" });
         setIcon(art, "inbox");
         empty.createEl("h2", { text: "收件箱已清空" });
         empty.createDiv({
-          cls: "wb-inbox-emptysub",
+          cls: "cl-inbox-emptysub",
           text: "所有笔记都已归入模块。新的散落文件会自动出现在这里。"
         });
-        const acts = empty.createDiv({ cls: "wb-inbox-emptyacts" });
-        const home = acts.createEl("button", { cls: "wb-btn wb-btn-accent", text: "回到首页" });
+        const acts = empty.createDiv({ cls: "cl-inbox-emptyacts" });
+        const home = acts.createEl("button", { cls: "cl-btn cl-btn-accent", text: "回到首页" });
         home.onclick = () => this.go("home");
-        const again = acts.createEl("button", { cls: "wb-btn", text: "刷新" });
+        const again = acts.createEl("button", { cls: "cl-btn", text: "刷新" });
         again.onclick = () => this.refresh();
         updateBulk();
         return;
       }
 
       if (!current.length) {
-        const none = list.createDiv({ cls: "wb-inbox-nomatch" });
+        const none = list.createDiv({ cls: "cl-inbox-nomatch" });
         none.createSpan({ text: "没有匹配的条目" });
-        const clear = none.createEl("button", { cls: "wb-inbox-clear", text: "清除筛选" });
+        const clear = none.createEl("button", { cls: "cl-inbox-clear", text: "清除筛选" });
         clear.onclick = () => {
           this._inboxQuery = "";
           this._inboxFilter = "all";
@@ -2849,19 +2849,19 @@ class WorkbenchView extends ItemView {
 
       buckets.forEach(([label, items]) => {
         if (!items.length) return;
-        const group = list.createDiv({ cls: "wb-inbox-group" });
-        const groupHead = group.createDiv({ cls: "wb-inbox-group-head" });
-        groupHead.createSpan({ cls: "wb-inbox-group-name", text: label });
-        groupHead.createSpan({ cls: "wb-inbox-group-count", text: String(items.length) });
-        groupHead.createSpan({ cls: "wb-inbox-group-line" });
+        const group = list.createDiv({ cls: "cl-inbox-group" });
+        const groupHead = group.createDiv({ cls: "cl-inbox-group-head" });
+        groupHead.createSpan({ cls: "cl-inbox-group-name", text: label });
+        groupHead.createSpan({ cls: "cl-inbox-group-count", text: String(items.length) });
+        groupHead.createSpan({ cls: "cl-inbox-group-line" });
 
         items.forEach((file) => {
           const selected = this._inboxSel.has(file.path);
           const card = group.createDiv({
-            cls: "wb-inbox-card" + (selected ? " is-selected" : "")
+            cls: "cl-inbox-card" + (selected ? " is-selected" : "")
           });
 
-          const check = card.createDiv({ cls: "wb-inbox-check" });
+          const check = card.createDiv({ cls: "cl-inbox-check" });
           const box = check.createEl("input", {
             attr: { type: "checkbox", "aria-label": "选择 " + file.basename }
           });
@@ -2875,22 +2875,22 @@ class WorkbenchView extends ItemView {
           };
 
           const info = typeInfo(file);
-          const ico = card.createDiv({ cls: "wb-inbox-type is-" + info.key });
+          const ico = card.createDiv({ cls: "cl-inbox-type is-" + info.key });
           setIcon(ico, info.icon);
 
-          const main = card.createDiv({ cls: "wb-inbox-main" });
-          main.createDiv({ cls: "wb-inbox-name", text: file.basename });
-          main.createDiv({ cls: "wb-inbox-path", text: file.path });
+          const main = card.createDiv({ cls: "cl-inbox-main" });
+          main.createDiv({ cls: "cl-inbox-name", text: file.basename });
+          main.createDiv({ cls: "cl-inbox-path", text: file.path });
 
-          const swap = card.createDiv({ cls: "wb-inbox-suggestwrap" });
+          const swap = card.createDiv({ cls: "cl-inbox-suggestwrap" });
           const suggest = suggestions.get(file.path);
           if (suggest) {
-            const chip = swap.createSpan({ cls: "wb-inbox-suggest" });
-            const dot = chip.createSpan({ cls: "wb-inbox-dot" });
+            const chip = swap.createSpan({ cls: "cl-inbox-suggest" });
+            const dot = chip.createSpan({ cls: "cl-inbox-dot" });
             dot.style.setProperty("--dot", suggest.color || "var(--interactive-accent)");
             chip.createSpan({ text: "建议 · " + suggest.name });
             const accept = swap.createEl("button", {
-              cls: "wb-inbox-adopt",
+              cls: "cl-inbox-adopt",
               attr: { "aria-label": "采纳建议：" + suggest.name }
             });
             setIcon(accept, "check");
@@ -2899,15 +2899,15 @@ class WorkbenchView extends ItemView {
               this.assignToModule([file], suggest);
             };
           } else {
-            swap.createSpan({ cls: "wb-inbox-nosug", text: "暂无建议" });
+            swap.createSpan({ cls: "cl-inbox-nosug", text: "暂无建议" });
           }
 
-          card.createDiv({ cls: "wb-inbox-time", text: formatTime(file.stat.mtime) });
+          card.createDiv({ cls: "cl-inbox-time", text: formatTime(file.stat.mtime) });
 
-          const acts = card.createDiv({ cls: "wb-inbox-actions" });
+          const acts = card.createDiv({ cls: "cl-inbox-actions" });
 
           if (file.extension === "md") {
-            const assign = acts.createEl("button", { cls: "wb-inbox-act" });
+            const assign = acts.createEl("button", { cls: "cl-inbox-act" });
             setIcon(assign, "folder");
             assign.setAttribute("aria-label", "归入模块");
             assign.onclick = (evt) => {
@@ -2916,7 +2916,7 @@ class WorkbenchView extends ItemView {
             };
           }
 
-          const open = acts.createEl("button", { cls: "wb-inbox-act" });
+          const open = acts.createEl("button", { cls: "cl-inbox-act" });
           setIcon(open, "corner-up-right");
           open.setAttribute("aria-label", "打开");
           open.onclick = (evt) => {
@@ -2924,7 +2924,7 @@ class WorkbenchView extends ItemView {
             this.openFile(file);
           };
 
-          const remove = acts.createEl("button", { cls: "wb-inbox-act is-danger" });
+          const remove = acts.createEl("button", { cls: "cl-inbox-act is-danger" });
           setIcon(remove, "trash-2");
           remove.setAttribute("aria-label", "删除");
           remove.onclick = (evt) => {
@@ -2946,23 +2946,23 @@ class WorkbenchView extends ItemView {
   renderUnknownBanners(el) {
     const groups = this.unknownModuleValues();
     groups.forEach((groupFiles, value) => {
-      const banner = el.createDiv({ cls: "wb-banner" });
+      const banner = el.createDiv({ cls: "cl-banner" });
       banner.createDiv({
-        cls: "wb-banner-text",
+        cls: "cl-banner-text",
         text: "未知模块值「" + value + "」· " + groupFiles.length + " 篇"
       });
-      const actions = banner.createDiv({ cls: "wb-banner-actions" });
+      const actions = banner.createDiv({ cls: "cl-banner-actions" });
 
       const create = actions.createEl("button", {
-        cls: "wb-btn wb-btn-accent",
+        cls: "cl-btn cl-btn-accent",
         text: "新建模块"
       });
       create.onclick = () => this.openModuleEditor(null, value);
 
-      const pick = actions.createEl("button", { cls: "wb-btn", text: "归入现有模块" });
+      const pick = actions.createEl("button", { cls: "cl-btn", text: "归入现有模块" });
       pick.onclick = () => this.openModulePicker(groupFiles);
 
-      const ignore = actions.createEl("button", { cls: "wb-btn", text: "忽略" });
+      const ignore = actions.createEl("button", { cls: "cl-btn", text: "忽略" });
       ignore.onclick = () => {
         this.ignoreModuleValue(value);
         this.render();
@@ -3032,32 +3032,32 @@ class WorkbenchView extends ItemView {
     };
 
     el.empty();
-    el.addClass("wb-md-scroll");
-    const page = el.createDiv({ cls: "wb-md-page" });
+    el.addClass("cl-md-scroll");
+    const page = el.createDiv({ cls: "cl-md-page" });
 
     /* ---------- 标题区 ---------- */
-    const head = page.createDiv({ cls: "wb-md-head" });
-    const headMain = head.createDiv({ cls: "wb-md-head-main" });
-    const titleRow = headMain.createDiv({ cls: "wb-md-title-row" });
-    const modtile = titleRow.createDiv({ cls: "wb-md-modtile" });
+    const head = page.createDiv({ cls: "cl-md-head" });
+    const headMain = head.createDiv({ cls: "cl-md-head-main" });
+    const titleRow = headMain.createDiv({ cls: "cl-md-title-row" });
+    const modtile = titleRow.createDiv({ cls: "cl-md-modtile" });
     modtile.style.setProperty("--tint", tint);
     setIcon(modtile, mod.icon || "file-text");
     titleRow.createEl("h1", { text: mod.name });
-    const countPill = titleRow.createSpan({ cls: "wb-md-count" });
+    const countPill = titleRow.createSpan({ cls: "cl-md-count" });
     headMain.createEl("p", {
-      cls: "wb-md-desc",
+      cls: "cl-md-desc",
       text: dir
         ? dir + " · 笔记按 frontmatter 聚合，图片 / 视频 / 文档等按文件夹收录"
         : "尚未设置保存文件夹 · 新建笔记时会先选择位置"
     });
-    const headActs = head.createDiv({ cls: "wb-md-head-actions" });
-    const addBtn = headActs.createEl("button", { cls: "wb-md-btn wb-md-btn-primary" });
+    const headActs = head.createDiv({ cls: "cl-md-head-actions" });
+    const addBtn = headActs.createEl("button", { cls: "cl-md-btn cl-md-btn-primary" });
     setIcon(addBtn, "plus");
     addBtn.appendText("新建笔记");
     addBtn.onclick = () => this.createModuleNote(mod);
 
     // 更多：编辑模块 + 多选删除
-    const moreBtn = headActs.createEl("button", { cls: "wb-md-btn wb-md-more", attr: { "aria-label": "更多操作" } });
+    const moreBtn = headActs.createEl("button", { cls: "cl-md-btn cl-md-more", attr: { "aria-label": "更多操作" } });
     setIcon(moreBtn, "more-horizontal");
     moreBtn.appendText("更多");
     moreBtn.onclick = (event) => {
@@ -3083,11 +3083,11 @@ class WorkbenchView extends ItemView {
     };
 
     /* ---------- 统计条 ---------- */
-    const stats = page.createDiv({ cls: "wb-md-stats" });
+    const stats = page.createDiv({ cls: "cl-md-stats" });
     const addStat = (num, label) => {
-      const cell = stats.createDiv({ cls: "wb-md-stat" });
-      cell.createSpan({ cls: "wb-md-stat-num", text: String(num) });
-      cell.createSpan({ cls: "wb-md-stat-label", text: label });
+      const cell = stats.createDiv({ cls: "cl-md-stat" });
+      cell.createSpan({ cls: "cl-md-stat-num", text: String(num) });
+      cell.createSpan({ cls: "cl-md-stat-label", text: label });
     };
     const noteCount = files.filter((file) => kindOf(file) === "note").length;
     addStat(files.length, "全部文件");
@@ -3095,50 +3095,50 @@ class WorkbenchView extends ItemView {
     addStat(files.length - noteCount, "素材（图片 / 视频 / 音频 / 文档）");
 
     /* ---------- 控制栏 ---------- */
-    const controls = page.createDiv({ cls: "wb-md-controls" });
-    const search = controls.createDiv({ cls: "wb-md-search" });
-    const searchIcon = search.createSpan({ cls: "wb-md-searchico" });
+    const controls = page.createDiv({ cls: "cl-md-controls" });
+    const search = controls.createDiv({ cls: "cl-md-search" });
+    const searchIcon = search.createSpan({ cls: "cl-md-searchico" });
     setIcon(searchIcon, "search");
     const input = search.createEl("input", {
-      cls: "wb-md-query",
+      cls: "cl-md-query",
       attr: { placeholder: "筛选标题或路径", type: "text" }
     });
 
-    const typeSeg = controls.createDiv({ cls: "wb-md-seg" });
+    const typeSeg = controls.createDiv({ cls: "cl-md-seg" });
     [
       ["all", "全部"], ["note", "笔记"], ["image", "图片"], ["video", "视频"],
       ["doc", "文档"], ["audio", "音频"], ["other", "其他"]
     ].forEach(([key, label]) => {
-      const btn = typeSeg.createEl("button", { cls: "wb-md-segbtn", text: label });
+      const btn = typeSeg.createEl("button", { cls: "cl-md-segbtn", text: label });
       btn.dataset.kind = key;
       if (key === filter) btn.addClass("is-active");
     });
 
-    const viewSeg = controls.createDiv({ cls: "wb-md-viewseg" });
-    const listBtn = viewSeg.createEl("button", { cls: "wb-md-segbtn", text: "列表" });
+    const viewSeg = controls.createDiv({ cls: "cl-md-viewseg" });
+    const listBtn = viewSeg.createEl("button", { cls: "cl-md-segbtn", text: "列表" });
     listBtn.dataset.view = "list";
-    const gridBtn = viewSeg.createEl("button", { cls: "wb-md-segbtn", text: "网格" });
+    const gridBtn = viewSeg.createEl("button", { cls: "cl-md-segbtn", text: "网格" });
     gridBtn.dataset.view = "grid";
 
-    const sortWrap = controls.createDiv({ cls: "wb-md-sort" });
-    const sortBtn = sortWrap.createEl("button", { cls: "wb-md-sortbtn" });
+    const sortWrap = controls.createDiv({ cls: "cl-md-sort" });
+    const sortBtn = sortWrap.createEl("button", { cls: "cl-md-sortbtn" });
     const sortText = sortBtn.createSpan({ text: "最近更新" });
-    const sortIcon = sortBtn.createSpan({ cls: "wb-md-sortico" });
+    const sortIcon = sortBtn.createSpan({ cls: "cl-md-sortico" });
     setIcon(sortIcon, "chevron-down");
 
     /* ---------- 列表 / 网格 / 页脚 ---------- */
-    const body = page.createDiv({ cls: "wb-md-body" });
+    const body = page.createDiv({ cls: "cl-md-body" });
 
     // 多选悬浮条：勾选后固定在页面底部，删除前由 DeleteFilesModal 弹窗确认
-    const selBar = page.createDiv({ cls: "wb-md-selbar" });
-    const selCount = selBar.createSpan({ cls: "wb-md-selcount" });
-    const selCancel = selBar.createEl("button", { cls: "wb-md-btn", text: "取消" });
+    const selBar = page.createDiv({ cls: "cl-md-selbar" });
+    const selCount = selBar.createSpan({ cls: "cl-md-selcount" });
+    const selCancel = selBar.createEl("button", { cls: "cl-md-btn", text: "取消" });
     selCancel.onclick = () => {
       this._mdMulti = false;
       this._mdSel.clear();
       draw();
     };
-    const selDelete = selBar.createEl("button", { cls: "wb-md-btn wb-md-btn-danger", text: "删除所选" });
+    const selDelete = selBar.createEl("button", { cls: "cl-md-btn cl-md-btn-danger", text: "删除所选" });
     selDelete.onclick = () => {
       const chosen = files.filter((file) => this._mdSel.has(file.path));
       if (!chosen.length) return;
@@ -3149,9 +3149,9 @@ class WorkbenchView extends ItemView {
       });
     };
 
-    const foot = page.createDiv({ cls: "wb-md-foot" });
+    const foot = page.createDiv({ cls: "cl-md-foot" });
     const footLeft = foot.createSpan();
-    const footRight = foot.createSpan({ cls: "wb-md-footright" });
+    const footRight = foot.createSpan({ cls: "cl-md-footright" });
 
     const sortItems = (items) => {
       if (sort === "name") {
@@ -3170,19 +3170,19 @@ class WorkbenchView extends ItemView {
       });
       groups.forEach((list, name) => {
         if (!list.length) return;
-        const section = parent.createDiv({ cls: "wb-md-group" });
-        const groupHead = section.createDiv({ cls: "wb-md-group-head" });
-        groupHead.createSpan({ cls: "wb-md-group-name", text: name });
-        groupHead.createSpan({ cls: "wb-md-group-count", text: String(list.length) });
-        groupHead.createSpan({ cls: "wb-md-group-line" });
+        const section = parent.createDiv({ cls: "cl-md-group" });
+        const groupHead = section.createDiv({ cls: "cl-md-group-head" });
+        groupHead.createSpan({ cls: "cl-md-group-name", text: name });
+        groupHead.createSpan({ cls: "cl-md-group-count", text: String(list.length) });
+        groupHead.createSpan({ cls: "cl-md-group-line" });
 
         list.forEach((item) => {
           const picked = this._mdSel.has(item.file.path);
-          const card = section.createDiv({ cls: "wb-md-card wb-md-kind-" + item.kind });
+          const card = section.createDiv({ cls: "cl-md-card cl-md-kind-" + item.kind });
           if (this._mdMulti) {
             card.addClass("is-multi");
             if (picked) card.addClass("is-selected");
-            const check = card.createDiv({ cls: "wb-md-check" });
+            const check = card.createDiv({ cls: "cl-md-check" });
             const box = check.createEl("input", {
               attr: { type: "checkbox", "aria-label": "选择 " + item.file.basename }
             });
@@ -3192,26 +3192,26 @@ class WorkbenchView extends ItemView {
               toggleSelect(item.file.path);
             };
           }
-          const type = card.createDiv({ cls: "wb-md-type" });
+          const type = card.createDiv({ cls: "cl-md-type" });
           setIcon(type, item.icon);
-          const main = card.createDiv({ cls: "wb-md-main" });
-          main.createDiv({ cls: "wb-md-name", text: item.file.basename });
-          main.createDiv({ cls: "wb-md-path", text: item.file.path });
-          const meta = card.createDiv({ cls: "wb-md-meta" });
+          const main = card.createDiv({ cls: "cl-md-main" });
+          main.createDiv({ cls: "cl-md-name", text: item.file.basename });
+          main.createDiv({ cls: "cl-md-path", text: item.file.path });
+          const meta = card.createDiv({ cls: "cl-md-meta" });
           meta.createEl("b", { text: item.label });
-          meta.createSpan({ cls: "wb-md-metadot" });
-          meta.createSpan({ cls: "wb-md-size", text: fmtSize(item.file.stat.size) });
-          card.createDiv({ cls: "wb-md-time", text: formatTime(item.file.stat.mtime) });
+          meta.createSpan({ cls: "cl-md-metadot" });
+          meta.createSpan({ cls: "cl-md-size", text: fmtSize(item.file.stat.size) });
+          card.createDiv({ cls: "cl-md-time", text: formatTime(item.file.stat.mtime) });
           if (!this._mdMulti) {
-            const acts = card.createDiv({ cls: "wb-md-actions" });
-            const openBtn = acts.createEl("button", { cls: "wb-md-act" });
+            const acts = card.createDiv({ cls: "cl-md-actions" });
+            const openBtn = acts.createEl("button", { cls: "cl-md-act" });
             openBtn.setAttribute("aria-label", "打开");
             setIcon(openBtn, "external-link");
             openBtn.onclick = (event) => {
               event.stopPropagation();
               this.openFile(item.file);
             };
-            const delBtn = acts.createEl("button", { cls: "wb-md-act is-danger" });
+            const delBtn = acts.createEl("button", { cls: "cl-md-act is-danger" });
             delBtn.setAttribute("aria-label", "删除");
             setIcon(delBtn, "trash-2");
             delBtn.onclick = (event) => {
@@ -3231,13 +3231,13 @@ class WorkbenchView extends ItemView {
     // 缩略图规则由 paintNoteThumb / paintMediaThumb 统一提供：
     // 图片铺图、视频首帧、笔记正文片段或内嵌媒体；音频 / 文档 / 其他用类型图标。
     const renderGrid = (parent, items) => {
-      const grid = parent.createDiv({ cls: "wb-md-grid" });
+      const grid = parent.createDiv({ cls: "cl-md-grid" });
       items.forEach((item) => {
         const picked = this._mdSel.has(item.file.path);
         const tile = grid.createDiv({
-          cls: "wb-md-tile wb-md-kind-" + item.kind + (this._mdMulti && picked ? " is-selected" : "")
+          cls: "cl-md-tile cl-md-kind-" + item.kind + (this._mdMulti && picked ? " is-selected" : "")
         });
-        const thumb = tile.createDiv({ cls: "wb-md-thumb" });
+        const thumb = tile.createDiv({ cls: "cl-md-thumb" });
 
         if (item.kind === "note") {
           paintNoteThumb(this.app, thumb, item.file);
@@ -3248,7 +3248,7 @@ class WorkbenchView extends ItemView {
         }
 
         if (this._mdMulti) {
-          const check = tile.createDiv({ cls: "wb-md-tilecheck" });
+          const check = tile.createDiv({ cls: "cl-md-tilecheck" });
           const box = check.createEl("input", {
             attr: { type: "checkbox", "aria-label": "选择 " + item.file.basename }
           });
@@ -3259,13 +3259,13 @@ class WorkbenchView extends ItemView {
           };
         }
 
-        tile.createDiv({ cls: "wb-md-tilename", text: item.file.basename });
-        const tileMeta = tile.createDiv({ cls: "wb-md-tilemeta" });
+        tile.createDiv({ cls: "cl-md-tilename", text: item.file.basename });
+        const tileMeta = tile.createDiv({ cls: "cl-md-tilemeta" });
         tileMeta.createSpan({ text: item.label });
         tileMeta.createSpan({ text: fmtSize(item.file.stat.size) });
         if (!this._mdMulti) {
           const del = tile.createEl("button", {
-            cls: "wb-md-tiledel",
+            cls: "cl-md-tiledel",
             attr: { "aria-label": "删除 " + item.file.basename }
           });
           setIcon(del, "trash-2");
@@ -3295,23 +3295,23 @@ class WorkbenchView extends ItemView {
       stats.style.display = "none";
       controls.style.display = "none";
       foot.style.display = "none";
-      const empty = body.createDiv({ cls: "wb-md-empty" });
+      const empty = body.createDiv({ cls: "cl-md-empty" });
       empty.style.setProperty("--tint", tint);
-      const art = empty.createDiv({ cls: "wb-md-emptyart" });
+      const art = empty.createDiv({ cls: "cl-md-emptyart" });
       setIcon(art, "file-text");
       empty.createEl("h2", { text: "这个模块还没有文件" });
       empty.createEl("p", {
-        cls: "wb-md-emptysub",
+        cls: "cl-md-emptysub",
         text:
           "点「新建笔记」会在这里生成第一篇笔记；图片、视频、PDF、音频放进模块文件夹后，也会自动出现在这一页。"
       });
-      const acts = empty.createDiv({ cls: "wb-md-emptyacts" });
-      const newBtn = acts.createEl("button", { cls: "wb-md-btn wb-md-btn-primary" });
+      const acts = empty.createDiv({ cls: "cl-md-emptyacts" });
+      const newBtn = acts.createEl("button", { cls: "cl-md-btn cl-md-btn-primary" });
       setIcon(newBtn, "plus");
       newBtn.appendText("新建笔记");
       newBtn.onclick = () => this.createModuleNote(mod);
       if (dir) {
-        empty.createDiv({ cls: "wb-md-emptymeta", text: "保存位置 " + dir });
+        empty.createDiv({ cls: "cl-md-emptymeta", text: "保存位置 " + dir });
       }
     };
 
@@ -3344,7 +3344,7 @@ class WorkbenchView extends ItemView {
       controls.style.display = "";
       foot.style.display = "";
       if (!items.length) {
-        body.createDiv({ cls: "wb-md-nomatch", text: "没有匹配的文件" });
+        body.createDiv({ cls: "cl-md-nomatch", text: "没有匹配的文件" });
       } else if (mode === "grid") {
         renderGrid(body, items);
       } else {
@@ -3467,16 +3467,16 @@ class WorkbenchView extends ItemView {
   }
 
   renderCanvas(el) {
-    el.addClass("wb-scroll-canvas");
+    el.addClass("cl-scroll-canvas");
     const collisBoard =
       this.plugin.childPlugins && this.plugin.childPlugins["collis-board"];
 
     if (!collisBoard) {
-      const head = el.createDiv({ cls: "wb-pagehead" });
+      const head = el.createDiv({ cls: "cl-pagehead" });
       head.createEl("h1", { text: "白板" });
       head.createDiv({
-        cls: "wb-sub",
-        text: "Collis 画布集没有加载成功，请打开控制台查看 [workbench] 日志。"
+        cls: "cl-sub",
+        text: "Collis 画布集没有加载成功，请打开控制台查看 [collis] 日志。"
       });
       return;
     }
@@ -3486,17 +3486,17 @@ class WorkbenchView extends ItemView {
   }
 
   renderNotes(el) {
-    el.addClass("wb-scroll-notes");
+    el.addClass("cl-scroll-notes");
     const collis =
       (this.plugin.childPlugins && this.plugin.childPlugins.collis) ||
       (this.app.plugins.plugins && this.app.plugins.plugins.collis);
 
     if (!collis) {
-      const head = el.createDiv({ cls: "wb-pagehead" });
+      const head = el.createDiv({ cls: "cl-pagehead" });
       head.createEl("h1", { text: "卡片笔记" });
       head.createDiv({
-        cls: "wb-sub",
-        text: "Collis 没有加载成功，请打开控制台查看 [workbench] 日志。"
+        cls: "cl-sub",
+        text: "Collis 没有加载成功，请打开控制台查看 [collis] 日志。"
       });
       return;
     }
@@ -3506,7 +3506,7 @@ class WorkbenchView extends ItemView {
   }
 }
 
-class WorkbenchSettingTab extends PluginSettingTab {
+class CollisSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -3545,12 +3545,12 @@ class WorkbenchSettingTab extends PluginSettingTab {
       );
 
     containerEl.createEl("p", {
-      cls: "wb-settings-hint",
+      cls: "cl-settings-hint",
       text:
         "模块配置是 JSON 数组。每项支持 id、name、icon、color、module、types、folder、keywords。也可以在导航里点「新建模块」用图形界面添加。"
     });
 
-    const textarea = containerEl.createEl("textarea", { cls: "wb-settings-json" });
+    const textarea = containerEl.createEl("textarea", { cls: "cl-settings-json" });
     textarea.value = JSON.stringify(this.plugin.settings.modules, null, 2);
 
     new Setting(containerEl).addButton((button) =>
@@ -3576,14 +3576,14 @@ class WorkbenchSettingTab extends PluginSettingTab {
     );
 
     containerEl.createEl("p", {
-      cls: "wb-settings-hint",
+      cls: "cl-settings-hint",
       text:
         "匹配顺序：module 字段（中英文都认）→ type → folder 前缀 → 标签关键词。一篇笔记只归一个模块，按导航顺序先命中先得；都不命中会进收集箱的待处理队列。"
     });
   }
 }
 
-module.exports = class WorkbenchPlugin extends Plugin {
+module.exports = class CollisPlugin extends Plugin {
   async onload() {
     const saved = await this.readHostData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
@@ -3598,7 +3598,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
 
     this.requestRefresh = debounce(() => this.refreshAll(), 700, true);
 
-    this.registerView(VIEW_TYPE, (leaf) => new WorkbenchView(leaf, this));
+    this.registerView(VIEW_TYPE, (leaf) => new CollisView(leaf, this));
 
     // 先注册图标，addRibbonIcon 和视图标签页才认得这个名字
     if (PLUGIN_ICON_SVG) addIcon(PLUGIN_ICON_ID, PLUGIN_ICON_SVG);
@@ -3606,19 +3606,19 @@ module.exports = class WorkbenchPlugin extends Plugin {
     this.addRibbonIcon(PLUGIN_ICON_ID, "打开 Collis", () => this.activateView());
 
     this.addCommand({
-      id: "open-workbench",
+      id: "open-collis",
       name: "打开 Collis",
       callback: () => this.activateView()
     });
 
     this.addCommand({
-      id: "open-workbench-focus",
+      id: "open-collis-focus",
       name: "打开 Collis（专注模式）",
       callback: () => this.activateView(true)
     });
 
     this.addCommand({
-      id: "toggle-workbench-focus",
+      id: "toggle-collis-focus",
       name: "切换 Collis 专注模式",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
@@ -3629,7 +3629,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "toggle-workbench-nav",
+      id: "toggle-collis-nav",
       name: "切换 Collis 侧栏",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
@@ -3640,7 +3640,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "open-collis",
+      id: "open-collis-notes",
       name: "打开卡片笔记",
       callback: async () => {
         await this.activateView();
@@ -3668,7 +3668,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
       }
     });
 
-    this.addSettingTab(new WorkbenchSettingTab(this.app, this));
+    this.addSettingTab(new CollisSettingTab(this.app, this));
 
     await this.loadBundledPlugins();
 
@@ -3725,16 +3725,16 @@ module.exports = class WorkbenchPlugin extends Plugin {
       this.app.workspace.on("active-leaf-change", (leaf) => {
         const type = leaf && leaf.view ? leaf.view.getViewType() : null;
         if (type === VIEW_TYPE) {
-          if (leaf.view.focus) document.body.classList.add("workbench-focus");
+          if (leaf.view.focus) document.body.classList.add("collis-focus");
         } else {
-          document.body.classList.remove("workbench-focus");
+          document.body.classList.remove("collis-focus");
         }
       })
     );
   }
 
   onunload() {
-    document.body.classList.remove("workbench-focus");
+    document.body.classList.remove("collis-focus");
     this.unloadBundledPlugins();
   }
 
@@ -3747,7 +3747,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
       try {
         this.app.workspace.detachLeavesOfType(type);
       } catch (error) {
-        console.error("[workbench] 清理旧视图失败: " + type, error);
+        console.error("[collis] 清理旧视图失败: " + type, error);
       }
     }
   }
@@ -3811,14 +3811,14 @@ module.exports = class WorkbenchPlugin extends Plugin {
         moved += 1;
       } catch (error) {
         skipped += 1;
-        console.error("[workbench] 白板后缀迁移失败: " + file.path, error);
+        console.error("[collis] 白板后缀迁移失败: " + file.path, error);
       }
     }
     if (moved) {
       new Notice("已把 " + moved + " 张白板的扩展名更新为 .collis");
     }
     if (skipped) {
-      console.warn("[workbench] 有 " + skipped + " 张白板未能迁移，请检查同名文件");
+      console.warn("[collis] 有 " + skipped + " 张白板未能迁移，请检查同名文件");
     }
   }
 
@@ -3840,10 +3840,27 @@ module.exports = class WorkbenchPlugin extends Plugin {
   }
 
   // 旧版独立插件的设置分别在各自文件夹的 data.json。
-  // 第一次启动时搬进 workbench/data.json，搬完后那两个文件夹可以随时删掉。
+  // 第一次启动时搬进 collis/data.json，搬完后那两个文件夹可以随时删掉。
   async migrateLegacySettings() {
     const data = await this.readHostData();
     let dirty = false;
+    // 旧目录名是工具链临时起的，正式版改为 collis；把旧设置搬过来，已存在的键不覆盖。
+    try {
+      const legacyRaw = await this.app.vault.adapter.read(
+        this.app.vault.configDir + "/plugins/workbench/data.json"
+      );
+      const legacy = JSON.parse(legacyRaw);
+      if (legacy && typeof legacy === "object") {
+        for (const [key, value] of Object.entries(legacy)) {
+          if (!(key in data)) {
+            data[key] = value;
+            dirty = true;
+          }
+        }
+      }
+    } catch (error) {
+      // 没有旧目录数据就跳过
+    }
     // 画布子插件内部 id 从 volis 更名为 collis-board：搬运旧设置，避免丢配置。
     if (!data["collis-board"] && data.volis) {
       data["collis-board"] = data.volis;
@@ -3875,7 +3892,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
     }
   }
 
-  // 子插件的读写重定向到 workbench 的 data.json，键名分别是 collis / collis-board。
+  // 子插件的读写重定向到 collis 的 data.json，键名分别是 collis / collis-board。
   attachChildSettings(child, id) {
     child.loadData = async () => {
       const data = await this.readHostData();
@@ -3890,7 +3907,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
 
   async loadBundledPlugin(spec) {
     if (this.isStandaloneEnabled(spec.id)) {
-      console.log("[workbench] 独立插件已启用，跳过内置 " + spec.id);
+      console.log("[collis] 独立插件已启用，跳过内置 " + spec.id);
       return;
     }
     try {
@@ -3899,7 +3916,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
         throw new Error("未找到可用的插件类");
       }
       const manifest = Object.assign({}, spec.manifest);
-      manifest.dir = this.manifest.dir || this.app.vault.configDir + "/plugins/workbench";
+      manifest.dir = this.manifest.dir || this.app.vault.configDir + "/plugins/collis";
       const child = new PluginClass(this.app, manifest);
       this.attachChildSettings(child, spec.id);
       // 内置子插件只作为功能模块存在，不再单独出现在界面上：
@@ -3915,9 +3932,9 @@ module.exports = class WorkbenchPlugin extends Plugin {
       await child.onload();
       this.childPlugins = this.childPlugins || {};
       this.childPlugins[spec.id] = child;
-      console.log("[workbench] 已加载内置插件 " + manifest.id);
+      console.log("[collis] 已加载内置插件 " + manifest.id);
     } catch (error) {
-      console.error("[workbench] 内置插件启动失败: " + spec.id, error);
+      console.error("[collis] 内置插件启动失败: " + spec.id, error);
       new Notice("Collis：内置 " + spec.id + " 启动失败，请查看控制台");
     }
   }
@@ -3929,7 +3946,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
       try {
         child.unload();
       } catch (error) {
-        console.error("[workbench] 内置插件卸载失败", error);
+        console.error("[collis] 内置插件卸载失败", error);
       }
     }
   }

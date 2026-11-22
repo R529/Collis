@@ -4,7 +4,7 @@
 > 原来的 `collis`（速记卡片）和 `volis`（画布集）两个插件已合并进 Collis，启用这一个就够了。
 
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7c6df2)](https://obsidian.md)
-[![Version](https://img.shields.io/badge/version-0.3.0-blue)](https://github.com/R529/Collis/releases)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue)](https://github.com/R529/Collis/releases)
 [![Desktop only](https://img.shields.io/badge/platform-desktop-lightgrey)](#)
 
 ## 它能做什么
@@ -42,7 +42,7 @@
 
 ### 手动安装
 1. 到 [Releases](https://github.com/R529/Collis/releases) 下载最新版的 `main.js`、`manifest.json`、`styles.css`。
-2. 在你的库目录下创建文件夹 `.obsidian/plugins/workbench/`，把三个文件放进去。
+2. 在你的库目录下创建文件夹 `.obsidian/plugins/collis/`，把三个文件放进去。
 3. 设置 → 第三方插件 → 刷新 → 启用 **Collis**。
 
 ### 用 BRAT 安装
@@ -81,12 +81,12 @@ node build/build.js
 node build/verify.js
 ```
 
-把 `dist/` 里的三个文件拷到 `.obsidian/plugins/workbench/` 即可在 Obsidian 里加载测试。
+把 `dist/` 里的三个文件拷到 `.obsidian/plugins/collis/` 即可在 Obsidian 里加载测试。
 
 ### 目录结构
 
 ```
-workbench-suite/
+Collis/
 ├── dist/                # 构建产物（发布到 Release 的三个文件在这里）
 │   ├── main.js
 │   ├── manifest.json

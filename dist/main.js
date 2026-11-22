@@ -6018,9 +6018,9 @@ var require_collis_board_core = __commonJS({
       }
       return null;
     }
-    var WORKBENCH_FOLDER = "\u753B\u5E03";
-    var DEFAULT_WORKBENCH_SETTINGS = {
-      boardFolder: WORKBENCH_FOLDER
+    var GALLERY_FOLDER = "\u753B\u5E03";
+    var DEFAULT_GALLERY_SETTINGS = {
+      boardFolder: GALLERY_FOLDER
     };
     var DEFAULT_CONTEXT_POLICY = {
       safetyTokens: 1024,
@@ -6044,17 +6044,17 @@ var require_collis_board_core = __commonJS({
         policy: { ...DEFAULT_CONTEXT_POLICY }
       },
       conversations: [],
-      workbench: { ...DEFAULT_WORKBENCH_SETTINGS }
+      collis: { ...DEFAULT_GALLERY_SETTINGS }
     };
     function activeProfile(ai) {
       var _a, _b;
       return (_b = (_a = ai.profiles.find((profile) => profile.id === ai.activeId)) != null ? _a : ai.profiles[0]) != null ? _b : null;
     }
-    function normalizeWorkbenchSettings(raw) {
+    function normalizeCollisSettings(raw) {
       const value = raw != null ? raw : {};
       const folder = typeof value.boardFolder === "string" ? value.boardFolder.trim() : "";
       return {
-        boardFolder: folder || DEFAULT_WORKBENCH_SETTINGS.boardFolder
+        boardFolder: folder || DEFAULT_GALLERY_SETTINGS.boardFolder
       };
     }
     function normalizeAISettings(raw) {
@@ -6363,7 +6363,7 @@ var require_collis_board_core = __commonJS({
         ...items.map((item) => `${item.file.path}:${item.mtime}:${item.nodes}:${item.edges}`)
       ].join("|");
     }
-    var VIEW_TYPE_WORKBENCH = "collis-workbench";
+    var VIEW_TYPE_GALLERY = "collis-gallery";
     var SVG_NS = "http://www.w3.org/2000/svg";
     var BoardGalleryView = class extends import_obsidian3.ItemView {
       constructor(leaf, plugin) {
@@ -6379,7 +6379,7 @@ var require_collis_board_core = __commonJS({
         this.plugin = plugin;
       }
       getViewType() {
-        return VIEW_TYPE_WORKBENCH;
+        return VIEW_TYPE_GALLERY;
       }
       getDisplayText() {
         return "\u753B\u5E03\u96C6";
@@ -6420,7 +6420,7 @@ var require_collis_board_core = __commonJS({
         if (this.watching)
           return;
         this.watching = true;
-        const inFolder = (path) => isBoardPath(path, this.plugin.workbenchFolder);
+        const inFolder = (path) => isBoardPath(path, this.plugin.collisFolder);
         this.registerEvent(
           this.app.vault.on("modify", (file) => {
             if (inFolder(file.path))
@@ -6497,7 +6497,7 @@ var require_collis_board_core = __commonJS({
       async loadItems() {
         let items = [];
         try {
-          items = await listBoardItems(this.app, this.plugin.workbenchFolder);
+          items = await listBoardItems(this.app, this.plugin.collisFolder);
         } catch (e) {
           new import_obsidian3.Notice("\u8BFB\u53D6\u753B\u5E03\u5217\u8868\u5931\u8D25");
         }
@@ -6520,7 +6520,7 @@ var require_collis_board_core = __commonJS({
         const scrolled = root.querySelector(".vw-scroll");
         const scroll = scrolled ? scrolled.scrollTop : 0;
         this.clearRoot(root);
-        root.classList.add("wb-root");
+        root.classList.add("cl-root");
         const frame = node("div", "vw-frame");
         const toolbar = node("div", "vw-toolbar");
         toolbar.appendChild(this.buildHead());
@@ -15800,7 +15800,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       }
     };
     var SVG_NS2 = "http://www.w3.org/2000/svg";
-    var LEGACY_WORKBENCH_FOLDER = "\u767D\u677F";
+    var LEGACY_GALLERY_FOLDER = "\u767D\u677F";
     var RenameBoardFolderModal = class extends import_obsidian21.Modal {
       constructor(app, from, to, count2, onResult) {
         super(app);
@@ -15887,7 +15887,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
     var CollisBoardPlugin = class extends import_obsidian21.Plugin {
       constructor() {
         super(...arguments);
-        this.workbenchViewRef = null;
+        this.collisViewRef = null;
         this.observer = null;
         this.observedContainer = null;
         this.timer = null;
@@ -15917,7 +15917,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         this.installInlineEditing();
         this.registerView(VIEW_TYPE_COLLIS_BOARD, (leaf) => new BoardView(leaf, this));
         this.registerExtensions(["collis"], VIEW_TYPE_COLLIS_BOARD);
-        this.installWorkbench();
+        this.installCollis();
         const ribbon = this.addRibbonIcon("dot", "Collis", () => {
           void this.openBoardGallery();
         });
@@ -15928,14 +15928,14 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       }
       /** Installs the board wall. collis's own board view, paths and commands stay
        *  exactly as they were; this only adds one view and one folder entry point. */
-      installWorkbench() {
-        this.registerView(VIEW_TYPE_WORKBENCH, (leaf) => {
+      installCollis() {
+        this.registerView(VIEW_TYPE_GALLERY, (leaf) => {
           const view = new BoardGalleryView(leaf, this);
-          this.workbenchViewRef = view;
+          this.collisViewRef = view;
           return view;
         });
         this.addCommand({
-          id: "open-workbench",
+          id: "open-collis-gallery",
           name: "\u6253\u5F00\u753B\u5E03\u96C6",
           callback: () => {
             void this.openBoardGallery();
@@ -15943,12 +15943,12 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         });
       }
       /** Single folder used by the wall. Users can change it in data.json. */
-      get workbenchFolder() {
+      get collisFolder() {
         var _a;
-        return ((_a = this.settings.workbench) == null ? void 0 : _a.boardFolder) || "\u753B\u5E03";
+        return ((_a = this.settings.collis) == null ? void 0 : _a.boardFolder) || "\u753B\u5E03";
       }
       async ensureBoardFolder() {
-        const path = this.workbenchFolder;
+        const path = this.collisFolder;
         const existing = this.app.vault.getAbstractFileByPath(path);
         if (existing instanceof import_obsidian21.TFolder)
           return;
@@ -15956,12 +15956,12 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           new import_obsidian21.Notice(`\u300C${path}\u300D\u5DF2\u662F\u4E00\u4E2A\u6587\u4EF6\uFF0C\u4E0D\u80FD\u4F5C\u4E3A\u753B\u5E03\u6587\u4EF6\u5939\u3002`);
           return;
         }
-        const legacy = this.app.vault.getAbstractFileByPath(LEGACY_WORKBENCH_FOLDER);
-        if (legacy instanceof import_obsidian21.TFolder && path !== LEGACY_WORKBENCH_FOLDER) {
+        const legacy = this.app.vault.getAbstractFileByPath(LEGACY_GALLERY_FOLDER);
+        if (legacy instanceof import_obsidian21.TFolder && path !== LEGACY_GALLERY_FOLDER) {
           const confirmed = await new Promise((resolve) => {
             new RenameBoardFolderModal(
               this.app,
-              LEGACY_WORKBENCH_FOLDER,
+              LEGACY_GALLERY_FOLDER,
               path,
               legacy.children.length,
               resolve
@@ -15986,66 +15986,40 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
        *  one board wall on the right. Never creates a second one. */
       async openBoardGallery() {
         var _a, _b, _c;
-        this.debugLog("openBoardGallery: start");
         await this.ensureBoardFolder();
-        this.debugLog(`openBoardGallery: folder="${this.workbenchFolder}"`);
-        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_WORKBENCH);
-        this.debugLog(`openBoardGallery: existing leaves=${leaves.length}`);
+        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_GALLERY);
         const existing = leaves[0];
         if (existing) {
           await this.app.workspace.revealLeaf(existing);
           this.app.workspace.setActiveLeaf(existing, { focus: true });
           if (existing.view instanceof BoardGalleryView) {
             existing.view.refreshWall();
-            this.debugLog("openBoardGallery: repainted existing view");
           } else {
-            this.debugLog(
-              `openBoardGallery: existing view is ${(_c = (_b = (_a = existing.view) == null ? void 0 : _a.getViewType) == null ? void 0 : _b.call(_a)) != null ? _c : "unknown"}`
-            );
-            await existing.setViewState({ type: VIEW_TYPE_WORKBENCH, active: true });
+            await existing.setViewState({ type: VIEW_TYPE_GALLERY, active: true });
           }
           return;
         }
         const leaf = this.app.workspace.getLeaf("tab");
         try {
-          await leaf.setViewState({ type: VIEW_TYPE_WORKBENCH, active: true });
+          await leaf.setViewState({ type: VIEW_TYPE_GALLERY, active: true });
           await this.app.workspace.revealLeaf(leaf);
           this.app.workspace.setActiveLeaf(leaf, { focus: true });
-          this.debugLog("openBoardGallery: new tab created");
         } catch (error) {
-          this.debugLog(`openBoardGallery: setViewState failed ${String(error)}`);
           new import_obsidian21.Notice(
             `\u65E0\u6CD5\u6253\u5F00\u753B\u5E03\u96C6\uFF1A${error instanceof Error ? error.message : String(error)}`
           );
         }
       }
-      /** Temporary runtime trace for the board wall. Writes inside the plugin
-       *  folder, never into notes, and never throws. */
-      debugLog(message) {
-        const line = `${(/* @__PURE__ */ new Date()).toISOString()} ${message}
-`;
-        const path = ".obsidian/plugins/workbench/collis-board-debug.log";
-        const adapter = this.app.vault.adapter;
-        void (async () => {
-          try {
-            if (await adapter.exists(path))
-              await adapter.append(path, line);
-            else
-              await adapter.write(path, line);
-          } catch (e) {
-          }
-        })();
-      }
       /** Create from inside the wall, so the file always lands in its folder. */
       async createGalleryBoard() {
         await this.ensureBoardFolder();
-        const file = await createBoardItem(this.app, this.workbenchFolder);
+        const file = await createBoardItem(this.app, this.collisFolder);
         await this.openBoardFile(file.path);
-        this.refreshWorkbench();
+        this.refreshCollis();
       }
-      refreshWorkbench() {
+      refreshCollis() {
         var _a;
-        (_a = this.workbenchViewRef) == null ? void 0 : _a.refreshWall();
+        (_a = this.collisViewRef) == null ? void 0 : _a.refreshWall();
       }
       async openBoard() {
         const boards = listBoards(this.app);
@@ -16103,7 +16077,9 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
           ...loaded != null ? loaded : {},
           ai: normalizeAISettings(loaded == null ? void 0 : loaded.ai),
           conversations: Array.isArray(loaded == null ? void 0 : loaded.conversations) ? loaded.conversations : [],
-          workbench: normalizeWorkbenchSettings(loaded == null ? void 0 : loaded.workbench)
+          collis: normalizeCollisSettings(
+            (loaded == null ? void 0 : loaded.collis) ?? (loaded == null ? void 0 : loaded.workbench)
+          )
         };
       }
       async saveSettings() {
@@ -17034,7 +17010,7 @@ var require_collis_gallery = __commonJS({
         if (this.watching)
           return;
         this.watching = true;
-        const inFolder = (path) => isBoardPath(path, this.collis.workbenchFolder);
+        const inFolder = (path) => isBoardPath(path, this.collis.collisFolder);
         this.vaultRefs.push(
           this.app.vault.on("modify", (file) => {
             if (inFolder(file.path))
@@ -17098,7 +17074,7 @@ var require_collis_gallery = __commonJS({
       async loadItems() {
         let items = [];
         try {
-          items = await listBoardItems(this.app, this.collis.workbenchFolder);
+          items = await listBoardItems(this.app, this.collis.collisFolder);
         } catch {
           new Notice2("\u8BFB\u53D6\u753B\u5E03\u5217\u8868\u5931\u8D25");
         }
@@ -17121,7 +17097,7 @@ var require_collis_gallery = __commonJS({
         const scrolled = root.querySelector(".vw-scroll");
         const scroll = scrolled ? scrolled.scrollTop : 0;
         this.clearRoot(root);
-        root.classList.add("wb-root");
+        root.classList.add("cl-root");
         const frame = node("div", "vw-frame");
         const toolbar = node("div", "vw-toolbar");
         toolbar.appendChild(this.buildHead());
@@ -17521,7 +17497,7 @@ var require_collis_notes = __commonJS({
         this.closeCardMenu();
         this.container = containerEl;
         this.container.empty();
-        this.container.addClass("wb-notes-panel");
+        this.container.addClass("cl-notes-panel");
         this.container.addClass("qm-view");
         this.buildHead();
         this.buildBody();
@@ -17556,13 +17532,13 @@ var require_collis_notes = __commonJS({
       }
       /* ---------------- 结构 ---------------- */
       buildHead() {
-        const head = this.container.createDiv({ cls: "wb-notes-head" });
+        const head = this.container.createDiv({ cls: "cl-notes-head" });
         head.style.position = "relative";
-        const actions = head.createDiv({ cls: "wb-notes-actions wb-notes-toolrow" });
+        const actions = head.createDiv({ cls: "cl-notes-actions cl-notes-toolrow" });
         actions.style.position = "relative";
         this.headEl = head;
         this.toolrow = actions;
-        const box = actions.createDiv({ cls: "qm-searchbox wb-notes-search" });
+        const box = actions.createDiv({ cls: "qm-searchbox cl-notes-search" });
         const searchIcon = box.createDiv({ cls: "qm-search-ico" });
         setIconHtml(searchIcon, "search");
         const search = box.createEl("input", {
@@ -17606,7 +17582,7 @@ var require_collis_notes = __commonJS({
         };
       }
       buildBody() {
-        const body = this.container.createDiv({ cls: "wb-notes-body" });
+        const body = this.container.createDiv({ cls: "cl-notes-body" });
         this.chipsEl = body.createDiv({ cls: "qm-chips" });
         const composer = body.createDiv({ cls: "qm-composer" });
         const input = composer.createEl("textarea", {
@@ -17639,7 +17615,7 @@ var require_collis_notes = __commonJS({
           }
         });
         save.onclick = () => this.capture();
-        this.listWrap = body.createDiv({ cls: "wb-notes-listwrap" });
+        this.listWrap = body.createDiv({ cls: "cl-notes-listwrap" });
         this.selBarEl = body.createDiv({ cls: "qm-selbar" });
         this.reviewEl = body.createDiv({ cls: "qm-review" });
       }
@@ -17669,7 +17645,7 @@ var require_collis_notes = __commonJS({
         try {
           cards = await this.collis.readAllCards();
         } catch (e) {
-          console.error("[workbench] \u8BFB\u53D6\u5361\u7247\u5931\u8D25", e);
+          console.error("[collis] \u8BFB\u53D6\u5361\u7247\u5931\u8D25", e);
           cards = [];
         }
         this._loading = false;
@@ -18395,7 +18371,7 @@ var require_collis_notes = __commonJS({
       /* ---------------- 弹层 ---------------- */
       showPop(owner, build) {
         this.closePop();
-        const pop = this.toolrow.createDiv({ cls: "wb-notes-pop" });
+        const pop = this.toolrow.createDiv({ cls: "cl-notes-pop" });
         build(pop);
         this.pop = pop;
         this.popOwner = owner;
@@ -19043,7 +19019,7 @@ var require_collis_notes = __commonJS({
         try {
           ok = await this.collis.appendCard(text);
         } catch (e) {
-          console.error("[workbench] \u5199\u5165\u5361\u7247\u5931\u8D25", e);
+          console.error("[collis] \u5199\u5165\u5361\u7247\u5931\u8D25", e);
         }
         if (ok) {
           this.input.value = "";
@@ -19135,7 +19111,7 @@ var BUNDLED_PLUGINS = [
     }
   }
 ];
-var VIEW_TYPE = "workbench-view";
+var VIEW_TYPE = "collis-view";
 var QM_VIEW_TYPE = "qm-cards-view";
 var PLUGIN_ICON_ID = CollisBundle && CollisBundle.ICON_ID || "collis-mark";
 var PLUGIN_ICON_SVG = CollisBundle && CollisBundle.ICON_MARK || "";
@@ -19515,35 +19491,35 @@ function paintMediaThumb(app, thumb, file, kind) {
   }
   if (!src)
     return false;
-  thumb.addClass("wb-md-thumb-media");
+  thumb.addClass("cl-md-thumb-media");
   if (kind === "image") {
-    const img = thumb.createEl("img", { cls: "wb-md-media" });
+    const img = thumb.createEl("img", { cls: "cl-md-media" });
     img.setAttribute("alt", file.basename);
     img.setAttribute("loading", "lazy");
     img.onerror = () => {
       img.remove();
-      thumb.removeClass("wb-md-thumb-media");
+      thumb.removeClass("cl-md-thumb-media");
       setIcon(thumb, "image");
     };
     img.setAttribute("src", src);
     return true;
   }
   if (kind === "video") {
-    const video = thumb.createEl("video", { cls: "wb-md-media" });
+    const video = thumb.createEl("video", { cls: "cl-md-media" });
     video.setAttribute("preload", "metadata");
     video.setAttribute("muted", "");
     video.setAttribute("playsinline", "");
     video.onerror = () => {
       video.remove();
-      thumb.removeClass("wb-md-thumb-media");
+      thumb.removeClass("cl-md-thumb-media");
       setIcon(thumb, "video");
     };
     video.setAttribute("src", src + "#t=0.1");
-    const play = thumb.createDiv({ cls: "wb-md-play" });
+    const play = thumb.createDiv({ cls: "cl-md-play" });
     setIcon(play, "play");
     return true;
   }
-  thumb.removeClass("wb-md-thumb-media");
+  thumb.removeClass("cl-md-thumb-media");
   return false;
 }
 function paintNoteThumb(app, thumb, file) {
@@ -19559,21 +19535,21 @@ function paintNoteThumb(app, thumb, file) {
       setIcon(thumb, "file-text");
       return;
     }
-    thumb.addClass("wb-md-thumb-note");
-    thumb.createDiv({ cls: "wb-md-snippet", text: snippet });
+    thumb.addClass("cl-md-thumb-note");
+    thumb.createDiv({ cls: "cl-md-snippet", text: snippet });
   }).catch(() => {
     if (thumb.isConnected)
       setIcon(thumb, "file-text");
   });
 }
 var WB_TOOLTIP_SCOPE = [
-  ".workbench-view",
+  ".collis-view",
   ".qm-view",
   ".qm-root",
   ".collis-board-leaf",
   ".collis-board-host",
   ".collis-board",
-  ".wb-root",
+  ".cl-root",
   ".vw-frame",
   ".collis-doctor-content",
   ".collis-export-content",
@@ -19595,8 +19571,8 @@ function wbNormalizeTitle(el) {
   const t = el.getAttribute("title") || "";
   if (!el.hasAttribute("aria-label")) {
     el.setAttribute("aria-label", t);
-    el.setAttribute("data-wb-tt", "1");
-  } else if (el.getAttribute("data-wb-tt") === "1") {
+    el.setAttribute("data-cl-tt", "1");
+  } else if (el.getAttribute("data-cl-tt") === "1") {
     el.setAttribute("aria-label", t);
   }
   el.removeAttribute("title");
@@ -19665,10 +19641,10 @@ var ModuleEditorModal = class extends Modal {
   }
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("wb-modaleditor");
+    contentEl.addClass("cl-modaleditor");
     contentEl.createEl("h2", { text: this.module ? "\u7F16\u8F91\u6A21\u5757" : "\u65B0\u5EFA\u6A21\u5757" });
     contentEl.createDiv({
-      cls: "wb-modal-hint",
+      cls: "cl-modal-hint",
       text: "\u6A21\u5757\u53EA\u662F\u4E00\u4E2A\u7B5B\u9009\u5165\u53E3\uFF0C\u4E0D\u4F1A\u642C\u52A8\u6216\u590D\u5236\u4F60\u7684\u6587\u4EF6\u3002"
     });
     let name = this.module ? this.module.name || "" : this.initialName;
@@ -19679,13 +19655,13 @@ var ModuleEditorModal = class extends Modal {
         name = v;
       })
     );
-    const iconRow = contentEl.createDiv({ cls: "wb-modalfield" });
-    iconRow.createDiv({ cls: "wb-modalfield-label", text: "\u56FE\u6807" });
-    const iconGrid = iconRow.createDiv({ cls: "wb-iconpick" });
+    const iconRow = contentEl.createDiv({ cls: "cl-modalfield" });
+    iconRow.createDiv({ cls: "cl-modalfield-label", text: "\u56FE\u6807" });
+    const iconGrid = iconRow.createDiv({ cls: "cl-iconpick" });
     const iconButtons = [];
     MODULE_ICONS.forEach((name2) => {
       const btn = iconGrid.createDiv({
-        cls: "wb-iconpick-item" + (name2 === this.icon ? " is-active" : "")
+        cls: "cl-iconpick-item" + (name2 === this.icon ? " is-active" : "")
       });
       setIcon(btn, name2);
       btn.onclick = () => {
@@ -19695,13 +19671,13 @@ var ModuleEditorModal = class extends Modal {
       };
       iconButtons.push(btn);
     });
-    const colorRow = contentEl.createDiv({ cls: "wb-modalfield" });
-    colorRow.createDiv({ cls: "wb-modalfield-label", text: "\u989C\u8272" });
-    const swatches = colorRow.createDiv({ cls: "wb-colorpick" });
+    const colorRow = contentEl.createDiv({ cls: "cl-modalfield" });
+    colorRow.createDiv({ cls: "cl-modalfield-label", text: "\u989C\u8272" });
+    const swatches = colorRow.createDiv({ cls: "cl-colorpick" });
     const colorDots = [];
     MODULE_COLORS.forEach((color) => {
       const dot = swatches.createDiv({
-        cls: "wb-colorpick-dot" + (color === this.color ? " is-active" : "")
+        cls: "cl-colorpick-dot" + (color === this.color ? " is-active" : "")
       });
       dot.style.setProperty("--dot-color", color);
       dot.onclick = () => {
@@ -19734,9 +19710,9 @@ var ModuleEditorModal = class extends Modal {
         keywords = v;
       })
     );
-    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
     if (this.module && this.options.onDelete) {
-      const del = foot.createEl("button", { cls: "wb-btn wb-btn-danger", text: "\u5220\u9664\u6A21\u5757" });
+      const del = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664\u6A21\u5757" });
       del.onclick = () => {
         if (!this.deleteArmed) {
           this.deleteArmed = true;
@@ -19751,9 +19727,9 @@ var ModuleEditorModal = class extends Modal {
         this.options.onDelete(this.module);
       };
     }
-    const cancel = foot.createEl("button", { cls: "wb-btn", text: "\u53D6\u6D88" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
-    const save = foot.createEl("button", { cls: "wb-btn wb-btn-accent", text: "\u4FDD\u5B58" });
+    const save = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u4FDD\u5B58" });
     save.onclick = () => {
       const finalName = String(name || "").trim();
       if (!finalName) {
@@ -19792,19 +19768,19 @@ var DeleteFilesModal = class extends Modal {
   }
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("wb-modaleditor");
+    contentEl.addClass("cl-modaleditor");
     contentEl.createEl("h2", {
       text: this.files.length === 1 ? "\u5220\u9664\u8FD9\u4E2A\u6587\u4EF6\uFF1F" : "\u5220\u9664\u8FD9 " + this.files.length + " \u4E2A\u6587\u4EF6\uFF1F"
     });
     const names = this.files.slice(0, 3).map((f) => f.basename).join("\u3001");
     contentEl.createDiv({
-      cls: "wb-modal-hint",
+      cls: "cl-modal-hint",
       text: this.files.length > 3 ? "\u4F1A\u79FB\u5230\u7CFB\u7EDF\u56DE\u6536\u7AD9\uFF1A" + names + " \u7B49 " + this.files.length + " \u4E2A\u6587\u4EF6\u3002" : "\u4F1A\u79FB\u5230\u7CFB\u7EDF\u56DE\u6536\u7AD9\uFF1A" + names + "\u3002"
     });
-    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
-    const cancel = foot.createEl("button", { cls: "wb-btn", text: "\u53D6\u6D88" });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
-    const remove = foot.createEl("button", { cls: "wb-btn wb-btn-danger", text: "\u5220\u9664" });
+    const remove = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664" });
     remove.onclick = () => {
       this.close();
       if (this.onConfirm)
@@ -19851,19 +19827,19 @@ var FolderPickerModal = class extends Modal {
   }
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("wb-modaleditor");
+    contentEl.addClass("cl-modaleditor");
     contentEl.createEl("h2", { text: "\u9009\u62E9\u4FDD\u5B58\u6587\u4EF6\u5939" });
     contentEl.createDiv({
-      cls: "wb-modal-hint",
+      cls: "cl-modal-hint",
       text: "\u9009\u4E00\u4E2A\u5DF2\u6709\u7684\u6587\u4EF6\u5939\uFF0C\u6216\u70B9\u4E0B\u9762\u7684\u300C\u65B0\u5EFA\u6587\u4EF6\u5939\u300D\u76F4\u63A5\u5EFA\u4E00\u4E2A\u3002"
     });
     const pickWrap = contentEl.createDiv();
     const input = pickWrap.createEl("input", {
-      cls: "wb-modalfilter",
+      cls: "cl-modalfilter",
       attr: { type: "text", placeholder: "\u7B5B\u9009\u6587\u4EF6\u5939\u2026" }
     });
-    const listEl = pickWrap.createDiv({ cls: "wb-picklist" });
-    const empty = pickWrap.createDiv({ cls: "wb-modal-hint" });
+    const listEl = pickWrap.createDiv({ cls: "cl-picklist" });
+    const empty = pickWrap.createDiv({ cls: "cl-modal-hint" });
     const folders = this.listFolders();
     const draw = () => {
       const q = String(input.value || "").trim().toLowerCase();
@@ -19874,12 +19850,12 @@ var FolderPickerModal = class extends Modal {
       );
       empty.toggle(rows.length === 0);
       rows.forEach((path) => {
-        const row = listEl.createDiv({ cls: "wb-pickitem" });
+        const row = listEl.createDiv({ cls: "cl-pickitem" });
         if (path === this.options.current)
           row.addClass("is-active");
-        const icon = row.createDiv({ cls: "wb-pickicon" });
+        const icon = row.createDiv({ cls: "cl-pickicon" });
         setIcon(icon, "folder");
-        row.createDiv({ cls: "wb-pickname", text: path });
+        row.createDiv({ cls: "cl-pickname", text: path });
         row.onclick = () => {
           this.close();
           if (this.options.onPick)
@@ -19889,20 +19865,20 @@ var FolderPickerModal = class extends Modal {
     };
     input.addEventListener("input", draw);
     draw();
-    const form = contentEl.createDiv({ cls: "wb-foldernew is-hidden" });
-    form.createDiv({ cls: "wb-modalfield-label", text: "\u65B0\u6587\u4EF6\u5939\u8DEF\u5F84" });
+    const form = contentEl.createDiv({ cls: "cl-foldernew is-hidden" });
+    form.createDiv({ cls: "cl-modalfield-label", text: "\u65B0\u6587\u4EF6\u5939\u8DEF\u5F84" });
     const nameInput = form.createEl("input", {
-      cls: "wb-modalfilter",
+      cls: "cl-modalfilter",
       attr: { type: "text", placeholder: "\u4F8B\u5982\uFF1A01-Notes \u6216 10-Modules/\u5065\u8EAB\u8BB0\u5F55" }
     });
     form.createDiv({
-      cls: "wb-modal-hint",
+      cls: "cl-modal-hint",
       text: "\u652F\u6301\u591A\u7EA7\u8DEF\u5F84\uFF0C\u521B\u5EFA\u540E\u4F1A\u7ACB\u5373\u51FA\u73B0\u5728 Obsidian \u6587\u4EF6\u6811\u91CC\u3002"
     });
-    const formFoot = form.createDiv({ cls: "wb-modalfoot" });
-    const backBtn = formFoot.createEl("button", { cls: "wb-btn", text: "\u8FD4\u56DE" });
+    const formFoot = form.createDiv({ cls: "cl-modalfoot" });
+    const backBtn = formFoot.createEl("button", { cls: "cl-btn", text: "\u8FD4\u56DE" });
     const okBtn = formFoot.createEl("button", {
-      cls: "wb-btn wb-btn-accent",
+      cls: "cl-btn cl-btn-accent",
       text: "\u521B\u5EFA\u5E76\u4F7F\u7528"
     });
     const showForm = (on) => {
@@ -19943,16 +19919,16 @@ var FolderPickerModal = class extends Modal {
       if (evt.key === "Enter")
         okBtn.click();
     });
-    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
     const create = foot.createEl("button", {
-      cls: "wb-btn wb-btn-accent wb-foldernew-btn",
+      cls: "cl-btn cl-btn-accent cl-foldernew-btn",
       text: "\u65B0\u5EFA\u6587\u4EF6\u5939"
     });
     create.onclick = () => {
       showForm(true);
       nameInput.focus();
     };
-    const cancel = foot.createEl("button", { cls: "wb-btn", text: "\u53D6\u6D88" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
   }
   onClose() {
@@ -19968,33 +19944,33 @@ var ModulePickerModal = class extends Modal {
   }
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("wb-modaleditor");
+    contentEl.addClass("cl-modaleditor");
     contentEl.createEl("h2", { text: "\u5F52\u5165\u6A21\u5757" });
     contentEl.createDiv({
-      cls: "wb-modal-hint",
+      cls: "cl-modal-hint",
       text: "\u53EA\u4F1A\u5199\u5165 module \u5B57\u6BB5\uFF0C\u6587\u4EF6\u4F4D\u7F6E\u4E0D\u53D8\u3002"
     });
-    const list = contentEl.createDiv({ cls: "wb-picklist" });
+    const list = contentEl.createDiv({ cls: "cl-picklist" });
     this.modules.forEach((mod) => {
-      const item = list.createDiv({ cls: "wb-pickitem" });
-      const iconEl = item.createDiv({ cls: "wb-pickicon" });
+      const item = list.createDiv({ cls: "cl-pickitem" });
+      const iconEl = item.createDiv({ cls: "cl-pickicon" });
       iconEl.style.setProperty("--dot-color", mod.color || "var(--interactive-accent)");
       setIcon(iconEl, mod.icon || "file-text");
-      item.createDiv({ cls: "wb-pickname", text: mod.name });
+      item.createDiv({ cls: "cl-pickname", text: mod.name });
       item.onclick = () => {
         this.close();
         if (this.onPick)
           this.onPick(mod);
       };
     });
-    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
-    const create = foot.createEl("button", { cls: "wb-btn", text: "\u65B0\u5EFA\u6A21\u5757\u2026" });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const create = foot.createEl("button", { cls: "cl-btn", text: "\u65B0\u5EFA\u6A21\u5757\u2026" });
     create.onclick = () => {
       this.close();
       if (this.onCreate)
         this.onCreate();
     };
-    const cancel = foot.createEl("button", { cls: "wb-btn", text: "\u53D6\u6D88" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
   }
   onClose() {
@@ -20011,22 +19987,22 @@ var ModuleManagerModal = class extends Modal {
   }
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("wb-modaleditor");
+    contentEl.addClass("cl-modaleditor");
     contentEl.createEl("h2", { text: "\u7BA1\u7406\u6A21\u5757" });
     contentEl.createDiv({
-      cls: "wb-modal-hint",
+      cls: "cl-modal-hint",
       text: "\u62D6\u52A8\u5DE6\u4FA7\u628A\u624B\u53EF\u4EE5\u6392\u5E8F\uFF0C\u987A\u5E8F\u4F1A\u540C\u6B65\u5230\u5DE6\u8FB9\u5BFC\u822A\u3002\u5220\u9664\u6A21\u5757\u53EA\u4F1A\u79FB\u9664\u7B5B\u9009\u5165\u53E3\uFF0C\u4E0D\u4F1A\u5220\u9664\u7B14\u8BB0\u6587\u4EF6\u3002"
     });
-    this.listEl = contentEl.createDiv({ cls: "wb-picklist" });
+    this.listEl = contentEl.createDiv({ cls: "cl-picklist" });
     this.renderList();
-    const foot = contentEl.createDiv({ cls: "wb-modalfoot" });
-    const create = foot.createEl("button", { cls: "wb-btn wb-btn-accent", text: "\u65B0\u5EFA\u6A21\u5757" });
+    const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
+    const create = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u65B0\u5EFA\u6A21\u5757" });
     create.onclick = () => {
       this.close();
       if (this.options.onCreate)
         this.options.onCreate();
     };
-    const close = foot.createEl("button", { cls: "wb-btn", text: "\u5173\u95ED" });
+    const close = foot.createEl("button", { cls: "cl-btn", text: "\u5173\u95ED" });
     close.onclick = () => this.close();
   }
   renderList() {
@@ -20034,19 +20010,19 @@ var ModuleManagerModal = class extends Modal {
     list.empty();
     const mods = this.options.getModules ? this.options.getModules() : [];
     if (!mods.length) {
-      list.createDiv({ cls: "wb-modal-hint", text: "\u8FD8\u6CA1\u6709\u6A21\u5757\uFF0C\u70B9\u4E0B\u9762\u7684\u300C\u65B0\u5EFA\u6A21\u5757\u300D\u3002" });
+      list.createDiv({ cls: "cl-modal-hint", text: "\u8FD8\u6CA1\u6709\u6A21\u5757\uFF0C\u70B9\u4E0B\u9762\u7684\u300C\u65B0\u5EFA\u6A21\u5757\u300D\u3002" });
       return;
     }
     mods.forEach((mod) => {
-      const row = list.createDiv({ cls: "wb-modrow" });
+      const row = list.createDiv({ cls: "cl-modrow" });
       row.dataset.modId = mod.id;
       row.setAttribute("draggable", "true");
-      const grip = row.createDiv({ cls: "wb-modrow-grip" });
+      const grip = row.createDiv({ cls: "cl-modrow-grip" });
       setIcon(grip, "grip-vertical");
-      const iconEl = row.createDiv({ cls: "wb-pickicon" });
+      const iconEl = row.createDiv({ cls: "cl-pickicon" });
       iconEl.style.setProperty("--dot-color", mod.color || "var(--interactive-accent)");
       setIcon(iconEl, mod.icon || "file-text");
-      row.createDiv({ cls: "wb-modrow-name", text: mod.name });
+      row.createDiv({ cls: "cl-modrow-name", text: mod.name });
       row.addEventListener("mousedown", (evt) => {
         this.dragBlocked = !!(evt.target.closest && evt.target.closest("button"));
       });
@@ -20078,7 +20054,7 @@ var ModuleManagerModal = class extends Modal {
         this.dragBlocked = false;
         this.commitOrder();
       });
-      const edit = row.createEl("button", { cls: "wb-btn", text: "\u7F16\u8F91" });
+      const edit = row.createEl("button", { cls: "cl-btn", text: "\u7F16\u8F91" });
       edit.onclick = () => {
         this.close();
         if (this.options.onEdit)
@@ -20086,7 +20062,7 @@ var ModuleManagerModal = class extends Modal {
       };
       const armed = this.armedId === mod.id;
       const del = row.createEl("button", {
-        cls: "wb-btn wb-btn-danger",
+        cls: "cl-btn cl-btn-danger",
         text: armed ? "\u786E\u8BA4\u5220\u9664" : "\u5220\u9664"
       });
       del.onclick = () => {
@@ -20106,7 +20082,7 @@ var ModuleManagerModal = class extends Modal {
   commitOrder() {
     if (!this.listEl)
       return;
-    const order = Array.from(this.listEl.querySelectorAll(".wb-modrow")).map((row) => row.dataset.modId).filter(Boolean);
+    const order = Array.from(this.listEl.querySelectorAll(".cl-modrow")).map((row) => row.dataset.modId).filter(Boolean);
     if (this.options.onReorder)
       this.options.onReorder(order);
   }
@@ -20114,7 +20090,7 @@ var ModuleManagerModal = class extends Modal {
     this.contentEl.empty();
   }
 };
-var WorkbenchView = class extends ItemView {
+var CollisView = class extends ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -20138,8 +20114,8 @@ var WorkbenchView = class extends ItemView {
     return PLUGIN_ICON_ID;
   }
   async onOpen() {
-    this.containerEl.addClass("workbench-view");
-    this.contentEl.addClass("wb-content");
+    this.containerEl.addClass("collis-view");
+    this.contentEl.addClass("cl-content");
     this.render();
     this.watchWidth();
     this.registerEvent(
@@ -20154,7 +20130,7 @@ var WorkbenchView = class extends ItemView {
       this._ro.disconnect();
       this._ro = null;
     }
-    document.body.classList.remove("workbench-focus");
+    document.body.classList.remove("collis-focus");
     this.focus = false;
     this.destroyGallery();
     this.destroyNotes();
@@ -20185,7 +20161,7 @@ var WorkbenchView = class extends ItemView {
     app.classList.toggle("is-mini", w < 940);
     app.classList.toggle("is-nav-collapsed", !!this.navCollapsed);
     const pad = Math.max(12, Math.min(28, Math.round(w * 0.026)));
-    app.style.setProperty("--wb-pad", pad + "px");
+    app.style.setProperty("--cl-pad", pad + "px");
   }
   getModules() {
     const list = this.plugin.settings.modules;
@@ -20586,7 +20562,7 @@ var WorkbenchView = class extends ItemView {
   }
   setFocus(on) {
     this.focus = on;
-    document.body.classList.toggle("workbench-focus", on);
+    document.body.classList.toggle("collis-focus", on);
     this.render();
   }
   setNavCollapsed(on) {
@@ -20648,14 +20624,14 @@ var WorkbenchView = class extends ItemView {
       this._cardCount = total;
       if (!item.isConnected)
         return;
-      let badge = item.querySelector(".wb-navcount");
+      let badge = item.querySelector(".cl-navcount");
       if (!total) {
         if (badge)
           badge.remove();
         return;
       }
       if (!badge)
-        badge = item.createDiv({ cls: "wb-navcount" });
+        badge = item.createDiv({ cls: "cl-navcount" });
       badge.setText(String(total));
     }).catch(() => {
     });
@@ -20759,16 +20735,16 @@ var WorkbenchView = class extends ItemView {
     if (this.active !== "notes")
       this.destroyNotes();
     this.contentEl.empty();
-    this.contentEl.addClass("wb-content");
-    const root = this.contentEl.createDiv({ cls: "wb-app" });
+    this.contentEl.addClass("cl-content");
+    const root = this.contentEl.createDiv({ cls: "cl-app" });
     this.appEl = root;
     this.renderNav(root);
-    const main = root.createDiv({ cls: "wb-main" });
-    const restore = main.createDiv({ cls: "wb-navrestore" });
+    const main = root.createDiv({ cls: "cl-main" });
+    const restore = main.createDiv({ cls: "cl-navrestore" });
     restore.setAttribute("aria-label", "\u5C55\u5F00 Collis \u4FA7\u680F");
     setIcon(restore, "chevrons-right");
     restore.onclick = () => this.setNavCollapsed(false);
-    const scroll = main.createDiv({ cls: "wb-scroll" });
+    const scroll = main.createDiv({ cls: "cl-scroll" });
     if (this.active === "inbox") {
       this.renderInbox(scroll);
     } else if (this.active === "canvas") {
@@ -20787,40 +20763,40 @@ var WorkbenchView = class extends ItemView {
     this.applyLayout();
   }
   renderNav(root) {
-    const nav = root.createDiv({ cls: "wb-nav" });
-    const brand = nav.createDiv({ cls: "wb-brand" });
-    brand.createDiv({ cls: "wb-mark", text: "C" });
+    const nav = root.createDiv({ cls: "cl-nav" });
+    const brand = nav.createDiv({ cls: "cl-brand" });
+    brand.createDiv({ cls: "cl-mark", text: "C" });
     const brandName = this.plugin.settings.workspaceName || "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0";
-    const brandText = brand.createDiv({ cls: "wb-brand-txt" });
-    brandText.createDiv({ cls: "wb-brand-name", text: brandName });
+    const brandText = brand.createDiv({ cls: "cl-brand-txt" });
+    brandText.createDiv({ cls: "cl-brand-name", text: brandName });
     brandText.createDiv({
-      cls: "wb-brand-sub",
+      cls: "cl-brand-sub",
       text: brandName === "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0" ? "Collis Workspace" : "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0"
     });
-    const collapseBtn = brand.createDiv({ cls: "wb-navtoggle" });
+    const collapseBtn = brand.createDiv({ cls: "cl-navtoggle" });
     collapseBtn.setAttribute("aria-label", "\u6536\u8D77 Collis \u4FA7\u680F");
     setIcon(collapseBtn, "chevrons-left");
     collapseBtn.onclick = () => this.setNavCollapsed(true);
-    const navList = nav.createDiv({ cls: "wb-navlist" });
+    const navList = nav.createDiv({ cls: "cl-navlist" });
     const group = (caption) => {
-      const g = navList.createDiv({ cls: "wb-navgroup" });
-      g.createDiv({ cls: "wb-navcap", text: caption });
+      const g = navList.createDiv({ cls: "cl-navgroup" });
+      g.createDiv({ cls: "cl-navcap", text: caption });
       return g;
     };
     const addItem = (parent, { label, icon, tile, color, active, count, onClick }) => {
       const item = parent.createDiv({
-        cls: "wb-navitem" + (active ? " is-active" : "")
+        cls: "cl-navitem" + (active ? " is-active" : "")
       });
       item.setAttribute("aria-label", label);
       const iconEl = item.createDiv({
-        cls: "wb-navicon" + (tile ? " wb-navtile " + tile : "")
+        cls: "cl-navicon" + (tile ? " cl-navtile " + tile : "")
       });
       if (color)
         iconEl.style.setProperty("--tint", color);
       setIcon(iconEl, icon);
-      item.createDiv({ cls: "wb-navlabel", text: label });
+      item.createDiv({ cls: "cl-navlabel", text: label });
       if (count > 0)
-        item.createDiv({ cls: "wb-navcount", text: String(count) });
+        item.createDiv({ cls: "cl-navcount", text: String(count) });
       item.onclick = onClick;
       return item;
     };
@@ -20838,15 +20814,15 @@ var WorkbenchView = class extends ItemView {
       count: this.inboxFiles().length,
       onClick: () => this.go("inbox")
     });
-    const modules = navList.createDiv({ cls: "wb-navgroup" });
-    const capRow = modules.createDiv({ cls: "wb-navcap-row" });
-    capRow.createDiv({ cls: "wb-navcap", text: "MODULES" });
-    const capActs = capRow.createDiv({ cls: "wb-navcap-acts" });
-    const addModule = capActs.createDiv({ cls: "wb-navcap-btn" });
+    const modules = navList.createDiv({ cls: "cl-navgroup" });
+    const capRow = modules.createDiv({ cls: "cl-navcap-row" });
+    capRow.createDiv({ cls: "cl-navcap", text: "MODULES" });
+    const capActs = capRow.createDiv({ cls: "cl-navcap-acts" });
+    const addModule = capActs.createDiv({ cls: "cl-navcap-btn" });
     addModule.setAttribute("aria-label", "\u65B0\u5EFA\u6A21\u5757");
     setIcon(addModule, "plus");
     addModule.onclick = () => this.openModuleEditor(null);
-    const manageModule = capActs.createDiv({ cls: "wb-navcap-btn" });
+    const manageModule = capActs.createDiv({ cls: "cl-navcap-btn" });
     manageModule.setAttribute("aria-label", "\u7BA1\u7406\u6A21\u5757");
     setIcon(manageModule, "more-horizontal");
     manageModule.onclick = () => this.openModuleManager();
@@ -20854,7 +20830,7 @@ var WorkbenchView = class extends ItemView {
       addItem(modules, {
         label: mod.name,
         icon: mod.icon || "file",
-        tile: "wb-tint-" + index % 5,
+        tile: "cl-tint-" + index % 5,
         color: mod.color,
         active: this.active === mod.id,
         count: this.moduleFiles(mod).length,
@@ -20877,28 +20853,28 @@ var WorkbenchView = class extends ItemView {
       onClick: () => this.go("notes")
     });
     this.fillCardCount(cardsItem);
-    const foot = nav.createDiv({ cls: "wb-navfoot" });
-    const focusBtn = foot.createDiv({ cls: "wb-navitem" });
+    const foot = nav.createDiv({ cls: "cl-navfoot" });
+    const focusBtn = foot.createDiv({ cls: "cl-navitem" });
     focusBtn.setAttribute("aria-label", this.focus ? "\u9000\u51FA\u4E13\u6CE8" : "\u4E13\u6CE8\u6A21\u5F0F");
-    const focusIcon = focusBtn.createDiv({ cls: "wb-navicon" });
+    const focusIcon = focusBtn.createDiv({ cls: "cl-navicon" });
     setIcon(focusIcon, this.focus ? "minimize" : "maximize");
-    focusBtn.createDiv({ cls: "wb-navlabel", text: this.focus ? "\u9000\u51FA\u4E13\u6CE8" : "\u4E13\u6CE8\u6A21\u5F0F" });
+    focusBtn.createDiv({ cls: "cl-navlabel", text: this.focus ? "\u9000\u51FA\u4E13\u6CE8" : "\u4E13\u6CE8\u6A21\u5F0F" });
     focusBtn.onclick = () => this.setFocus(!this.focus);
-    const settingsBtn = foot.createDiv({ cls: "wb-navitem" });
+    const settingsBtn = foot.createDiv({ cls: "cl-navitem" });
     settingsBtn.setAttribute("aria-label", "\u8BBE\u7F6E");
-    const settingsIcon = settingsBtn.createDiv({ cls: "wb-navicon" });
+    const settingsIcon = settingsBtn.createDiv({ cls: "cl-navicon" });
     setIcon(settingsIcon, "settings");
-    settingsBtn.createDiv({ cls: "wb-navlabel", text: "\u8BBE\u7F6E" });
+    settingsBtn.createDiv({ cls: "cl-navlabel", text: "\u8BBE\u7F6E" });
     settingsBtn.onclick = () => this.openSettings();
-    foot.createDiv({ cls: "wb-navversion", text: "v" + this.plugin.manifest.version });
+    foot.createDiv({ cls: "cl-navversion", text: "v" + this.plugin.manifest.version });
   }
   renderHome(el) {
-    el.addClass("wb-hm-scroll");
-    const page = el.createDiv({ cls: "wb-hm-page" });
-    const aurora = page.createDiv({ cls: "wb-hm-aurora" });
-    aurora.createEl("i", { cls: "wb-hm-a1" });
-    aurora.createEl("i", { cls: "wb-hm-a2" });
-    aurora.createEl("i", { cls: "wb-hm-a3" });
+    el.addClass("cl-hm-scroll");
+    const page = el.createDiv({ cls: "cl-hm-page" });
+    const aurora = page.createDiv({ cls: "cl-hm-aurora" });
+    aurora.createEl("i", { cls: "cl-hm-a1" });
+    aurora.createEl("i", { cls: "cl-hm-a2" });
+    aurora.createEl("i", { cls: "cl-hm-a3" });
     const boards = this.getBoardFiles();
     const inbox = this.inboxFiles();
     const modules = this.getModules();
@@ -20909,54 +20885,54 @@ var WorkbenchView = class extends ItemView {
     const WEEKNAMES = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
     const MONTHNAMES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
     let captureInput = null;
-    const top = page.createDiv({ cls: "wb-hm-top" });
-    const crumb = top.createDiv({ cls: "wb-hm-crumb" });
+    const top = page.createDiv({ cls: "cl-hm-top" });
+    const crumb = top.createDiv({ cls: "cl-hm-crumb" });
     crumb.createEl("b", { text: "\u603B\u89C8" });
     crumb.createSpan({ text: " / \u9996\u9875" });
-    top.createDiv({ cls: "wb-hm-topspace" });
-    const cmd = top.createDiv({ cls: "wb-hm-cmd" });
-    setIcon(cmd.createDiv({ cls: "wb-hm-cmdico" }), "search");
+    top.createDiv({ cls: "cl-hm-topspace" });
+    const cmd = top.createDiv({ cls: "cl-hm-cmd" });
+    setIcon(cmd.createDiv({ cls: "cl-hm-cmdico" }), "search");
     cmd.createSpan({ text: "\u5FEB\u901F\u8BB0\u4E00\u6761" });
-    cmd.createDiv({ cls: "wb-hm-kbd", text: "\u21B5" });
+    cmd.createDiv({ cls: "cl-hm-kbd", text: "\u21B5" });
     cmd.onclick = () => {
       if (captureInput)
         captureInput.focus();
     };
-    const gear = top.createDiv({ cls: "wb-hm-iconbtn" });
+    const gear = top.createDiv({ cls: "cl-hm-iconbtn" });
     gear.setAttribute("aria-label", "\u8BBE\u7F6E");
     setIcon(gear, "settings");
     gear.onclick = () => this.openSettings();
     top.createDiv({
-      cls: "wb-hm-avatar",
+      cls: "cl-hm-avatar",
       text: workspaceName.slice(0, 2) || "C"
     });
-    const grid = page.createDiv({ cls: "wb-hm-bento" });
-    const hero = grid.createDiv({ cls: "wb-hm-card wb-hm-hero wb-hm-s5" });
-    hero.createDiv({ cls: "wb-hm-bigdate", text: String(now.getDate()) });
-    const heroTop = hero.createDiv({ cls: "wb-hm-herotop" });
-    heroTop.createDiv({ cls: "wb-hm-live" });
+    const grid = page.createDiv({ cls: "cl-hm-bento" });
+    const hero = grid.createDiv({ cls: "cl-hm-card cl-hm-hero cl-hm-s5" });
+    hero.createDiv({ cls: "cl-hm-bigdate", text: String(now.getDate()) });
+    const heroTop = hero.createDiv({ cls: "cl-hm-herotop" });
+    heroTop.createDiv({ cls: "cl-hm-live" });
     heroTop.createSpan({ text: WEEKNAMES[now.getDay()] + " \xB7 " + MONTHNAMES[now.getMonth()] + " " + now.getDate() });
-    const heroMid = hero.createDiv({ cls: "wb-hm-heromid" });
-    const hello = heroMid.createEl("h1", { cls: "wb-hm-hello" });
+    const heroMid = hero.createDiv({ cls: "cl-hm-heromid" });
+    const hello = heroMid.createEl("h1", { cls: "cl-hm-hello" });
     hello.createSpan({ text: greet + "\uFF0C" });
-    hello.createSpan({ cls: "wb-hm-gradtext", text: workspaceName });
-    const meta = heroMid.createDiv({ cls: "wb-hm-herometa" });
+    hello.createSpan({ cls: "cl-hm-gradtext", text: workspaceName });
+    const meta = heroMid.createDiv({ cls: "cl-hm-herometa" });
     const metaPart = (value, label) => {
       meta.createSpan({ text: "" }).createEl("b", { text: String(value) });
       meta.createSpan({ text: " " + label });
     };
     metaPart(modules.length, "\u4E2A\u6A21\u5757");
-    meta.createDiv({ cls: "wb-hm-sep" });
+    meta.createDiv({ cls: "cl-hm-sep" });
     metaPart(boards.length, "\u5757\u767D\u677F");
-    meta.createDiv({ cls: "wb-hm-sep" });
+    meta.createDiv({ cls: "cl-hm-sep" });
     metaPart(inbox.length, "\u6761\u5F85\u6574\u7406");
-    const capture = hero.createDiv({ cls: "wb-hm-capture" });
-    setIcon(capture.createDiv({ cls: "wb-hm-captico" }), "plus");
+    const capture = hero.createDiv({ cls: "cl-hm-capture" });
+    setIcon(capture.createDiv({ cls: "cl-hm-captico" }), "plus");
     captureInput = capture.createEl("input", {
-      cls: "wb-hm-captinput",
+      cls: "cl-hm-captinput",
       attr: { type: "text", placeholder: "\u8BB0\u4E00\u6761\u901F\u8BB0\uFF0C\u56DE\u8F66\u4FDD\u5B58\u2026" }
     });
-    const sendBtn = capture.createDiv({ cls: "wb-hm-go" });
+    const sendBtn = capture.createDiv({ cls: "cl-hm-go" });
     setIcon(sendBtn, "arrow-right");
     const submitCapture = async () => {
       const text = String(captureInput.value || "").trim();
@@ -20985,10 +20961,10 @@ var WorkbenchView = class extends ItemView {
       }
     });
     sendBtn.onclick = submitCapture;
-    const weekCard = grid.createDiv({ cls: "wb-hm-card wb-hm-week wb-hm-s4" });
-    const weekHead = weekCard.createDiv({ cls: "wb-hm-head" });
-    weekHead.createDiv({ cls: "wb-hm-title", text: "\u672C\u5468\u8282\u594F" });
-    weekHead.createDiv({ cls: "wb-hm-sub", text: "\u8FC7\u53BB 12 \u5468" });
+    const weekCard = grid.createDiv({ cls: "cl-hm-card cl-hm-week cl-hm-s4" });
+    const weekHead = weekCard.createDiv({ cls: "cl-hm-head" });
+    weekHead.createDiv({ cls: "cl-hm-title", text: "\u672C\u5468\u8282\u594F" });
+    weekHead.createDiv({ cls: "cl-hm-sub", text: "\u8FC7\u53BB 12 \u5468" });
     const dayMs = 864e5;
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -21010,14 +20986,14 @@ var WorkbenchView = class extends ItemView {
         prevCount += 1;
     }
     const trend = prevCount ? Math.round((recentCount - prevCount) / prevCount * 100) : null;
-    const weekNum = weekCard.createDiv({ cls: "wb-hm-weeknum" });
+    const weekNum = weekCard.createDiv({ cls: "cl-hm-weeknum" });
     weekNum.createEl("strong", { text: String(recentCount) });
     weekNum.createSpan({ text: "\u6B21\u7F16\u8F91" });
     const trendEl = weekNum.createDiv({
-      cls: "wb-hm-trend" + (trend !== null && trend < 0 ? " is-down" : ""),
+      cls: "cl-hm-trend" + (trend !== null && trend < 0 ? " is-down" : ""),
       text: trend === null ? "\u2014" : (trend > 0 ? "+" : "") + trend + "%"
     });
-    const heat = weekCard.createDiv({ cls: "wb-hm-heat" });
+    const heat = weekCard.createDiv({ cls: "cl-hm-heat" });
     const levels = [0, 1, 2, 4, 6];
     for (let i = 0; i < 84; i++) {
       const weekIndex = Math.floor(i / 7);
@@ -21037,45 +21013,45 @@ var WorkbenchView = class extends ItemView {
           cell.addClass("l" + level);
       }
     }
-    const heatFoot = weekCard.createDiv({ cls: "wb-hm-heatfoot" });
+    const heatFoot = weekCard.createDiv({ cls: "cl-hm-heatfoot" });
     heatFoot.createSpan({ text: "\u5C11" });
-    const legend = heatFoot.createDiv({ cls: "wb-hm-legend" });
+    const legend = heatFoot.createDiv({ cls: "cl-hm-legend" });
     for (let i = 0; i < 5; i++)
       legend.createEl("i", { cls: "l" + i });
     heatFoot.createSpan({ text: "\u591A" });
-    const inboxCard = grid.createDiv({ cls: "wb-hm-card wb-hm-inbox wb-hm-s3" });
-    const inboxHead = inboxCard.createDiv({ cls: "wb-hm-head" });
-    inboxHead.createDiv({ cls: "wb-hm-title", text: "\u6536\u4EF6\u7BB1" });
-    inboxHead.createDiv({ cls: "wb-hm-sub", text: "\u672A\u5F52\u5C5E" });
-    const inboxMore = inboxHead.createDiv({ cls: "wb-hm-more", text: "\u5168\u90E8 \u203A" });
+    const inboxCard = grid.createDiv({ cls: "cl-hm-card cl-hm-inbox cl-hm-s3" });
+    const inboxHead = inboxCard.createDiv({ cls: "cl-hm-head" });
+    inboxHead.createDiv({ cls: "cl-hm-title", text: "\u6536\u4EF6\u7BB1" });
+    inboxHead.createDiv({ cls: "cl-hm-sub", text: "\u672A\u5F52\u5C5E" });
+    const inboxMore = inboxHead.createDiv({ cls: "cl-hm-more", text: "\u5168\u90E8 \u203A" });
     inboxMore.onclick = () => this.go("inbox");
     const mdTotal = this.vaultFiles().length;
     const inboxMd = inbox.filter((f) => f.extension === "md").length;
     const handled = Math.max(0, mdTotal - inboxMd);
     const pct = mdTotal ? Math.max(6, Math.round(handled / mdTotal * 100)) : 100;
-    const ringWrap = inboxCard.createDiv({ cls: "wb-hm-ringwrap" });
-    const ring = ringWrap.createDiv({ cls: "wb-hm-ring" });
+    const ringWrap = inboxCard.createDiv({ cls: "cl-hm-ringwrap" });
+    const ring = ringWrap.createDiv({ cls: "cl-hm-ring" });
     ring.style.setProperty("--p", pct + "%");
     ring.createEl("b", { text: String(inbox.length) });
-    const ringSide = ringWrap.createDiv({ cls: "wb-hm-ringside" });
-    const ringK = ringSide.createDiv({ cls: "wb-hm-ringk" });
+    const ringSide = ringWrap.createDiv({ cls: "cl-hm-ringside" });
+    const ringK = ringSide.createDiv({ cls: "cl-hm-ringk" });
     ringK.createDiv({ text: "\u6761\u7B14\u8BB0" });
     ringK.createEl("strong", { text: "\u7B49\u4F60\u51B3\u5B9A\u53BB\u5411" });
     const first = inbox[0];
     const firstMod = first ? this.suggestModuleFor(first) : null;
     if (first) {
-      const item = inboxCard.createDiv({ cls: "wb-hm-inboxitem" });
-      item.createDiv({ cls: "wb-hm-inboxname", text: first.basename });
+      const item = inboxCard.createDiv({ cls: "cl-hm-inboxitem" });
+      item.createDiv({ cls: "cl-hm-inboxname", text: first.basename });
       if (firstMod) {
-        const pill = item.createDiv({ cls: "wb-hm-pill" });
-        pill.createDiv({ cls: "wb-hm-pilldot" });
+        const pill = item.createDiv({ cls: "cl-hm-pill" });
+        pill.createDiv({ cls: "cl-hm-pilldot" });
         pill.createSpan({ text: firstMod.name });
       }
       item.onclick = () => this.go("inbox");
     } else {
-      inboxCard.createDiv({ cls: "wb-hm-inboxempty", text: "\u6536\u4EF6\u7BB1\u5DF2\u6E05\u7A7A\uFF0C\u4ECA\u5929\u5F88\u5E72\u51C0\u3002" });
+      inboxCard.createDiv({ cls: "cl-hm-inboxempty", text: "\u6536\u4EF6\u7BB1\u5DF2\u6E05\u7A7A\uFF0C\u4ECA\u5929\u5F88\u5E72\u51C0\u3002" });
     }
-    const inboxLink = inboxCard.createDiv({ cls: "wb-hm-inboxlink" });
+    const inboxLink = inboxCard.createDiv({ cls: "cl-hm-inboxlink" });
     if (inbox.length) {
       inboxLink.createSpan({ text: "\u6309\u5EFA\u8BAE\u5F52\u5165 " });
       inboxLink.createEl("b", { text: inbox.length + " \u6761" });
@@ -21092,14 +21068,14 @@ var WorkbenchView = class extends ItemView {
       inboxLink.createSpan({ text: "\u6253\u5F00\u6536\u96C6\u7BB1 \u2192" });
       inboxLink.onclick = () => this.go("inbox");
     }
-    const resumeCard = grid.createDiv({ cls: "wb-hm-card wb-hm-s6" });
-    const resumeHead = resumeCard.createDiv({ cls: "wb-hm-head" });
-    resumeHead.createDiv({ cls: "wb-hm-title", text: "\u7EE7\u7EED" });
-    resumeHead.createDiv({ cls: "wb-hm-sub", text: "\u6700\u8FD1\u7F16\u8F91" });
-    const resumeGrid = resumeCard.createDiv({ cls: "wb-hm-resumes" });
+    const resumeCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s6" });
+    const resumeHead = resumeCard.createDiv({ cls: "cl-hm-head" });
+    resumeHead.createDiv({ cls: "cl-hm-title", text: "\u7EE7\u7EED" });
+    resumeHead.createDiv({ cls: "cl-hm-sub", text: "\u6700\u8FD1\u7F16\u8F91" });
+    const resumeGrid = resumeCard.createDiv({ cls: "cl-hm-resumes" });
     const recentFiles = [...this._contentFiles, ...boards].filter((file) => !/^未命名笔记/.test(file.basename)).filter((file) => !file.path.startsWith(CARD_FOLDER + "/")).sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, 4);
     if (!recentFiles.length) {
-      resumeGrid.createDiv({ cls: "wb-hm-empty", text: "\u8FD8\u6CA1\u6709\u53EF\u7EE7\u7EED\u7684\u5185\u5BB9\u3002" });
+      resumeGrid.createDiv({ cls: "cl-hm-empty", text: "\u8FD8\u6CA1\u6709\u53EF\u7EE7\u7EED\u7684\u5185\u5BB9\u3002" });
     }
     for (const file of recentFiles) {
       const isBoard = file.extension === "collis";
@@ -21108,29 +21084,29 @@ var WorkbenchView = class extends ItemView {
       const color = isBoard ? "#9b8cff" : mod && mod.color || "#3f7fd1";
       const fm = isBoard ? {} : getFm(this.app, file);
       const typeText = isBoard ? "BOARD" : fm && fm.status ? String(fm.status).toUpperCase() : "NOTE";
-      const cell = resumeGrid.createDiv({ cls: "wb-hm-file" });
+      const cell = resumeGrid.createDiv({ cls: "cl-hm-file" });
       cell.style.setProperty("--hm-c", color);
       cell.style.setProperty("--hm-cb", hmRgba(color, 0.16));
-      const cellTop = cell.createDiv({ cls: "wb-hm-filetop" });
-      const iconWrap = cellTop.createDiv({ cls: "wb-hm-fileico" });
+      const cellTop = cell.createDiv({ cls: "cl-hm-filetop" });
+      const iconWrap = cellTop.createDiv({ cls: "cl-hm-fileico" });
       setIcon(iconWrap, isBoard ? "presentation" : "file-text");
-      cellTop.createDiv({ cls: "wb-hm-filetype", text: typeText });
-      cell.createDiv({ cls: "wb-hm-filetree", text: file.basename });
-      const fileMeta = cell.createDiv({ cls: "wb-hm-filemeta" });
-      const modSpan = fileMeta.createDiv({ cls: "wb-hm-filemod" });
-      const dot = modSpan.createDiv({ cls: "wb-hm-filedot" });
+      cellTop.createDiv({ cls: "cl-hm-filetype", text: typeText });
+      cell.createDiv({ cls: "cl-hm-filetree", text: file.basename });
+      const fileMeta = cell.createDiv({ cls: "cl-hm-filemeta" });
+      const modSpan = fileMeta.createDiv({ cls: "cl-hm-filemod" });
+      const dot = modSpan.createDiv({ cls: "cl-hm-filedot" });
       dot.style.background = color;
       modSpan.createSpan({ text: isBoard ? "\u767D\u677F" : mod && mod.name || "\u672A\u5F52\u5C5E" });
-      fileMeta.createDiv({ cls: "wb-hm-filedtime", text: formatTime(file.stat.mtime) });
+      fileMeta.createDiv({ cls: "cl-hm-filedtime", text: formatTime(file.stat.mtime) });
       cell.onclick = () => this.openFile(file);
     }
-    const modCard = grid.createDiv({ cls: "wb-hm-card wb-hm-s6" });
-    const modHead = modCard.createDiv({ cls: "wb-hm-head" });
-    modHead.createDiv({ cls: "wb-hm-title", text: "\u6A21\u5757\u8109\u640F" });
-    modHead.createDiv({ cls: "wb-hm-sub", text: "\u6309\u6D3B\u8DC3\u5EA6" });
-    const modMore = modHead.createDiv({ cls: "wb-hm-more", text: "\u7BA1\u7406 \u203A" });
+    const modCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s6" });
+    const modHead = modCard.createDiv({ cls: "cl-hm-head" });
+    modHead.createDiv({ cls: "cl-hm-title", text: "\u6A21\u5757\u8109\u640F" });
+    modHead.createDiv({ cls: "cl-hm-sub", text: "\u6309\u6D3B\u8DC3\u5EA6" });
+    const modMore = modHead.createDiv({ cls: "cl-hm-more", text: "\u7BA1\u7406 \u203A" });
     modMore.onclick = () => this.openSettings();
-    const modGrid = modCard.createDiv({ cls: "wb-hm-mods" });
+    const modGrid = modCard.createDiv({ cls: "cl-hm-mods" });
     const ranked = modules.map((mod) => {
       const files = this.filesFor(mod);
       const active = files.filter(
@@ -21140,59 +21116,59 @@ var WorkbenchView = class extends ItemView {
     }).sort((a, b) => b.active - a.active || b.total - a.total).slice(0, 5);
     ranked.forEach((entry, index) => {
       const color = entry.mod.color || MODULE_COLORS[index % MODULE_COLORS.length];
-      const tile = modGrid.createDiv({ cls: "wb-hm-mod" });
+      const tile = modGrid.createDiv({ cls: "cl-hm-mod" });
       tile.style.setProperty("--hm-c", color);
       tile.style.setProperty("--hm-wash", hmRgba(color, 0.16));
-      const icon = tile.createDiv({ cls: "wb-hm-modico" });
+      const icon = tile.createDiv({ cls: "cl-hm-modico" });
       setIcon(icon, entry.mod.icon || "file");
-      tile.createDiv({ cls: "wb-hm-modname", text: entry.mod.name });
-      const row = tile.createDiv({ cls: "wb-hm-modrow" });
+      tile.createDiv({ cls: "cl-hm-modname", text: entry.mod.name });
+      const row = tile.createDiv({ cls: "cl-hm-modrow" });
       row.createEl("span", {
-        cls: "wb-hm-modcount",
+        cls: "cl-hm-modcount",
         text: String(entry.total).padStart(2, "0")
       });
-      row.createSpan({ cls: "wb-hm-modunit", text: "\u7BC7" });
-      row.createSpan({ cls: "wb-hm-modlive", text: entry.active + " \u8FDB\u884C\u4E2D" });
-      const bar = tile.createDiv({ cls: "wb-hm-modbar" });
+      row.createSpan({ cls: "cl-hm-modunit", text: "\u7BC7" });
+      row.createSpan({ cls: "cl-hm-modlive", text: entry.active + " \u8FDB\u884C\u4E2D" });
+      const bar = tile.createDiv({ cls: "cl-hm-modbar" });
       const fill = bar.createEl("i");
       fill.style.width = (entry.total ? Math.round(entry.active / entry.total * 100) : 0) + "%";
       tile.onclick = () => this.go(entry.mod.id);
     });
-    const addTile = modGrid.createDiv({ cls: "wb-hm-mod wb-hm-modadd" });
+    const addTile = modGrid.createDiv({ cls: "cl-hm-mod cl-hm-modadd" });
     setIcon(addTile.createDiv(), "plus");
     addTile.createSpan({ text: "\u65B0\u5EFA\u6A21\u5757" });
     addTile.onclick = () => this.openModuleEditor(null);
-    const boardCard = grid.createDiv({ cls: "wb-hm-card wb-hm-s7" });
-    const boardHead = boardCard.createDiv({ cls: "wb-hm-head" });
-    boardHead.createDiv({ cls: "wb-hm-title", text: "\u6700\u8FD1\u767D\u677F" });
-    boardHead.createDiv({ cls: "wb-hm-sub", text: boards.length + " \u5757" });
-    const boardMore = boardHead.createDiv({ cls: "wb-hm-more", text: "\u753B\u5E03\u96C6 \u203A" });
+    const boardCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s7" });
+    const boardHead = boardCard.createDiv({ cls: "cl-hm-head" });
+    boardHead.createDiv({ cls: "cl-hm-title", text: "\u6700\u8FD1\u767D\u677F" });
+    boardHead.createDiv({ cls: "cl-hm-sub", text: boards.length + " \u5757" });
+    const boardMore = boardHead.createDiv({ cls: "cl-hm-more", text: "\u753B\u5E03\u96C6 \u203A" });
     boardMore.onclick = () => this.openCollisGallery();
-    const boardGrid = boardCard.createDiv({ cls: "wb-hm-boards" });
+    const boardGrid = boardCard.createDiv({ cls: "cl-hm-boards" });
     const boardEls = [];
     boards.slice(0, 3).forEach((file, index) => {
-      const board = boardGrid.createDiv({ cls: "wb-hm-board" });
-      const art = board.createDiv({ cls: "wb-hm-art" });
+      const board = boardGrid.createDiv({ cls: "cl-hm-board" });
+      const art = board.createDiv({ cls: "cl-hm-art" });
       this.renderBoardArt(art, index % 3);
-      board.createDiv({ cls: "wb-hm-shade" });
-      const badge = board.createDiv({ cls: "wb-hm-badge", text: "\u8BFB\u53D6\u4E2D\u2026" });
-      const info = board.createDiv({ cls: "wb-hm-boardinfo" });
-      info.createDiv({ cls: "wb-hm-boardname", text: file.basename });
-      const metaEl = info.createDiv({ cls: "wb-hm-boardmeta", text: "\u8BFB\u53D6\u4E2D\u2026" });
+      board.createDiv({ cls: "cl-hm-shade" });
+      const badge = board.createDiv({ cls: "cl-hm-badge", text: "\u8BFB\u53D6\u4E2D\u2026" });
+      const info = board.createDiv({ cls: "cl-hm-boardinfo" });
+      info.createDiv({ cls: "cl-hm-boardname", text: file.basename });
+      const metaEl = info.createDiv({ cls: "cl-hm-boardmeta", text: "\u8BFB\u53D6\u4E2D\u2026" });
       board.onclick = () => this.openFile(file);
       boardEls.push({ file, badge, metaEl });
     });
     if (!boards.length) {
-      boardGrid.createDiv({ cls: "wb-hm-empty", text: "\u8FD8\u6CA1\u6709\u767D\u677F\uFF0C\u53BB\u753B\u5E03\u96C6\u65B0\u5EFA\u4E00\u5F20\u3002" });
+      boardGrid.createDiv({ cls: "cl-hm-empty", text: "\u8FD8\u6CA1\u6709\u767D\u677F\uFF0C\u53BB\u753B\u5E03\u96C6\u65B0\u5EFA\u4E00\u5F20\u3002" });
     }
-    const noteCard = grid.createDiv({ cls: "wb-hm-card wb-hm-s5" });
-    const noteHead = noteCard.createDiv({ cls: "wb-hm-head" });
-    noteHead.createDiv({ cls: "wb-hm-title", text: "\u901F\u8BB0" });
-    noteHead.createDiv({ cls: "wb-hm-sub", text: (this._cardCount || 0) + " \u6761\u5361\u7247" });
-    const noteMore = noteHead.createDiv({ cls: "wb-hm-more", text: "\u6253\u5F00 \u203A" });
+    const noteCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s5" });
+    const noteHead = noteCard.createDiv({ cls: "cl-hm-head" });
+    noteHead.createDiv({ cls: "cl-hm-title", text: "\u901F\u8BB0" });
+    noteHead.createDiv({ cls: "cl-hm-sub", text: (this._cardCount || 0) + " \u6761\u5361\u7247" });
+    const noteMore = noteHead.createDiv({ cls: "cl-hm-more", text: "\u6253\u5F00 \u203A" });
     noteMore.onclick = () => this.go("notes");
-    const noteWrap = noteCard.createDiv({ cls: "wb-hm-notes" });
-    page.createDiv({ cls: "wb-hm-foot", text: "\u6570\u636E\u5B9E\u65F6\u8BFB\u53D6 \xB7 Collis v" + this.plugin.manifest.version });
+    const noteWrap = noteCard.createDiv({ cls: "cl-hm-notes" });
+    page.createDiv({ cls: "cl-hm-foot", text: "\u6570\u636E\u5B9E\u65F6\u8BFB\u53D6 \xB7 Collis v" + this.plugin.manifest.version });
     this.fillHomeBoards(boardEls);
     this.fillHomeCards(noteWrap);
   }
@@ -21264,31 +21240,31 @@ var WorkbenchView = class extends ItemView {
     container.empty();
     if (!cards.length) {
       container.createDiv({
-        cls: "wb-hm-empty",
+        cls: "cl-hm-empty",
         text: "\u8FD8\u6CA1\u6709\u901F\u8BB0\u5361\u7247\u3002\u5728\u4E0A\u9762\u8BB0\u4E00\u6761\uFF0C\u5B83\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC\u3002"
       });
       return;
     }
     for (const card of cards) {
-      const row = container.createDiv({ cls: "wb-hm-note" });
-      const meta = row.createDiv({ cls: "wb-hm-notedate" });
+      const row = container.createDiv({ cls: "cl-hm-note" });
+      const meta = row.createDiv({ cls: "cl-hm-notedate" });
       meta.createSpan({ text: card.date ? card.date.slice(5) : "" });
       if (card.time)
         meta.createSpan({ text: " " + card.time });
-      row.createDiv({ cls: "wb-hm-notetext", text: card.text });
+      row.createDiv({ cls: "cl-hm-notetext", text: card.text });
       if (card.tags && card.tags.length) {
-        row.createDiv({ cls: "wb-hm-notetag", text: "#" + card.tags[0] });
+        row.createDiv({ cls: "cl-hm-notetag", text: "#" + card.tags[0] });
       }
       row.onclick = () => this.openCardInNotes(card);
     }
   }
   makePanel(parent, title, actionText, onAction) {
-    const panel = parent.createDiv({ cls: "wb-panel" });
-    const head = panel.createDiv({ cls: "wb-panel-head" });
-    head.createDiv({ cls: "wb-panel-title", text: title });
-    head.createDiv({ cls: "wb-spacer" });
+    const panel = parent.createDiv({ cls: "cl-panel" });
+    const head = panel.createDiv({ cls: "cl-panel-head" });
+    head.createDiv({ cls: "cl-panel-title", text: title });
+    head.createDiv({ cls: "cl-spacer" });
     if (actionText) {
-      const action = head.createDiv({ cls: "wb-panel-action", text: actionText });
+      const action = head.createDiv({ cls: "cl-panel-action", text: actionText });
       if (onAction)
         action.onclick = onAction;
     }
@@ -21323,13 +21299,13 @@ var WorkbenchView = class extends ItemView {
       return;
     container.empty();
     if (!tasks.length) {
-      container.createDiv({ cls: "wb-empty", text: "\u6CA1\u6709\u672A\u5B8C\u6210\u4EFB\u52A1\uFF0C\u6536\u4EF6\u7BB1\u662F\u7A7A\u7684\u3002" });
+      container.createDiv({ cls: "cl-empty", text: "\u6CA1\u6709\u672A\u5B8C\u6210\u4EFB\u52A1\uFF0C\u6536\u4EF6\u7BB1\u662F\u7A7A\u7684\u3002" });
       return;
     }
     for (const task of tasks) {
-      const row = container.createDiv({ cls: "wb-task" });
-      row.createDiv({ cls: "wb-check" });
-      row.createDiv({ cls: "wb-task-text", text: task.text });
+      const row = container.createDiv({ cls: "cl-task" });
+      row.createDiv({ cls: "cl-check" });
+      row.createDiv({ cls: "cl-task-text", text: task.text });
       row.onclick = () => this.openFile(task.file);
     }
   }
@@ -21340,21 +21316,21 @@ var WorkbenchView = class extends ItemView {
     container.empty();
     if (!cards.length) {
       container.createDiv({
-        cls: "wb-empty",
+        cls: "cl-empty",
         text: "\u8FD8\u6CA1\u6709\u901F\u8BB0\u5361\u7247\u3002\u7528 Collis \u8BB0\u4E00\u6761\uFF0C\u5B83\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC\u3002"
       });
       return;
     }
     for (const card of cards) {
-      const row = container.createDiv({ cls: "wb-feed" });
-      const meta = row.createDiv({ cls: "wb-feed-meta" });
-      meta.createSpan({ cls: "wb-feed-date", text: card.date ? card.date.slice(5) : "" });
-      meta.createSpan({ cls: "wb-feed-time", text: card.time });
-      row.createDiv({ cls: "wb-feed-text", text: card.text });
+      const row = container.createDiv({ cls: "cl-feed" });
+      const meta = row.createDiv({ cls: "cl-feed-meta" });
+      meta.createSpan({ cls: "cl-feed-date", text: card.date ? card.date.slice(5) : "" });
+      meta.createSpan({ cls: "cl-feed-time", text: card.time });
+      row.createDiv({ cls: "cl-feed-text", text: card.text });
       if (card.tags.length) {
-        const tagRow = row.createDiv({ cls: "wb-feed-tags" });
+        const tagRow = row.createDiv({ cls: "cl-feed-tags" });
         card.tags.slice(0, 3).forEach((tag) => {
-          tagRow.createSpan({ cls: "wb-tag", text: "#" + tag });
+          tagRow.createSpan({ cls: "cl-tag", text: "#" + tag });
         });
       }
       row.onclick = () => this.openCard(card);
@@ -21365,18 +21341,18 @@ var WorkbenchView = class extends ItemView {
     container.empty();
     if (!boards.length) {
       container.createDiv({
-        cls: "wb-empty",
+        cls: "cl-empty",
         text: "\u8FD8\u6CA1\u6709 .collis \u767D\u677F\u3002\u53BB\u753B\u5E03\u96C6\u65B0\u5EFA\u4E00\u5F20\u3002"
       });
       return;
     }
     for (const file of boards) {
-      const row = container.createDiv({ cls: "wb-board-row" });
-      const icon = row.createDiv({ cls: "wb-board-icon" });
+      const row = container.createDiv({ cls: "cl-board-row" });
+      const icon = row.createDiv({ cls: "cl-board-icon" });
       setIcon(icon, "presentation");
-      const info = row.createDiv({ cls: "wb-board-info" });
-      info.createDiv({ cls: "wb-board-name", text: file.basename });
-      const sub = info.createDiv({ cls: "wb-board-sub", text: "\u8BFB\u53D6\u4E2D\u2026" });
+      const info = row.createDiv({ cls: "cl-board-info" });
+      info.createDiv({ cls: "cl-board-name", text: file.basename });
+      const sub = info.createDiv({ cls: "cl-board-sub", text: "\u8BFB\u53D6\u4E2D\u2026" });
       row.onclick = () => this.openFile(file);
       this.readBoard(file).then((data) => {
         if (sub.isConnected)
@@ -21399,46 +21375,46 @@ var WorkbenchView = class extends ItemView {
       if (mod)
         suggestions.set(f.path, mod);
     });
-    el.addClass("wb-inbox-scroll");
-    const page = el.createDiv({ cls: "wb-inbox-page" });
-    const head = page.createDiv({ cls: "wb-inbox-head" });
-    const headMain = head.createDiv({ cls: "wb-inbox-head-main" });
-    const titleRow = headMain.createDiv({ cls: "wb-inbox-title-row" });
+    el.addClass("cl-inbox-scroll");
+    const page = el.createDiv({ cls: "cl-inbox-page" });
+    const head = page.createDiv({ cls: "cl-inbox-head" });
+    const headMain = head.createDiv({ cls: "cl-inbox-head-main" });
+    const titleRow = headMain.createDiv({ cls: "cl-inbox-title-row" });
     titleRow.createEl("h1", { text: "\u6536\u4EF6\u7BB1" });
     if (files.length) {
-      titleRow.createDiv({ cls: "wb-inbox-count", text: files.length + " \u5F85\u5904\u7406" });
+      titleRow.createDiv({ cls: "cl-inbox-count", text: files.length + " \u5F85\u5904\u7406" });
     }
     headMain.createDiv({
-      cls: "wb-inbox-sub",
+      cls: "cl-inbox-sub",
       text: "\u6563\u843D\u5728\u5E93\u91CC\u7684\u7B14\u8BB0\u548C\u7D20\u6750\uFF0C\u5F52\u5165\u6A21\u5757\u540E\u81EA\u52A8\u79BB\u5F00"
     });
-    const headActions = head.createDiv({ cls: "wb-inbox-head-actions" });
-    const refreshBtn = headActions.createEl("button", { cls: "wb-inbox-refresh" });
+    const headActions = head.createDiv({ cls: "cl-inbox-head-actions" });
+    const refreshBtn = headActions.createEl("button", { cls: "cl-inbox-refresh" });
     setIcon(refreshBtn, "refresh-cw");
     refreshBtn.setAttribute("aria-label", "\u5237\u65B0\u6536\u4EF6\u7BB1");
     refreshBtn.onclick = () => this.refresh();
     const weekCount = files.filter(
       (f) => Date.now() - f.stat.mtime < 7 * 864e5
     ).length;
-    const stats = page.createDiv({ cls: "wb-inbox-stats" });
+    const stats = page.createDiv({ cls: "cl-inbox-stats" });
     [
       ["\u5F85\u5F52\u5C5E", files.length],
       ["\u6709\u5F52\u5C5E\u5EFA\u8BAE", suggestions.size],
       ["\u672C\u5468\u65B0\u589E", weekCount]
     ].forEach(([label, value]) => {
-      const cell = stats.createDiv({ cls: "wb-inbox-stat" });
-      cell.createDiv({ cls: "wb-inbox-stat-value", text: String(value) });
-      cell.createDiv({ cls: "wb-inbox-stat-label", text: label });
+      const cell = stats.createDiv({ cls: "cl-inbox-stat" });
+      cell.createDiv({ cls: "cl-inbox-stat-value", text: String(value) });
+      cell.createDiv({ cls: "cl-inbox-stat-label", text: label });
     });
-    const controls = page.createDiv({ cls: "wb-inbox-controls" });
-    const search = controls.createDiv({ cls: "wb-inbox-search" });
-    setIcon(search.createDiv({ cls: "wb-inbox-searchico" }), "search");
+    const controls = page.createDiv({ cls: "cl-inbox-controls" });
+    const search = controls.createDiv({ cls: "cl-inbox-search" });
+    setIcon(search.createDiv({ cls: "cl-inbox-searchico" }), "search");
     const query = search.createEl("input", {
-      cls: "wb-inbox-query",
+      cls: "cl-inbox-query",
       attr: { type: "text", placeholder: "\u7B5B\u9009\u6807\u9898\u6216\u8DEF\u5F84" }
     });
     query.value = this._inboxQuery || "";
-    const seg = controls.createDiv({ cls: "wb-inbox-seg" });
+    const seg = controls.createDiv({ cls: "cl-inbox-seg" });
     const kinds = [
       ["all", "\u5168\u90E8"],
       ["note", "\u7B14\u8BB0"],
@@ -21450,7 +21426,7 @@ var WorkbenchView = class extends ItemView {
     ];
     const segButtons = /* @__PURE__ */ new Map();
     kinds.forEach(([key, label]) => {
-      const btn = seg.createEl("button", { cls: "wb-inbox-segbtn", text: label });
+      const btn = seg.createEl("button", { cls: "cl-inbox-segbtn", text: label });
       btn.onclick = () => {
         this._inboxFilter = key;
         segButtons.forEach((b, k) => b.classList.toggle("is-active", k === key));
@@ -21461,13 +21437,13 @@ var WorkbenchView = class extends ItemView {
     if (!this._inboxFilter)
       this._inboxFilter = "all";
     segButtons.get(this._inboxFilter).classList.add("is-active");
-    const viewSeg = controls.createDiv({ cls: "wb-inbox-viewseg" });
+    const viewSeg = controls.createDiv({ cls: "cl-inbox-viewseg" });
     const viewButtons = /* @__PURE__ */ new Map();
     [
       ["list", "\u5217\u8868"],
       ["grid", "\u7F51\u683C"]
     ].forEach(([key, label]) => {
-      const btn = viewSeg.createEl("button", { cls: "wb-inbox-segbtn", text: label });
+      const btn = viewSeg.createEl("button", { cls: "cl-inbox-segbtn", text: label });
       btn.onclick = () => {
         this._inboxView = key;
         syncView();
@@ -21482,12 +21458,12 @@ var WorkbenchView = class extends ItemView {
       viewButtons.forEach((btn, key) => btn.classList.toggle("is-active", key === mode));
     };
     syncView();
-    const sortWrap = controls.createDiv({ cls: "wb-inbox-sort" });
-    const sortBtn = sortWrap.createEl("button", { cls: "wb-inbox-sortbtn" });
+    const sortWrap = controls.createDiv({ cls: "cl-inbox-sort" });
+    const sortBtn = sortWrap.createEl("button", { cls: "cl-inbox-sortbtn" });
     const sortLabel = sortBtn.createSpan({
       text: (this._inboxSort || "recent") === "name" ? "\u540D\u79F0" : "\u6700\u8FD1\u66F4\u65B0"
     });
-    setIcon(sortBtn.createSpan({ cls: "wb-inbox-sortico" }), "chevron-down");
+    setIcon(sortBtn.createSpan({ cls: "cl-inbox-sortico" }), "chevron-down");
     sortBtn.onclick = () => {
       const menu = new Menu();
       [["recent", "\u6700\u8FD1\u66F4\u65B0"], ["name", "\u540D\u79F0"]].forEach(([value, label]) => {
@@ -21501,30 +21477,30 @@ var WorkbenchView = class extends ItemView {
       });
       anchorMenuBelow(menu, sortBtn);
     };
-    const banners = page.createDiv({ cls: "wb-inbox-banners" });
-    const bulk = page.createDiv({ cls: "wb-inbox-bulk" });
+    const banners = page.createDiv({ cls: "cl-inbox-banners" });
+    const bulk = page.createDiv({ cls: "cl-inbox-bulk" });
     bulk.hidden = true;
-    const bulkLabel = bulk.createSpan({ cls: "wb-inbox-bulkcount" });
-    setIcon(bulkLabel.createSpan({ cls: "wb-inbox-bulkico" }), "check");
+    const bulkLabel = bulk.createSpan({ cls: "cl-inbox-bulkcount" });
+    setIcon(bulkLabel.createSpan({ cls: "cl-inbox-bulkico" }), "check");
     bulkLabel.createSpan({ text: "\u5DF2\u9009 " });
     const bulkNum = bulkLabel.createEl("b", { text: "0" });
     bulkLabel.createSpan({ text: " \u9879" });
-    bulk.createDiv({ cls: "wb-inbox-bulkspace" });
+    bulk.createDiv({ cls: "cl-inbox-bulkspace" });
     const bulkAssign = bulk.createEl("button", {
-      cls: "wb-btn wb-btn-accent",
+      cls: "cl-btn cl-btn-accent",
       text: "\u5F52\u5165\u9009\u4E2D"
     });
     const bulkDelete = bulk.createEl("button", {
-      cls: "wb-btn wb-inbox-danger",
+      cls: "cl-btn cl-inbox-danger",
       text: "\u5220\u9664\u9009\u4E2D"
     });
-    const list = page.createDiv({ cls: "wb-inbox-list" });
-    const foot = page.createDiv({ cls: "wb-inbox-foot" });
+    const list = page.createDiv({ cls: "cl-inbox-list" });
+    const foot = page.createDiv({ cls: "cl-inbox-foot" });
     foot.createSpan({
       text: "\u5168\u5E93\u626B\u63CF " + (this.vaultFiles().length + this.vaultAttachments().length) + " \u4E2A\u6587\u4EF6 \xB7 \u81EA\u52A8\u6392\u9664\u767D\u677F\u3001\u5361\u7247\u7B14\u8BB0\u4E0E\u6280\u672F\u76EE\u5F55"
     });
     foot.createSpan({
-      cls: "wb-inbox-footright",
+      cls: "cl-inbox-footright",
       text: "\u5171 " + files.length + " \u6761\u5F85\u5904\u7406"
     });
     const selectedFiles = () => files.filter((f) => this._inboxSel.has(f.path));
@@ -21584,14 +21560,14 @@ var WorkbenchView = class extends ItemView {
       bulkDelete.disabled = n === 0;
     };
     const renderGrid = (parent, items) => {
-      const grid = parent.createDiv({ cls: "wb-md-grid" });
+      const grid = parent.createDiv({ cls: "cl-md-grid" });
       items.forEach((file) => {
         const info = typeInfo(file);
         const selected = this._inboxSel.has(file.path);
         const tile = grid.createDiv({
-          cls: "wb-md-tile wb-inbox-tile wb-md-kind-" + info.key + (selected ? " is-selected" : "")
+          cls: "cl-md-tile cl-inbox-tile cl-md-kind-" + info.key + (selected ? " is-selected" : "")
         });
-        const thumb = tile.createDiv({ cls: "wb-md-thumb" });
+        const thumb = tile.createDiv({ cls: "cl-md-thumb" });
         if (info.key === "note") {
           paintNoteThumb(this.app, thumb, file);
         } else if (info.key === "image" || info.key === "video") {
@@ -21599,7 +21575,7 @@ var WorkbenchView = class extends ItemView {
         } else {
           setIcon(thumb, info.icon);
         }
-        const check = tile.createDiv({ cls: "wb-inbox-tilecheck" });
+        const check = tile.createDiv({ cls: "cl-inbox-tilecheck" });
         const box = check.createEl("input", {
           attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + file.basename }
         });
@@ -21613,19 +21589,19 @@ var WorkbenchView = class extends ItemView {
           tile.classList.toggle("is-selected", box.checked);
           updateBulk();
         };
-        tile.createDiv({ cls: "wb-md-tilename", text: file.basename });
-        const tileMeta = tile.createDiv({ cls: "wb-md-tilemeta" });
+        tile.createDiv({ cls: "cl-md-tilename", text: file.basename });
+        const tileMeta = tile.createDiv({ cls: "cl-md-tilemeta" });
         tileMeta.createSpan({ text: THUMB_KIND_LABELS[info.key] || "\u6587\u4EF6" });
         tileMeta.createSpan({ text: formatTime(file.stat.mtime) });
         const suggest = suggestions.get(file.path);
         if (suggest) {
-          const sug = tile.createDiv({ cls: "wb-inbox-tilesug" });
-          const chip = sug.createSpan({ cls: "wb-inbox-suggest" });
-          const dot = chip.createSpan({ cls: "wb-inbox-dot" });
+          const sug = tile.createDiv({ cls: "cl-inbox-tilesug" });
+          const chip = sug.createSpan({ cls: "cl-inbox-suggest" });
+          const dot = chip.createSpan({ cls: "cl-inbox-dot" });
           dot.style.setProperty("--dot", suggest.color || "var(--interactive-accent)");
           chip.createSpan({ text: "\u5EFA\u8BAE \xB7 " + suggest.name });
           const accept = sug.createEl("button", {
-            cls: "wb-inbox-adopt",
+            cls: "cl-inbox-adopt",
             attr: { "aria-label": "\u91C7\u7EB3\u5EFA\u8BAE\uFF1A" + suggest.name }
           });
           setIcon(accept, "check");
@@ -21634,9 +21610,9 @@ var WorkbenchView = class extends ItemView {
             this.assignToModule([file], suggest);
           };
         }
-        const acts = tile.createDiv({ cls: "wb-inbox-tileacts" });
+        const acts = tile.createDiv({ cls: "cl-inbox-tileacts" });
         if (file.extension === "md") {
-          const assign = acts.createEl("button", { cls: "wb-inbox-act" });
+          const assign = acts.createEl("button", { cls: "cl-inbox-act" });
           setIcon(assign, "folder");
           assign.setAttribute("aria-label", "\u5F52\u5165\u6A21\u5757");
           assign.onclick = (evt) => {
@@ -21644,14 +21620,14 @@ var WorkbenchView = class extends ItemView {
             this.openModulePicker([file]);
           };
         }
-        const open = acts.createEl("button", { cls: "wb-inbox-act" });
+        const open = acts.createEl("button", { cls: "cl-inbox-act" });
         setIcon(open, "corner-up-right");
         open.setAttribute("aria-label", "\u6253\u5F00");
         open.onclick = (evt) => {
           evt.stopPropagation();
           this.openFile(file);
         };
-        const remove = acts.createEl("button", { cls: "wb-inbox-act is-danger" });
+        const remove = acts.createEl("button", { cls: "cl-inbox-act is-danger" });
         setIcon(remove, "trash-2");
         remove.setAttribute("aria-label", "\u5220\u9664");
         remove.onclick = (evt) => {
@@ -21672,26 +21648,26 @@ var WorkbenchView = class extends ItemView {
       const gridMode = (this._inboxView || "list") === "grid";
       list.classList.toggle("is-grid", gridMode);
       if (!files.length) {
-        const empty = list.createDiv({ cls: "wb-inbox-empty" });
-        const art = empty.createDiv({ cls: "wb-inbox-emptyart" });
+        const empty = list.createDiv({ cls: "cl-inbox-empty" });
+        const art = empty.createDiv({ cls: "cl-inbox-emptyart" });
         setIcon(art, "inbox");
         empty.createEl("h2", { text: "\u6536\u4EF6\u7BB1\u5DF2\u6E05\u7A7A" });
         empty.createDiv({
-          cls: "wb-inbox-emptysub",
+          cls: "cl-inbox-emptysub",
           text: "\u6240\u6709\u7B14\u8BB0\u90FD\u5DF2\u5F52\u5165\u6A21\u5757\u3002\u65B0\u7684\u6563\u843D\u6587\u4EF6\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u8FD9\u91CC\u3002"
         });
-        const acts = empty.createDiv({ cls: "wb-inbox-emptyacts" });
-        const home = acts.createEl("button", { cls: "wb-btn wb-btn-accent", text: "\u56DE\u5230\u9996\u9875" });
+        const acts = empty.createDiv({ cls: "cl-inbox-emptyacts" });
+        const home = acts.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u56DE\u5230\u9996\u9875" });
         home.onclick = () => this.go("home");
-        const again = acts.createEl("button", { cls: "wb-btn", text: "\u5237\u65B0" });
+        const again = acts.createEl("button", { cls: "cl-btn", text: "\u5237\u65B0" });
         again.onclick = () => this.refresh();
         updateBulk();
         return;
       }
       if (!current.length) {
-        const none = list.createDiv({ cls: "wb-inbox-nomatch" });
+        const none = list.createDiv({ cls: "cl-inbox-nomatch" });
         none.createSpan({ text: "\u6CA1\u6709\u5339\u914D\u7684\u6761\u76EE" });
-        const clear = none.createEl("button", { cls: "wb-inbox-clear", text: "\u6E05\u9664\u7B5B\u9009" });
+        const clear = none.createEl("button", { cls: "cl-inbox-clear", text: "\u6E05\u9664\u7B5B\u9009" });
         clear.onclick = () => {
           this._inboxQuery = "";
           this._inboxFilter = "all";
@@ -21714,17 +21690,17 @@ var WorkbenchView = class extends ItemView {
       buckets.forEach(([label, items]) => {
         if (!items.length)
           return;
-        const group = list.createDiv({ cls: "wb-inbox-group" });
-        const groupHead = group.createDiv({ cls: "wb-inbox-group-head" });
-        groupHead.createSpan({ cls: "wb-inbox-group-name", text: label });
-        groupHead.createSpan({ cls: "wb-inbox-group-count", text: String(items.length) });
-        groupHead.createSpan({ cls: "wb-inbox-group-line" });
+        const group = list.createDiv({ cls: "cl-inbox-group" });
+        const groupHead = group.createDiv({ cls: "cl-inbox-group-head" });
+        groupHead.createSpan({ cls: "cl-inbox-group-name", text: label });
+        groupHead.createSpan({ cls: "cl-inbox-group-count", text: String(items.length) });
+        groupHead.createSpan({ cls: "cl-inbox-group-line" });
         items.forEach((file) => {
           const selected = this._inboxSel.has(file.path);
           const card = group.createDiv({
-            cls: "wb-inbox-card" + (selected ? " is-selected" : "")
+            cls: "cl-inbox-card" + (selected ? " is-selected" : "")
           });
-          const check = card.createDiv({ cls: "wb-inbox-check" });
+          const check = card.createDiv({ cls: "cl-inbox-check" });
           const box = check.createEl("input", {
             attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + file.basename }
           });
@@ -21739,20 +21715,20 @@ var WorkbenchView = class extends ItemView {
             updateBulk();
           };
           const info = typeInfo(file);
-          const ico = card.createDiv({ cls: "wb-inbox-type is-" + info.key });
+          const ico = card.createDiv({ cls: "cl-inbox-type is-" + info.key });
           setIcon(ico, info.icon);
-          const main = card.createDiv({ cls: "wb-inbox-main" });
-          main.createDiv({ cls: "wb-inbox-name", text: file.basename });
-          main.createDiv({ cls: "wb-inbox-path", text: file.path });
-          const swap = card.createDiv({ cls: "wb-inbox-suggestwrap" });
+          const main = card.createDiv({ cls: "cl-inbox-main" });
+          main.createDiv({ cls: "cl-inbox-name", text: file.basename });
+          main.createDiv({ cls: "cl-inbox-path", text: file.path });
+          const swap = card.createDiv({ cls: "cl-inbox-suggestwrap" });
           const suggest = suggestions.get(file.path);
           if (suggest) {
-            const chip = swap.createSpan({ cls: "wb-inbox-suggest" });
-            const dot = chip.createSpan({ cls: "wb-inbox-dot" });
+            const chip = swap.createSpan({ cls: "cl-inbox-suggest" });
+            const dot = chip.createSpan({ cls: "cl-inbox-dot" });
             dot.style.setProperty("--dot", suggest.color || "var(--interactive-accent)");
             chip.createSpan({ text: "\u5EFA\u8BAE \xB7 " + suggest.name });
             const accept = swap.createEl("button", {
-              cls: "wb-inbox-adopt",
+              cls: "cl-inbox-adopt",
               attr: { "aria-label": "\u91C7\u7EB3\u5EFA\u8BAE\uFF1A" + suggest.name }
             });
             setIcon(accept, "check");
@@ -21761,12 +21737,12 @@ var WorkbenchView = class extends ItemView {
               this.assignToModule([file], suggest);
             };
           } else {
-            swap.createSpan({ cls: "wb-inbox-nosug", text: "\u6682\u65E0\u5EFA\u8BAE" });
+            swap.createSpan({ cls: "cl-inbox-nosug", text: "\u6682\u65E0\u5EFA\u8BAE" });
           }
-          card.createDiv({ cls: "wb-inbox-time", text: formatTime(file.stat.mtime) });
-          const acts = card.createDiv({ cls: "wb-inbox-actions" });
+          card.createDiv({ cls: "cl-inbox-time", text: formatTime(file.stat.mtime) });
+          const acts = card.createDiv({ cls: "cl-inbox-actions" });
           if (file.extension === "md") {
-            const assign = acts.createEl("button", { cls: "wb-inbox-act" });
+            const assign = acts.createEl("button", { cls: "cl-inbox-act" });
             setIcon(assign, "folder");
             assign.setAttribute("aria-label", "\u5F52\u5165\u6A21\u5757");
             assign.onclick = (evt) => {
@@ -21774,14 +21750,14 @@ var WorkbenchView = class extends ItemView {
               this.openModulePicker([file]);
             };
           }
-          const open = acts.createEl("button", { cls: "wb-inbox-act" });
+          const open = acts.createEl("button", { cls: "cl-inbox-act" });
           setIcon(open, "corner-up-right");
           open.setAttribute("aria-label", "\u6253\u5F00");
           open.onclick = (evt) => {
             evt.stopPropagation();
             this.openFile(file);
           };
-          const remove = acts.createEl("button", { cls: "wb-inbox-act is-danger" });
+          const remove = acts.createEl("button", { cls: "cl-inbox-act is-danger" });
           setIcon(remove, "trash-2");
           remove.setAttribute("aria-label", "\u5220\u9664");
           remove.onclick = (evt) => {
@@ -21799,20 +21775,20 @@ var WorkbenchView = class extends ItemView {
   renderUnknownBanners(el) {
     const groups = this.unknownModuleValues();
     groups.forEach((groupFiles, value) => {
-      const banner = el.createDiv({ cls: "wb-banner" });
+      const banner = el.createDiv({ cls: "cl-banner" });
       banner.createDiv({
-        cls: "wb-banner-text",
+        cls: "cl-banner-text",
         text: "\u672A\u77E5\u6A21\u5757\u503C\u300C" + value + "\u300D\xB7 " + groupFiles.length + " \u7BC7"
       });
-      const actions = banner.createDiv({ cls: "wb-banner-actions" });
+      const actions = banner.createDiv({ cls: "cl-banner-actions" });
       const create = actions.createEl("button", {
-        cls: "wb-btn wb-btn-accent",
+        cls: "cl-btn cl-btn-accent",
         text: "\u65B0\u5EFA\u6A21\u5757"
       });
       create.onclick = () => this.openModuleEditor(null, value);
-      const pick = actions.createEl("button", { cls: "wb-btn", text: "\u5F52\u5165\u73B0\u6709\u6A21\u5757" });
+      const pick = actions.createEl("button", { cls: "cl-btn", text: "\u5F52\u5165\u73B0\u6709\u6A21\u5757" });
       pick.onclick = () => this.openModulePicker(groupFiles);
-      const ignore = actions.createEl("button", { cls: "wb-btn", text: "\u5FFD\u7565" });
+      const ignore = actions.createEl("button", { cls: "cl-btn", text: "\u5FFD\u7565" });
       ignore.onclick = () => {
         this.ignoreModuleValue(value);
         this.render();
@@ -21899,26 +21875,26 @@ var WorkbenchView = class extends ItemView {
       draw();
     };
     el.empty();
-    el.addClass("wb-md-scroll");
-    const page = el.createDiv({ cls: "wb-md-page" });
-    const head = page.createDiv({ cls: "wb-md-head" });
-    const headMain = head.createDiv({ cls: "wb-md-head-main" });
-    const titleRow = headMain.createDiv({ cls: "wb-md-title-row" });
-    const modtile = titleRow.createDiv({ cls: "wb-md-modtile" });
+    el.addClass("cl-md-scroll");
+    const page = el.createDiv({ cls: "cl-md-page" });
+    const head = page.createDiv({ cls: "cl-md-head" });
+    const headMain = head.createDiv({ cls: "cl-md-head-main" });
+    const titleRow = headMain.createDiv({ cls: "cl-md-title-row" });
+    const modtile = titleRow.createDiv({ cls: "cl-md-modtile" });
     modtile.style.setProperty("--tint", tint);
     setIcon(modtile, mod.icon || "file-text");
     titleRow.createEl("h1", { text: mod.name });
-    const countPill = titleRow.createSpan({ cls: "wb-md-count" });
+    const countPill = titleRow.createSpan({ cls: "cl-md-count" });
     headMain.createEl("p", {
-      cls: "wb-md-desc",
+      cls: "cl-md-desc",
       text: dir ? dir + " \xB7 \u7B14\u8BB0\u6309 frontmatter \u805A\u5408\uFF0C\u56FE\u7247 / \u89C6\u9891 / \u6587\u6863\u7B49\u6309\u6587\u4EF6\u5939\u6536\u5F55" : "\u5C1A\u672A\u8BBE\u7F6E\u4FDD\u5B58\u6587\u4EF6\u5939 \xB7 \u65B0\u5EFA\u7B14\u8BB0\u65F6\u4F1A\u5148\u9009\u62E9\u4F4D\u7F6E"
     });
-    const headActs = head.createDiv({ cls: "wb-md-head-actions" });
-    const addBtn = headActs.createEl("button", { cls: "wb-md-btn wb-md-btn-primary" });
+    const headActs = head.createDiv({ cls: "cl-md-head-actions" });
+    const addBtn = headActs.createEl("button", { cls: "cl-md-btn cl-md-btn-primary" });
     setIcon(addBtn, "plus");
     addBtn.appendText("\u65B0\u5EFA\u7B14\u8BB0");
     addBtn.onclick = () => this.createModuleNote(mod);
-    const moreBtn = headActs.createEl("button", { cls: "wb-md-btn wb-md-more", attr: { "aria-label": "\u66F4\u591A\u64CD\u4F5C" } });
+    const moreBtn = headActs.createEl("button", { cls: "cl-md-btn cl-md-more", attr: { "aria-label": "\u66F4\u591A\u64CD\u4F5C" } });
     setIcon(moreBtn, "more-horizontal");
     moreBtn.appendText("\u66F4\u591A");
     moreBtn.onclick = (event) => {
@@ -21936,25 +21912,25 @@ var WorkbenchView = class extends ItemView {
       );
       anchorMenuBelow(menu, moreBtn);
     };
-    const stats = page.createDiv({ cls: "wb-md-stats" });
+    const stats = page.createDiv({ cls: "cl-md-stats" });
     const addStat = (num, label) => {
-      const cell = stats.createDiv({ cls: "wb-md-stat" });
-      cell.createSpan({ cls: "wb-md-stat-num", text: String(num) });
-      cell.createSpan({ cls: "wb-md-stat-label", text: label });
+      const cell = stats.createDiv({ cls: "cl-md-stat" });
+      cell.createSpan({ cls: "cl-md-stat-num", text: String(num) });
+      cell.createSpan({ cls: "cl-md-stat-label", text: label });
     };
     const noteCount = files.filter((file) => kindOf(file) === "note").length;
     addStat(files.length, "\u5168\u90E8\u6587\u4EF6");
     addStat(noteCount, "\u7B14\u8BB0");
     addStat(files.length - noteCount, "\u7D20\u6750\uFF08\u56FE\u7247 / \u89C6\u9891 / \u97F3\u9891 / \u6587\u6863\uFF09");
-    const controls = page.createDiv({ cls: "wb-md-controls" });
-    const search = controls.createDiv({ cls: "wb-md-search" });
-    const searchIcon = search.createSpan({ cls: "wb-md-searchico" });
+    const controls = page.createDiv({ cls: "cl-md-controls" });
+    const search = controls.createDiv({ cls: "cl-md-search" });
+    const searchIcon = search.createSpan({ cls: "cl-md-searchico" });
     setIcon(searchIcon, "search");
     const input = search.createEl("input", {
-      cls: "wb-md-query",
+      cls: "cl-md-query",
       attr: { placeholder: "\u7B5B\u9009\u6807\u9898\u6216\u8DEF\u5F84", type: "text" }
     });
-    const typeSeg = controls.createDiv({ cls: "wb-md-seg" });
+    const typeSeg = controls.createDiv({ cls: "cl-md-seg" });
     [
       ["all", "\u5168\u90E8"],
       ["note", "\u7B14\u8BB0"],
@@ -21964,31 +21940,31 @@ var WorkbenchView = class extends ItemView {
       ["audio", "\u97F3\u9891"],
       ["other", "\u5176\u4ED6"]
     ].forEach(([key, label]) => {
-      const btn = typeSeg.createEl("button", { cls: "wb-md-segbtn", text: label });
+      const btn = typeSeg.createEl("button", { cls: "cl-md-segbtn", text: label });
       btn.dataset.kind = key;
       if (key === filter)
         btn.addClass("is-active");
     });
-    const viewSeg = controls.createDiv({ cls: "wb-md-viewseg" });
-    const listBtn = viewSeg.createEl("button", { cls: "wb-md-segbtn", text: "\u5217\u8868" });
+    const viewSeg = controls.createDiv({ cls: "cl-md-viewseg" });
+    const listBtn = viewSeg.createEl("button", { cls: "cl-md-segbtn", text: "\u5217\u8868" });
     listBtn.dataset.view = "list";
-    const gridBtn = viewSeg.createEl("button", { cls: "wb-md-segbtn", text: "\u7F51\u683C" });
+    const gridBtn = viewSeg.createEl("button", { cls: "cl-md-segbtn", text: "\u7F51\u683C" });
     gridBtn.dataset.view = "grid";
-    const sortWrap = controls.createDiv({ cls: "wb-md-sort" });
-    const sortBtn = sortWrap.createEl("button", { cls: "wb-md-sortbtn" });
+    const sortWrap = controls.createDiv({ cls: "cl-md-sort" });
+    const sortBtn = sortWrap.createEl("button", { cls: "cl-md-sortbtn" });
     const sortText = sortBtn.createSpan({ text: "\u6700\u8FD1\u66F4\u65B0" });
-    const sortIcon = sortBtn.createSpan({ cls: "wb-md-sortico" });
+    const sortIcon = sortBtn.createSpan({ cls: "cl-md-sortico" });
     setIcon(sortIcon, "chevron-down");
-    const body = page.createDiv({ cls: "wb-md-body" });
-    const selBar = page.createDiv({ cls: "wb-md-selbar" });
-    const selCount = selBar.createSpan({ cls: "wb-md-selcount" });
-    const selCancel = selBar.createEl("button", { cls: "wb-md-btn", text: "\u53D6\u6D88" });
+    const body = page.createDiv({ cls: "cl-md-body" });
+    const selBar = page.createDiv({ cls: "cl-md-selbar" });
+    const selCount = selBar.createSpan({ cls: "cl-md-selcount" });
+    const selCancel = selBar.createEl("button", { cls: "cl-md-btn", text: "\u53D6\u6D88" });
     selCancel.onclick = () => {
       this._mdMulti = false;
       this._mdSel.clear();
       draw();
     };
-    const selDelete = selBar.createEl("button", { cls: "wb-md-btn wb-md-btn-danger", text: "\u5220\u9664\u6240\u9009" });
+    const selDelete = selBar.createEl("button", { cls: "cl-md-btn cl-md-btn-danger", text: "\u5220\u9664\u6240\u9009" });
     selDelete.onclick = () => {
       const chosen = files.filter((file) => this._mdSel.has(file.path));
       if (!chosen.length)
@@ -21999,9 +21975,9 @@ var WorkbenchView = class extends ItemView {
         this.refresh();
       });
     };
-    const foot = page.createDiv({ cls: "wb-md-foot" });
+    const foot = page.createDiv({ cls: "cl-md-foot" });
     const footLeft = foot.createSpan();
-    const footRight = foot.createSpan({ cls: "wb-md-footright" });
+    const footRight = foot.createSpan({ cls: "cl-md-footright" });
     const sortItems = (items) => {
       if (sort === "name") {
         items.sort((a, b) => a.file.basename.localeCompare(b.file.basename, "zh"));
@@ -22019,19 +21995,19 @@ var WorkbenchView = class extends ItemView {
       groups.forEach((list, name) => {
         if (!list.length)
           return;
-        const section = parent.createDiv({ cls: "wb-md-group" });
-        const groupHead = section.createDiv({ cls: "wb-md-group-head" });
-        groupHead.createSpan({ cls: "wb-md-group-name", text: name });
-        groupHead.createSpan({ cls: "wb-md-group-count", text: String(list.length) });
-        groupHead.createSpan({ cls: "wb-md-group-line" });
+        const section = parent.createDiv({ cls: "cl-md-group" });
+        const groupHead = section.createDiv({ cls: "cl-md-group-head" });
+        groupHead.createSpan({ cls: "cl-md-group-name", text: name });
+        groupHead.createSpan({ cls: "cl-md-group-count", text: String(list.length) });
+        groupHead.createSpan({ cls: "cl-md-group-line" });
         list.forEach((item) => {
           const picked = this._mdSel.has(item.file.path);
-          const card = section.createDiv({ cls: "wb-md-card wb-md-kind-" + item.kind });
+          const card = section.createDiv({ cls: "cl-md-card cl-md-kind-" + item.kind });
           if (this._mdMulti) {
             card.addClass("is-multi");
             if (picked)
               card.addClass("is-selected");
-            const check = card.createDiv({ cls: "wb-md-check" });
+            const check = card.createDiv({ cls: "cl-md-check" });
             const box = check.createEl("input", {
               attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + item.file.basename }
             });
@@ -22041,26 +22017,26 @@ var WorkbenchView = class extends ItemView {
               toggleSelect(item.file.path);
             };
           }
-          const type = card.createDiv({ cls: "wb-md-type" });
+          const type = card.createDiv({ cls: "cl-md-type" });
           setIcon(type, item.icon);
-          const main = card.createDiv({ cls: "wb-md-main" });
-          main.createDiv({ cls: "wb-md-name", text: item.file.basename });
-          main.createDiv({ cls: "wb-md-path", text: item.file.path });
-          const meta = card.createDiv({ cls: "wb-md-meta" });
+          const main = card.createDiv({ cls: "cl-md-main" });
+          main.createDiv({ cls: "cl-md-name", text: item.file.basename });
+          main.createDiv({ cls: "cl-md-path", text: item.file.path });
+          const meta = card.createDiv({ cls: "cl-md-meta" });
           meta.createEl("b", { text: item.label });
-          meta.createSpan({ cls: "wb-md-metadot" });
-          meta.createSpan({ cls: "wb-md-size", text: fmtSize(item.file.stat.size) });
-          card.createDiv({ cls: "wb-md-time", text: formatTime(item.file.stat.mtime) });
+          meta.createSpan({ cls: "cl-md-metadot" });
+          meta.createSpan({ cls: "cl-md-size", text: fmtSize(item.file.stat.size) });
+          card.createDiv({ cls: "cl-md-time", text: formatTime(item.file.stat.mtime) });
           if (!this._mdMulti) {
-            const acts = card.createDiv({ cls: "wb-md-actions" });
-            const openBtn = acts.createEl("button", { cls: "wb-md-act" });
+            const acts = card.createDiv({ cls: "cl-md-actions" });
+            const openBtn = acts.createEl("button", { cls: "cl-md-act" });
             openBtn.setAttribute("aria-label", "\u6253\u5F00");
             setIcon(openBtn, "external-link");
             openBtn.onclick = (event) => {
               event.stopPropagation();
               this.openFile(item.file);
             };
-            const delBtn = acts.createEl("button", { cls: "wb-md-act is-danger" });
+            const delBtn = acts.createEl("button", { cls: "cl-md-act is-danger" });
             delBtn.setAttribute("aria-label", "\u5220\u9664");
             setIcon(delBtn, "trash-2");
             delBtn.onclick = (event) => {
@@ -22078,13 +22054,13 @@ var WorkbenchView = class extends ItemView {
       });
     };
     const renderGrid = (parent, items) => {
-      const grid = parent.createDiv({ cls: "wb-md-grid" });
+      const grid = parent.createDiv({ cls: "cl-md-grid" });
       items.forEach((item) => {
         const picked = this._mdSel.has(item.file.path);
         const tile = grid.createDiv({
-          cls: "wb-md-tile wb-md-kind-" + item.kind + (this._mdMulti && picked ? " is-selected" : "")
+          cls: "cl-md-tile cl-md-kind-" + item.kind + (this._mdMulti && picked ? " is-selected" : "")
         });
-        const thumb = tile.createDiv({ cls: "wb-md-thumb" });
+        const thumb = tile.createDiv({ cls: "cl-md-thumb" });
         if (item.kind === "note") {
           paintNoteThumb(this.app, thumb, item.file);
         } else if (item.kind === "image" || item.kind === "video") {
@@ -22093,7 +22069,7 @@ var WorkbenchView = class extends ItemView {
           setIcon(thumb, item.icon);
         }
         if (this._mdMulti) {
-          const check = tile.createDiv({ cls: "wb-md-tilecheck" });
+          const check = tile.createDiv({ cls: "cl-md-tilecheck" });
           const box = check.createEl("input", {
             attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + item.file.basename }
           });
@@ -22103,13 +22079,13 @@ var WorkbenchView = class extends ItemView {
             toggleSelect(item.file.path);
           };
         }
-        tile.createDiv({ cls: "wb-md-tilename", text: item.file.basename });
-        const tileMeta = tile.createDiv({ cls: "wb-md-tilemeta" });
+        tile.createDiv({ cls: "cl-md-tilename", text: item.file.basename });
+        const tileMeta = tile.createDiv({ cls: "cl-md-tilemeta" });
         tileMeta.createSpan({ text: item.label });
         tileMeta.createSpan({ text: fmtSize(item.file.stat.size) });
         if (!this._mdMulti) {
           const del = tile.createEl("button", {
-            cls: "wb-md-tiledel",
+            cls: "cl-md-tiledel",
             attr: { "aria-label": "\u5220\u9664 " + item.file.basename }
           });
           setIcon(del, "trash-2");
@@ -22139,22 +22115,22 @@ var WorkbenchView = class extends ItemView {
       stats.style.display = "none";
       controls.style.display = "none";
       foot.style.display = "none";
-      const empty = body.createDiv({ cls: "wb-md-empty" });
+      const empty = body.createDiv({ cls: "cl-md-empty" });
       empty.style.setProperty("--tint", tint);
-      const art = empty.createDiv({ cls: "wb-md-emptyart" });
+      const art = empty.createDiv({ cls: "cl-md-emptyart" });
       setIcon(art, "file-text");
       empty.createEl("h2", { text: "\u8FD9\u4E2A\u6A21\u5757\u8FD8\u6CA1\u6709\u6587\u4EF6" });
       empty.createEl("p", {
-        cls: "wb-md-emptysub",
+        cls: "cl-md-emptysub",
         text: "\u70B9\u300C\u65B0\u5EFA\u7B14\u8BB0\u300D\u4F1A\u5728\u8FD9\u91CC\u751F\u6210\u7B2C\u4E00\u7BC7\u7B14\u8BB0\uFF1B\u56FE\u7247\u3001\u89C6\u9891\u3001PDF\u3001\u97F3\u9891\u653E\u8FDB\u6A21\u5757\u6587\u4EF6\u5939\u540E\uFF0C\u4E5F\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u8FD9\u4E00\u9875\u3002"
       });
-      const acts = empty.createDiv({ cls: "wb-md-emptyacts" });
-      const newBtn = acts.createEl("button", { cls: "wb-md-btn wb-md-btn-primary" });
+      const acts = empty.createDiv({ cls: "cl-md-emptyacts" });
+      const newBtn = acts.createEl("button", { cls: "cl-md-btn cl-md-btn-primary" });
       setIcon(newBtn, "plus");
       newBtn.appendText("\u65B0\u5EFA\u7B14\u8BB0");
       newBtn.onclick = () => this.createModuleNote(mod);
       if (dir) {
-        empty.createDiv({ cls: "wb-md-emptymeta", text: "\u4FDD\u5B58\u4F4D\u7F6E " + dir });
+        empty.createDiv({ cls: "cl-md-emptymeta", text: "\u4FDD\u5B58\u4F4D\u7F6E " + dir });
       }
     };
     const draw = () => {
@@ -22181,7 +22157,7 @@ var WorkbenchView = class extends ItemView {
       controls.style.display = "";
       foot.style.display = "";
       if (!items.length) {
-        body.createDiv({ cls: "wb-md-nomatch", text: "\u6CA1\u6709\u5339\u914D\u7684\u6587\u4EF6" });
+        body.createDiv({ cls: "cl-md-nomatch", text: "\u6CA1\u6709\u5339\u914D\u7684\u6587\u4EF6" });
       } else if (mode === "grid") {
         renderGrid(body, items);
       } else {
@@ -22276,14 +22252,14 @@ var WorkbenchView = class extends ItemView {
     }
   }
   renderCanvas(el) {
-    el.addClass("wb-scroll-canvas");
+    el.addClass("cl-scroll-canvas");
     const collisBoard = this.plugin.childPlugins && this.plugin.childPlugins["collis-board"];
     if (!collisBoard) {
-      const head = el.createDiv({ cls: "wb-pagehead" });
+      const head = el.createDiv({ cls: "cl-pagehead" });
       head.createEl("h1", { text: "\u767D\u677F" });
       head.createDiv({
-        cls: "wb-sub",
-        text: "Collis \u753B\u5E03\u96C6\u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u6253\u5F00\u63A7\u5236\u53F0\u67E5\u770B [workbench] \u65E5\u5FD7\u3002"
+        cls: "cl-sub",
+        text: "Collis \u753B\u5E03\u96C6\u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u6253\u5F00\u63A7\u5236\u53F0\u67E5\u770B [collis] \u65E5\u5FD7\u3002"
       });
       return;
     }
@@ -22292,14 +22268,14 @@ var WorkbenchView = class extends ItemView {
     this.gallery.mount(el);
   }
   renderNotes(el) {
-    el.addClass("wb-scroll-notes");
+    el.addClass("cl-scroll-notes");
     const collis = this.plugin.childPlugins && this.plugin.childPlugins.collis || this.app.plugins.plugins && this.app.plugins.plugins.collis;
     if (!collis) {
-      const head = el.createDiv({ cls: "wb-pagehead" });
+      const head = el.createDiv({ cls: "cl-pagehead" });
       head.createEl("h1", { text: "\u5361\u7247\u7B14\u8BB0" });
       head.createDiv({
-        cls: "wb-sub",
-        text: "Collis \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u6253\u5F00\u63A7\u5236\u53F0\u67E5\u770B [workbench] \u65E5\u5FD7\u3002"
+        cls: "cl-sub",
+        text: "Collis \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u6253\u5F00\u63A7\u5236\u53F0\u67E5\u770B [collis] \u65E5\u5FD7\u3002"
       });
       return;
     }
@@ -22308,7 +22284,7 @@ var WorkbenchView = class extends ItemView {
     this.notes.mount(el);
   }
 };
-var WorkbenchSettingTab = class extends PluginSettingTab {
+var CollisSettingTab = class extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -22334,10 +22310,10 @@ var WorkbenchSettingTab = class extends PluginSettingTab {
       })
     );
     containerEl.createEl("p", {
-      cls: "wb-settings-hint",
+      cls: "cl-settings-hint",
       text: "\u6A21\u5757\u914D\u7F6E\u662F JSON \u6570\u7EC4\u3002\u6BCF\u9879\u652F\u6301 id\u3001name\u3001icon\u3001color\u3001module\u3001types\u3001folder\u3001keywords\u3002\u4E5F\u53EF\u4EE5\u5728\u5BFC\u822A\u91CC\u70B9\u300C\u65B0\u5EFA\u6A21\u5757\u300D\u7528\u56FE\u5F62\u754C\u9762\u6DFB\u52A0\u3002"
     });
-    const textarea = containerEl.createEl("textarea", { cls: "wb-settings-json" });
+    const textarea = containerEl.createEl("textarea", { cls: "cl-settings-json" });
     textarea.value = JSON.stringify(this.plugin.settings.modules, null, 2);
     new Setting(containerEl).addButton(
       (button) => button.setButtonText("\u4FDD\u5B58\u6A21\u5757\u914D\u7F6E").setCta().onClick(async () => {
@@ -22358,12 +22334,12 @@ var WorkbenchSettingTab = class extends PluginSettingTab {
       })
     );
     containerEl.createEl("p", {
-      cls: "wb-settings-hint",
+      cls: "cl-settings-hint",
       text: "\u5339\u914D\u987A\u5E8F\uFF1Amodule \u5B57\u6BB5\uFF08\u4E2D\u82F1\u6587\u90FD\u8BA4\uFF09\u2192 type \u2192 folder \u524D\u7F00 \u2192 \u6807\u7B7E\u5173\u952E\u8BCD\u3002\u4E00\u7BC7\u7B14\u8BB0\u53EA\u5F52\u4E00\u4E2A\u6A21\u5757\uFF0C\u6309\u5BFC\u822A\u987A\u5E8F\u5148\u547D\u4E2D\u5148\u5F97\uFF1B\u90FD\u4E0D\u547D\u4E2D\u4F1A\u8FDB\u6536\u96C6\u7BB1\u7684\u5F85\u5904\u7406\u961F\u5217\u3002"
     });
   }
 };
-module.exports = class WorkbenchPlugin extends Plugin {
+module.exports = class CollisPlugin extends Plugin {
   async onload() {
     const saved = await this.readHostData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
@@ -22376,22 +22352,22 @@ module.exports = class WorkbenchPlugin extends Plugin {
       });
     }
     this.requestRefresh = debounce(() => this.refreshAll(), 700, true);
-    this.registerView(VIEW_TYPE, (leaf) => new WorkbenchView(leaf, this));
+    this.registerView(VIEW_TYPE, (leaf) => new CollisView(leaf, this));
     if (PLUGIN_ICON_SVG)
       addIcon(PLUGIN_ICON_ID, PLUGIN_ICON_SVG);
     this.addRibbonIcon(PLUGIN_ICON_ID, "\u6253\u5F00 Collis", () => this.activateView());
     this.addCommand({
-      id: "open-workbench",
+      id: "open-collis",
       name: "\u6253\u5F00 Collis",
       callback: () => this.activateView()
     });
     this.addCommand({
-      id: "open-workbench-focus",
+      id: "open-collis-focus",
       name: "\u6253\u5F00 Collis\uFF08\u4E13\u6CE8\u6A21\u5F0F\uFF09",
       callback: () => this.activateView(true)
     });
     this.addCommand({
-      id: "toggle-workbench-focus",
+      id: "toggle-collis-focus",
       name: "\u5207\u6362 Collis \u4E13\u6CE8\u6A21\u5F0F",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
@@ -22401,7 +22377,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
       }
     });
     this.addCommand({
-      id: "toggle-workbench-nav",
+      id: "toggle-collis-nav",
       name: "\u5207\u6362 Collis \u4FA7\u680F",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
@@ -22411,7 +22387,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
       }
     });
     this.addCommand({
-      id: "open-collis",
+      id: "open-collis-notes",
       name: "\u6253\u5F00\u5361\u7247\u7B14\u8BB0",
       callback: async () => {
         await this.activateView();
@@ -22439,7 +22415,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
           leaf.view.go("canvas");
       }
     });
-    this.addSettingTab(new WorkbenchSettingTab(this.app, this));
+    this.addSettingTab(new CollisSettingTab(this.app, this));
     await this.loadBundledPlugins();
     this._ttObserver = new MutationObserver((mutations) => {
       for (let i = 0; i < mutations.length; i++) {
@@ -22485,15 +22461,15 @@ module.exports = class WorkbenchPlugin extends Plugin {
         const type = leaf && leaf.view ? leaf.view.getViewType() : null;
         if (type === VIEW_TYPE) {
           if (leaf.view.focus)
-            document.body.classList.add("workbench-focus");
+            document.body.classList.add("collis-focus");
         } else {
-          document.body.classList.remove("workbench-focus");
+          document.body.classList.remove("collis-focus");
         }
       })
     );
   }
   onunload() {
-    document.body.classList.remove("workbench-focus");
+    document.body.classList.remove("collis-focus");
     this.unloadBundledPlugins();
   }
   // 清理旧版插件残留的独立视图，避免启动后右侧栏还挂着旧画布视图。
@@ -22505,7 +22481,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
       try {
         this.app.workspace.detachLeavesOfType(type);
       } catch (error) {
-        console.error("[workbench] \u6E05\u7406\u65E7\u89C6\u56FE\u5931\u8D25: " + type, error);
+        console.error("[collis] \u6E05\u7406\u65E7\u89C6\u56FE\u5931\u8D25: " + type, error);
       }
     }
   }
@@ -22567,14 +22543,14 @@ module.exports = class WorkbenchPlugin extends Plugin {
         moved += 1;
       } catch (error) {
         skipped += 1;
-        console.error("[workbench] \u767D\u677F\u540E\u7F00\u8FC1\u79FB\u5931\u8D25: " + file.path, error);
+        console.error("[collis] \u767D\u677F\u540E\u7F00\u8FC1\u79FB\u5931\u8D25: " + file.path, error);
       }
     }
     if (moved) {
       new Notice("\u5DF2\u628A " + moved + " \u5F20\u767D\u677F\u7684\u6269\u5C55\u540D\u66F4\u65B0\u4E3A .collis");
     }
     if (skipped) {
-      console.warn("[workbench] \u6709 " + skipped + " \u5F20\u767D\u677F\u672A\u80FD\u8FC1\u79FB\uFF0C\u8BF7\u68C0\u67E5\u540C\u540D\u6587\u4EF6");
+      console.warn("[collis] \u6709 " + skipped + " \u5F20\u767D\u677F\u672A\u80FD\u8FC1\u79FB\uFF0C\u8BF7\u68C0\u67E5\u540C\u540D\u6587\u4EF6");
     }
   }
   async readHostData() {
@@ -22593,10 +22569,25 @@ module.exports = class WorkbenchPlugin extends Plugin {
     }
   }
   // 旧版独立插件的设置分别在各自文件夹的 data.json。
-  // 第一次启动时搬进 workbench/data.json，搬完后那两个文件夹可以随时删掉。
+  // 第一次启动时搬进 collis/data.json，搬完后那两个文件夹可以随时删掉。
   async migrateLegacySettings() {
     const data = await this.readHostData();
     let dirty = false;
+    try {
+      const legacyRaw = await this.app.vault.adapter.read(
+        this.app.vault.configDir + "/plugins/workbench/data.json"
+      );
+      const legacy = JSON.parse(legacyRaw);
+      if (legacy && typeof legacy === "object") {
+        for (const [key, value] of Object.entries(legacy)) {
+          if (!(key in data)) {
+            data[key] = value;
+            dirty = true;
+          }
+        }
+      }
+    } catch (error) {
+    }
     if (!data["collis-board"] && data.volis) {
       data["collis-board"] = data.volis;
       delete data.volis;
@@ -22626,7 +22617,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
       return false;
     }
   }
-  // 子插件的读写重定向到 workbench 的 data.json，键名分别是 collis / collis-board。
+  // 子插件的读写重定向到 collis 的 data.json，键名分别是 collis / collis-board。
   attachChildSettings(child, id) {
     child.loadData = async () => {
       const data = await this.readHostData();
@@ -22640,7 +22631,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
   }
   async loadBundledPlugin(spec) {
     if (this.isStandaloneEnabled(spec.id)) {
-      console.log("[workbench] \u72EC\u7ACB\u63D2\u4EF6\u5DF2\u542F\u7528\uFF0C\u8DF3\u8FC7\u5185\u7F6E " + spec.id);
+      console.log("[collis] \u72EC\u7ACB\u63D2\u4EF6\u5DF2\u542F\u7528\uFF0C\u8DF3\u8FC7\u5185\u7F6E " + spec.id);
       return;
     }
     try {
@@ -22649,7 +22640,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
         throw new Error("\u672A\u627E\u5230\u53EF\u7528\u7684\u63D2\u4EF6\u7C7B");
       }
       const manifest = Object.assign({}, spec.manifest);
-      manifest.dir = this.manifest.dir || this.app.vault.configDir + "/plugins/workbench";
+      manifest.dir = this.manifest.dir || this.app.vault.configDir + "/plugins/collis";
       const child = new PluginClass(this.app, manifest);
       this.attachChildSettings(child, spec.id);
       const noElement = () => document.createElement("div");
@@ -22662,9 +22653,9 @@ module.exports = class WorkbenchPlugin extends Plugin {
       await child.onload();
       this.childPlugins = this.childPlugins || {};
       this.childPlugins[spec.id] = child;
-      console.log("[workbench] \u5DF2\u52A0\u8F7D\u5185\u7F6E\u63D2\u4EF6 " + manifest.id);
+      console.log("[collis] \u5DF2\u52A0\u8F7D\u5185\u7F6E\u63D2\u4EF6 " + manifest.id);
     } catch (error) {
-      console.error("[workbench] \u5185\u7F6E\u63D2\u4EF6\u542F\u52A8\u5931\u8D25: " + spec.id, error);
+      console.error("[collis] \u5185\u7F6E\u63D2\u4EF6\u542F\u52A8\u5931\u8D25: " + spec.id, error);
       new Notice("Collis\uFF1A\u5185\u7F6E " + spec.id + " \u542F\u52A8\u5931\u8D25\uFF0C\u8BF7\u67E5\u770B\u63A7\u5236\u53F0");
     }
   }
@@ -22675,7 +22666,7 @@ module.exports = class WorkbenchPlugin extends Plugin {
       try {
         child.unload();
       } catch (error) {
-        console.error("[workbench] \u5185\u7F6E\u63D2\u4EF6\u5378\u8F7D\u5931\u8D25", error);
+        console.error("[collis] \u5185\u7F6E\u63D2\u4EF6\u5378\u8F7D\u5931\u8D25", error);
       }
     }
   }

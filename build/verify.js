@@ -55,8 +55,8 @@ Module._load = function (request) {
   return originalLoad.apply(this, arguments);
 };
 try {
-  const WorkbenchPlugin = require(path.join(root, "dist/main.js"));
-  console.log("dist/main.js OK:", typeof WorkbenchPlugin, WorkbenchPlugin && WorkbenchPlugin.name);
+  const CollisPlugin = require(path.join(root, "dist/main.js"));
+  console.log("dist/main.js OK:", typeof CollisPlugin, CollisPlugin && CollisPlugin.name);
 } finally {
   Module._load = originalLoad;
 }

@@ -26,16 +26,16 @@ if (result.status !== 0) {
 }
 
 // 2) 三段样式拼接：宿主 → 速记卡片 → 画布集
-const parts = ["build/workbench.css", "build/collis.css", "build/collis-board.css"].map(
+const parts = ["build/collis-host.css", "build/collis.css", "build/collis-board.css"].map(
   (p) => "/* ==================== " + path.basename(p) + " ==================== */\n" + read(p)
 );
 fs.writeFileSync(path.join(dist, "styles.css"), parts.join("\n\n"), "utf8");
 
 // 3) 插件清单
 const manifest = {
-  id: "workbench",
+  id: "collis",
   name: "Collis",
-  version: "0.3.0",
+  version: "0.4.0",
   minAppVersion: "1.13.0",
   description: "本地工作台：模块视图、速记卡片与画布集合并为一个插件.",
   author: "Lak",

@@ -3251,21 +3251,21 @@
 /* This view only: Obsidian's own header row is trimmed to a thin bar, and the
    wall is pinned to the leaf so its frame sits right under the tabs and right
    above the bottom of the pane. */
-.workspace-leaf:has(.wb-root),
-.workspace-leaf:has(.wb-root) .workspace-leaf-content { position: relative; }
-/* Only trim Obsidian's header when the gallery is its own leaf. Inside Workbench
-   the wall lives under .workbench-view; trimming that view's header makes the
-   whole workbench jump upward as soon as 白板 is opened. */
-.workspace-leaf:has(.wb-root):not(:has(.workbench-view)) .view-header {
+.workspace-leaf:has(.cl-root),
+.workspace-leaf:has(.cl-root) .workspace-leaf-content { position: relative; }
+/* Only trim Obsidian's header when the gallery is its own leaf. Inside Collis
+   the wall lives under .collis-view; trimming that view's header makes the
+   whole collis jump upward as soon as 白板 is opened. */
+.workspace-leaf:has(.cl-root):not(:has(.collis-view)) .view-header {
   box-sizing: border-box;
   height: 24px;
   min-height: 24px;
   padding: 0 8px;
 }
-.workspace-leaf:has(.wb-root):not(:has(.workbench-view)) .view-header .view-header-nav-buttons,
-.workspace-leaf:has(.wb-root):not(:has(.workbench-view)) .view-header .view-actions { height: 24px; }
+.workspace-leaf:has(.cl-root):not(:has(.collis-view)) .view-header .view-header-nav-buttons,
+.workspace-leaf:has(.cl-root):not(:has(.collis-view)) .view-header .view-actions { height: 24px; }
 
-.wb-root {
+.cl-root {
   --vw-line: var(--background-modifier-border, var(--background-modifier-hover));
   --vw-soft: var(--background-modifier-hover);
   --vw-tint: var(--background-secondary-alt, var(--background-secondary));
@@ -3289,19 +3289,19 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.theme-light .wb-root {
+.theme-light .cl-root {
   --vw-card-bg: #f9f8f5;
   --vw-card-bg-hover: #fdfcfa;
 }
 
-.theme-dark .wb-root {
+.theme-dark .cl-root {
   --vw-card-bg: #434e4c;
   --vw-card-bg-hover: #475250;
   --vw-card-shadow: 0 2px 7px rgba(0, 0, 0, .18);
 }
 
 /* ---------- Frame: the whole page sits on one bordered layer ---------- */
-.wb-root .vw-frame {
+.cl-root .vw-frame {
   position: relative;
   box-sizing: border-box;
   display: flex;
@@ -3312,7 +3312,7 @@
   background: var(--background-primary);
   box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
 }
-.wb-root .vw-toolbar {
+.cl-root .vw-toolbar {
   position: relative;
   z-index: 2;
   flex: 0 0 auto;
@@ -3323,7 +3323,7 @@
   background: var(--background-primary);
   box-shadow: 0 3px 10px -6px rgba(0, 0, 0, .32);
 }
-.wb-root .vw-scroll {
+.cl-root .vw-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -3331,16 +3331,16 @@
 }
 
 /* ---------- Header ---------- */
-.wb-root .vw-head {
+.cl-root .vw-head {
   display: flex;
   align-items: flex-end;
   gap: 18px;
   padding: 0;
   flex-wrap: wrap;
 }
-.wb-root .vw-intro { min-width: 0; }
-.wb-root .vw-title { display: flex; align-items: baseline; gap: 10px; }
-.wb-root .vw-title h1 {
+.cl-root .vw-intro { min-width: 0; }
+.cl-root .vw-title { display: flex; align-items: baseline; gap: 10px; }
+.cl-root .vw-title h1 {
   margin: 0;
   font-size: 26px;
   line-height: 1.12;
@@ -3348,7 +3348,7 @@
   letter-spacing: -.032em;
   color: var(--text-normal);
 }
-.wb-root .vw-count {
+.cl-root .vw-count {
   font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -3360,17 +3360,17 @@
 }
 
 /* ---------- Toolbar ---------- */
-.wb-root .vw-actions {
+.cl-root .vw-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-left: auto;
 }
-.wb-root .vw-ico { display: inline-flex; align-items: center; }
-.wb-root .vw-ico svg { width: 14px; height: 14px; }
+.cl-root .vw-ico { display: inline-flex; align-items: center; }
+.cl-root .vw-ico svg { width: 14px; height: 14px; }
 
 /* ---------- Search ---------- */
-.wb-root .vw-search {
+.cl-root .vw-search {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3382,10 +3382,10 @@
   color: var(--text-faint);
   transition: border-color .14s ease;
 }
-.wb-root .vw-search:focus-within {
+.cl-root .vw-search:focus-within {
   border-color: var(--background-modifier-border-hover, var(--text-faint));
 }
-.wb-root .vw-search-input {
+.cl-root .vw-search-input {
   all: unset;
   display: block;
   width: 116px;
@@ -3397,10 +3397,10 @@
   background: transparent;
   cursor: text;
 }
-.wb-root .vw-search-input::placeholder { color: var(--text-faint); opacity: 1; }
-.wb-root .vw-search-input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.cl-root .vw-search-input::placeholder { color: var(--text-faint); opacity: 1; }
+.cl-root .vw-search-input::-webkit-search-cancel-button { -webkit-appearance: none; }
 
-.wb-root .vw-sort {
+.cl-root .vw-sort {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3415,15 +3415,15 @@
   cursor: pointer;
   transition: color .14s ease, background .14s ease, border-color .14s ease;
 }
-.wb-root .vw-sort:hover {
+.cl-root .vw-sort:hover {
   color: var(--text-normal);
   background: var(--vw-soft);
   border-color: var(--vw-line);
 }
-.wb-root .vw-caret { opacity: .6; margin-left: -1px; }
-.wb-root .vw-caret svg { width: 12px; height: 12px; }
+.cl-root .vw-caret { opacity: .6; margin-left: -1px; }
+.cl-root .vw-caret svg { width: 12px; height: 12px; }
 
-.wb-root .vw-primary {
+.cl-root .vw-primary {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -3440,7 +3440,7 @@
   cursor: pointer;
   transition: opacity .14s ease, transform .14s ease;
 }
-.wb-root .vw-ghost {
+.cl-root .vw-ghost {
   display: inline-flex;
   align-items: center;
   height: 30px;
@@ -3453,26 +3453,26 @@
   font-size: 12px;
   cursor: pointer;
 }
-.wb-root .vw-ghost:hover { background: var(--vw-soft); }
-.wb-root .vw-ghost:disabled, .wb-root .vw-primary:disabled { opacity: .45; cursor: default; }
-.wb-root .vw-multi-count {
+.cl-root .vw-ghost:hover { background: var(--vw-soft); }
+.cl-root .vw-ghost:disabled, .cl-root .vw-primary:disabled { opacity: .45; cursor: default; }
+.cl-root .vw-multi-count {
   margin-right: auto;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--text-normal);
 }
-.wb-root .vw-danger {
+.cl-root .vw-danger {
   background: var(--color-red, var(--text-normal));
   color: var(--background-primary);
   border-color: transparent;
 }
-.wb-root .vw-more { padding: 0 8px; }
-.wb-root .vw-more .vw-ico svg { width: 16px; height: 16px; }
-.wb-root .vw-primary:hover {
+.cl-root .vw-more { padding: 0 8px; }
+.cl-root .vw-more .vw-ico svg { width: 16px; height: 16px; }
+.cl-root .vw-primary:hover {
   background: var(--background-modifier-border-hover, var(--vw-soft));
 }
-.wb-root .vw-primary:active { transform: scale(.985); }
-.wb-root .vw-primary.is-large {
+.cl-root .vw-primary:active { transform: scale(.985); }
+.cl-root .vw-primary.is-large {
   height: 36px;
   padding: 0 18px;
   font-size: 13px;
@@ -3480,7 +3480,7 @@
 }
 
 /* ---------- Grid: 与模块页网格同一套栅格 ---------- */
-.wb-root .vw-grid {
+.cl-root .vw-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
   gap: 12px;
@@ -3488,7 +3488,7 @@
   justify-content: start;
 }
 
-.wb-root .vw-card {
+.cl-root .vw-card {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -3504,11 +3504,11 @@
   transition: background-color .14s ease, border-color .14s ease,
     transform .14s ease, box-shadow .14s ease;
 }
-.wb-root .vw-card.is-selected {
+.cl-root .vw-card.is-selected {
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 32%, transparent), var(--vw-card-shadow);
 }
-.wb-root .vw-card-del {
+.cl-root .vw-card-del {
   position: absolute;
   top: 14px;
   right: 14px;
@@ -3527,13 +3527,13 @@
   cursor: pointer;
   transition: opacity .15s ease, color .15s ease;
 }
-.wb-root .vw-card:hover .vw-card-del,
-.wb-root .vw-card-del:focus { opacity: 1; }
-.wb-root .vw-card-del:hover {
+.cl-root .vw-card:hover .vw-card-del,
+.cl-root .vw-card-del:focus { opacity: 1; }
+.cl-root .vw-card-del:hover {
   color: var(--color-red, var(--text-normal));
 }
-.wb-root .vw-card-del svg { width: 13px; height: 13px; }
-.wb-root .vw-check {
+.cl-root .vw-card-del svg { width: 13px; height: 13px; }
+.cl-root .vw-check {
   position: absolute;
   top: 14px;
   left: 14px;
@@ -3546,14 +3546,14 @@
   background: var(--interactive-accent);
   color: var(--text-on-accent, var(--background-primary));
 }
-.wb-root .vw-card.is-selected .vw-check { display: grid; }
-.wb-root .vw-check svg { width: 12px; height: 12px; }
-.wb-root .vw-card:nth-child(2) { animation-delay: .035s; }
-.wb-root .vw-card:nth-child(3) { animation-delay: .07s; }
-.wb-root .vw-card:nth-child(4) { animation-delay: .105s; }
-.wb-root .vw-card:nth-child(5) { animation-delay: .14s; }
-.wb-root .vw-card:nth-child(n+6) { animation-delay: .18s; }
-.wb-root .vw-card:hover {
+.cl-root .vw-card.is-selected .vw-check { display: grid; }
+.cl-root .vw-check svg { width: 12px; height: 12px; }
+.cl-root .vw-card:nth-child(2) { animation-delay: .035s; }
+.cl-root .vw-card:nth-child(3) { animation-delay: .07s; }
+.cl-root .vw-card:nth-child(4) { animation-delay: .105s; }
+.cl-root .vw-card:nth-child(5) { animation-delay: .14s; }
+.cl-root .vw-card:nth-child(n+6) { animation-delay: .18s; }
+.cl-root .vw-card:hover {
   background: var(--vw-card-bg-hover);
   transform: translateY(-1px);
   border-color: var(--background-modifier-border-hover, var(--text-faint));
@@ -3561,7 +3561,7 @@
 }
 /* Hover must not mask the selection ring: same specificity as :hover, but
    declared later, so a selected card keeps its outline while pointed at. */
-.wb-root .vw-card.is-selected:hover {
+.cl-root .vw-card.is-selected:hover {
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 32%, transparent), var(--vw-card-shadow);
 }
@@ -3571,7 +3571,7 @@
 }
 
 /* ---------- Cover: 画布微缩图，尺寸和模块卡片的缩略图一致 ---------- */
-.wb-root .vw-cover {
+.cl-root .vw-cover {
   position: relative;
   height: 92px;
   overflow: hidden;
@@ -3581,18 +3581,18 @@
   background-size: 14px 14px;
   background-position: 6px 6px;
 }
-.wb-root .vw-cover.is-blank {
+.cl-root .vw-cover.is-blank {
   display: grid;
   place-items: center;
 }
-.wb-root .vw-cover-ghost {
+.cl-root .vw-cover-ghost {
   display: inline-flex;
   color: var(--text-faint);
   opacity: .55;
 }
-.wb-root .vw-cover-ghost svg { width: 24px; height: 24px; }
+.cl-root .vw-cover-ghost svg { width: 24px; height: 24px; }
 /* An empty board still shows a canvas: a dashed artboard inside the cover. */
-.wb-root .vw-cover.is-blank::after {
+.cl-root .vw-cover.is-blank::after {
   content: "";
   position: absolute;
   inset: 15%;
@@ -3602,21 +3602,21 @@
   pointer-events: none;
 }
 
-.wb-root .vw-cover-lines {
+.cl-root .vw-cover-lines {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
 }
-.wb-root .vw-cover-lines line {
+.cl-root .vw-cover-lines line {
   stroke: var(--text-faint);
   stroke-width: 1;
   opacity: .45;
   vector-effect: non-scaling-stroke;
 }
 
-.wb-root .vw-chip {
+.cl-root .vw-chip {
   position: absolute;
   display: block;
   border-radius: 3px;
@@ -3625,17 +3625,17 @@
   box-shadow: inset 0 0 0 1px var(--vw-line);
   transition: box-shadow .18s ease;
 }
-.wb-root .vw-chip::before {
+.cl-root .vw-chip::before {
   content: "";
   position: absolute;
   inset: 0;
   background: var(--tn, var(--text-muted));
   opacity: .18;
 }
-.wb-root .vw-chip[data-kind="text"]::before { opacity: .26; }
-.wb-root .vw-chip[data-kind="group"]::before { opacity: .1; }
-.wb-root .vw-card:hover .vw-chip { box-shadow: inset 0 0 0 1px var(--text-faint); }
-.wb-root .vw-chip-text {
+.cl-root .vw-chip[data-kind="text"]::before { opacity: .26; }
+.cl-root .vw-chip[data-kind="group"]::before { opacity: .1; }
+.cl-root .vw-card:hover .vw-chip { box-shadow: inset 0 0 0 1px var(--text-faint); }
+.cl-root .vw-chip-text {
   position: relative;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -3649,23 +3649,23 @@
   opacity: .92;
   word-break: break-word;
 }
-.wb-root .vw-chip[data-tone="orange"] { --tn: var(--color-orange); }
-.wb-root .vw-chip[data-tone="red"] { --tn: var(--color-red); }
-.wb-root .vw-chip[data-tone="yellow"] { --tn: var(--color-yellow); }
-.wb-root .vw-chip[data-tone="green"] { --tn: var(--color-green); }
-.wb-root .vw-chip[data-tone="cyan"] { --tn: var(--color-cyan); }
-.wb-root .vw-chip[data-tone="blue"] { --tn: var(--color-blue); }
-.wb-root .vw-chip[data-tone="purple"] { --tn: var(--color-purple); }
-.wb-root .vw-chip[data-tone="pink"] { --tn: var(--color-pink); }
+.cl-root .vw-chip[data-tone="orange"] { --tn: var(--color-orange); }
+.cl-root .vw-chip[data-tone="red"] { --tn: var(--color-red); }
+.cl-root .vw-chip[data-tone="yellow"] { --tn: var(--color-yellow); }
+.cl-root .vw-chip[data-tone="green"] { --tn: var(--color-green); }
+.cl-root .vw-chip[data-tone="cyan"] { --tn: var(--color-cyan); }
+.cl-root .vw-chip[data-tone="blue"] { --tn: var(--color-blue); }
+.cl-root .vw-chip[data-tone="purple"] { --tn: var(--color-purple); }
+.cl-root .vw-chip[data-tone="pink"] { --tn: var(--color-pink); }
 
 /* ---------- Card body: 标题 + 一行元信息，对齐模块页卡片 ---------- */
-.wb-root .vw-card-body {
+.cl-root .vw-card-body {
   display: flex;
   flex-direction: column;
   gap: 0;
   padding: 8px 0 0;
 }
-.wb-root .vw-card-title {
+.cl-root .vw-card-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3675,7 +3675,7 @@
   line-height: 1.4;
   color: var(--text-normal);
 }
-.wb-root .vw-card-meta {
+.cl-root .vw-card-meta {
   margin-top: 2px;
   display: flex;
   align-items: center;
@@ -3684,8 +3684,8 @@
   font-size: 10px;
   color: var(--text-faint);
 }
-.wb-root .vw-card-count,
-.wb-root .vw-card-date {
+.cl-root .vw-card-count,
+.cl-root .vw-card-date {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3709,7 +3709,7 @@
 }
 
 /* ---------- Empty ---------- */
-.wb-root .vw-empty {
+.cl-root .vw-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3718,7 +3718,7 @@
   padding: 38px 24px 44px;
   animation: vw-rise .32s ease both;
 }
-.wb-root .vw-empty-art {
+.cl-root .vw-empty-art {
   display: grid;
   place-items: center;
   width: 74px;
@@ -3729,15 +3729,15 @@
   border: 1px solid var(--vw-line);
   box-shadow: var(--vw-shadow);
 }
-.wb-root .vw-empty-art svg { width: 32px; height: 32px; }
-.wb-root .vw-empty-title {
+.cl-root .vw-empty-art svg { width: 32px; height: 32px; }
+.cl-root .vw-empty-title {
   margin-top: 18px;
   font-size: 15.5px;
   font-weight: 600;
   letter-spacing: -.01em;
   color: var(--text-normal);
 }
-.wb-root .vw-empty-hint {
+.cl-root .vw-empty-hint {
   margin: 7px 0 0;
   max-width: 320px;
   font-size: 12.5px;
@@ -3746,7 +3746,7 @@
 }
 
 /* ---------- Error ---------- */
-.wb-root .vw-error {
+.cl-root .vw-error {
   margin: 30px 0;
   padding: 18px 20px;
   border-radius: 12px;
@@ -3754,8 +3754,8 @@
   background: var(--background-secondary);
   color: var(--text-normal);
 }
-.wb-root .vw-error strong { display: block; font-size: 13.5px; margin-bottom: 6px; }
-.wb-root .vw-error p {
+.cl-root .vw-error strong { display: block; font-size: 13.5px; margin-bottom: 6px; }
+.cl-root .vw-error p {
   margin: 0;
   font-size: 12px;
   line-height: 1.6;
@@ -3764,8 +3764,8 @@
 }
 
 @media (max-width: 780px) {
-  .wb-root { padding: 4px 6px; }
-  .wb-root .vw-scroll { padding: 0 14px 12px; }
-  .wb-root .vw-grid { gap: 12px; }
-  .wb-root .vw-actions { margin-left: 0; }
+  .cl-root { padding: 4px 6px; }
+  .cl-root .vw-scroll { padding: 0 14px 12px; }
+  .cl-root .vw-grid { gap: 12px; }
+  .cl-root .vw-actions { margin-left: 0; }
 }

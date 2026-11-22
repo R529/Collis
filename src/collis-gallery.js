@@ -1,5 +1,5 @@
 /** 画布集面板：BoardGalleryView 的可嵌入 CommonJS 版本。
- *  只保留渲染与数据逻辑，去掉 ItemView / leaf 生命周期，供 Workbench 内嵌显示。 */
+ *  只保留渲染与数据逻辑，去掉 ItemView / leaf 生命周期，供 Collis 内嵌显示。 */
 
 const { Menu, Modal, Notice, setIcon, TFile } = require("obsidian");
 
@@ -424,7 +424,7 @@ class CollisGalleryPanel {
   watchSources() {
     if (this.watching) return;
     this.watching = true;
-    const inFolder = (path) => isBoardPath(path, this.collis.workbenchFolder);
+    const inFolder = (path) => isBoardPath(path, this.collis.collisFolder);
 
     this.vaultRefs.push(
       this.app.vault.on("modify", (file) => {
@@ -487,7 +487,7 @@ class CollisGalleryPanel {
   async loadItems() {
     let items = [];
     try {
-      items = await listBoardItems(this.app, this.collis.workbenchFolder);
+      items = await listBoardItems(this.app, this.collis.collisFolder);
     } catch {
       new Notice("读取画布列表失败");
     }
@@ -507,7 +507,7 @@ class CollisGalleryPanel {
     const scrolled = root.querySelector(".vw-scroll");
     const scroll = scrolled ? scrolled.scrollTop : 0;
     this.clearRoot(root);
-    root.classList.add("wb-root");
+    root.classList.add("cl-root");
 
     // 整个页面（含头部）套一层边框，卡片在内部滚动，外框保持不动。
     const frame = node("div", "vw-frame");

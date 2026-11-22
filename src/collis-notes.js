@@ -94,7 +94,7 @@ class CollisNotesPanel {
 
     this.container = containerEl;
     this.container.empty();
-    this.container.addClass("wb-notes-panel");
+    this.container.addClass("cl-notes-panel");
     // 借用 Collis 的按钮 / 卡片样式作用域（.qm-view 前缀规则）。
     this.container.addClass("qm-view");
 
@@ -133,14 +133,14 @@ class CollisNotesPanel {
   buildHead() {
     // 页面顶部不再放标题，直接是搜索与工具按钮这一排。
     // 尺寸全部交给样式表：内联 width / flex 会盖掉窄视图下的自适应规则。
-    const head = this.container.createDiv({ cls: "wb-notes-head" });
+    const head = this.container.createDiv({ cls: "cl-notes-head" });
     head.style.position = "relative";
-    const actions = head.createDiv({ cls: "wb-notes-actions wb-notes-toolrow" });
+    const actions = head.createDiv({ cls: "cl-notes-actions cl-notes-toolrow" });
     actions.style.position = "relative";
     this.headEl = head;
     this.toolrow = actions;
 
-    const box = actions.createDiv({ cls: "qm-searchbox wb-notes-search" });
+    const box = actions.createDiv({ cls: "qm-searchbox cl-notes-search" });
     const searchIcon = box.createDiv({ cls: "qm-search-ico" });
     setIconHtml(searchIcon, "search");
     const search = box.createEl("input", {
@@ -189,7 +189,7 @@ class CollisNotesPanel {
   }
 
   buildBody() {
-    const body = this.container.createDiv({ cls: "wb-notes-body" });
+    const body = this.container.createDiv({ cls: "cl-notes-body" });
 
     // 生效条件 chips：紧贴搜索行下方，和 Collis 一致
     this.chipsEl = body.createDiv({ cls: "qm-chips" });
@@ -234,7 +234,7 @@ class CollisNotesPanel {
     save.onclick = () => this.capture();
 
     // 卡片列表
-    this.listWrap = body.createDiv({ cls: "wb-notes-listwrap" });
+    this.listWrap = body.createDiv({ cls: "cl-notes-listwrap" });
 
     // 多选浮条：与 Collis 同一个 .qm-selbar
     this.selBarEl = body.createDiv({ cls: "qm-selbar" });
@@ -270,7 +270,7 @@ class CollisNotesPanel {
     try {
       cards = await this.collis.readAllCards();
     } catch (e) {
-      console.error("[workbench] 读取卡片失败", e);
+      console.error("[collis] 读取卡片失败", e);
       cards = [];
     }
     this._loading = false;
@@ -1081,7 +1081,7 @@ class CollisNotesPanel {
 
   showPop(owner, build) {
     this.closePop();
-    const pop = this.toolrow.createDiv({ cls: "wb-notes-pop" });
+    const pop = this.toolrow.createDiv({ cls: "cl-notes-pop" });
     build(pop);
     this.pop = pop;
     this.popOwner = owner;
@@ -1812,7 +1812,7 @@ class CollisNotesPanel {
     try {
       ok = await this.collis.appendCard(text);
     } catch (e) {
-      console.error("[workbench] 写入卡片失败", e);
+      console.error("[collis] 写入卡片失败", e);
     }
     if (ok) {
       this.input.value = "";
