@@ -4,7 +4,7 @@
 > 原来的 `collis`（速记卡片）和 `volis`（画布集）两个插件已合并进 Collis，启用这一个就够了。
 
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7c6df2)](https://obsidian.md)
-[![Version](https://img.shields.io/badge/version-0.4.0-blue)](https://github.com/R529/Collis/releases)
+[![Version](https://img.shields.io/badge/version-0.4.1-blue)](https://github.com/R529/Collis/releases)
 [![Desktop only](https://img.shields.io/badge/platform-desktop-lightgrey)](#)
 
 ## 它能做什么

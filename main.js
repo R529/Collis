@@ -22594,6 +22594,8 @@ module.exports = class CollisPlugin extends Plugin {
       dirty = true;
     }
     for (const spec of BUNDLED_PLUGINS) {
+      if (spec.id === this.manifest.id)
+        continue;
       if (data[spec.id])
         continue;
       const path = this.app.vault.configDir + "/plugins/" + spec.id + "/data.json";
@@ -22612,7 +22614,10 @@ module.exports = class CollisPlugin extends Plugin {
   }
   isStandaloneEnabled(id) {
     try {
-      return !!(this.app.plugins && this.app.plugins.plugins && this.app.plugins.plugins[id]);
+      if (id === this.manifest.id)
+        return false;
+      const plugins = this.app.plugins && this.app.plugins.plugins;
+      return !!(plugins && plugins[id] && plugins[id] !== this);
     } catch (error) {
       return false;
     }

@@ -3868,6 +3868,8 @@ module.exports = class CollisPlugin extends Plugin {
       dirty = true;
     }
     for (const spec of BUNDLED_PLUGINS) {
+      // 宿主现在也叫 collis，不能把自己当成旧独立插件的配置读进来。
+      if (spec.id === this.manifest.id) continue;
       if (data[spec.id]) continue;
       const path = this.app.vault.configDir + "/plugins/" + spec.id + "/data.json";
       try {
@@ -3886,7 +3888,11 @@ module.exports = class CollisPlugin extends Plugin {
 
   isStandaloneEnabled(id) {
     try {
-      return !!(this.app.plugins && this.app.plugins.plugins && this.app.plugins.plugins[id]);
+      // 宿主 id 已改成 collis，和内置速记卡片子模块同名；必须排除自身，
+      // 否则会被误判为“旧独立插件已启用”，整个卡片模块就不加载了。
+      if (id === this.manifest.id) return false;
+      const plugins = this.app.plugins && this.app.plugins.plugins;
+      return !!(plugins && plugins[id] && plugins[id] !== this);
     } catch (error) {
       return false;
     }
