@@ -23343,12 +23343,42 @@ module.exports = class NovalPlugin extends Plugin {
     document.body.classList.remove("noval-focus");
     this.unloadBundledPlugins();
   }
-  // 清理旧版插件残留的独立视图，避免启动后右侧栏还挂着旧画布视图。
+  // 处理更名前留在工作区里的旧标签页。
   // 注意：qm-cards-view 现在是内置 Noval 的正式右侧栏，不能再当旧视图清掉，
   // 否则每次启动都会把上次开着的卡片笔记关掉。
   closeLegacyViews() {
-    const types = LEGACY.viewTypes.concat(["volis-board", "volis-workbench"]);
-    for (const type of types) {
+    const remap = { "collis-view": VIEW_TYPE, "collis-gallery": "noval-gallery" };
+    const drop = new Set(LEGACY.viewTypes.concat(["volis-board", "volis-workbench"]));
+    const leaves = [];
+    try {
+      this.app.workspace.iterateAllLeaves((leaf) => leaves.push(leaf));
+    } catch (error) {
+      leaves.length = 0;
+    }
+    for (const leaf of leaves) {
+      let type = "";
+      try {
+        type = leaf.view && typeof leaf.view.getViewType === "function" && leaf.view.getViewType() || typeof leaf.getViewState === "function" && leaf.getViewState().type || "";
+      } catch (error) {
+        type = "";
+      }
+      if (remap[type]) {
+        try {
+          leaf.setViewState({ type: remap[type], active: false });
+          continue;
+        } catch (error) {
+          console.error("[noval] \u8FC1\u79FB\u65E7\u89C6\u56FE\u5931\u8D25: " + type, error);
+        }
+      }
+      if (drop.has(type)) {
+        try {
+          leaf.detach();
+        } catch (error) {
+          console.error("[noval] \u5173\u95ED\u65E7\u89C6\u56FE\u5931\u8D25: " + type, error);
+        }
+      }
+    }
+    for (const type of drop) {
       try {
         this.app.workspace.detachLeavesOfType(type);
       } catch (error) {

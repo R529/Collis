@@ -4739,14 +4739,49 @@ module.exports = class NovalPlugin extends Plugin {
     this.unloadBundledPlugins();
   }
 
-  // 清理旧版插件残留的独立视图，避免启动后右侧栏还挂着旧画布视图。
+  // 处理更名前留在工作区里的旧标签页。
   // 注意：qm-cards-view 现在是内置 Noval 的正式右侧栏，不能再当旧视图清掉，
   // 否则每次启动都会把上次开着的卡片笔记关掉。
   closeLegacyViews() {
-    // 更名前的标签页类型：这里只关掉，不迁移状态——视图注册已经换成新类型，
-    // 留着旧标签就是一个打不开的空页；关掉后用户从 ribbon 或命令重新打开即可。
-    const types = LEGACY.viewTypes.concat(["volis-board", "volis-workbench"]);
-    for (const type of types) {
+    // 能一一对应的直接换成新类型，标签页原地复活；其余（旧画布文件视图等）
+    // 直接关掉——视图类型已经注销，留着就是一个打不开的空页。
+    const remap = { "collis-view": VIEW_TYPE, "collis-gallery": "noval-gallery" };
+    const drop = new Set(LEGACY.viewTypes.concat(["volis-board", "volis-workbench"]));
+    const leaves = [];
+    try {
+      this.app.workspace.iterateAllLeaves((leaf) => leaves.push(leaf));
+    } catch (error) {
+      leaves.length = 0;
+    }
+    for (const leaf of leaves) {
+      // 未注册的视图类型取不到 getViewType，退回读保存的 state.type
+      let type = "";
+      try {
+        type =
+          (leaf.view && typeof leaf.view.getViewType === "function" && leaf.view.getViewType()) ||
+          (typeof leaf.getViewState === "function" && leaf.getViewState().type) ||
+          "";
+      } catch (error) {
+        type = "";
+      }
+      if (remap[type]) {
+        try {
+          leaf.setViewState({ type: remap[type], active: false });
+          continue;
+        } catch (error) {
+          console.error("[noval] 迁移旧视图失败: " + type, error);
+        }
+      }
+      if (drop.has(type)) {
+        try {
+          leaf.detach();
+        } catch (error) {
+          console.error("[noval] 关闭旧视图失败: " + type, error);
+        }
+      }
+    }
+    // 兜底：按类型整体清一遍，覆盖上面取不到类型的情况。
+    for (const type of drop) {
       try {
         this.app.workspace.detachLeavesOfType(type);
       } catch (error) {
