@@ -1601,6 +1601,8 @@ var require_noval_notes_core = __commonJS({
           // 正在编辑但还没保存的文本：列表被重画时用它恢复，避免白打一遍
           editingDraft: null,
           cards: [],
+          // 卡片视图：list 保留日期时间线；grid 只铺卡片、不显示日期头
+          view: "list",
           // 折叠的日期（只影响渲染，不改文件）
           collapsed: new Set(plugin.settings && plugin.settings.collapsedDates || []),
           // 多选删除
@@ -16915,6 +16917,8 @@ var require_noval_notes = __commonJS({
       review: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4.3l2.8 1.7"/></svg>',
       filter: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h16"/><path d="M7 12h10"/><path d="M10 17h4"/></svg>',
       more: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
+      list: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>',
+      grid: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3.5" y="3.5" width="7" height="7" rx="1.2"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.2"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.2"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.2"/></svg>',
       back: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>'
     };
     function setIconHtml(parent, name) {
@@ -16951,8 +16955,19 @@ var require_noval_notes = __commonJS({
         this.editingKey = null;
         this.editingDraft = null;
         this.appendOpen = /* @__PURE__ */ new Set();
+        this.appendClosed = /* @__PURE__ */ new Set();
         this.appendDrafting = null;
         this.appendEditing = null;
+        this.view = "list";
+        this.viewCountEl = null;
+        this.detailKey = null;
+        this.detailEl = null;
+        this.detailEditingBody = false;
+        this.detailBodyDraft = "";
+        this.detailEditingAppend = -1;
+        this.detailAppendDraft = "";
+        this.detailAppendInput = "";
+        this._detailKeys = null;
         this.cards = [];
         this.query = "";
         this.refFilter = "";
@@ -16960,6 +16975,13 @@ var require_noval_notes = __commonJS({
         this.untagged = false;
         this.expanded = {};
         this.collapsed = /* @__PURE__ */ new Set();
+        this.batchSize = 100;
+        this.renderPlan = null;
+        this.renderCursor = 0;
+        this.currentListEl = null;
+        this.loadMoreEl = null;
+        this.loadMoreIO = null;
+        this._searchTimer = null;
         this._loading = false;
         this._pending = false;
         this._outside = null;
@@ -16972,6 +16994,7 @@ var require_noval_notes = __commonJS({
         this.closeMenu();
         this.closePop();
         this.closeCardMenu();
+        this.closeDetail();
         this.container = containerEl;
         this.container.empty();
         this.container.addClass("cl-notes-panel");
@@ -16993,9 +17016,18 @@ var require_noval_notes = __commonJS({
       destroy() {
         if (this._outside) document.removeEventListener("mousedown", this._outside);
         this._outside = null;
+        if (this._searchTimer) {
+          window.clearTimeout(this._searchTimer);
+          this._searchTimer = null;
+        }
+        this.stopLoadMore();
+        this.currentListEl = null;
+        this.renderPlan = null;
+        this.renderCursor = 0;
         this.closeMenu();
         this.closePop();
         this.closeCardMenu();
+        this.closeDetail();
         if (this.container) this.container.empty();
         this.container = null;
         this.listWrap = null;
@@ -17023,10 +17055,18 @@ var require_noval_notes = __commonJS({
         search.addEventListener("input", () => {
           this.query = search.value;
           clear.classList.toggle("is-visible", !!search.value);
-          this.renderList();
-          if (this.pop) this.renderFilterPanel();
+          if (this._searchTimer) window.clearTimeout(this._searchTimer);
+          this._searchTimer = window.setTimeout(() => {
+            this._searchTimer = null;
+            this.renderList();
+            if (this.pop) this.renderFilterPanel();
+          }, 150);
         });
         clear.onclick = () => {
+          if (this._searchTimer) {
+            window.clearTimeout(this._searchTimer);
+            this._searchTimer = null;
+          }
           search.value = "";
           this.query = "";
           clear.classList.remove("is-visible");
@@ -17086,6 +17126,23 @@ var require_noval_notes = __commonJS({
           }
         });
         save.onclick = () => this.capture();
+        const viewBar = body.createDiv({ cls: "cl-notes-viewbar" });
+        const seg = viewBar.createDiv({ cls: "qm-viewseg cl-notes-viewseg" });
+        const makeViewBtn = (label, mode) => {
+          const btn = seg.createEl("button", { cls: "qm-viewbtn cl-notes-viewbtn" });
+          btn.setAttribute("type", "button");
+          setIconHtml(btn, mode === "list" ? "list" : "grid");
+          btn.createSpan({ text: label });
+          if (mode === "list") btn.addClass("is-active");
+          btn.onclick = (ev) => {
+            ev.stopPropagation();
+            this.setView(mode);
+          };
+          return btn;
+        };
+        this.viewListBtn = makeViewBtn("\u5217\u8868", "list");
+        this.viewGridBtn = makeViewBtn("\u5361\u7247", "grid");
+        this.viewCountEl = viewBar.createSpan({ cls: "cl-notes-viewcount" });
         this.listWrap = body.createDiv({ cls: "cl-notes-listwrap" });
         this.selBarEl = body.createDiv({ cls: "qm-selbar" });
         this.reviewEl = body.createDiv({ cls: "qm-review" });
@@ -17100,6 +17157,13 @@ var require_noval_notes = __commonJS({
       }
       /* ---------------- 数据 ---------------- */
       async load() {
+        return this.reloadCards();
+      }
+      refresh() {
+        this.load();
+      }
+      /** 数据层写入后只重读数据；能局部更新的就不整表重画 */
+      async reloadCards() {
         if (!this.container) return;
         if (this._loading) {
           this._pending = true;
@@ -17119,20 +17183,80 @@ var require_noval_notes = __commonJS({
         }
         this._loading = false;
         if (!this.container) return;
-        this.cards = Array.isArray(cards) ? cards : [];
-        this.renderList();
+        this.applyCardsLoaded(Array.isArray(cards) ? cards : []);
         this.applyPendingFocus();
+        if (this.detailKey) this.renderDetail();
         if (this.reviewEl && this.reviewEl.hasClass("show")) {
           this.syncReviewCards();
           this.renderReview();
         }
         if (this._pending) {
           this._pending = false;
-          this.load();
+          this.reloadCards();
         }
       }
-      refresh() {
-        this.load();
+      /** 卡片数据签名：用来判断哪一张的内容变了 */
+      cardSig(card) {
+        return String(card.date || "") + "\0" + String(card.time || "") + "\0" + String(card.body || "");
+      }
+      findCardNode(key) {
+        if (!this.listWrap) return null;
+        const nodes = this.listWrap.querySelectorAll(".qm-card");
+        for (const node of nodes) {
+          if (node.getAttribute("data-qm-key") === key) return node;
+        }
+        return null;
+      }
+      /**
+       * 新数据落地：卡片集合没增删、也没换顺序时，只替换内容变化的那几张卡片的 DOM。
+       * 这样编辑 / 追加一条不会重建整个列表，滚动位置和已渲染批次都能保住。
+       */
+      applyCardsLoaded(cards) {
+        const prev = this.cards || [];
+        const prevKeys = prev.map((c) => this.cardKey(c));
+        const nextKeys = cards.map((c) => this.cardKey(c));
+        const sameOrder = prevKeys.length === nextKeys.length && prevKeys.every((k, i) => k === nextKeys[i]);
+        this.cards = cards;
+        if (!sameOrder || !this.currentListEl || !this.renderPlan) {
+          this.renderList();
+          return;
+        }
+        const prevSig = new Map(prev.map((c) => [this.cardKey(c), this.cardSig(c)]));
+        const byKey = new Map(cards.map((c) => [this.cardKey(c), c]));
+        this.renderPlan = this.renderPlan.map(
+          (item) => item.kind === "card" ? { kind: "card", card: byKey.get(this.cardKey(item.card)) || item.card } : item
+        );
+        let fallback = false;
+        for (const card of cards) {
+          const key = this.cardKey(card);
+          if (prevSig.get(key) === this.cardSig(card)) continue;
+          const node = this.findCardNode(key);
+          if (!node) {
+            fallback = true;
+            break;
+          }
+          const holder = document.createElement("div");
+          this.renderCard(holder, card);
+          const next = holder.firstElementChild;
+          if (!next) {
+            fallback = true;
+            break;
+          }
+          node.replaceWith(next);
+        }
+        if (fallback) {
+          this.renderList();
+          return;
+        }
+        if (this.viewCountEl) this.viewCountEl.setText("\u5171 " + this.filteredCards().length + " \u5F20");
+      }
+      /** 数据层按文件通知过来的入口：只更新卡片数据，不整页重建 */
+      applyFileCards() {
+        this.reloadCards();
+      }
+      /** 只有界面文字变化时调用，不重读文件 */
+      rerender() {
+        this.renderList();
       }
       /** 首页点速记时调用：切到卡片笔记后定位到这一条。 */
       focusCard(card) {
@@ -17161,6 +17285,7 @@ var require_noval_notes = __commonJS({
           changed = true;
         }
         if (changed) this.renderList();
+        this.renderAllRemaining();
         this.pendingFocus = null;
         window.setTimeout(() => {
           if (!this.listWrap) return;
@@ -17457,17 +17582,31 @@ var require_noval_notes = __commonJS({
         pop.style.top = Math.max(0, Math.round(top)) + "px";
       }
       /* ---------------- 渲染 ---------------- */
+      setView(view) {
+        if (view !== "list" && view !== "grid") return;
+        if (this.view === view) return;
+        this.view = view;
+        if (this.viewListBtn) this.viewListBtn.classList.toggle("is-active", view === "list");
+        if (this.viewGridBtn) this.viewGridBtn.classList.toggle("is-active", view === "grid");
+        this.renderList();
+      }
       renderList() {
         if (!this.listWrap) return;
         this.closeCardMenu();
         this.closeMenu();
         const cards = this.filteredCards();
+        if (this.viewCountEl) this.viewCountEl.setText("\u5171 " + cards.length + " \u5F20");
         this.renderFilterBtnState();
         this.renderChips();
         this.renderSelectBar();
-        const keepScroll = this.listWrap.scrollTop;
+        const prevList = this.listWrap.querySelector(".qm-list");
+        const keepScroll = prevList ? prevList.scrollTop : 0;
+        this.stopLoadMore();
+        this.currentListEl = null;
         this.listWrap.empty();
         if (!cards.length) {
+          this.renderPlan = null;
+          this.renderCursor = 0;
           const empty = this.listWrap.createDiv({ cls: "qm-empty" });
           empty.setText(
             this.cards.length ? "\u6CA1\u6709\u5339\u914D\u7684\u5361\u7247\u3002\u6362\u4E2A\u8BCD\uFF0C\u6216\u8005\u6E05\u9664\u7B5B\u9009\u3002" : "\u8FD8\u6CA1\u6709\u5361\u7247\u3002\u5728\u4E0A\u9762\u5199\u70B9\u4EC0\u4E48\uFF0CCtrl+Enter \u8BB0\u4E0B\u3002"
@@ -17475,11 +17614,30 @@ var require_noval_notes = __commonJS({
           return;
         }
         this.renderCards(cards);
-        this.listWrap.scrollTop = keepScroll;
+        let guard = 0;
+        if (keepScroll > 0) {
+          while (this.renderCursor < this.renderPlan.length && this.currentListEl.scrollHeight <= keepScroll + 400 && guard++ < 200) {
+            this.renderNextBatch();
+          }
+        }
+        if (this.currentListEl) this.currentListEl.scrollTop = keepScroll;
       }
       renderCards(cards) {
-        const list = this.listWrap.createDiv({ cls: "qm-list" });
-        const searching = !!this.query.trim();
+        const grid = this.view === "grid";
+        this.currentListEl = this.listWrap.createDiv({
+          cls: grid ? "qm-list cl-notes-grid" : "qm-list"
+        });
+        this.renderPlan = this.buildRenderPlan(cards);
+        this.renderCursor = 0;
+        this.renderNextBatch();
+      }
+      /** 把过滤后的卡片摊平成渲染计划：日期头 + 卡片，收起的分组只留头 */
+      buildRenderPlan(cards) {
+        if (this.view === "grid") {
+          return cards.map((card) => ({ kind: "card", card }));
+        }
+        const searching = !!String(this.query || "").trim();
+        const plan = [];
         let i = 0;
         while (i < cards.length) {
           const date = cards[i].date;
@@ -17489,17 +17647,93 @@ var require_noval_notes = __commonJS({
             i++;
           }
           const collapsed = !searching && this.collapsed.has(date);
-          const day = list.createDiv({ cls: "qm-day" + (collapsed ? " is-collapsed" : "") });
-          day.createSpan({ cls: "qm-day-arrow", text: collapsed ? "\u25B6" : "\u25BC" });
-          day.createSpan({ cls: "qm-day-text", text: date });
-          day.createSpan({ cls: "qm-day-count", text: String(group.length) });
-          day.onclick = () => {
-            if (this.collapsed.has(date)) this.collapsed.delete(date);
-            else this.collapsed.add(date);
-            this.renderList();
-          };
-          if (collapsed) continue;
-          for (const card of group) this.renderCard(list, card);
+          plan.push({ kind: "day", date, count: group.length, collapsed });
+          if (!collapsed) {
+            for (const card of group) plan.push({ kind: "card", card });
+          }
+        }
+        return plan;
+      }
+      /** 渲染下一批；滚动到底部时由 IntersectionObserver 再调用 */
+      renderNextBatch() {
+        if (!this.renderPlan || !this.currentListEl) return;
+        if (this.renderCursor >= this.renderPlan.length) {
+          this.stopLoadMore();
+          return;
+        }
+        const end = Math.min(this.renderCursor + this.batchSize, this.renderPlan.length);
+        for (; this.renderCursor < end; this.renderCursor++) {
+          const item = this.renderPlan[this.renderCursor];
+          if (item.kind === "day") {
+            const collapsed = item.collapsed;
+            const day = this.currentListEl.createDiv({
+              cls: "qm-day" + (collapsed ? " is-collapsed" : "")
+            });
+            day.createSpan({ cls: "qm-day-arrow", text: collapsed ? "\u25B6" : "\u25BC" });
+            day.createSpan({ cls: "qm-day-text", text: item.date });
+            day.createSpan({ cls: "qm-day-count", text: String(item.count) });
+            day.onclick = () => {
+              if (this.collapsed.has(item.date)) this.collapsed.delete(item.date);
+              else this.collapsed.add(item.date);
+              this.renderList();
+            };
+          } else {
+            this.renderCard(this.currentListEl, item.card);
+          }
+        }
+        if (this.renderCursor >= this.renderPlan.length) {
+          this.stopLoadMore();
+          return;
+        }
+        this.ensureLoadMore();
+        this.scheduleLoadMoreCheck();
+      }
+      /** 哨兵一直在视口里时 IntersectionObserver 不会重复回调，补一次自检 */
+      scheduleLoadMoreCheck() {
+        window.setTimeout(() => {
+          if (!this.loadMoreEl || !this.currentListEl || !this.renderPlan) return;
+          if (this.renderCursor >= this.renderPlan.length) return;
+          const rootRect = this.currentListEl.getBoundingClientRect();
+          if (!rootRect.height) return;
+          const sentinelRect = this.loadMoreEl.getBoundingClientRect();
+          if (sentinelRect.top < rootRect.bottom + 700) this.renderNextBatch();
+        }, 16);
+      }
+      /** 列表底部的哨兵：视口快到底时再渲染下一批 */
+      ensureLoadMore() {
+        if (!this.currentListEl) return;
+        if (this.loadMoreEl && this.loadMoreEl.parentNode === this.currentListEl) {
+          this.currentListEl.appendChild(this.loadMoreEl);
+          return;
+        }
+        this.stopLoadMore();
+        const el = this.currentListEl.createDiv({ cls: "cl-notes-loadmore" });
+        this.loadMoreEl = el;
+        if (typeof IntersectionObserver !== "function") return;
+        this.loadMoreIO = new IntersectionObserver(
+          (entries) => {
+            if (entries.some((e) => e.isIntersecting)) this.renderNextBatch();
+          },
+          { root: this.currentListEl, rootMargin: "700px 0px" }
+        );
+        this.loadMoreIO.observe(el);
+      }
+      stopLoadMore() {
+        if (this.loadMoreIO) {
+          this.loadMoreIO.disconnect();
+          this.loadMoreIO = null;
+        }
+        if (this.loadMoreEl) {
+          this.loadMoreEl.remove();
+          this.loadMoreEl = null;
+        }
+      }
+      /** 定位 / 打印等需要全量 DOM 时，把剩余批次一次补齐 */
+      renderAllRemaining() {
+        if (!this.renderPlan) return;
+        let guard = 0;
+        while (this.renderCursor < this.renderPlan.length && guard++ < 1e4) {
+          this.renderNextBatch();
         }
       }
       renderCard(list, card) {
@@ -17511,6 +17745,7 @@ var require_noval_notes = __commonJS({
         el.setAttribute("data-qm-date", card.date || "");
         el.setAttribute("data-qm-time", card.time || "");
         el.setAttribute("data-qm-id", card.id || "");
+        el.setAttribute("data-qm-key", key);
         if (this.selectMode) el.addClass("is-selectable");
         const head = el.createDiv({ cls: "qm-card-head" });
         if (this.selectMode) head.createSpan({ cls: "qm-tick", text: "\u2713" });
@@ -17525,8 +17760,14 @@ var require_noval_notes = __commonJS({
           badge.setAttribute("role", "button");
           badge.onclick = (ev) => {
             ev.stopPropagation();
-            if (this.appendOpen.has(key)) this.appendOpen.delete(key);
-            else this.appendOpen.add(key);
+            if (this.view === "grid") {
+              if (this.appendClosed.has(key)) this.appendClosed.delete(key);
+              else this.appendClosed.add(key);
+            } else if (this.appendOpen.has(key)) {
+              this.appendOpen.delete(key);
+            } else {
+              this.appendOpen.add(key);
+            }
             this.renderList();
           };
         }
@@ -17540,23 +17781,43 @@ var require_noval_notes = __commonJS({
           this.openCardMenu(el, card, ev.currentTarget || more);
         };
         if (editing) {
+          if (this.view === "grid") el.addClass("is-editing");
           this.renderEditBox(el, card, key, sections.original);
           el.onclick = (e) => e.stopPropagation();
           return;
         }
-        const bodyEl = el.createDiv({ cls: "qm-body" });
+        const isGrid = this.view === "grid";
+        const scrollEl = isGrid ? el.createDiv({ cls: "cl-notes-card-scroll" }) : el;
+        const bodyEl = scrollEl.createDiv({ cls: "qm-body" });
         this.renderCardBody(bodyEl, card, sections.original);
-        if (sections.appends.length && this.appendOpen.has(key)) {
-          this.renderAppendList(el, card, sections, key);
+        if (isGrid) {
+          const tags = Array.from(bodyEl.querySelectorAll(".qm-tag"));
+          if (tags.length) {
+            const foot = el.createDiv({ cls: "qm-card-tags" });
+            for (const tag of tags) foot.appendChild(tag);
+          }
+        }
+        const appendsOpen = sections.appends.length && (isGrid ? !this.appendClosed.has(key) : this.appendOpen.has(key));
+        if (appendsOpen) {
+          this.renderAppendList(scrollEl, card, sections, key);
         }
         if (this.appendDrafting && this.appendDrafting.key === key) {
-          this.renderAppendComposer(el, card, key);
+          this.renderAppendComposer(scrollEl, card, key);
         }
-        el.onclick = () => {
-          if (this.selectMode) this.toggleSelected(card, el);
+        el.onclick = (ev) => {
+          if (this.selectMode) {
+            this.toggleSelected(card, el);
+            return;
+          }
+          if (!isGrid) return;
+          const t = ev.target;
+          if (t && typeof t.closest === "function" && t.closest("a, button, textarea, input, .qm-tag, .qm-ref, .qm-append-badge, .qm-append-acts")) {
+            return;
+          }
+          this.openDetail(card);
         };
         el.addEventListener("dblclick", (e) => {
-          if (this.selectMode) return;
+          if (this.selectMode || isGrid) return;
           const t = e.target;
           if (t && typeof t.closest === "function" && t.closest("a, .qm-tag, .qm-more, .qm-ref, .qm-append-badge, button, textarea")) {
             return;
@@ -17599,7 +17860,7 @@ var require_noval_notes = __commonJS({
           }
           this.editingKey = null;
           this.editingDraft = null;
-          await this.load();
+          await this.reloadCards();
         };
         ta.addEventListener("keydown", (e) => {
           if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -17645,7 +17906,7 @@ var require_noval_notes = __commonJS({
               const ok = await this.noval.updateAppend(card, index, text);
               if (!ok) return;
               this.appendEditing = null;
-              await this.load();
+              await this.reloadCards();
             };
             return;
           }
@@ -17671,6 +17932,7 @@ var require_noval_notes = __commonJS({
         const key = this.cardKey(card);
         this.appendEditing = { key, index, text: String(text || "") };
         this.appendOpen.add(key);
+        this.appendClosed.delete(key);
         this.renderAll();
       }
       confirmDeleteAppend(card, index) {
@@ -17678,7 +17940,7 @@ var require_noval_notes = __commonJS({
           const ok = await this.noval.deleteAppend(card, index);
           if (!ok) return;
           this.appendEditing = null;
-          await this.load();
+          await this.reloadCards();
         }).open();
       }
       /** 从「···」进追加：展开这张卡并就地放一个输入框 */
@@ -17686,6 +17948,7 @@ var require_noval_notes = __commonJS({
         const key = this.cardKey(card);
         this.appendDrafting = { key, text: "" };
         this.appendOpen.add(key);
+        this.appendClosed.delete(key);
         this.renderAll();
       }
       renderAppendComposer(el, card, key) {
@@ -17724,7 +17987,7 @@ var require_noval_notes = __commonJS({
           if (!ok) return;
           this.appendDrafting = null;
           this.appendOpen.add(key);
-          await this.load();
+          await this.reloadCards();
         };
         ta.addEventListener("keydown", (ev) => {
           if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
@@ -17735,6 +17998,240 @@ var require_noval_notes = __commonJS({
             cancel();
           }
         });
+      }
+      /* ---------------- 卡片详情浮窗（只在卡片视图里使用） ---------------- */
+      detailCard() {
+        if (!this.detailKey) return null;
+        return this.cards.find((c) => this.cardKey(c) === this.detailKey) || null;
+      }
+      openDetail(card) {
+        if (!card || !this.container) return;
+        this.detailKey = this.cardKey(card);
+        this.detailEditingBody = false;
+        this.detailBodyDraft = "";
+        this.detailEditingAppend = -1;
+        this.detailAppendDraft = "";
+        this.detailAppendInput = "";
+        if (!this._detailKeys) {
+          this._detailKeys = (ev) => {
+            if (ev.key === "Escape" && this.detailEl) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              this.closeDetail();
+            }
+          };
+          document.addEventListener("keydown", this._detailKeys, true);
+        }
+        this.renderDetail();
+      }
+      closeDetail() {
+        if (this._detailKeys) {
+          document.removeEventListener("keydown", this._detailKeys, true);
+          this._detailKeys = null;
+        }
+        if (this.detailEl) {
+          this.detailEl.remove();
+          this.detailEl = null;
+        }
+        this.detailKey = null;
+        this.detailEditingBody = false;
+        this.detailBodyDraft = "";
+        this.detailEditingAppend = -1;
+        this.detailAppendDraft = "";
+      }
+      renderDetail() {
+        const card = this.detailCard();
+        if (!card || !this.container) {
+          this.closeDetail();
+          return;
+        }
+        let keepScroll = 0;
+        if (this.detailEl) {
+          const oldScroll = this.detailEl.querySelector(".cl-notes-detail-scroll");
+          if (oldScroll) keepScroll = oldScroll.scrollTop;
+          this.detailEl.remove();
+        }
+        const overlay = this.container.createDiv({ cls: "cl-notes-detail-overlay" });
+        this.detailEl = overlay;
+        overlay.addEventListener("mousedown", (ev) => {
+          if (ev.target === overlay) this.closeDetail();
+        });
+        const dlg = overlay.createDiv({ cls: "cl-notes-detail" });
+        const sections = NovalBundle2.qmCardSections(card.body);
+        const head = dlg.createDiv({ cls: "cl-notes-detail-head" });
+        head.createSpan({ cls: "cl-notes-detail-time", text: card.time || "" });
+        const refDot = head.createSpan({ cls: "qm-ref" });
+        this.paintRefDot(refDot, card);
+        if (sections.appends.length) {
+          head.createSpan({
+            cls: "cl-notes-detail-badge",
+            text: "\u8FFD\u52A0 " + sections.appends.length
+          });
+        }
+        const close = head.createEl("button", { cls: "cl-notes-detail-close", text: "\u2715" });
+        close.setAttribute("type", "button");
+        close.setAttribute("aria-label", "\u5173\u95ED");
+        close.onclick = () => this.closeDetail();
+        const scroll = dlg.createDiv({ cls: "cl-notes-detail-scroll" });
+        const label = scroll.createDiv({ cls: "cl-notes-detail-label" });
+        label.createSpan({ text: "\u6B63\u6587" });
+        if (!this.detailEditingBody) {
+          const edit = label.createEl("button", { cls: "cl-notes-detail-link", text: "\u7F16\u8F91" });
+          edit.setAttribute("type", "button");
+          edit.onclick = () => {
+            this.detailEditingBody = true;
+            this.detailBodyDraft = String(sections.original || "");
+            this.renderDetail();
+          };
+        }
+        if (this.detailEditingBody) {
+          const ta = scroll.createEl("textarea", { cls: "qm-edit cl-notes-detail-edit" });
+          ta.value = this.detailBodyDraft;
+          ta.addEventListener("input", () => {
+            this.detailBodyDraft = ta.value;
+          });
+          window.setTimeout(() => ta.focus(), 20);
+          const bar = scroll.createDiv({ cls: "cl-notes-detail-editbar" });
+          const cancel = bar.createEl("button", { cls: "qm-mini-btn", text: "\u53D6\u6D88" });
+          cancel.onclick = () => {
+            this.detailEditingBody = false;
+            this.detailBodyDraft = "";
+            this.renderDetail();
+          };
+          const save = bar.createEl("button", { cls: "qm-mini-btn is-primary", text: "\u4FDD\u5B58" });
+          save.onclick = async () => {
+            const text = String(this.detailBodyDraft || "");
+            if (!text.trim()) {
+              new Notice2("\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A");
+              return;
+            }
+            const ok = await this.noval.updateCard(card, text);
+            if (!ok) {
+              new Notice2("\u4FDD\u5B58\u5931\u8D25\uFF0C\u5361\u7247\u4F4D\u7F6E\u53EF\u80FD\u5DF2\u53D8\u5316");
+              return;
+            }
+            this.detailEditingBody = false;
+            this.detailBodyDraft = "";
+            await this.reloadCards();
+          };
+          ta.addEventListener("keydown", (ev) => {
+            if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+              ev.preventDefault();
+              save.onclick(ev);
+            }
+          });
+        } else {
+          const bodyEl = scroll.createDiv({ cls: "cl-notes-detail-body" });
+          this.renderCardBody(bodyEl, card, sections.original, false);
+          const tags = Array.from(bodyEl.querySelectorAll(".qm-tag"));
+          if (tags.length) {
+            const tagWrap = scroll.createDiv({ cls: "cl-notes-detail-tags" });
+            for (const tag of tags) tagWrap.appendChild(tag);
+          }
+        }
+        scroll.createDiv({ cls: "cl-notes-detail-divider", text: "\u8FFD\u52A0\u5185\u5BB9" });
+        const list = scroll.createDiv({ cls: "cl-notes-detail-appends" });
+        if (!sections.appends.length) {
+          list.createDiv({ cls: "cl-notes-detail-empty", text: "\u8FD8\u6CA1\u6709\u8FFD\u52A0\u5185\u5BB9\u3002" });
+        }
+        sections.appends.forEach((item, index) => {
+          const row = list.createDiv({ cls: "cl-notes-detail-append" });
+          const bar = row.createDiv({ cls: "cl-notes-detail-append-head" });
+          bar.createSpan({ cls: "cl-notes-detail-append-time", text: item.label });
+          const editingAppend = this.detailEditingAppend === index;
+          if (!editingAppend) {
+            const acts = bar.createDiv({ cls: "cl-notes-detail-acts" });
+            const edit = acts.createEl("button", { cls: "qm-mini-btn", text: "\u7F16\u8F91" });
+            edit.onclick = () => {
+              this.detailEditingAppend = index;
+              this.detailAppendDraft = String(item.text || "");
+              this.renderDetail();
+            };
+            const del = acts.createEl("button", {
+              cls: "qm-mini-btn qm-mini-btn-danger",
+              text: "\u5220\u9664"
+            });
+            del.onclick = () => {
+              new NovalBundle2.ConfirmModal(this.app, "\u5220\u9664\u8FD9\u6761\u8FFD\u52A0\uFF1F", async () => {
+                const ok = await this.noval.deleteAppend(card, index);
+                if (!ok) return;
+                this.detailEditingAppend = -1;
+                await this.reloadCards();
+              }).open();
+            };
+          }
+          if (editingAppend) {
+            const ta = row.createEl("textarea", { cls: "qm-edit cl-notes-detail-edit" });
+            ta.value = this.detailAppendDraft;
+            ta.addEventListener("input", () => {
+              this.detailAppendDraft = ta.value;
+            });
+            window.setTimeout(() => ta.focus(), 20);
+            const editBar = row.createDiv({ cls: "cl-notes-detail-editbar" });
+            const cancel = editBar.createEl("button", { cls: "qm-mini-btn", text: "\u53D6\u6D88" });
+            cancel.onclick = () => {
+              this.detailEditingAppend = -1;
+              this.detailAppendDraft = "";
+              this.renderDetail();
+            };
+            const save = editBar.createEl("button", { cls: "qm-mini-btn is-primary", text: "\u4FDD\u5B58" });
+            save.onclick = async () => {
+              const text = String(this.detailAppendDraft || "");
+              if (!text.trim()) {
+                new Notice2("\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A");
+                return;
+              }
+              const ok = await this.noval.updateAppend(card, index, text);
+              if (!ok) return;
+              this.detailEditingAppend = -1;
+              this.detailAppendDraft = "";
+              await this.reloadCards();
+            };
+            ta.addEventListener("keydown", (ev) => {
+              if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+                ev.preventDefault();
+                save.onclick(ev);
+              }
+            });
+          } else {
+            const textEl = row.createDiv({ cls: "cl-notes-detail-append-text" });
+            this.renderCardBody(textEl, card, item.text, false);
+          }
+        });
+        const foot = dlg.createDiv({ cls: "cl-notes-detail-foot" });
+        const input = foot.createEl("textarea", {
+          cls: "cl-notes-detail-input",
+          attr: { rows: "2", placeholder: "\u8FFD\u52A0\u4E00\u6761\u2026" }
+        });
+        input.value = this.detailAppendInput;
+        input.addEventListener("input", () => {
+          this.detailAppendInput = input.value;
+        });
+        const footBar = foot.createDiv({ cls: "cl-notes-detail-footbar" });
+        footBar.createSpan({ cls: "cl-notes-detail-hint", text: "Esc \u5173\u95ED \xB7 Ctrl+Enter \u4FDD\u5B58" });
+        const addBtn = footBar.createEl("button", { cls: "qm-mini-btn is-primary", text: "\u8FFD\u52A0" });
+        addBtn.onclick = async () => {
+          const text = String(this.detailAppendInput || "").trim();
+          if (!text) {
+            new Notice2("\u5199\u70B9\u4EC0\u4E48\u518D\u8FFD\u52A0\u5427");
+            return;
+          }
+          const ok = await this.noval.appendToCard(card, text);
+          if (!ok) return;
+          this.detailAppendInput = "";
+          await this.reloadCards();
+          if (this.detailEl) {
+            const sc = this.detailEl.querySelector(".cl-notes-detail-scroll");
+            if (sc) sc.scrollTop = sc.scrollHeight;
+          }
+        };
+        input.addEventListener("keydown", (ev) => {
+          if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+            ev.preventDefault();
+            addBtn.onclick(ev);
+          }
+        });
+        if (keepScroll) scroll.scrollTop = keepScroll;
       }
       /** 引用小红点：数字与提示文案都与 Noval 的 paintRefDot 一致 */
       paintRefDot(el, card) {
@@ -17757,7 +18254,7 @@ var require_noval_notes = __commonJS({
         if (info.ambiguous) lines.push("\uFF08\u6709\u540C\u540D\u6587\u4EF6\uFF0C\u94FE\u63A5\u53EF\u80FD\u6307\u9519\uFF0C\u6CE8\u610F\uFF09");
         el.setAttribute("title", lines.join("\n"));
       }
-      renderCardBody(bodyEl, card, textOverride) {
+      renderCardBody(bodyEl, card, textOverride, interactive = true) {
         const text = textOverride != null ? String(textOverride) : NovalBundle2.qmCardSections(String(card.body || "")).original;
         TAG_RE.lastIndex = 0;
         let last = 0;
@@ -17768,7 +18265,7 @@ var require_noval_notes = __commonJS({
           }
           const tagValue = match[1];
           const tag = bodyEl.createSpan({ cls: "qm-tag", text: match[0] });
-          if (!this.selectMode) {
+          if (!this.selectMode && interactive) {
             tag.onclick = (ev) => {
               ev.stopPropagation();
               this.setFilterTags([tagValue]);
@@ -18095,7 +18592,7 @@ var require_noval_notes = __commonJS({
             const res = await this.noval.deleteCards(picked);
             this.selectMode = false;
             this.selected.clear();
-            await this.load();
+            await this.reloadCards();
             if (res && res.deleted && res.failed) {
               new Notice2("\u5DF2\u5220\u9664 " + res.deleted + " \u6761\uFF0C" + res.failed + " \u6761\u6CA1\u627E\u5230\u5DF2\u8DF3\u8FC7", 9e3);
             } else if (res && res.deleted) {
@@ -18366,7 +18863,7 @@ var require_noval_notes = __commonJS({
           "\u5220\u9664\u8FD9\u6761\u5361\u7247\uFF1F",
           async () => {
             await this.noval.deleteCard(card);
-            await this.load();
+            await this.reloadCards();
           },
           detail
         ).open();
@@ -18401,7 +18898,7 @@ var require_noval_notes = __commonJS({
           this.saveBtn.disabled = true;
           this.saveBtn.classList.add("is-disabled");
         }
-        this.load();
+        this.reloadCards();
       }
       openCard(card, newLeaf) {
         if (!card || !card.filePath) return;
@@ -18471,7 +18968,7 @@ var BUNDLED_PLUGINS = [
     manifest: {
       id: BOARD_ID,
       name: "Noval",
-      version: "0.6.2",
+      version: "0.7.3",
       minAppVersion: "1.13.0",
       description: "Canvas \u601D\u8003\u5DE5\u4F5C\u53F0\uFF1A\u753B\u5E03\u96C6\u3001\u8BED\u4E49\u8FDE\u7EBF\u3001\u5927\u7EB2\u3001Markdown \u5BFC\u51FA\u4E0E AI\u3002",
       author: "Lak",
@@ -19196,7 +19693,7 @@ var DeleteFilesModal = class extends Modal {
     this.contentEl.empty();
   }
 };
-var DissolveModuleModal = class extends Modal {
+var DeleteModuleModal = class extends Modal {
   constructor(app, info, onConfirm) {
     super(app);
     this.info = info || {};
@@ -19216,7 +19713,7 @@ var DissolveModuleModal = class extends Modal {
     if (this.info.folderCount) parts.push(this.info.folderCount + " \u4E2A\u5B50\u6587\u4EF6\u5939");
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: parts.length ? "\u4F1A\u628A " + parts.join("\u3001") + " \u4E0A\u79FB\u5230\u300C" + (this.info.parentLabel || "\u4E0A\u4E00\u7EA7") + "\u300D\uFF0C\u7136\u540E\u5220\u9664\u7A7A\u7684\u6A21\u5757\u6587\u4EF6\u5939\u3002\u4E0D\u4F1A\u5220\u9664\u4EFB\u4F55\u7B14\u8BB0\u5185\u5BB9\u3002" : "\u8FD9\u4E2A\u6A21\u5757\u6587\u4EF6\u5939\u662F\u7A7A\u7684\uFF0C\u4F1A\u76F4\u63A5\u79FB\u9664\u6A21\u5757\u5E76\u5220\u9664\u7A7A\u6587\u4EF6\u5939\u3002"
+      text: parts.length ? "\u4F1A\u8FDE\u540C " + parts.join("\u3001") + "\uFF08\u542B\u5B50\u6A21\u5757\uFF09\u4E00\u8D77\uFF0C\u6309 Obsidian\u300C\u6587\u4EF6\u4E0E\u94FE\u63A5 \u2192 \u5220\u9664\u6587\u4EF6\u300D\u7684\u8BBE\u7F6E\u5904\u7406\u3002" : "\u8FD9\u4E2A\u6A21\u5757\u6587\u4EF6\u5939\u662F\u7A7A\u7684\uFF0C\u4F1A\u6309 Obsidian\u300C\u6587\u4EF6\u4E0E\u94FE\u63A5 \u2192 \u5220\u9664\u6587\u4EF6\u300D\u7684\u8BBE\u7F6E\u5904\u7406\u5E76\u79FB\u9664\u6A21\u5757\u3002"
     });
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
     const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
@@ -19224,7 +19721,7 @@ var DissolveModuleModal = class extends Modal {
       this.finish(false);
       this.close();
     };
-    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u4E0A\u79FB\u5E76\u5220\u9664\u6A21\u5757" });
+    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664\u6587\u4EF6\u5939\u548C\u6A21\u5757" });
     ok.onclick = () => {
       this.finish(true);
       this.close();
@@ -19413,11 +19910,10 @@ var FolderPickerModal = class extends Modal {
   }
 };
 var ModulePickerModal = class extends Modal {
-  constructor(app, modules, onPick, onCreate) {
+  constructor(app, options) {
     super(app);
-    this.modules = modules || [];
-    this.onPick = onPick;
-    this.onCreate = onCreate;
+    this.options = options || {};
+    this.expanded = /* @__PURE__ */ new Set();
   }
   onOpen() {
     const { contentEl } = this;
@@ -19425,28 +19921,73 @@ var ModulePickerModal = class extends Modal {
     contentEl.createEl("h2", { text: "\u5F52\u5165\u6A21\u5757" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "\u9009\u4E2D\u7684\u6587\u4EF6\u4F1A\u79FB\u52A8\u5230\u8BE5\u6A21\u5757\u7684\u4FDD\u5B58\u6587\u4EF6\u5939\uFF0C\u5E76\u8BB0\u5F55\u5F52\u5C5E\uFF1B\u7B14\u8BB0\u540C\u65F6\u5199\u5165 module \u5B57\u6BB5\u3002\u591A\u4E2A\u6A21\u5757\u5171\u7528\u540C\u4E00\u6587\u4EF6\u5939\u65F6\u4F1A\u81EA\u52A8\u653E\u8FDB\u8BE5\u6A21\u5757\u7684\u5B50\u76EE\u5F55\u3002"
+      text: "\u6309\u6587\u4EF6\u6811\u5C42\u7EA7\u5C55\u793A\uFF0C\u70B9\u4EFB\u610F\u4E00\u7EA7\u6A21\u5757\u5373\u53EF\u5F52\u5165\u3002\u9009\u4E2D\u7684\u6587\u4EF6\u4F1A\u79FB\u52A8\u5230\u8BE5\u6A21\u5757\u7684\u4FDD\u5B58\u6587\u4EF6\u5939\uFF0C\u5E76\u8BB0\u5F55\u5F52\u5C5E\uFF1B\u7B14\u8BB0\u540C\u65F6\u5199\u5165 module \u5B57\u6BB5\u3002"
     });
-    const list = contentEl.createDiv({ cls: "cl-picklist" });
-    this.modules.forEach((mod) => {
-      const item = list.createDiv({ cls: "cl-pickitem" });
-      const iconEl = item.createDiv({ cls: "cl-pickicon" });
-      iconEl.style.setProperty("--dot-color", mod.color || "var(--interactive-accent)");
-      setIcon(iconEl, mod.icon || "file-text");
-      item.createDiv({ cls: "cl-pickname", text: mod.name });
-      item.onclick = () => {
-        this.close();
-        if (this.onPick) this.onPick(mod);
-      };
-    });
+    this.listEl = contentEl.createDiv({ cls: "cl-picklist cl-modtree cl-modpick" });
+    const expandAll = (mod) => {
+      const children = this.options.getChildren ? this.options.getChildren(mod) : [];
+      if (!children.length) return;
+      this.expanded.add(moduleIdOf(mod));
+      children.forEach(expandAll);
+    };
+    const roots = this.options.getRootModules ? this.options.getRootModules() : [];
+    roots.forEach(expandAll);
+    this.renderList();
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
     const create = foot.createEl("button", { cls: "cl-btn", text: "\u65B0\u5EFA\u6A21\u5757\u2026" });
     create.onclick = () => {
       this.close();
-      if (this.onCreate) this.onCreate();
+      if (this.options.onCreate) this.options.onCreate();
     };
     const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
+  }
+  renderList() {
+    const list = this.listEl;
+    if (!list) return;
+    list.empty();
+    const roots = this.options.getRootModules ? this.options.getRootModules() : [];
+    if (!roots.length) {
+      list.createDiv({ cls: "cl-modal-hint", text: "\u8FD8\u6CA1\u6709\u6A21\u5757\uFF0C\u70B9\u4E0B\u9762\u7684\u300C\u65B0\u5EFA\u6A21\u5757\u2026\u300D\u3002" });
+      return;
+    }
+    const all = this.options.getAllModules ? this.options.getAllModules() : roots;
+    const draw = (mod, depth) => {
+      const key = moduleIdOf(mod);
+      const children = this.options.getChildren ? this.options.getChildren(mod) : [];
+      const isOpen = this.expanded.has(key);
+      const row = list.createDiv({ cls: "cl-modrow" });
+      row.style.paddingLeft = 8 + depth * 18 + "px";
+      const toggle = row.createDiv({ cls: "cl-modrow-toggle" });
+      if (children.length) {
+        setIcon(toggle, isOpen ? "chevron-down" : "chevron-right");
+        toggle.onclick = (event) => {
+          event.stopPropagation();
+          if (isOpen) this.expanded.delete(key);
+          else this.expanded.add(key);
+          this.renderList();
+        };
+      } else {
+        toggle.addClass("is-blank");
+      }
+      const iconEl = row.createDiv({ cls: "cl-pickicon" });
+      const index = all.indexOf(mod);
+      const tint = index >= 0 ? index % 5 : depth % 5;
+      iconEl.addClass("cl-tint-" + tint);
+      iconEl.style.setProperty("--dot-color", mod.color || "var(--tint)");
+      setIcon(iconEl, mod.icon || (children.length ? "folder" : "file-text"));
+      const main = row.createDiv({ cls: "cl-modrow-main" });
+      main.createDiv({ cls: "cl-modrow-name", text: mod.name });
+      const folder = this.options.getFolder ? this.options.getFolder(mod) : mod.folder || "";
+      if (folder && folder !== mod.name) main.createDiv({ cls: "cl-modrow-path", text: folder });
+      row.createDiv({ cls: "cl-modpick-go", text: "\u5F52\u5165" });
+      row.onclick = () => {
+        this.close();
+        if (this.options.onPick) this.options.onPick(mod);
+      };
+      if (children.length && isOpen) children.forEach((child) => draw(child, depth + 1));
+    };
+    roots.forEach((mod) => draw(mod, 0));
   }
   onClose() {
     this.contentEl.empty();
@@ -19464,7 +20005,7 @@ var ModuleManagerModal = class extends Modal {
     contentEl.createEl("h2", { text: "\u7BA1\u7406\u6A21\u5757" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "\u6309\u6587\u4EF6\u6811\u5C42\u7EA7\u5C55\u793A\u3002\u5220\u9664\u6A21\u5757\u65F6\uFF0C\u91CC\u9762\u7684\u6587\u4EF6\u548C\u5B50\u6587\u4EF6\u5939\u4F1A\u6574\u4F53\u4E0A\u79FB\u4E00\u7EA7\uFF0C\u4E0D\u4F1A\u5220\u9664\u4EFB\u4F55\u5185\u5BB9\u3002"
+      text: "\u6309\u6587\u4EF6\u6811\u5C42\u7EA7\u5C55\u793A\u3002\u5220\u9664\u6A21\u5757\u548C Obsidian \u5220\u9664\u6587\u4EF6\u5939\u4E00\u81F4\uFF1A\u6574\u4E2A\u6587\u4EF6\u5939\u8FDE\u540C\u6587\u4EF6\u548C\u5B50\u6587\u4EF6\u5939\uFF08\u542B\u5B50\u6A21\u5757\uFF09\u4E00\u8D77\u6309\u300C\u5220\u9664\u6587\u4EF6\u300D\u8BBE\u7F6E\u5904\u7406\u3002"
     });
     this.listEl = contentEl.createDiv({ cls: "cl-picklist cl-modtree" });
     this.renderList();
@@ -19521,8 +20062,8 @@ var ModuleManagerModal = class extends Modal {
       };
       const del = row.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664" });
       del.onclick = async () => {
-        if (!this.options.onDissolve) return;
-        await this.options.onDissolve(mod);
+        if (!this.options.onDelete) return;
+        await this.options.onDelete(mod);
         this.renderList();
       };
       if (children.length && isOpen) children.forEach((child) => draw(child, depth + 1));
@@ -20048,128 +20589,84 @@ var NovalView = class extends ItemView {
     if (!file) return;
     this.app.workspace.getLeaf("tab").openFile(file);
   }
-  /* 删除模块只删配置，不动磁盘文件。
-   * 文件夹还在，所以要记进 hiddenModuleFolders，否则会被当成隐式模块又冒出来。 */
-  async removeModuleConfig(target) {
+  /* 删除模块 = Obsidian 删除文件夹：
+   * 整个文件夹连同子文件夹、子模块、笔记与附件一起，按仓库「删除文件」的设置处理
+   * （回收站或永久删除），同时移除这一层及以下的所有模块配置。 */
+  async deleteModule(target) {
+    if (!target) return;
     const folder = this.moduleTargetFolder(target);
-    const list = this.getModules().filter((m) => m.id !== target.id);
-    this.plugin.settings.modules = list;
-    if (folder && !list.some((m) => this.moduleTargetFolder(m) === folder)) {
-      const hidden = new Set(this.plugin.settings.hiddenModuleFolders || []);
-      hidden.add(folder);
-      this.plugin.settings.hiddenModuleFolders = Array.from(hidden);
-    }
-    if (this.active === target.id) this.active = "home";
-    this._ownership = null;
-    await this.plugin.saveSettings();
-  }
-  // 上移时遇到同名文件/文件夹就加序号，绝不覆盖已有内容
-  uniqueVaultPath(parentPath, name, isFolder) {
-    const base = parentPath ? parentPath + "/" : "";
-    const text = String(name || "");
-    const dot = isFolder ? -1 : text.lastIndexOf(".");
-    const stem = dot > 0 ? text.slice(0, dot) : text;
-    const ext = dot > 0 ? text.slice(dot) : "";
-    let candidate = base + text;
-    let index = 2;
-    while (this.app.vault.getAbstractFileByPath(candidate)) {
-      candidate = base + stem + " (" + index + ")" + ext;
-      index += 1;
-    }
-    return candidate;
-  }
-  /* 删除模块 = 把这一层溶解到上一级：
-   * 直接文件与子文件夹整体上移，再移除模块配置并清掉空文件夹。不删除任何内容。 */
-  async dissolveModule(target) {
-    const folder = this.moduleTargetFolder(target);
-    if (!folder) return;
-    const node = this.app.vault.getAbstractFileByPath(folder);
-    const parentPath = folder.indexOf("/") === -1 ? "" : folder.slice(0, folder.lastIndexOf("/"));
-    const parentLabel = parentPath ? parentPath.split("/").pop() : "\u5E93\u6839\u76EE\u5F55";
-    if (!node || !Array.isArray(node.children)) {
-      await this.removeModuleConfig(target);
+    const node = folder ? this.app.vault.getAbstractFileByPath(folder) : null;
+    if (!folder || !node || !Array.isArray(node.children)) {
+      await this.removeModuleSubtreeConfigs(folder, target);
       new Notice("\u5DF2\u79FB\u9664\u6A21\u5757\u300C" + target.name + "\u300D");
       this.render();
       return;
     }
-    const children = node.children.slice();
-    const files = children.filter((child) => !Array.isArray(child.children));
-    const folders = children.filter((child) => Array.isArray(child.children));
+    const counts = this.countModuleTree(node);
     const confirmed = await new Promise((resolve) => {
-      new DissolveModuleModal(
+      new DeleteModuleModal(
         this.app,
-        {
-          name: target.name,
-          parentLabel,
-          fileCount: files.length,
-          folderCount: folders.length
-        },
+        { name: target.name, fileCount: counts.files, folderCount: counts.folders },
         resolve
       ).open();
     });
     if (!confirmed) return;
-    let movedFiles = 0;
-    let movedFolders = 0;
     try {
-      for (const child of files) {
-        const dest = this.uniqueVaultPath(parentPath, child.name, false);
-        await this.app.fileManager.renameFile(child, dest);
-        movedFiles += 1;
-      }
-      for (const child of folders) {
-        const oldPath = child.path;
-        const dest = this.uniqueVaultPath(parentPath, child.name, true);
-        await this.app.fileManager.renameFile(child, dest);
-        this.plugin.remapModuleFolder(oldPath, dest);
-        movedFolders += 1;
+      if (this.app.fileManager && typeof this.app.fileManager.trashFile === "function") {
+        await this.app.fileManager.trashFile(node);
+      } else {
+        await this.app.vault.trash(node, true);
       }
     } catch (error) {
-      new Notice("\u4E0A\u79FB\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
-      await this.plugin.saveSettings();
-      this.render();
+      new Notice("\u5220\u9664\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
       return;
     }
-    const remain = this.getModules().filter(
-      (mod) => this.moduleTargetFolder(mod).toLowerCase() !== folder.toLowerCase()
-    );
-    const byFolder = /* @__PURE__ */ new Map();
-    const deduped = [];
-    remain.forEach((mod) => {
-      const key = this.moduleTargetFolder(mod).toLowerCase() || "id:" + mod.id;
-      const prev = byFolder.get(key);
-      if (!prev) {
-        byFolder.set(key, mod);
-        deduped.push(mod);
-        return;
-      }
-      const prevAuto = String(prev.id || "").startsWith("dir:");
-      const nextAuto = String(mod.id || "").startsWith("dir:");
-      if (prevAuto && !nextAuto) {
-        const index = deduped.indexOf(prev);
-        if (index >= 0) deduped[index] = mod;
-        byFolder.set(key, mod);
-      }
-    });
-    this.plugin.settings.modules = deduped;
-    this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => String(path).toLowerCase() !== folder.toLowerCase());
-    if (this.active === target.id) this.active = "home";
-    this._ownership = null;
-    try {
-      const left = this.app.vault.getAbstractFileByPath(folder);
-      if (left && Array.isArray(left.children) && !left.children.length) {
-        if (this.app.fileManager && typeof this.app.fileManager.trashFile === "function") {
-          await this.app.fileManager.trashFile(left);
-        } else {
-          await this.app.vault.trash(left, true);
-        }
-      }
-    } catch (error) {
-    }
-    await this.plugin.saveSettings();
+    await this.removeModuleSubtreeConfigs(folder, target);
     this.render();
     new Notice(
-      "\u5DF2\u5220\u9664\u6A21\u5757\u300C" + target.name + "\u300D\uFF1A" + (movedFiles ? movedFiles + " \u4E2A\u6587\u4EF6" : "\u65E0\u6587\u4EF6") + (movedFolders ? "\u3001" + movedFolders + " \u4E2A\u6587\u4EF6\u5939" : "") + "\u5DF2\u4E0A\u79FB\u5230" + parentLabel
+      "\u5DF2\u5220\u9664\u6A21\u5757\u300C" + target.name + "\u300D\uFF1A" + (counts.files ? counts.files + " \u4E2A\u6587\u4EF6" : "\u65E0\u6587\u4EF6") + (counts.folders ? "\u3001" + counts.folders + " \u4E2A\u5B50\u6587\u4EF6\u5939" : "") + "\u5DF2\u6309 Obsidian \u5220\u9664\u8BBE\u7F6E\u5904\u7406"
     );
+  }
+  /* 递归统计文件夹里的文件和子文件夹数量，弹窗里给用户看清影响范围 */
+  countModuleTree(node) {
+    let files = 0;
+    let folders = 0;
+    const walk = (folderNode) => {
+      (folderNode.children || []).forEach((child) => {
+        if (Array.isArray(child.children)) {
+          folders += 1;
+          walk(child);
+        } else {
+          files += 1;
+        }
+      });
+    };
+    walk(node);
+    return { files, folders };
+  }
+  /* 移除被删文件夹这一层及以下的所有模块配置与隐藏记录 */
+  async removeModuleSubtreeConfigs(folder, target) {
+    const dir = String(folder || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+    const inTree = (path) => {
+      const value = String(path || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+      if (!dir) return false;
+      return value === dir || value.startsWith(dir + "/");
+    };
+    const all = this.getModules();
+    const removed = all.filter(
+      (mod) => dir ? inTree(this.moduleTargetFolder(mod)) : mod.id === target.id
+    );
+    const removedIds = new Set(removed.map((mod) => mod.id));
+    this.plugin.settings.modules = all.filter((mod) => !removedIds.has(mod.id));
+    this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => !inTree(path));
+    const activeId = String(this.active || "");
+    let activeGone = removedIds.has(activeId);
+    if (!activeGone && activeId.startsWith("dir:")) {
+      activeGone = inTree(activeId.slice(4));
+    }
+    if (activeGone) this.active = "home";
+    this._ownership = null;
+    await this.plugin.saveSettings();
   }
   /* 模块右键菜单：和文件树一样，就地重命名或删除，操作同步到文件夹。 */
   showModuleMenu(mod, event) {
@@ -20184,7 +20681,7 @@ var NovalView = class extends ItemView {
     menu.addSeparator();
     menu.addItem(
       (item) => item.setTitle("\u5220\u9664\u6A21\u5757\u2026").setIcon("trash").onClick(() => {
-        void this.dissolveModule(mod);
+        void this.deleteModule(mod);
       })
     );
     menu.showAtMouseEvent(event);
@@ -20278,8 +20775,7 @@ var NovalView = class extends ItemView {
         else if (!mod) this.go(next.id);
       },
       onDelete: mod ? async (target) => {
-        await this.removeModuleConfig(target);
-        new Notice("\u5DF2\u5220\u9664\u6A21\u5757\u300C" + target.name + "\u300D\uFF0C\u7B14\u8BB0\u6587\u4EF6\u672A\u53D7\u5F71\u54CD");
+        await this.deleteModule(target);
       } : null
     }).open();
   }
@@ -20291,22 +20787,24 @@ var NovalView = class extends ItemView {
       getFolder: (mod) => this.moduleTargetFolder(mod),
       onCreate: () => this.openModuleEditor(null),
       onEdit: (mod) => this.openModuleEditor(mod),
-      onDissolve: async (mod) => {
-        await this.dissolveModule(mod);
+      onDelete: async (mod) => {
+        await this.deleteModule(mod);
       }
     }).open();
   }
   openModulePicker(files) {
     if (!files || !files.length) return;
-    new ModulePickerModal(
-      this.app,
-      this.getModules(),
-      (mod) => this.assignToModule(files, mod),
-      () => {
+    new ModulePickerModal(this.app, {
+      getRootModules: () => this.rootModules(),
+      getChildren: (mod) => this.submodulesOf(mod),
+      getAllModules: () => this.getModules(),
+      getFolder: (mod) => this.moduleTargetFolder(mod),
+      onPick: (mod) => this.assignToModule(files, mod),
+      onCreate: () => {
         this._pendingAssign = files;
         this.openModuleEditor(null);
       }
-    ).open();
+    }).open();
   }
   // 等 Obsidian 的元数据缓存刷新，避免刚写完 module 又被旧缓存判成未归类
   waitForMetadata(file, timeout = 800) {
@@ -20517,6 +21015,22 @@ var NovalView = class extends ItemView {
       return;
     }
     this.render();
+  }
+  /** 卡片文件写入后只刷新卡片数据，通知里有文件路径时不再整页 load */
+  applyFileCards(path, content) {
+    if (this.active === "notes" && this.notes) {
+      this.notes.applyFileCards(path, content);
+      return;
+    }
+    this._needsRefresh = true;
+  }
+  /** 只有界面文字变化（没有写入）时调用，不重读文件 */
+  rerender() {
+    if (this.active === "notes" && this.notes) {
+      this.notes.rerender();
+      return;
+    }
+    this.refresh();
   }
   go(id) {
     if (this.active === "canvas" && id !== "canvas") this.destroyGallery();
@@ -21722,6 +22236,41 @@ var NovalView = class extends ItemView {
     const modIndex = mods.findIndex((m) => m.id === mod.id);
     const tint = mod.color || tintPalette[(modIndex < 0 ? 0 : modIndex) % tintPalette.length];
     const childHue = (child, index) => child.color || tintPalette[(Math.max(modIndex, 0) + 1 + index) % tintPalette.length];
+    const treeFiles = children.length ? this.moduleTreeNoteFiles(mod).sort((a, b) => b.stat.mtime - a.stat.mtime) : [];
+    const parentDir = String(this.moduleTargetFolder(mod) || "").replace(/\/+$/, "");
+    const annotate = (file) => {
+      const fileDir = String(file.parent ? file.parent.path : "").replace(/\/+$/, "");
+      let depth = 0;
+      if (parentDir && fileDir && fileDir !== parentDir && fileDir.startsWith(parentDir + "/")) {
+        depth = fileDir.slice(parentDir.length + 1).split("/").length;
+      }
+      let owner = null;
+      let dir = fileDir;
+      while (dir && (!parentDir || dir !== parentDir)) {
+        if (parentDir && parentDir !== "" && dir.startsWith(parentDir + "/")) {
+          const cand = this.moduleForFolder(dir);
+          if (cand) {
+            owner = cand;
+            break;
+          }
+        } else if (!parentDir || parentDir === "") {
+          const cand = this.moduleForFolder(dir);
+          if (cand) {
+            owner = cand;
+            break;
+          }
+        }
+        const parts = dir.split("/");
+        parts.pop();
+        dir = parts.join("/");
+      }
+      if (!owner && depth > 0) {
+        owner = this.moduleForFolder(fileDir);
+      }
+      return { file, depth, owner };
+    };
+    const wrappedSelf = allNotes.map((file) => ({ file, depth: 0, owner: null }));
+    const wrappedTree = treeFiles.map(annotate);
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
     const todayTs = today.getTime();
@@ -21754,8 +22303,12 @@ var NovalView = class extends ItemView {
       this._mdSelModule = mod.id;
       this._mdMulti = false;
       this._mdSel = /* @__PURE__ */ new Set();
+      this._mdIncludeChildren = false;
     }
     const selected = this._mdSel;
+    let includeChildren = !!this._mdIncludeChildren;
+    const depthHuePalette = ["#b394af", "#e9c77e", "#ce7379", "#7fa9b6", "#5d86a4"];
+    const currentPoolOf = () => includeChildren ? wrappedTree : wrappedSelf;
     const toggleSelect = (path) => {
       if (selected.has(path)) selected.delete(path);
       else selected.add(path);
@@ -21824,7 +22377,7 @@ var NovalView = class extends ItemView {
       );
       menu.addItem(
         (item) => item.setTitle("\u5220\u9664\u6A21\u5757\u2026").setIcon("trash").onClick(() => {
-          void this.dissolveModule(mod);
+          void this.deleteModule(mod);
         })
       );
       menu.addSeparator();
@@ -21931,6 +22484,18 @@ var NovalView = class extends ItemView {
     noteSec.createEl("h3", { text: "\u672C\u5C42\u7B14\u8BB0" });
     const noteCount = noteSec.createSpan({ cls: "cl-mdv-count", text: String(allNotes.length) });
     noteSec.createSpan({ cls: "cl-mdv-line" });
+    let treeBtn = null;
+    if (children.length) {
+      treeBtn = noteSec.createSpan({ cls: "cl-mdv-treebtn" + (includeChildren ? " is-on" : "") });
+      const treeDot = treeBtn.createSpan({ cls: "cl-mdv-treedot" });
+      setIcon(treeDot, includeChildren ? "check" : "chevron-down");
+      treeBtn.createSpan({ cls: "cl-mdv-treetxt", text: "\u5305\u542B\u5B50\u6A21\u5757" });
+      treeBtn.onclick = () => {
+        includeChildren = !includeChildren;
+        this._mdIncludeChildren = includeChildren;
+        draw();
+      };
+    }
     const viewSw = noteSec.createSpan({ cls: "cl-mdv-viewsw" });
     const listBtn = viewSw.createSpan({ text: "\u5217\u8868" });
     const gridBtn = viewSw.createSpan({ text: "\u5361\u7247" });
@@ -21945,7 +22510,7 @@ var NovalView = class extends ItemView {
     };
     const selDelete = selBar.createEl("button", { cls: "cl-md-btn cl-md-btn-danger", text: "\u5220\u9664\u6240\u9009" });
     selDelete.onclick = () => {
-      const chosen = allNotes.filter((file) => this._mdSel.has(file.path));
+      const chosen = currentPoolOf().map((entry) => entry.file).filter((file) => this._mdSel.has(file.path));
       if (!chosen.length) return;
       this.deleteFiles(chosen, () => {
         this._mdMulti = false;
@@ -21955,16 +22520,29 @@ var NovalView = class extends ItemView {
     };
     const renderList = (items) => {
       const groups = /* @__PURE__ */ new Map([["\u4ECA\u5929", []], ["\u672C\u5468", []], ["\u66F4\u65E9", []]]);
-      items.forEach((file) => groups.get(groupOf(file.stat.mtime)).push(file));
+      items.forEach((entry) => groups.get(groupOf(entry.file.stat.mtime)).push(entry));
       groups.forEach((list, name) => {
         if (!list.length) return;
         body.createDiv({ cls: "cl-mdv-glabel", text: name });
-        list.forEach((file) => {
+        list.forEach((entry) => {
+          const file = entry.file;
           const picked = this._mdSel.has(file.path);
           const row = body.createDiv({
             cls: "cl-mdv-row" + (this._mdMulti && picked ? " is-selected" : "")
           });
-          row.style.setProperty("--hue", tint);
+          const rowHue = entry.owner && entry.owner.color ? entry.owner.color : depthHuePalette[(entry.depth || 0) % depthHuePalette.length];
+          row.style.setProperty("--hue", entry.depth > 0 ? rowHue : tint);
+          if (entry.depth > 0 && entry.owner) {
+            const badge = row.createDiv({ cls: "cl-mdv-rowmod" });
+            badge.createSpan({ cls: "cl-mdv-rowmodico" });
+            badge.createSpan({ cls: "cl-mdv-rowmodname", text: entry.owner.name });
+            badge.title = "\u8DF3\u8F6C\u5230\u300C" + entry.owner.name + "\u300D";
+            badge.onclick = (event) => {
+              event.stopPropagation();
+              this.go(this.moduleIdOf(entry.owner));
+            };
+            row.classList.add("has-child-note");
+          }
           const glyph = row.createDiv({ cls: "cl-mdv-glyph" });
           if (this._mdMulti) {
             const box = glyph.createEl("input", {
@@ -21981,7 +22559,10 @@ var NovalView = class extends ItemView {
           const main = row.createDiv({ cls: "cl-mdv-rowmain" });
           main.createDiv({ cls: "cl-mdv-rowtitle", text: file.basename });
           main.createDiv({ cls: "cl-mdv-rowsub", text: file.path });
-          row.createDiv({ cls: "cl-mdv-tag", text: mod.name });
+          row.createDiv({
+            cls: "cl-mdv-tag",
+            text: entry.depth > 0 && entry.owner ? entry.owner.name : mod.name
+          });
           row.createDiv({ cls: "cl-mdv-date", text: fmtDate(file.stat.mtime) });
           if (!this._mdMulti) {
             const del = row.createDiv({
@@ -22003,7 +22584,8 @@ var NovalView = class extends ItemView {
     };
     const renderGrid = (items) => {
       const grid = body.createDiv({ cls: "cl-md-grid" });
-      items.forEach((file) => {
+      items.forEach((entry) => {
+        const file = entry.file;
         const picked = this._mdSel.has(file.path);
         const tile = grid.createDiv({
           cls: "cl-md-tile cl-md-kind-note" + (this._mdMulti && picked ? " is-selected" : "")
@@ -22025,6 +22607,12 @@ var NovalView = class extends ItemView {
         const tileMeta = tile.createDiv({ cls: "cl-md-tilemeta" });
         tileMeta.createSpan({ text: "\u7B14\u8BB0" });
         tileMeta.createSpan({ text: fmtSize(file.stat.size) });
+        if (entry.depth > 0 && entry.owner) {
+          const badge = tile.createDiv({ cls: "cl-md-tilemod" });
+          badge.createSpan({ cls: "cl-md-tilemodico" });
+          badge.createSpan({ cls: "cl-md-tilemodname", text: entry.owner.name });
+          tile.classList.add("has-child-note");
+        }
         if (!this._mdMulti) {
           const del = tile.createEl("button", {
             cls: "cl-md-tiledel",
@@ -22045,23 +22633,37 @@ var NovalView = class extends ItemView {
     const draw = () => {
       listBtn.classList.toggle("is-on", mode === "list");
       gridBtn.classList.toggle("is-on", mode === "grid");
-      selBar.classList.toggle("is-on", !!this._mdMulti && allNotes.length > 0);
+      if (treeBtn) {
+        treeBtn.classList.toggle("is-on", includeChildren);
+        const dot = treeBtn.querySelector(".cl-mdv-treedot");
+        if (dot) setIcon(dot, includeChildren ? "check" : "chevron-down");
+      }
+      const currentPool = currentPoolOf();
+      selBar.classList.toggle("is-on", !!this._mdMulti && currentPool.length > 0);
       selCount.setText("\u5DF2\u9009 " + selected.size + " \u9879");
       selDelete.disabled = selected.size === 0;
-      noteCount.setText(String(allNotes.length));
+      noteCount.setText(String(currentPool.length));
       const q = query.trim().toLowerCase();
-      const items = allNotes.filter((file) => !q || file.path.toLowerCase().includes(q));
+      const items = currentPool.filter((entry) => !q || entry.file.path.toLowerCase().includes(q));
       body.empty();
-      if (!allNotes.length) {
+      if (!currentPool.length) {
         const blank = body.createDiv({ cls: "cl-mdv-blank" });
         const blankIcon = blank.createDiv({ cls: "cl-mdv-blank-icon" });
         setIcon(blankIcon, "file-text");
         const blankText = blank.createDiv({ cls: "cl-mdv-blank-text" });
-        blankText.createDiv({ cls: "cl-mdv-blank-title", text: "\u8FD9\u4E00\u5C42\u8FD8\u6CA1\u6709\u7B14\u8BB0" });
-        blankText.createDiv({
-          cls: "cl-mdv-blank-sub",
-          text: "\u76F4\u63A5\u5728\u7236\u6A21\u5757\u5199\u53EF\u4EE5\uFF1B\u4E5F\u53EF\u4EE5\u70B9\u4E0A\u9762\u7684\u5B50\u6A21\u5757\u7EE7\u7EED\u5206\u5C42\u3002"
-        });
+        if (includeChildren) {
+          blankText.createDiv({ cls: "cl-mdv-blank-title", text: "\u8FD9\u4E2A\u6A21\u5757\uFF08\u542B\u5B50\u6A21\u5757\uFF09\u8FD8\u6CA1\u6709\u7B14\u8BB0" });
+          blankText.createDiv({
+            cls: "cl-mdv-blank-sub",
+            text: "\u5173\u6389\u300C\u5305\u542B\u5B50\u6A21\u5757\u300D\u53EF\u4EE5\u53EA\u770B\u672C\u5C42\uFF1B\u6216\u5728\u672C\u5C42\u76F4\u63A5\u65B0\u5EFA\u7B14\u8BB0\u3002"
+          });
+        } else {
+          blankText.createDiv({ cls: "cl-mdv-blank-title", text: "\u8FD9\u4E00\u5C42\u8FD8\u6CA1\u6709\u7B14\u8BB0" });
+          blankText.createDiv({
+            cls: "cl-mdv-blank-sub",
+            text: "\u76F4\u63A5\u5728\u7236\u6A21\u5757\u5199\u53EF\u4EE5\uFF1B\u4E5F\u53EF\u4EE5\u70B9\u4E0A\u9762\u7684\u5B50\u6A21\u5757\u7EE7\u7EED\u5206\u5C42\u3002"
+          });
+        }
         const blankBtn = blank.createEl("button", { cls: "cl-mdv-blank-btn", text: "\u65B0\u5EFA\u7B14\u8BB0" });
         blankBtn.onclick = () => this.createModuleNote(mod);
         return;

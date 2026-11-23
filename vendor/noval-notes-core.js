@@ -2136,6 +2136,8 @@ class CardsView extends ItemView {
       // 正在编辑但还没保存的文本：列表被重画时用它恢复，避免白打一遍
       editingDraft: null,
       cards: [],
+      // 卡片视图：list 保留日期时间线；grid 只铺卡片、不显示日期头
+      view: 'list',
       // 折叠的日期（只影响渲染，不改文件）
       collapsed: new Set((plugin.settings && plugin.settings.collapsedDates) || []),
       // 多选删除

@@ -3769,3 +3769,108 @@
   .cl-root .vw-grid { gap: 12px; }
   .cl-root .vw-actions { margin-left: 0; }
 }
+
+
+/* ====== 包含子模块开关（v0.7.1 新增）====== */
+.cl-mdv-treebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  line-height: 1.5;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.cl-mdv-treebtn:hover {
+  border-color: var(--interactive-accent-hover);
+  color: var(--text-normal);
+}
+.cl-mdv-treebtn.is-on {
+  border-color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  color: var(--interactive-accent);
+}
+.cl-mdv-treedot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--background-modifier-hover);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-faint);
+}
+.cl-mdv-treebtn.is-on .cl-mdv-treedot {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.cl-mdv-treetxt {
+  font-weight: 500;
+}
+
+/* ====== 列表视图 · 子模块笔记徽标（v0.7.1 新增）====== */
+.cl-mdv-row.has-child-note {
+  padding-left: 4px;
+}
+.cl-mdv-rowmod {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 2px 7px 2px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--hue, var(--interactive-accent)) 14%, transparent);
+  color: var(--hue, var(--interactive-accent));
+  font-size: 10.5px;
+  line-height: 1;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter .15s;
+}
+.cl-mdv-rowmod:hover { filter: brightness(.92); }
+.cl-mdv-rowmodico {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--hue, var(--interactive-accent));
+}
+.cl-mdv-rowmodname { white-space: nowrap; max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
+
+/* ====== 网格视图 · 子模块笔记徽标（v0.7.1 新增）====== */
+.cl-md-tile.has-child-note {
+  position: relative;
+}
+.cl-md-tilemod {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px 2px 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, .55);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 500;
+  backdrop-filter: blur(2px);
+}
+.cl-md-tilemodico {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--interactive-accent);
+}
+.cl-md-tilemodname { white-space: nowrap; max-width: 60px; overflow: hidden; text-overflow: ellipsis; }

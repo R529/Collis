@@ -55,7 +55,7 @@ const BUNDLED_PLUGINS = [
     manifest: {
       id: BOARD_ID,
       name: "Noval",
-      version: "0.6.2",
+      version: "0.7.3",
       minAppVersion: "1.13.0",
       description: "Canvas 思考工作台：画布集、语义连线、大纲、Markdown 导出与 AI。",
       author: "Lak",
@@ -852,8 +852,9 @@ class DeleteFilesModal extends Modal {
   }
 }
 
-/* 删除模块确认：说明会把文件和子文件夹上移一级，再清掉空文件夹。 */
-class DissolveModuleModal extends Modal {
+/* 删除模块确认：和 Obsidian 删除文件夹保持一致，
+ * 整个文件夹连同里面的文件和子文件夹一起按仓库的删除设置处理。 */
+class DeleteModuleModal extends Modal {
   constructor(app, info, onConfirm) {
     super(app);
     this.info = info || {};
@@ -877,9 +878,9 @@ class DissolveModuleModal extends Modal {
     contentEl.createDiv({
       cls: "cl-modal-hint",
       text: parts.length
-        ? "会把 " + parts.join("、") + " 上移到「" + (this.info.parentLabel || "上一级") +
-          "」，然后删除空的模块文件夹。不会删除任何笔记内容。"
-        : "这个模块文件夹是空的，会直接移除模块并删除空文件夹。"
+        ? "会连同 " + parts.join("、") +
+          "（含子模块）一起，按 Obsidian「文件与链接 → 删除文件」的设置处理。"
+        : "这个模块文件夹是空的，会按 Obsidian「文件与链接 → 删除文件」的设置处理并移除模块。"
     });
 
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
@@ -888,7 +889,7 @@ class DissolveModuleModal extends Modal {
       this.finish(false);
       this.close();
     };
-    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "上移并删除模块" });
+    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "删除文件夹和模块" });
     ok.onclick = () => {
       this.finish(true);
       this.close();
@@ -1101,13 +1102,12 @@ class FolderPickerModal extends Modal {
   }
 }
 
-/* 归入模块：选一个模块，把选中的笔记和素材一起移到该模块的目录。 */
+/* 归入模块：按文件树层级展开，点任意一级模块即可归入。 */
 class ModulePickerModal extends Modal {
-  constructor(app, modules, onPick, onCreate) {
+  constructor(app, options) {
     super(app);
-    this.modules = modules || [];
-    this.onPick = onPick;
-    this.onCreate = onCreate;
+    this.options = options || {};
+    this.expanded = new Set();
   }
 
   onOpen() {
@@ -1116,30 +1116,86 @@ class ModulePickerModal extends Modal {
     contentEl.createEl("h2", { text: "归入模块" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "选中的文件会移动到该模块的保存文件夹，并记录归属；笔记同时写入 module 字段。多个模块共用同一文件夹时会自动放进该模块的子目录。"
+      text: "按文件树层级展示，点任意一级模块即可归入。选中的文件会移动到该模块的保存文件夹，并记录归属；笔记同时写入 module 字段。"
     });
 
-    const list = contentEl.createDiv({ cls: "cl-picklist" });
-    this.modules.forEach((mod) => {
-      const item = list.createDiv({ cls: "cl-pickitem" });
-      const iconEl = item.createDiv({ cls: "cl-pickicon" });
-      iconEl.style.setProperty("--dot-color", mod.color || "var(--interactive-accent)");
-      setIcon(iconEl, mod.icon || "file-text");
-      item.createDiv({ cls: "cl-pickname", text: mod.name });
-      item.onclick = () => {
-        this.close();
-        if (this.onPick) this.onPick(mod);
-      };
-    });
+    this.listEl = contentEl.createDiv({ cls: "cl-picklist cl-modtree cl-modpick" });
+
+    // 默认全部展开，方便直接看到子模块；点箭头仍可收起
+    const expandAll = (mod) => {
+      const children = this.options.getChildren ? this.options.getChildren(mod) : [];
+      if (!children.length) return;
+      this.expanded.add(moduleIdOf(mod));
+      children.forEach(expandAll);
+    };
+    const roots = this.options.getRootModules ? this.options.getRootModules() : [];
+    roots.forEach(expandAll);
+    this.renderList();
 
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
     const create = foot.createEl("button", { cls: "cl-btn", text: "新建模块…" });
     create.onclick = () => {
       this.close();
-      if (this.onCreate) this.onCreate();
+      if (this.options.onCreate) this.options.onCreate();
     };
     const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
     cancel.onclick = () => this.close();
+  }
+
+  renderList() {
+    const list = this.listEl;
+    if (!list) return;
+    list.empty();
+    const roots = this.options.getRootModules ? this.options.getRootModules() : [];
+    if (!roots.length) {
+      list.createDiv({ cls: "cl-modal-hint", text: "还没有模块，点下面的「新建模块…」。" });
+      return;
+    }
+    const all = this.options.getAllModules ? this.options.getAllModules() : roots;
+
+    const draw = (mod, depth) => {
+      const key = moduleIdOf(mod);
+      const children = this.options.getChildren ? this.options.getChildren(mod) : [];
+      const isOpen = this.expanded.has(key);
+
+      const row = list.createDiv({ cls: "cl-modrow" });
+      row.style.paddingLeft = 8 + depth * 18 + "px";
+
+      const toggle = row.createDiv({ cls: "cl-modrow-toggle" });
+      if (children.length) {
+        setIcon(toggle, isOpen ? "chevron-down" : "chevron-right");
+        toggle.onclick = (event) => {
+          event.stopPropagation();
+          if (isOpen) this.expanded.delete(key);
+          else this.expanded.add(key);
+          this.renderList();
+        };
+      } else {
+        toggle.addClass("is-blank");
+      }
+
+      const iconEl = row.createDiv({ cls: "cl-pickicon" });
+      const index = all.indexOf(mod);
+      const tint = index >= 0 ? index % 5 : depth % 5;
+      iconEl.addClass("cl-tint-" + tint);
+      iconEl.style.setProperty("--dot-color", mod.color || "var(--tint)");
+      setIcon(iconEl, mod.icon || (children.length ? "folder" : "file-text"));
+
+      const main = row.createDiv({ cls: "cl-modrow-main" });
+      main.createDiv({ cls: "cl-modrow-name", text: mod.name });
+      const folder = this.options.getFolder ? this.options.getFolder(mod) : mod.folder || "";
+      if (folder && folder !== mod.name) main.createDiv({ cls: "cl-modrow-path", text: folder });
+
+      row.createDiv({ cls: "cl-modpick-go", text: "归入" });
+      row.onclick = () => {
+        this.close();
+        if (this.options.onPick) this.options.onPick(mod);
+      };
+
+      if (children.length && isOpen) children.forEach((child) => draw(child, depth + 1));
+    };
+
+    roots.forEach((mod) => draw(mod, 0));
   }
 
   onClose() {
@@ -1148,7 +1204,7 @@ class ModulePickerModal extends Modal {
 }
 
 /* 管理模块：按文件树层级展示，每一级都可以编辑或删除。
- * 删除会把该层的文件和子文件夹整体上移一级，再移除空文件夹。 */
+ * 删除和 Obsidian 删除文件夹一致：整个文件夹连同子模块一起按删除设置处理。 */
 class ModuleManagerModal extends Modal {
   constructor(app, options) {
     super(app);
@@ -1162,7 +1218,7 @@ class ModuleManagerModal extends Modal {
     contentEl.createEl("h2", { text: "管理模块" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "按文件树层级展示。删除模块时，里面的文件和子文件夹会整体上移一级，不会删除任何内容。"
+      text: "按文件树层级展示。删除模块和 Obsidian 删除文件夹一致：整个文件夹连同文件和子文件夹（含子模块）一起按「删除文件」设置处理。"
     });
 
     this.listEl = contentEl.createDiv({ cls: "cl-picklist cl-modtree" });
@@ -1231,8 +1287,8 @@ class ModuleManagerModal extends Modal {
 
       const del = row.createEl("button", { cls: "cl-btn cl-btn-danger", text: "删除" });
       del.onclick = async () => {
-        if (!this.options.onDissolve) return;
-        await this.options.onDissolve(mod);
+        if (!this.options.onDelete) return;
+        await this.options.onDelete(mod);
         this.renderList();
       };
 
@@ -1861,148 +1917,101 @@ class NovalView extends ItemView {
     this.app.workspace.getLeaf("tab").openFile(file);
   }
 
-  /* 删除模块只删配置，不动磁盘文件。
-   * 文件夹还在，所以要记进 hiddenModuleFolders，否则会被当成隐式模块又冒出来。 */
-  async removeModuleConfig(target) {
+  /* 删除模块 = Obsidian 删除文件夹：
+   * 整个文件夹连同子文件夹、子模块、笔记与附件一起，按仓库「删除文件」的设置处理
+   * （回收站或永久删除），同时移除这一层及以下的所有模块配置。 */
+  async deleteModule(target) {
+    if (!target) return;
     const folder = this.moduleTargetFolder(target);
-    const list = this.getModules().filter((m) => m.id !== target.id);
-    this.plugin.settings.modules = list;
-    if (folder && !list.some((m) => this.moduleTargetFolder(m) === folder)) {
-      const hidden = new Set(this.plugin.settings.hiddenModuleFolders || []);
-      hidden.add(folder);
-      this.plugin.settings.hiddenModuleFolders = Array.from(hidden);
-    }
-    if (this.active === target.id) this.active = "home";
-    this._ownership = null;
-    await this.plugin.saveSettings();
-  }
-
-  // 上移时遇到同名文件/文件夹就加序号，绝不覆盖已有内容
-  uniqueVaultPath(parentPath, name, isFolder) {
-    const base = parentPath ? parentPath + "/" : "";
-    const text = String(name || "");
-    const dot = isFolder ? -1 : text.lastIndexOf(".");
-    const stem = dot > 0 ? text.slice(0, dot) : text;
-    const ext = dot > 0 ? text.slice(dot) : "";
-    let candidate = base + text;
-    let index = 2;
-    while (this.app.vault.getAbstractFileByPath(candidate)) {
-      candidate = base + stem + " (" + index + ")" + ext;
-      index += 1;
-    }
-    return candidate;
-  }
-
-  /* 删除模块 = 把这一层溶解到上一级：
-   * 直接文件与子文件夹整体上移，再移除模块配置并清掉空文件夹。不删除任何内容。 */
-  async dissolveModule(target) {
-    const folder = this.moduleTargetFolder(target);
-    if (!folder) return;
-    const node = this.app.vault.getAbstractFileByPath(folder);
-    const parentPath = folder.indexOf("/") === -1 ? "" : folder.slice(0, folder.lastIndexOf("/"));
-    const parentLabel = parentPath ? parentPath.split("/").pop() : "库根目录";
+    const node = folder ? this.app.vault.getAbstractFileByPath(folder) : null;
 
     // 文件夹已经不存在：只清理配置和隐藏记录
-    if (!node || !Array.isArray(node.children)) {
-      await this.removeModuleConfig(target);
+    if (!folder || !node || !Array.isArray(node.children)) {
+      await this.removeModuleSubtreeConfigs(folder, target);
       new Notice("已移除模块「" + target.name + "」");
       this.render();
       return;
     }
 
-    const children = node.children.slice();
-    const files = children.filter((child) => !Array.isArray(child.children));
-    const folders = children.filter((child) => Array.isArray(child.children));
-
+    const counts = this.countModuleTree(node);
     const confirmed = await new Promise((resolve) => {
-      new DissolveModuleModal(
+      new DeleteModuleModal(
         this.app,
-        {
-          name: target.name,
-          parentLabel,
-          fileCount: files.length,
-          folderCount: folders.length
-        },
+        { name: target.name, fileCount: counts.files, folderCount: counts.folders },
         resolve
       ).open();
     });
     if (!confirmed) return;
 
-    let movedFiles = 0;
-    let movedFolders = 0;
+    // 和文件树删除文件夹走同一个入口：由 Obsidian 按「删除文件」设置处理
     try {
-      for (const child of files) {
-        const dest = this.uniqueVaultPath(parentPath, child.name, false);
-        await this.app.fileManager.renameFile(child, dest);
-        movedFiles += 1;
-      }
-      for (const child of folders) {
-        const oldPath = child.path;
-        const dest = this.uniqueVaultPath(parentPath, child.name, true);
-        await this.app.fileManager.renameFile(child, dest);
-        // 子文件夹里的模块配置跟着换路径，上移后仍然是模块
-        this.plugin.remapModuleFolder(oldPath, dest);
-        movedFolders += 1;
+      if (this.app.fileManager && typeof this.app.fileManager.trashFile === "function") {
+        await this.app.fileManager.trashFile(node);
+      } else {
+        await this.app.vault.trash(node, true);
       }
     } catch (error) {
-      new Notice("上移失败：" + (error && error.message ? error.message : error));
-      await this.plugin.saveSettings();
-      this.render();
+      new Notice("删除失败：" + (error && error.message ? error.message : error));
       return;
     }
 
-    // 移除这一层的模块配置（子级配置已随目录迁移）
-    const remain = this.getModules().filter(
-      (mod) => this.moduleTargetFolder(mod).toLowerCase() !== folder.toLowerCase()
-    );
-    // 迁移过程中文件树事件可能补出自动模块，这里按文件夹去重，优先保留自定义配置
-    const byFolder = new Map();
-    const deduped = [];
-    remain.forEach((mod) => {
-      const key = this.moduleTargetFolder(mod).toLowerCase() || "id:" + mod.id;
-      const prev = byFolder.get(key);
-      if (!prev) {
-        byFolder.set(key, mod);
-        deduped.push(mod);
-        return;
-      }
-      const prevAuto = String(prev.id || "").startsWith("dir:");
-      const nextAuto = String(mod.id || "").startsWith("dir:");
-      if (prevAuto && !nextAuto) {
-        const index = deduped.indexOf(prev);
-        if (index >= 0) deduped[index] = mod;
-        byFolder.set(key, mod);
-      }
-    });
-    this.plugin.settings.modules = deduped;
-    this.plugin.settings.hiddenModuleFolders = (
-      this.plugin.settings.hiddenModuleFolders || []
-    ).filter((path) => String(path).toLowerCase() !== folder.toLowerCase());
-    if (this.active === target.id) this.active = "home";
-    this._ownership = null;
-
-    // 目录已空：移入回收站，保持文件树干净
-    try {
-      const left = this.app.vault.getAbstractFileByPath(folder);
-      if (left && Array.isArray(left.children) && !left.children.length) {
-        if (this.app.fileManager && typeof this.app.fileManager.trashFile === "function") {
-          await this.app.fileManager.trashFile(left);
-        } else {
-          await this.app.vault.trash(left, true);
-        }
-      }
-    } catch (error) {
-      // 空目录删除失败不影响模块移除，保留即可
-    }
-
-    await this.plugin.saveSettings();
+    await this.removeModuleSubtreeConfigs(folder, target);
     this.render();
     new Notice(
       "已删除模块「" + target.name + "」：" +
-        (movedFiles ? movedFiles + " 个文件" : "无文件") +
-        (movedFolders ? "、" + movedFolders + " 个文件夹" : "") +
-        "已上移到" + parentLabel
+        (counts.files ? counts.files + " 个文件" : "无文件") +
+        (counts.folders ? "、" + counts.folders + " 个子文件夹" : "") +
+        "已按 Obsidian 删除设置处理"
     );
+  }
+
+  /* 递归统计文件夹里的文件和子文件夹数量，弹窗里给用户看清影响范围 */
+  countModuleTree(node) {
+    let files = 0;
+    let folders = 0;
+    const walk = (folderNode) => {
+      (folderNode.children || []).forEach((child) => {
+        if (Array.isArray(child.children)) {
+          folders += 1;
+          walk(child);
+        } else {
+          files += 1;
+        }
+      });
+    };
+    walk(node);
+    return { files, folders };
+  }
+
+  /* 移除被删文件夹这一层及以下的所有模块配置与隐藏记录 */
+  async removeModuleSubtreeConfigs(folder, target) {
+    const dir = String(folder || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+    const inTree = (path) => {
+      const value = String(path || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+      if (!dir) return false;
+      return value === dir || value.startsWith(dir + "/");
+    };
+
+    const all = this.getModules();
+    const removed = all.filter((mod) =>
+      dir ? inTree(this.moduleTargetFolder(mod)) : mod.id === target.id
+    );
+    const removedIds = new Set(removed.map((mod) => mod.id));
+    this.plugin.settings.modules = all.filter((mod) => !removedIds.has(mod.id));
+
+    this.plugin.settings.hiddenModuleFolders = (
+      this.plugin.settings.hiddenModuleFolders || []
+    ).filter((path) => !inTree(path));
+
+    // 当前打开的模块在被删子树里：回到首页
+    const activeId = String(this.active || "");
+    let activeGone = removedIds.has(activeId);
+    if (!activeGone && activeId.startsWith("dir:")) {
+      activeGone = inTree(activeId.slice(4));
+    }
+    if (activeGone) this.active = "home";
+    this._ownership = null;
+    await this.plugin.saveSettings();
   }
 
   /* 模块右键菜单：和文件树一样，就地重命名或删除，操作同步到文件夹。 */
@@ -2021,7 +2030,7 @@ class NovalView extends ItemView {
         .setTitle("删除模块…")
         .setIcon("trash")
         .onClick(() => {
-          void this.dissolveModule(mod);
+          void this.deleteModule(mod);
         })
     );
     menu.showAtMouseEvent(event);
@@ -2130,8 +2139,7 @@ class NovalView extends ItemView {
       },
       onDelete: mod
         ? async (target) => {
-            await this.removeModuleConfig(target);
-            new Notice("已删除模块「" + target.name + "」，笔记文件未受影响");
+            await this.deleteModule(target);
           }
         : null
     }).open();
@@ -2145,23 +2153,25 @@ class NovalView extends ItemView {
       getFolder: (mod) => this.moduleTargetFolder(mod),
       onCreate: () => this.openModuleEditor(null),
       onEdit: (mod) => this.openModuleEditor(mod),
-      onDissolve: async (mod) => {
-        await this.dissolveModule(mod);
+      onDelete: async (mod) => {
+        await this.deleteModule(mod);
       }
     }).open();
   }
 
   openModulePicker(files) {
     if (!files || !files.length) return;
-    new ModulePickerModal(
-      this.app,
-      this.getModules(),
-      (mod) => this.assignToModule(files, mod),
-      () => {
+    new ModulePickerModal(this.app, {
+      getRootModules: () => this.rootModules(),
+      getChildren: (mod) => this.submodulesOf(mod),
+      getAllModules: () => this.getModules(),
+      getFolder: (mod) => this.moduleTargetFolder(mod),
+      onPick: (mod) => this.assignToModule(files, mod),
+      onCreate: () => {
         this._pendingAssign = files;
         this.openModuleEditor(null);
       }
-    ).open();
+    }).open();
   }
 
   // 等 Obsidian 的元数据缓存刷新，避免刚写完 module 又被旧缓存判成未归类
@@ -2404,6 +2414,24 @@ class NovalView extends ItemView {
       return;
     }
     this.render();
+  }
+
+  /** 卡片文件写入后只刷新卡片数据，通知里有文件路径时不再整页 load */
+  applyFileCards(path, content) {
+    if (this.active === "notes" && this.notes) {
+      this.notes.applyFileCards(path, content);
+      return;
+    }
+    this._needsRefresh = true;
+  }
+
+  /** 只有界面文字变化（没有写入）时调用，不重读文件 */
+  rerender() {
+    if (this.active === "notes" && this.notes) {
+      this.notes.rerender();
+      return;
+    }
+    this.refresh();
   }
 
   go(id) {
@@ -3833,6 +3861,45 @@ class NovalView extends ItemView {
     const childHue = (child, index) =>
       child.color || tintPalette[(Math.max(modIndex, 0) + 1 + index) % tintPalette.length];
 
+    // ====== 完整重写：owner 直接用现成的 moduleForFile ======
+    // 它从文件所在文件夹逐级往上找，含隐式子文件夹，完全正确
+    const treeFiles = children.length
+      ? this.moduleTreeNoteFiles(mod).sort((a, b) => b.stat.mtime - a.stat.mtime)
+      : [];
+    const parentDir = String(this.moduleTargetFolder(mod) || "").replace(/\/+$/, "");
+    // 对每条文件做 annotate：计算 depth 和 owner
+    const annotate = (file) => {
+      const fileDir = String(file.parent ? file.parent.path : "").replace(/\/+$/, "");
+      let depth = 0;
+      if (parentDir && fileDir && fileDir !== parentDir && fileDir.startsWith(parentDir + "/")) {
+        depth = fileDir.slice(parentDir.length + 1).split("/").length;
+      }
+      // 只在当前模块层级树里找 owner
+      // 注意：moduleForFile 会一路找到根，但我们只接受在 parentDir 之下的那个模块
+      let owner = null;
+      let dir = fileDir;
+      while (dir && (!parentDir || dir !== parentDir)) {
+        if (parentDir && parentDir !== "" && dir.startsWith(parentDir + "/")) {
+          const cand = this.moduleForFolder(dir);
+          if (cand) { owner = cand; break; }
+        } else if (!parentDir || parentDir === "") {
+          const cand = this.moduleForFolder(dir);
+          if (cand) { owner = cand; break; }
+        }
+        const parts = dir.split("/");
+        parts.pop();
+        dir = parts.join("/");
+      }
+      // 如果没有显式模块但路径还在 parentDir 之下，owner 就是隐式模块
+      if (!owner && depth > 0) {
+        owner = this.moduleForFolder(fileDir);
+      }
+      return { file, depth, owner };
+    };
+    const wrappedSelf = allNotes.map((file) => ({ file, depth: 0, owner: null }));
+    const wrappedTree = treeFiles.map(annotate);
+
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayTs = today.getTime();
@@ -3868,8 +3935,13 @@ class NovalView extends ItemView {
       this._mdSelModule = mod.id;
       this._mdMulti = false;
       this._mdSel = new Set();
+      this._mdIncludeChildren = false;
     }
     const selected = this._mdSel;
+    let includeChildren = !!this._mdIncludeChildren;
+    const depthHuePalette = ["#b394af", "#e9c77e", "#ce7379", "#7fa9b6", "#5d86a4"];
+    // 当前可见数据源：draw / selDelete / selectAll 都用它
+    const currentPoolOf = () => includeChildren ? wrappedTree : wrappedSelf;
     const toggleSelect = (path) => {
       if (selected.has(path)) selected.delete(path);
       else selected.add(path);
@@ -3948,7 +4020,7 @@ class NovalView extends ItemView {
       );
       menu.addItem((item) =>
         item.setTitle("删除模块…").setIcon("trash").onClick(() => {
-          void this.dissolveModule(mod);
+          void this.deleteModule(mod);
         })
       );
       menu.addSeparator();
@@ -4069,6 +4141,21 @@ class NovalView extends ItemView {
     noteSec.createEl("h3", { text: "本层笔记" });
     const noteCount = noteSec.createSpan({ cls: "cl-mdv-count", text: String(allNotes.length) });
     noteSec.createSpan({ cls: "cl-mdv-line" });
+
+    // 包含子模块开关：只在有子模块时出现；无子模块时整个控件不渲染
+    let treeBtn = null;
+    if (children.length) {
+      treeBtn = noteSec.createSpan({ cls: "cl-mdv-treebtn" + (includeChildren ? " is-on" : "") });
+      const treeDot = treeBtn.createSpan({ cls: "cl-mdv-treedot" });
+      setIcon(treeDot, includeChildren ? "check" : "chevron-down");
+      treeBtn.createSpan({ cls: "cl-mdv-treetxt", text: "包含子模块" });
+      treeBtn.onclick = () => {
+        includeChildren = !includeChildren;
+        this._mdIncludeChildren = includeChildren;
+        draw();
+      };
+    }
+
     const viewSw = noteSec.createSpan({ cls: "cl-mdv-viewsw" });
     const listBtn = viewSw.createSpan({ text: "列表" });
     const gridBtn = viewSw.createSpan({ text: "卡片" });
@@ -4086,7 +4173,9 @@ class NovalView extends ItemView {
     };
     const selDelete = selBar.createEl("button", { cls: "cl-md-btn cl-md-btn-danger", text: "删除所选" });
     selDelete.onclick = () => {
-      const chosen = allNotes.filter((file) => this._mdSel.has(file.path));
+      const chosen = currentPoolOf()
+        .map((entry) => entry.file)
+        .filter((file) => this._mdSel.has(file.path));
       if (!chosen.length) return;
       this.deleteFiles(chosen, () => {
         this._mdMulti = false;
@@ -4097,16 +4186,35 @@ class NovalView extends ItemView {
 
     const renderList = (items) => {
       const groups = new Map([["今天", []], ["本周", []], ["更早", []]]);
-      items.forEach((file) => groups.get(groupOf(file.stat.mtime)).push(file));
+      items.forEach((entry) => groups.get(groupOf(entry.file.stat.mtime)).push(entry));
       groups.forEach((list, name) => {
         if (!list.length) return;
         body.createDiv({ cls: "cl-mdv-glabel", text: name });
-        list.forEach((file) => {
+        list.forEach((entry) => {
+          const file = entry.file;
           const picked = this._mdSel.has(file.path);
           const row = body.createDiv({
             cls: "cl-mdv-row" + (this._mdMulti && picked ? " is-selected" : "")
           });
-          row.style.setProperty("--hue", tint);
+          // 子孙模块的笔记用 owner 颜色；本体用父模块颜色
+          const rowHue = entry.owner && entry.owner.color
+            ? entry.owner.color
+            : depthHuePalette[(entry.depth || 0) % depthHuePalette.length];
+          row.style.setProperty("--hue", entry.depth > 0 ? rowHue : tint);
+
+          // 子模块徽标（父模块自己的笔记不加）
+          if (entry.depth > 0 && entry.owner) {
+            const badge = row.createDiv({ cls: "cl-mdv-rowmod" });
+            badge.createSpan({ cls: "cl-mdv-rowmodico" });
+            badge.createSpan({ cls: "cl-mdv-rowmodname", text: entry.owner.name });
+            badge.title = "跳转到「" + entry.owner.name + "」";
+            badge.onclick = (event) => {
+              event.stopPropagation();
+              this.go(this.moduleIdOf(entry.owner));
+            };
+            row.classList.add("has-child-note");
+          }
+
           const glyph = row.createDiv({ cls: "cl-mdv-glyph" });
           if (this._mdMulti) {
             const box = glyph.createEl("input", {
@@ -4123,7 +4231,10 @@ class NovalView extends ItemView {
           const main = row.createDiv({ cls: "cl-mdv-rowmain" });
           main.createDiv({ cls: "cl-mdv-rowtitle", text: file.basename });
           main.createDiv({ cls: "cl-mdv-rowsub", text: file.path });
-          row.createDiv({ cls: "cl-mdv-tag", text: mod.name });
+          row.createDiv({
+            cls: "cl-mdv-tag",
+            text: entry.depth > 0 && entry.owner ? entry.owner.name : mod.name
+          });
           row.createDiv({ cls: "cl-mdv-date", text: fmtDate(file.stat.mtime) });
           if (!this._mdMulti) {
             const del = row.createDiv({
@@ -4147,7 +4258,8 @@ class NovalView extends ItemView {
     /* 网格视图：沿用原有 .cl-md-grid / .cl-md-tile，外观保持不变 */
     const renderGrid = (items) => {
       const grid = body.createDiv({ cls: "cl-md-grid" });
-      items.forEach((file) => {
+      items.forEach((entry) => {
+        const file = entry.file;
         const picked = this._mdSel.has(file.path);
         const tile = grid.createDiv({
           cls: "cl-md-tile cl-md-kind-note" + (this._mdMulti && picked ? " is-selected" : "")
@@ -4169,6 +4281,15 @@ class NovalView extends ItemView {
         const tileMeta = tile.createDiv({ cls: "cl-md-tilemeta" });
         tileMeta.createSpan({ text: "笔记" });
         tileMeta.createSpan({ text: fmtSize(file.stat.size) });
+
+        // 子模块徽标：左上角
+        if (entry.depth > 0 && entry.owner) {
+          const badge = tile.createDiv({ cls: "cl-md-tilemod" });
+          badge.createSpan({ cls: "cl-md-tilemodico" });
+          badge.createSpan({ cls: "cl-md-tilemodname", text: entry.owner.name });
+          tile.classList.add("has-child-note");
+        }
+
         if (!this._mdMulti) {
           const del = tile.createEl("button", {
             cls: "cl-md-tiledel",
@@ -4190,24 +4311,38 @@ class NovalView extends ItemView {
     const draw = () => {
       listBtn.classList.toggle("is-on", mode === "list");
       gridBtn.classList.toggle("is-on", mode === "grid");
-      selBar.classList.toggle("is-on", !!this._mdMulti && allNotes.length > 0);
+      if (treeBtn) {
+        treeBtn.classList.toggle("is-on", includeChildren);
+        const dot = treeBtn.querySelector(".cl-mdv-treedot");
+        if (dot) setIcon(dot, includeChildren ? "check" : "chevron-down");
+      }
+      const currentPool = currentPoolOf();
+      selBar.classList.toggle("is-on", !!this._mdMulti && currentPool.length > 0);
       selCount.setText("已选 " + selected.size + " 项");
       selDelete.disabled = selected.size === 0;
-      noteCount.setText(String(allNotes.length));
+      noteCount.setText(String(currentPool.length));
 
       const q = query.trim().toLowerCase();
-      const items = allNotes.filter((file) => !q || file.path.toLowerCase().includes(q));
+      const items = currentPool.filter((entry) => !q || entry.file.path.toLowerCase().includes(q));
       body.empty();
-      if (!allNotes.length) {
+      if (!currentPool.length) {
         const blank = body.createDiv({ cls: "cl-mdv-blank" });
         const blankIcon = blank.createDiv({ cls: "cl-mdv-blank-icon" });
         setIcon(blankIcon, "file-text");
         const blankText = blank.createDiv({ cls: "cl-mdv-blank-text" });
-        blankText.createDiv({ cls: "cl-mdv-blank-title", text: "这一层还没有笔记" });
-        blankText.createDiv({
-          cls: "cl-mdv-blank-sub",
-          text: "直接在父模块写可以；也可以点上面的子模块继续分层。"
-        });
+        if (includeChildren) {
+          blankText.createDiv({ cls: "cl-mdv-blank-title", text: "这个模块（含子模块）还没有笔记" });
+          blankText.createDiv({
+            cls: "cl-mdv-blank-sub",
+            text: "关掉「包含子模块」可以只看本层；或在本层直接新建笔记。"
+          });
+        } else {
+          blankText.createDiv({ cls: "cl-mdv-blank-title", text: "这一层还没有笔记" });
+          blankText.createDiv({
+            cls: "cl-mdv-blank-sub",
+            text: "直接在父模块写可以；也可以点上面的子模块继续分层。"
+          });
+        }
         const blankBtn = blank.createEl("button", { cls: "cl-mdv-blank-btn", text: "新建笔记" });
         blankBtn.onclick = () => this.createModuleNote(mod);
         return;

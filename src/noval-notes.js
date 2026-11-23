@@ -18,6 +18,10 @@ const ICONS = {
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h16"/><path d="M7 12h10"/><path d="M10 17h4"/></svg>',
   more:
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
+  list:
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>',
+  grid:
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3.5" y="3.5" width="7" height="7" rx="1.2"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.2"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.2"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.2"/></svg>',
   back:
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>'
 };
@@ -63,8 +67,23 @@ class NovalNotesPanel {
     this.editingDraft = null;
     // 追加区：哪些卡片展开着、正在写哪条、正在改哪条
     this.appendOpen = new Set();
+    // 卡片视图默认展开追加；这里只记录被手动收起的卡片
+    this.appendClosed = new Set();
     this.appendDrafting = null;
     this.appendEditing = null;
+
+    // 卡片视图：list 保留日期时间线；grid 只铺卡片、不显示日期头
+    this.view = "list";
+    this.viewCountEl = null;
+    // 卡片详情浮窗：只在卡片视图里单击卡片时出现
+    this.detailKey = null;
+    this.detailEl = null;
+    this.detailEditingBody = false;
+    this.detailBodyDraft = "";
+    this.detailEditingAppend = -1;
+    this.detailAppendDraft = "";
+    this.detailAppendInput = "";
+    this._detailKeys = null;
 
     this.cards = [];
     this.query = "";
@@ -74,6 +93,16 @@ class NovalNotesPanel {
     this.untagged = false;
     this.expanded = {};
     this.collapsed = new Set();
+
+    // 分批渲染：先画一批，滚到底部再补下一批，避免几千条一次性建 DOM
+    this.batchSize = 100;
+    this.renderPlan = null;
+    this.renderCursor = 0;
+    this.currentListEl = null;
+    this.loadMoreEl = null;
+    this.loadMoreIO = null;
+    // 搜索防抖：避免每敲一个字就全量重画
+    this._searchTimer = null;
 
     this._loading = false;
     this._pending = false;
@@ -91,6 +120,7 @@ class NovalNotesPanel {
     this.closeMenu();
     this.closePop();
     this.closeCardMenu();
+    this.closeDetail();
 
     this.container = containerEl;
     this.container.empty();
@@ -118,9 +148,18 @@ class NovalNotesPanel {
   destroy() {
     if (this._outside) document.removeEventListener("mousedown", this._outside);
     this._outside = null;
+    if (this._searchTimer) {
+      window.clearTimeout(this._searchTimer);
+      this._searchTimer = null;
+    }
+    this.stopLoadMore();
+    this.currentListEl = null;
+    this.renderPlan = null;
+    this.renderCursor = 0;
     this.closeMenu();
     this.closePop();
     this.closeCardMenu();
+    this.closeDetail();
     if (this.container) this.container.empty();
     this.container = null;
     this.listWrap = null;
@@ -154,10 +193,19 @@ class NovalNotesPanel {
     search.addEventListener("input", () => {
       this.query = search.value;
       clear.classList.toggle("is-visible", !!search.value);
-      this.renderList();
-      if (this.pop) this.renderFilterPanel();
+      // 卡片多时每敲一个字就全量重画会卡；等 150ms 再渲染
+      if (this._searchTimer) window.clearTimeout(this._searchTimer);
+      this._searchTimer = window.setTimeout(() => {
+        this._searchTimer = null;
+        this.renderList();
+        if (this.pop) this.renderFilterPanel();
+      }, 150);
     });
     clear.onclick = () => {
+      if (this._searchTimer) {
+        window.clearTimeout(this._searchTimer);
+        this._searchTimer = null;
+      }
       search.value = "";
       this.query = "";
       clear.classList.remove("is-visible");
@@ -233,6 +281,25 @@ class NovalNotesPanel {
 
     save.onclick = () => this.capture();
 
+    // 视图切换：输入框正下方、卡片区上方；搜索与筛选保持原位
+    const viewBar = body.createDiv({ cls: "cl-notes-viewbar" });
+    const seg = viewBar.createDiv({ cls: "qm-viewseg cl-notes-viewseg" });
+    const makeViewBtn = (label, mode) => {
+      const btn = seg.createEl("button", { cls: "qm-viewbtn cl-notes-viewbtn" });
+      btn.setAttribute("type", "button");
+      setIconHtml(btn, mode === "list" ? "list" : "grid");
+      btn.createSpan({ text: label });
+      if (mode === "list") btn.addClass("is-active");
+      btn.onclick = (ev) => {
+        ev.stopPropagation();
+        this.setView(mode);
+      };
+      return btn;
+    };
+    this.viewListBtn = makeViewBtn("列表", "list");
+    this.viewGridBtn = makeViewBtn("卡片", "grid");
+    this.viewCountEl = viewBar.createSpan({ cls: "cl-notes-viewcount" });
+
     // 卡片列表
     this.listWrap = body.createDiv({ cls: "cl-notes-listwrap" });
 
@@ -255,6 +322,15 @@ class NovalNotesPanel {
   /* ---------------- 数据 ---------------- */
 
   async load() {
+    return this.reloadCards();
+  }
+
+  refresh() {
+    this.load();
+  }
+
+  /** 数据层写入后只重读数据；能局部更新的就不整表重画 */
+  async reloadCards() {
     if (!this.container) return;
     if (this._loading) {
       this._pending = true;
@@ -276,9 +352,11 @@ class NovalNotesPanel {
     this._loading = false;
 
     if (!this.container) return;
-    this.cards = Array.isArray(cards) ? cards : [];
-    this.renderList();
+    this.applyCardsLoaded(Array.isArray(cards) ? cards : []);
     this.applyPendingFocus();
+
+    // 详情浮窗开着：数据替换后重画一次，编辑 / 追加才能看到最新内容
+    if (this.detailKey) this.renderDetail();
 
     // 回看打开着：把内存里那批旧对象换成本轮的新卡片，否则编辑 / 追加改的还是旧内容
     if (this.reviewEl && this.reviewEl.hasClass("show")) {
@@ -288,12 +366,86 @@ class NovalNotesPanel {
 
     if (this._pending) {
       this._pending = false;
-      this.load();
+      this.reloadCards();
     }
   }
 
-  refresh() {
-    this.load();
+  /** 卡片数据签名：用来判断哪一张的内容变了 */
+  cardSig(card) {
+    return String(card.date || "") + "\u0000" + String(card.time || "") +
+      "\u0000" + String(card.body || "");
+  }
+
+  findCardNode(key) {
+    if (!this.listWrap) return null;
+    const nodes = this.listWrap.querySelectorAll(".qm-card");
+    for (const node of nodes) {
+      if (node.getAttribute("data-qm-key") === key) return node;
+    }
+    return null;
+  }
+
+  /**
+   * 新数据落地：卡片集合没增删、也没换顺序时，只替换内容变化的那几张卡片的 DOM。
+   * 这样编辑 / 追加一条不会重建整个列表，滚动位置和已渲染批次都能保住。
+   */
+  applyCardsLoaded(cards) {
+    const prev = this.cards || [];
+    const prevKeys = prev.map((c) => this.cardKey(c));
+    const nextKeys = cards.map((c) => this.cardKey(c));
+    const sameOrder =
+      prevKeys.length === nextKeys.length && prevKeys.every((k, i) => k === nextKeys[i]);
+
+    this.cards = cards;
+
+    if (!sameOrder || !this.currentListEl || !this.renderPlan) {
+      this.renderList();
+      return;
+    }
+
+    const prevSig = new Map(prev.map((c) => [this.cardKey(c), this.cardSig(c)]));
+    const byKey = new Map(cards.map((c) => [this.cardKey(c), c]));
+    // 计划里存的是旧卡片对象，换成新的；索引与 cursor 不变
+    this.renderPlan = this.renderPlan.map((item) =>
+      item.kind === "card"
+        ? { kind: "card", card: byKey.get(this.cardKey(item.card)) || item.card }
+        : item
+    );
+
+    let fallback = false;
+    for (const card of cards) {
+      const key = this.cardKey(card);
+      if (prevSig.get(key) === this.cardSig(card)) continue;
+      const node = this.findCardNode(key);
+      if (!node) {
+        fallback = true;
+        break;
+      }
+      const holder = document.createElement("div");
+      this.renderCard(holder, card);
+      const next = holder.firstElementChild;
+      if (!next) {
+        fallback = true;
+        break;
+      }
+      node.replaceWith(next);
+    }
+
+    if (fallback) {
+      this.renderList();
+      return;
+    }
+    if (this.viewCountEl) this.viewCountEl.setText("共 " + this.filteredCards().length + " 张");
+  }
+
+  /** 数据层按文件通知过来的入口：只更新卡片数据，不整页重建 */
+  applyFileCards() {
+    this.reloadCards();
+  }
+
+  /** 只有界面文字变化时调用，不重读文件 */
+  rerender() {
+    this.renderList();
   }
 
   /** 首页点速记时调用：切到卡片笔记后定位到这一条。 */
@@ -327,6 +479,9 @@ class NovalNotesPanel {
       changed = true;
     }
     if (changed) this.renderList();
+
+    // 目标卡片可能在还没渲染到的批次里，先把剩余批次补齐再找
+    this.renderAllRemaining();
 
     this.pendingFocus = null;
     window.setTimeout(() => {
@@ -683,6 +838,15 @@ class NovalNotesPanel {
 
   /* ---------------- 渲染 ---------------- */
 
+  setView(view) {
+    if (view !== "list" && view !== "grid") return;
+    if (this.view === view) return;
+    this.view = view;
+    if (this.viewListBtn) this.viewListBtn.classList.toggle("is-active", view === "list");
+    if (this.viewGridBtn) this.viewGridBtn.classList.toggle("is-active", view === "grid");
+    this.renderList();
+  }
+
   renderList() {
     if (!this.listWrap) return;
     this.closeCardMenu();
@@ -690,15 +854,23 @@ class NovalNotesPanel {
     this.closeMenu();
 
     const cards = this.filteredCards();
+    if (this.viewCountEl) this.viewCountEl.setText("共 " + cards.length + " 张");
     // 有生效条件时按钮常亮并带小圆点，和 Noval 一致
     this.renderFilterBtnState();
     this.renderChips();
     this.renderSelectBar();
 
-    const keepScroll = this.listWrap.scrollTop;
+    // 真正滚动的是 .qm-list 本身，不是外层 listwrap
+    const prevList = this.listWrap.querySelector(".qm-list");
+    const keepScroll = prevList ? prevList.scrollTop : 0;
+
+    this.stopLoadMore();
+    this.currentListEl = null;
     this.listWrap.empty();
 
     if (!cards.length) {
+      this.renderPlan = null;
+      this.renderCursor = 0;
       const empty = this.listWrap.createDiv({ cls: "qm-empty" });
       empty.setText(
         this.cards.length
@@ -710,13 +882,38 @@ class NovalNotesPanel {
 
     this.renderCards(cards);
 
-    this.listWrap.scrollTop = keepScroll;
+    // 先补到原来的滚动深度，再把位置还回去，避免深滚动时一次只画 100 张
+    let guard = 0;
+    if (keepScroll > 0) {
+      while (
+        this.renderCursor < this.renderPlan.length &&
+        this.currentListEl.scrollHeight <= keepScroll + 400 &&
+        guard++ < 200
+      ) {
+        this.renderNextBatch();
+      }
+    }
+    if (this.currentListEl) this.currentListEl.scrollTop = keepScroll;
   }
 
   renderCards(cards) {
-    const list = this.listWrap.createDiv({ cls: "qm-list" });
-    const searching = !!this.query.trim();
+    // 卡片视图：不显示日期头，按时间倒序直接铺成网格
+    const grid = this.view === "grid";
+    this.currentListEl = this.listWrap.createDiv({
+      cls: grid ? "qm-list cl-notes-grid" : "qm-list"
+    });
+    this.renderPlan = this.buildRenderPlan(cards);
+    this.renderCursor = 0;
+    this.renderNextBatch();
+  }
 
+  /** 把过滤后的卡片摊平成渲染计划：日期头 + 卡片，收起的分组只留头 */
+  buildRenderPlan(cards) {
+    if (this.view === "grid") {
+      return cards.map((card) => ({ kind: "card", card }));
+    }
+    const searching = !!String(this.query || "").trim();
+    const plan = [];
     let i = 0;
     while (i < cards.length) {
       const date = cards[i].date;
@@ -725,20 +922,103 @@ class NovalNotesPanel {
         group.push(cards[i]);
         i++;
       }
-
       const collapsed = !searching && this.collapsed.has(date);
-      const day = list.createDiv({ cls: "qm-day" + (collapsed ? " is-collapsed" : "") });
-      day.createSpan({ cls: "qm-day-arrow", text: collapsed ? "\u25b6" : "\u25bc" });
-      day.createSpan({ cls: "qm-day-text", text: date });
-      day.createSpan({ cls: "qm-day-count", text: String(group.length) });
-      day.onclick = () => {
-        if (this.collapsed.has(date)) this.collapsed.delete(date);
-        else this.collapsed.add(date);
-        this.renderList();
-      };
+      plan.push({ kind: "day", date, count: group.length, collapsed });
+      if (!collapsed) {
+        for (const card of group) plan.push({ kind: "card", card });
+      }
+    }
+    return plan;
+  }
 
-      if (collapsed) continue;
-      for (const card of group) this.renderCard(list, card);
+  /** 渲染下一批；滚动到底部时由 IntersectionObserver 再调用 */
+  renderNextBatch() {
+    if (!this.renderPlan || !this.currentListEl) return;
+    if (this.renderCursor >= this.renderPlan.length) {
+      this.stopLoadMore();
+      return;
+    }
+
+    const end = Math.min(this.renderCursor + this.batchSize, this.renderPlan.length);
+    for (; this.renderCursor < end; this.renderCursor++) {
+      const item = this.renderPlan[this.renderCursor];
+      if (item.kind === "day") {
+        const collapsed = item.collapsed;
+        const day = this.currentListEl.createDiv({
+          cls: "qm-day" + (collapsed ? " is-collapsed" : "")
+        });
+        day.createSpan({ cls: "qm-day-arrow", text: collapsed ? "\u25b6" : "\u25bc" });
+        day.createSpan({ cls: "qm-day-text", text: item.date });
+        day.createSpan({ cls: "qm-day-count", text: String(item.count) });
+        day.onclick = () => {
+          if (this.collapsed.has(item.date)) this.collapsed.delete(item.date);
+          else this.collapsed.add(item.date);
+          this.renderList();
+        };
+      } else {
+        // 卡片必须挂在 .qm-list 下做日期头的兄弟节点；挂到日期头里会挤成一行
+        this.renderCard(this.currentListEl, item.card);
+      }
+    }
+
+    if (this.renderCursor >= this.renderPlan.length) {
+      this.stopLoadMore();
+      return;
+    }
+    this.ensureLoadMore();
+    this.scheduleLoadMoreCheck();
+  }
+
+  /** 哨兵一直在视口里时 IntersectionObserver 不会重复回调，补一次自检 */
+  scheduleLoadMoreCheck() {
+    window.setTimeout(() => {
+      if (!this.loadMoreEl || !this.currentListEl || !this.renderPlan) return;
+      if (this.renderCursor >= this.renderPlan.length) return;
+      const rootRect = this.currentListEl.getBoundingClientRect();
+      if (!rootRect.height) return;
+      const sentinelRect = this.loadMoreEl.getBoundingClientRect();
+      if (sentinelRect.top < rootRect.bottom + 700) this.renderNextBatch();
+    }, 16);
+  }
+
+  /** 列表底部的哨兵：视口快到底时再渲染下一批 */
+  ensureLoadMore() {
+    if (!this.currentListEl) return;
+    if (this.loadMoreEl && this.loadMoreEl.parentNode === this.currentListEl) {
+      // 移到队尾，继续充当下一批的触发点
+      this.currentListEl.appendChild(this.loadMoreEl);
+      return;
+    }
+    this.stopLoadMore();
+    const el = this.currentListEl.createDiv({ cls: "cl-notes-loadmore" });
+    this.loadMoreEl = el;
+    if (typeof IntersectionObserver !== "function") return;
+    this.loadMoreIO = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) this.renderNextBatch();
+      },
+      { root: this.currentListEl, rootMargin: "700px 0px" }
+    );
+    this.loadMoreIO.observe(el);
+  }
+
+  stopLoadMore() {
+    if (this.loadMoreIO) {
+      this.loadMoreIO.disconnect();
+      this.loadMoreIO = null;
+    }
+    if (this.loadMoreEl) {
+      this.loadMoreEl.remove();
+      this.loadMoreEl = null;
+    }
+  }
+
+  /** 定位 / 打印等需要全量 DOM 时，把剩余批次一次补齐 */
+  renderAllRemaining() {
+    if (!this.renderPlan) return;
+    let guard = 0;
+    while (this.renderCursor < this.renderPlan.length && guard++ < 10000) {
+      this.renderNextBatch();
     }
   }
 
@@ -753,6 +1033,8 @@ class NovalNotesPanel {
     el.setAttribute("data-qm-date", card.date || "");
     el.setAttribute("data-qm-time", card.time || "");
     el.setAttribute("data-qm-id", card.id || "");
+    // 局部更新时靠这个 key 找节点
+    el.setAttribute("data-qm-key", key);
     if (this.selectMode) el.addClass("is-selectable");
 
     const head = el.createDiv({ cls: "qm-card-head" });
@@ -772,8 +1054,15 @@ class NovalNotesPanel {
       badge.setAttribute("role", "button");
       badge.onclick = (ev) => {
         ev.stopPropagation();
-        if (this.appendOpen.has(key)) this.appendOpen.delete(key);
-        else this.appendOpen.add(key);
+        // 卡片视图默认展开，点徽标只切换手动收起；列表视图保持原来的展开集合
+        if (this.view === "grid") {
+          if (this.appendClosed.has(key)) this.appendClosed.delete(key);
+          else this.appendClosed.add(key);
+        } else if (this.appendOpen.has(key)) {
+          this.appendOpen.delete(key);
+        } else {
+          this.appendOpen.add(key);
+        }
         this.renderList();
       };
     }
@@ -789,29 +1078,60 @@ class NovalNotesPanel {
     };
 
     if (editing) {
+      // 就地编辑时卡片按内容展开，不被卡片视图的固定高度裁掉
+      if (this.view === "grid") el.addClass("is-editing");
       this.renderEditBox(el, card, key, sections.original);
       el.onclick = (e) => e.stopPropagation();
       return;
     }
 
-    const bodyEl = el.createDiv({ cls: "qm-body" });
+    // 卡片视图：正文和追加放进同一个滚动容器，悬停时一条滚动看完全部
+    const isGrid = this.view === "grid";
+    const scrollEl = isGrid ? el.createDiv({ cls: "cl-notes-card-scroll" }) : el;
+    const bodyEl = scrollEl.createDiv({ cls: "qm-body" });
     this.renderCardBody(bodyEl, card, sections.original);
 
-    if (sections.appends.length && this.appendOpen.has(key)) {
-      this.renderAppendList(el, card, sections, key);
-    }
-    if (this.appendDrafting && this.appendDrafting.key === key) {
-      this.renderAppendComposer(el, card, key);
+    // 卡片视图里把标签移到卡片底部，正文截断时不丢标签
+    if (isGrid) {
+      const tags = Array.from(bodyEl.querySelectorAll(".qm-tag"));
+      if (tags.length) {
+        const foot = el.createDiv({ cls: "qm-card-tags" });
+        for (const tag of tags) foot.appendChild(tag);
+      }
     }
 
-    // 单击不做事；双击进编辑。多选模式下单击用于勾选。
-    el.onclick = () => {
-      if (this.selectMode) this.toggleSelected(card, el);
+    // 卡片视图默认展开追加内容，配合悬停滚动一次看完；列表视图仍按徽标展开
+    const appendsOpen = sections.appends.length &&
+      (isGrid ? !this.appendClosed.has(key) : this.appendOpen.has(key));
+    if (appendsOpen) {
+      this.renderAppendList(scrollEl, card, sections, key);
+    }
+    if (this.appendDrafting && this.appendDrafting.key === key) {
+      this.renderAppendComposer(scrollEl, card, key);
+    }
+
+    // 列表视图：单击不做事，双击进编辑；卡片视图：单击打开详情浮窗。
+    el.onclick = (ev) => {
+      if (this.selectMode) {
+        this.toggleSelected(card, el);
+        return;
+      }
+      if (!isGrid) return;
+      const t = ev.target;
+      if (
+        t &&
+        typeof t.closest === "function" &&
+        t.closest("a, button, textarea, input, .qm-tag, .qm-ref, .qm-append-badge, .qm-append-acts")
+      ) {
+        return;
+      }
+      this.openDetail(card);
     };
 
     // 与 Noval bindCardEdit 一致：链接、标签、「···」、引用点保持原生语义
+    // 卡片视图的编辑统一走详情浮窗，不再用双击就地编辑
     el.addEventListener("dblclick", (e) => {
-      if (this.selectMode) return;
+      if (this.selectMode || isGrid) return;
       const t = e.target;
       if (
         t &&
@@ -863,7 +1183,7 @@ class NovalNotesPanel {
       }
       this.editingKey = null;
       this.editingDraft = null;
-      await this.load();
+      await this.reloadCards();
     };
 
     ta.addEventListener("keydown", (e) => {
@@ -920,7 +1240,7 @@ class NovalNotesPanel {
           const ok = await this.noval.updateAppend(card, index, text);
           if (!ok) return;
           this.appendEditing = null;
-          await this.load();
+          await this.reloadCards();
         };
         return;
       }
@@ -949,6 +1269,7 @@ class NovalNotesPanel {
     const key = this.cardKey(card);
     this.appendEditing = { key, index, text: String(text || "") };
     this.appendOpen.add(key);
+    this.appendClosed.delete(key);
     this.renderAll();
   }
 
@@ -957,7 +1278,7 @@ class NovalNotesPanel {
       const ok = await this.noval.deleteAppend(card, index);
       if (!ok) return;
       this.appendEditing = null;
-      await this.load();
+      await this.reloadCards();
     }).open();
   }
 
@@ -966,6 +1287,7 @@ class NovalNotesPanel {
     const key = this.cardKey(card);
     this.appendDrafting = { key, text: "" };
     this.appendOpen.add(key);
+    this.appendClosed.delete(key);
     this.renderAll();
   }
 
@@ -1011,7 +1333,7 @@ class NovalNotesPanel {
       if (!ok) return;
       this.appendDrafting = null;
       this.appendOpen.add(key);
-      await this.load();
+      await this.reloadCards();
     };
 
     ta.addEventListener("keydown", (ev) => {
@@ -1023,6 +1345,264 @@ class NovalNotesPanel {
         cancel();
       }
     });
+  }
+
+  /* ---------------- 卡片详情浮窗（只在卡片视图里使用） ---------------- */
+
+  detailCard() {
+    if (!this.detailKey) return null;
+    return this.cards.find((c) => this.cardKey(c) === this.detailKey) || null;
+  }
+
+  openDetail(card) {
+    if (!card || !this.container) return;
+    this.detailKey = this.cardKey(card);
+    this.detailEditingBody = false;
+    this.detailBodyDraft = "";
+    this.detailEditingAppend = -1;
+    this.detailAppendDraft = "";
+    this.detailAppendInput = "";
+    if (!this._detailKeys) {
+      this._detailKeys = (ev) => {
+        if (ev.key === "Escape" && this.detailEl) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          this.closeDetail();
+        }
+      };
+      document.addEventListener("keydown", this._detailKeys, true);
+    }
+    this.renderDetail();
+  }
+
+  closeDetail() {
+    if (this._detailKeys) {
+      document.removeEventListener("keydown", this._detailKeys, true);
+      this._detailKeys = null;
+    }
+    if (this.detailEl) {
+      this.detailEl.remove();
+      this.detailEl = null;
+    }
+    this.detailKey = null;
+    this.detailEditingBody = false;
+    this.detailBodyDraft = "";
+    this.detailEditingAppend = -1;
+    this.detailAppendDraft = "";
+  }
+
+  renderDetail() {
+    const card = this.detailCard();
+    if (!card || !this.container) {
+      this.closeDetail();
+      return;
+    }
+
+    // 重画时保住原来的滚动位置
+    let keepScroll = 0;
+    if (this.detailEl) {
+      const oldScroll = this.detailEl.querySelector(".cl-notes-detail-scroll");
+      if (oldScroll) keepScroll = oldScroll.scrollTop;
+      this.detailEl.remove();
+    }
+
+    const overlay = this.container.createDiv({ cls: "cl-notes-detail-overlay" });
+    this.detailEl = overlay;
+    overlay.addEventListener("mousedown", (ev) => {
+      if (ev.target === overlay) this.closeDetail();
+    });
+
+    const dlg = overlay.createDiv({ cls: "cl-notes-detail" });
+    const sections = NovalBundle.qmCardSections(card.body);
+
+    /* 顶部：时间 / 引用点 / 追加数 / 关闭 */
+    const head = dlg.createDiv({ cls: "cl-notes-detail-head" });
+    head.createSpan({ cls: "cl-notes-detail-time", text: card.time || "" });
+    const refDot = head.createSpan({ cls: "qm-ref" });
+    this.paintRefDot(refDot, card);
+    if (sections.appends.length) {
+      head.createSpan({
+        cls: "cl-notes-detail-badge",
+        text: "追加 " + sections.appends.length
+      });
+    }
+    const close = head.createEl("button", { cls: "cl-notes-detail-close", text: "\u2715" });
+    close.setAttribute("type", "button");
+    close.setAttribute("aria-label", "关闭");
+    close.onclick = () => this.closeDetail();
+
+    const scroll = dlg.createDiv({ cls: "cl-notes-detail-scroll" });
+
+    /* 正文 */
+    const label = scroll.createDiv({ cls: "cl-notes-detail-label" });
+    label.createSpan({ text: "正文" });
+    if (!this.detailEditingBody) {
+      const edit = label.createEl("button", { cls: "cl-notes-detail-link", text: "编辑" });
+      edit.setAttribute("type", "button");
+      edit.onclick = () => {
+        this.detailEditingBody = true;
+        this.detailBodyDraft = String(sections.original || "");
+        this.renderDetail();
+      };
+    }
+
+    if (this.detailEditingBody) {
+      const ta = scroll.createEl("textarea", { cls: "qm-edit cl-notes-detail-edit" });
+      ta.value = this.detailBodyDraft;
+      ta.addEventListener("input", () => {
+        this.detailBodyDraft = ta.value;
+      });
+      window.setTimeout(() => ta.focus(), 20);
+
+      const bar = scroll.createDiv({ cls: "cl-notes-detail-editbar" });
+      const cancel = bar.createEl("button", { cls: "qm-mini-btn", text: "取消" });
+      cancel.onclick = () => {
+        this.detailEditingBody = false;
+        this.detailBodyDraft = "";
+        this.renderDetail();
+      };
+      const save = bar.createEl("button", { cls: "qm-mini-btn is-primary", text: "保存" });
+      save.onclick = async () => {
+        const text = String(this.detailBodyDraft || "");
+        if (!text.trim()) {
+          new Notice("内容不能为空");
+          return;
+        }
+        const ok = await this.noval.updateCard(card, text);
+        if (!ok) {
+          new Notice("保存失败，卡片位置可能已变化");
+          return;
+        }
+        this.detailEditingBody = false;
+        this.detailBodyDraft = "";
+        await this.reloadCards();
+      };
+      ta.addEventListener("keydown", (ev) => {
+        if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+          ev.preventDefault();
+          save.onclick(ev);
+        }
+      });
+    } else {
+      const bodyEl = scroll.createDiv({ cls: "cl-notes-detail-body" });
+      this.renderCardBody(bodyEl, card, sections.original, false);
+      const tags = Array.from(bodyEl.querySelectorAll(".qm-tag"));
+      if (tags.length) {
+        const tagWrap = scroll.createDiv({ cls: "cl-notes-detail-tags" });
+        for (const tag of tags) tagWrap.appendChild(tag);
+      }
+    }
+
+    /* 追加内容 */
+    scroll.createDiv({ cls: "cl-notes-detail-divider", text: "追加内容" });
+    const list = scroll.createDiv({ cls: "cl-notes-detail-appends" });
+    if (!sections.appends.length) {
+      list.createDiv({ cls: "cl-notes-detail-empty", text: "还没有追加内容。" });
+    }
+    sections.appends.forEach((item, index) => {
+      const row = list.createDiv({ cls: "cl-notes-detail-append" });
+      const bar = row.createDiv({ cls: "cl-notes-detail-append-head" });
+      bar.createSpan({ cls: "cl-notes-detail-append-time", text: item.label });
+
+      const editingAppend = this.detailEditingAppend === index;
+      if (!editingAppend) {
+        const acts = bar.createDiv({ cls: "cl-notes-detail-acts" });
+        const edit = acts.createEl("button", { cls: "qm-mini-btn", text: "编辑" });
+        edit.onclick = () => {
+          this.detailEditingAppend = index;
+          this.detailAppendDraft = String(item.text || "");
+          this.renderDetail();
+        };
+        const del = acts.createEl("button", {
+          cls: "qm-mini-btn qm-mini-btn-danger",
+          text: "删除"
+        });
+        del.onclick = () => {
+          new NovalBundle.ConfirmModal(this.app, "删除这条追加？", async () => {
+            const ok = await this.noval.deleteAppend(card, index);
+            if (!ok) return;
+            this.detailEditingAppend = -1;
+            await this.reloadCards();
+          }).open();
+        };
+      }
+
+      if (editingAppend) {
+        const ta = row.createEl("textarea", { cls: "qm-edit cl-notes-detail-edit" });
+        ta.value = this.detailAppendDraft;
+        ta.addEventListener("input", () => {
+          this.detailAppendDraft = ta.value;
+        });
+        window.setTimeout(() => ta.focus(), 20);
+
+        const editBar = row.createDiv({ cls: "cl-notes-detail-editbar" });
+        const cancel = editBar.createEl("button", { cls: "qm-mini-btn", text: "取消" });
+        cancel.onclick = () => {
+          this.detailEditingAppend = -1;
+          this.detailAppendDraft = "";
+          this.renderDetail();
+        };
+        const save = editBar.createEl("button", { cls: "qm-mini-btn is-primary", text: "保存" });
+        save.onclick = async () => {
+          const text = String(this.detailAppendDraft || "");
+          if (!text.trim()) {
+            new Notice("内容不能为空");
+            return;
+          }
+          const ok = await this.noval.updateAppend(card, index, text);
+          if (!ok) return;
+          this.detailEditingAppend = -1;
+          this.detailAppendDraft = "";
+          await this.reloadCards();
+        };
+        ta.addEventListener("keydown", (ev) => {
+          if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+            ev.preventDefault();
+            save.onclick(ev);
+          }
+        });
+      } else {
+        const textEl = row.createDiv({ cls: "cl-notes-detail-append-text" });
+        this.renderCardBody(textEl, card, item.text, false);
+      }
+    });
+
+    /* 底部：新增追加 */
+    const foot = dlg.createDiv({ cls: "cl-notes-detail-foot" });
+    const input = foot.createEl("textarea", {
+      cls: "cl-notes-detail-input",
+      attr: { rows: "2", placeholder: "追加一条…" }
+    });
+    input.value = this.detailAppendInput;
+    input.addEventListener("input", () => {
+      this.detailAppendInput = input.value;
+    });
+    const footBar = foot.createDiv({ cls: "cl-notes-detail-footbar" });
+    footBar.createSpan({ cls: "cl-notes-detail-hint", text: "Esc 关闭 · Ctrl+Enter 保存" });
+    const addBtn = footBar.createEl("button", { cls: "qm-mini-btn is-primary", text: "追加" });
+    addBtn.onclick = async () => {
+      const text = String(this.detailAppendInput || "").trim();
+      if (!text) {
+        new Notice("写点什么再追加吧");
+        return;
+      }
+      const ok = await this.noval.appendToCard(card, text);
+      if (!ok) return;
+      this.detailAppendInput = "";
+      await this.reloadCards();
+      if (this.detailEl) {
+        const sc = this.detailEl.querySelector(".cl-notes-detail-scroll");
+        if (sc) sc.scrollTop = sc.scrollHeight;
+      }
+    };
+    input.addEventListener("keydown", (ev) => {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+        ev.preventDefault();
+        addBtn.onclick(ev);
+      }
+    });
+
+    if (keepScroll) scroll.scrollTop = keepScroll;
   }
 
   /** 引用小红点：数字与提示文案都与 Noval 的 paintRefDot 一致 */
@@ -1048,7 +1628,7 @@ class NovalNotesPanel {
     el.setAttribute("title", lines.join("\n"));
   }
 
-  renderCardBody(bodyEl, card, textOverride) {
+  renderCardBody(bodyEl, card, textOverride, interactive = true) {
     const text = textOverride != null
       ? String(textOverride)
       : NovalBundle.qmCardSections(String(card.body || "")).original;
@@ -1063,7 +1643,7 @@ class NovalNotesPanel {
       // 循环结束后的 match（已为 null），点标签会抛错、筛选与 chips 都不生效。
       const tagValue = match[1];
       const tag = bodyEl.createSpan({ cls: "qm-tag", text: match[0] });
-      if (!this.selectMode) {
+      if (!this.selectMode && interactive) {
         tag.onclick = (ev) => {
           ev.stopPropagation();
           // 与侧栏 Noval 一致：正文点标签 = 只用这一个标签筛选（换掉原条件）
@@ -1463,7 +2043,7 @@ class NovalNotesPanel {
         const res = await this.noval.deleteCards(picked);
         this.selectMode = false;
         this.selected.clear();
-        await this.load();
+        await this.reloadCards();
         if (res && res.deleted && res.failed) {
           new Notice("已删除 " + res.deleted + " 条，" + res.failed + " 条没找到已跳过", 9000);
         } else if (res && res.deleted) {
@@ -1785,7 +2365,7 @@ class NovalNotesPanel {
       "删除这条卡片？",
       async () => {
         await this.noval.deleteCard(card);
-        await this.load();
+        await this.reloadCards();
       },
       detail
     ).open();
@@ -1824,7 +2404,7 @@ class NovalNotesPanel {
       this.saveBtn.disabled = true;
       this.saveBtn.classList.add("is-disabled");
     }
-    this.load();
+    this.reloadCards();
   }
 
   openCard(card, newLeaf) {
