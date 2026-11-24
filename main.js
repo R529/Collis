@@ -18968,7 +18968,7 @@ var BUNDLED_PLUGINS = [
     manifest: {
       id: BOARD_ID,
       name: "Noval",
-      version: "0.7.3",
+      version: "0.7.9",
       minAppVersion: "1.13.0",
       description: "Canvas \u601D\u8003\u5DE5\u4F5C\u53F0\uFF1A\u753B\u5E03\u96C6\u3001\u8BED\u4E49\u8FDE\u7EBF\u3001\u5927\u7EB2\u3001Markdown \u5BFC\u51FA\u4E0E AI\u3002",
       author: "Lak",

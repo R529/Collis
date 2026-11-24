@@ -5919,6 +5919,80 @@ body.theme-light .noval-view .cl-hm-note {
   .noval-view .cl-mdv-mods { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 }
 
+/* =====================================================================
+   右侧区域配色：米白（v0.7.7）
+   变量只挂在 .cl-main 上，左侧导航、首页极光页保持原样。
+   ===================================================================== */
+.noval-view .cl-main {
+  --nv-canvas: #efefec;
+  --nv-pane: #fafaf8;
+  --nv-pane-2: #f4f4f1;
+  --nv-card: #ffffff;
+  --nv-line: #e7e7e2;
+  --nv-line-soft: #f0f0ec;
+  --nv-shadow: 0 1px 2px rgba(50, 48, 40, 0.04), 0 1px 4px rgba(50, 48, 40, 0.035);
+  background: var(--nv-canvas);
+}
+
+/* 深色沿用工作台自身的灰绿层级：右侧与左侧导航同一套明度，
+   不再往下压深，避免整块发黑、和导航割裂。 */
+.theme-dark .noval-view .cl-main {
+  --nv-canvas: #394442;
+  --nv-pane: #3f4a48;
+  --nv-pane-2: #37413f;
+  --nv-card: #444f4c;
+  --nv-line: rgba(231, 237, 232, 0.12);
+  --nv-line-soft: rgba(231, 237, 232, 0.06);
+  --nv-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
+  background: var(--nv-canvas);
+}
+
+/* 浮起面板：米白底 + 轻投影；画布滚动区保持自己的背景 */
+.noval-view .cl-main .cl-scroll:not(.cl-scroll-canvas) {
+  background: var(--nv-pane);
+  border-color: var(--nv-line);
+  box-shadow: var(--nv-shadow);
+}
+
+/* 模块页 / 收件箱：卡片比底色亮一层，悬停略降一档 */
+.noval-view .cl-main .cl-md-page,
+.noval-view .cl-main .cl-inbox-page {
+  --md-border: var(--nv-line);
+  --md-surface: var(--nv-card);
+  --md-surface-hover: var(--nv-pane-2);
+  --md-shadow: var(--nv-shadow);
+  --inbx-border: var(--nv-line);
+  --inbx-surface: var(--nv-card);
+  --inbx-surface-hover: var(--nv-pane-2);
+  --inbx-shadow: var(--nv-shadow);
+}
+
+/* 卡片笔记面板：跟随右侧同一套表面色 */
+.noval-view .cl-main .cl-notes-panel.qm-view {
+  --qm-pane-bg: var(--nv-pane);
+  --qm-card-bg: var(--nv-card);
+  --qm-card-hover: var(--nv-pane-2);
+  --qm-field-bg: var(--nv-pane-2);
+  --qm-line: var(--nv-line);
+  --qm-shadow-card: var(--nv-shadow);
+  --qm-shadow-pop: 0 12px 28px rgba(50, 48, 40, 0.12), 0 2px 5px rgba(50, 48, 40, 0.05);
+}
+
+.theme-dark .noval-view .cl-main .cl-notes-panel.qm-view {
+  --qm-shadow-pop: 0 12px 28px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.28);
+}
+
+/* 模块详情里的笔记行：贴到暖色卡片表面 */
+.noval-view .cl-main .cl-mdv-row {
+  border-color: var(--nv-line-soft);
+  background: var(--nv-card);
+}
+
+.noval-view .cl-main .cl-mdv-row:hover {
+  background: var(--nv-pane-2);
+  border-color: var(--nv-line);
+}
+
 
 /* ==================== noval-notes.css ==================== */
 /* Noval - 轻量卡片笔记插件样式

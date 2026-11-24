@@ -55,7 +55,7 @@ const BUNDLED_PLUGINS = [
     manifest: {
       id: BOARD_ID,
       name: "Noval",
-      version: "0.7.3",
+      version: "0.7.9",
       minAppVersion: "1.13.0",
       description: "Canvas 思考工作台：画布集、语义连线、大纲、Markdown 导出与 AI。",
       author: "Lak",
