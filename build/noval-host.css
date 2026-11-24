@@ -5953,9 +5953,13 @@ body.theme-light .noval-view .cl-hm-note {
   box-shadow: var(--nv-shadow);
 }
 
-/* 画布页用同一套米白面板底色，和模块页 / 收件箱 / 卡片笔记保持一致 */
+/* 画布页用同一套米白面板底色，和模块页 / 收件箱 / 卡片笔记保持一致。
+   注意 .vw-frame / .vw-toolbar 自带 --background-primary，必须一起覆盖，
+   否则用户看到的主面板仍是 Obsidian 默认底色。 */
 .noval-view .cl-main .cl-scroll.cl-scroll-canvas,
-.noval-view .cl-main .cl-scroll.cl-scroll-canvas .cl-root {
+.noval-view .cl-main .cl-scroll.cl-scroll-canvas .cl-root,
+.noval-view .cl-main .cl-scroll.cl-scroll-canvas .cl-root .vw-frame,
+.noval-view .cl-main .cl-scroll.cl-scroll-canvas .cl-root .vw-toolbar {
   background: var(--nv-pane);
 }
 
