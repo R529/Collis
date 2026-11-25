@@ -3610,19 +3610,21 @@
 }
 
 /* 画布集封面配色：按文件夹自动取色，可在卡片菜单里手动覆盖。
- * 只影响卡片封面底色，画布编辑器背景不受影响。 */
+ * 只影响卡片封面底色，画布编辑器背景不受影响。
+ * 深色值不是把浅色值压暗，而是按浅色主题“封面略深于卡片”的同一关系重算：
+ * 亮度与卡片（#434e4c）齐平，只靠色相区分，否则六色都会糊成同一块黑。 */
 .cl-root .vw-cover[data-tint="olive"] { --vw-tint: #eef2e4; }
 .cl-root .vw-cover[data-tint="teal"] { --vw-tint: #e6efec; }
 .cl-root .vw-cover[data-tint="sand"] { --vw-tint: #f4eee1; }
 .cl-root .vw-cover[data-tint="violet"] { --vw-tint: #eeeaf3; }
 .cl-root .vw-cover[data-tint="clay"] { --vw-tint: #f3eae5; }
 .cl-root .vw-cover[data-tint="mist"] { --vw-tint: #e8edf1; }
-.theme-dark .cl-root .vw-cover[data-tint="olive"] { --vw-tint: #262b21; }
-.theme-dark .cl-root .vw-cover[data-tint="teal"] { --vw-tint: #222a28; }
-.theme-dark .cl-root .vw-cover[data-tint="sand"] { --vw-tint: #2b2720; }
-.theme-dark .cl-root .vw-cover[data-tint="violet"] { --vw-tint: #272330; }
-.theme-dark .cl-root .vw-cover[data-tint="clay"] { --vw-tint: #2b2422; }
-.theme-dark .cl-root .vw-cover[data-tint="mist"] { --vw-tint: #22272c; }
+.theme-dark .cl-root .vw-cover[data-tint="olive"] { --vw-tint: #464f30; }
+.theme-dark .cl-root .vw-cover[data-tint="teal"] { --vw-tint: #304f45; }
+.theme-dark .cl-root .vw-cover[data-tint="sand"] { --vw-tint: #554930; }
+.theme-dark .cl-root .vw-cover[data-tint="violet"] { --vw-tint: #433753; }
+.theme-dark .cl-root .vw-cover[data-tint="clay"] { --vw-tint: #543d31; }
+.theme-dark .cl-root .vw-cover[data-tint="mist"] { --vw-tint: #364654; }
 
 /* ---------- 画布集：两行顶栏 + 分组 ---------- */
 .cl-root .vw-head {
@@ -4615,12 +4617,12 @@
 .cl-root .nvg-thumb[data-tint="violet"] { --a: #eeeaf3; --b: #e7e0ef; }
 .cl-root .nvg-thumb[data-tint="clay"] { --a: #f3eae5; --b: #eddfd7; }
 .cl-root .nvg-thumb[data-tint="mist"] { --a: #e8edf1; --b: #dfe7ee; }
-.theme-dark .cl-root .nvg-thumb[data-tint="olive"] { --a: #262b21; --b: #2e3528; }
-.theme-dark .cl-root .nvg-thumb[data-tint="teal"] { --a: #222a28; --b: #29332f; }
-.theme-dark .cl-root .nvg-thumb[data-tint="sand"] { --a: #2b2720; --b: #332e25; }
-.theme-dark .cl-root .nvg-thumb[data-tint="violet"] { --a: #272330; --b: #2f2a3a; }
-.theme-dark .cl-root .nvg-thumb[data-tint="clay"] { --a: #2b2422; --b: #332b28; }
-.theme-dark .cl-root .nvg-thumb[data-tint="mist"] { --a: #22272c; --b: #2a3037; }
+.theme-dark .cl-root .nvg-thumb[data-tint="olive"] { --a: #464f30; --b: #4f5936; }
+.theme-dark .cl-root .nvg-thumb[data-tint="teal"] { --a: #304f45; --b: #36594d; }
+.theme-dark .cl-root .nvg-thumb[data-tint="sand"] { --a: #554930; --b: #5f5235; }
+.theme-dark .cl-root .nvg-thumb[data-tint="violet"] { --a: #433753; --b: #4b3d5c; }
+.theme-dark .cl-root .nvg-thumb[data-tint="clay"] { --a: #543d31; --b: #5d4437; }
+.theme-dark .cl-root .nvg-thumb[data-tint="mist"] { --a: #364654; --b: #3c4e5d; }
 
 /* 微缩画布铺在渐变底上 */
 .cl-root .nvg-cover {
