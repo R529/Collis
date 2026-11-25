@@ -1,6 +1,11 @@
 # old local backups (not part of the plugin)
 backup/
 
+# 本地临时备份 / 工作副本：绝不进仓库（以前误用 git add -A 带进来过）
+_backup*/
+_work/
+_src-backup*/
+
 # dependencies
 node_modules/
 

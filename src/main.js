@@ -1,4 +1,4 @@
-const {
+var {
   Plugin,
   ItemView,
   PluginSettingTab,
@@ -10,30 +10,59 @@ const {
   setIcon,
   addIcon
 } = require("obsidian");
-
-// 内置子插件：Noval（速记卡片）与 Noval（画布工作台）。
-// 代码在打包时并入本插件，设置统一存进 noval/data.json 的 noval-notes / noval-board 键，
-// 不再依赖单独的插件文件夹。
-const NovalBundle = require("../vendor/noval-notes-core.js");
-const NovalBoardBundle = require("../vendor/noval-board-core.js");
-const { NovalGalleryPanel } = require("./noval-gallery.js");
-const { NovalNotesPanel } = require("./noval-notes.js");
-
+var NovalBundle = require("../vendor/noval-notes-core.js");
+var NovalBoardBundle = require("../vendor/noval-board-core.js");
+var { NovalGalleryPanel } = require("./noval-gallery.js");
+var { NovalNotesPanel } = require("./noval-notes.js");
+var RenameFileModal = class extends Modal {
+  constructor(app, initial, onSubmit, heading) {
+    super(app);
+    this.initial = initial;
+    this.onSubmit = onSubmit;
+    this.heading = heading || "\u91CD\u547D\u540D";
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h3", { text: this.heading });
+    const input = contentEl.createEl("input", { type: "text" });
+    input.value = this.initial;
+    input.addClass("noval-rename-input");
+    input.focus();
+    input.select();
+    const submit = () => {
+      const value = input.value.trim();
+      if (!value) return;
+      this.close();
+      this.onSubmit(value);
+    };
+    input.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter") {
+        evt.preventDefault();
+        submit();
+      }
+      if (evt.key === "Escape") {
+        evt.preventDefault();
+        this.close();
+      }
+    });
+    new Setting(contentEl).addButton(
+      (button) => button.setButtonText("\u91CD\u547D\u540D").setCta().onClick(submit)
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
 function resolvePluginClass(bundle, fallbackName) {
   if (typeof bundle === "function") return bundle;
   if (bundle && typeof bundle.default === "function") return bundle.default;
   if (bundle && typeof bundle[fallbackName] === "function") return bundle[fallbackName];
   return null;
 }
-
-/* 内置子模块的 id：既是 childPlugins 的键，也是 data.json 里的设置键。
- * 故意用 noval-notes / noval-board，而不是裸 noval——宿主 id 就是 noval，
- * 子模块再叫 noval 会撞名，isStandaloneEnabled 会把宿主自己当成“已启用的独立插件”
- * 从而跳过整个卡片模块的加载（上一个大版本踩过这个坑）。 */
-const NOTES_ID = "noval-notes";
-const BOARD_ID = "noval-board";
-
-const BUNDLED_PLUGINS = [
+var NOTES_ID = "noval-notes";
+var BOARD_ID = "noval-board";
+var BUNDLED_PLUGINS = [
   {
     id: NOTES_ID,
     className: "QuickMemoPlugin",
@@ -43,7 +72,7 @@ const BUNDLED_PLUGINS = [
       name: "Noval",
       version: "2.0.5",
       minAppVersion: "1.4.0",
-      description: "在知识库里速记：不建文件、不起标题，按月存进本地 Markdown。",
+      description: "\u5728\u77E5\u8BC6\u5E93\u91CC\u901F\u8BB0\uFF1A\u4E0D\u5EFA\u6587\u4EF6\u3001\u4E0D\u8D77\u6807\u9898\uFF0C\u6309\u6708\u5B58\u8FDB\u672C\u5730 Markdown\u3002",
       author: "Lak",
       isDesktopOnly: false
     }
@@ -57,28 +86,19 @@ const BUNDLED_PLUGINS = [
       name: "Noval",
       version: "0.7.9",
       minAppVersion: "1.13.0",
-      description: "Canvas 思考工作台：画布集、语义连线、大纲、Markdown 导出与 AI。",
+      description: "Canvas \u601D\u8003\u5DE5\u4F5C\u53F0\uFF1A\u753B\u5E03\u96C6\u3001\u8BED\u4E49\u8FDE\u7EBF\u3001\u5927\u7EB2\u3001Markdown \u5BFC\u51FA\u4E0E AI\u3002",
       author: "Lak",
       isDesktopOnly: true
     }
   }
 ];
-
-const VIEW_TYPE = "noval-view";
-// 卡片笔记右侧栏视图，由内置 Noval 注册；主插件需要用它判断/恢复侧栏
-const QM_VIEW_TYPE = "qm-cards-view";
-// 插件图标沿用 Noval 画布标志；图形从内置 Noval 模块里取，保证
-// 侧栏卡片视图、ribbon、标签页三处是同一枚图标。
-const PLUGIN_ICON_ID = (NovalBundle && NovalBundle.ICON_ID) || "noval-mark";
-const PLUGIN_ICON_SVG = (NovalBundle && NovalBundle.ICON_MARK) || "";
-const CARD_FOLDER = "00-Inbox/速记";
-const BOARD_EXT = "noval";
-
-/* ================= 旧版本兼容（只读，升级完成后可整块删除） =================
- * 0.6.0 起插件由 Collis 更名为 Noval。下面这些旧标识只用于把已有数据搬过来：
- * 数据键、插件目录名、白板后缀、旧标签页类型。它们不会出现在界面、文档或新数据里，
- * 只在本文件这一处引用，方便将来确认所有人都升级后一次性删除。 */
-const LEGACY = {
+var VIEW_TYPE = "noval-view";
+var QM_VIEW_TYPE = "qm-cards-view";
+var PLUGIN_ICON_ID = NovalBundle && NovalBundle.ICON_ID || "noval-mark";
+var PLUGIN_ICON_SVG = NovalBundle && NovalBundle.ICON_MARK || "";
+var CARD_FOLDER = "00-Inbox/\u901F\u8BB0";
+var BOARD_EXT = "noval";
+var LEGACY = {
   // 旧版 data.json 里的设置键，也是旧独立插件的目录名
   notesId: "collis",
   boardId: "collis-board",
@@ -88,33 +108,69 @@ const LEGACY = {
   // 旧标签页类型：升级后先把残留标签页关掉，避免留下打不开的空标签
   viewTypes: ["collis-view", "collis-board", "collis-gallery"]
 };
-
-/* 收集箱收录的附件类型白名单。
- * 以前是“非 md 全收”，结果白板的 .volis.json / .volis.bak 这类复合后缀
- * 也混进了收集箱。改成白名单后，只认真正给人看的素材文件。 */
-const ATTACHMENT_EXTENSIONS = new Set([
+var ATTACHMENT_EXTENSIONS = /* @__PURE__ */ new Set([
   // 图片
-  "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif", "heic", "heif", "ico", "tif", "tiff",
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "svg",
+  "bmp",
+  "avif",
+  "heic",
+  "heif",
+  "ico",
+  "tif",
+  "tiff",
   // 视频
-  "mp4", "mov", "webm", "mkv", "avi", "m4v", "flv", "wmv", "mpeg", "mpg",
+  "mp4",
+  "mov",
+  "webm",
+  "mkv",
+  "avi",
+  "m4v",
+  "flv",
+  "wmv",
+  "mpeg",
+  "mpg",
   // 音频
-  "mp3", "wav", "m4a", "ogg", "flac", "aac", "opus", "wma", "aiff",
+  "mp3",
+  "wav",
+  "m4a",
+  "ogg",
+  "flac",
+  "aac",
+  "opus",
+  "wma",
+  "aiff",
   // 文档
-  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "epub", "odt", "ods", "odp", "rtf", "txt",
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "ppt",
+  "pptx",
+  "epub",
+  "odt",
+  "ods",
+  "odp",
+  "rtf",
+  "txt",
   // 压缩包
-  "zip", "rar", "7z", "tar", "gz", "bz2", "xz",
+  "zip",
+  "rar",
+  "7z",
+  "tar",
+  "gz",
+  "bz2",
+  "xz",
   // 其他常见素材
-  "excalidraw", "base"
+  "excalidraw",
+  "base"
 ]);
-/* ---------------- 收录过滤 ----------------
- * 只排除“给工具/AI 用的技术文件”，不动任何正常笔记。
- * 判定分三层，任一命中就跳过：
- *   1. 路径里任意一段以 "." 开头（.obsidian / .claude / .git …）
- *   2. 任意一级目录名命中技术目录名单（vault-scripts / node_modules …）
- *   3. 文件名（去掉扩展名、转小写）命中工具文件名单（README / CLAUDE / AGENTS …）
- * 目录名和文件名都不区分大小写，所以 Vault-Scripts、Readme.md 同样会被排除。
- */
-const EXCLUDED_DIR_NAMES = new Set([
+var EXCLUDED_DIR_NAMES = /* @__PURE__ */ new Set([
   // AI / 编辑器 / 版本控制的工作目录
   ".git",
   ".github",
@@ -142,8 +198,7 @@ const EXCLUDED_DIR_NAMES = new Set([
   ".venv",
   "venv"
 ]);
-
-const EXCLUDED_FILE_NAMES = new Set([
+var EXCLUDED_FILE_NAMES = /* @__PURE__ */ new Set([
   // 仓库说明类
   "readme",
   "license",
@@ -176,7 +231,6 @@ const EXCLUDED_FILE_NAMES = new Set([
   "thumbs",
   "desktop"
 ]);
-
 function isIgnoredPath(filePath) {
   const parts = String(filePath || "").split("/");
   if (!parts.length) return false;
@@ -187,53 +241,33 @@ function isIgnoredPath(filePath) {
   const name = base.replace(/\.[^.]+$/, "").toLowerCase();
   return EXCLUDED_FILE_NAMES.has(name);
 }
-
-// 文件夹名与模块名保持同一个规则，避免「模块叫 A、目录叫 B」的偏差
 function sanitizeFolderName(value) {
-  return String(value || "")
-    .trim()
-    .replace(/[\\/:*?"<>|]/g, "_")
-    .replace(/[. ]+$/, "")
-    .replace(/^\/+|\/+$/g, "");
+  return String(value || "").trim().replace(/[\\/:*?"<>|]/g, "_").replace(/[. ]+$/, "").replace(/^\/+|\/+$/g, "");
 }
-
-// 给工具 / AI / 构建用的目录（vault-scripts、node_modules、.claude …）不当作模块
 function isToolFolder(path) {
   const dir = String(path || "").replace(/^\/+|\/+$/g, "").toLowerCase();
   if (!dir) return false;
   return dir.split("/").some((part) => EXCLUDED_DIR_NAMES.has(part));
 }
-
-// 模块对应的文件夹：没单独配置 folder 时用模块自己的名字。
-// 视图和宿主（启动同步）都要用，抽成公共函数，避免两处逻辑不一致。
 function moduleFolderOf(mod) {
-  const raw = String((mod && (mod.folder || mod.name || mod.id || mod.module)) || "").trim();
+  const raw = String(mod && (mod.folder || mod.name || mod.id || mod.module) || "").trim();
   return raw.replace(/^\/+|\/+$/g, "").replace(/[\\:*?"<>|]/g, "_");
 }
-
-/* ---------------- 文件树顺序 ----------------
- * 直接沿用 Obsidian 文件浏览器的比较器（getSortedFolderItems → fm）：
- * 文件夹一律「文件夹在前、名称升序」，且是数字自然排序、忽略大小写与重音。
- * 这条规则不受「修改时间/倒序」等排序设置影响——文件夹在文件树里始终这么排。 */
-const FILE_TREE_COLLATOR = new Intl.Collator(undefined, {
+var FILE_TREE_COLLATOR = new Intl.Collator(void 0, {
   usage: "sort",
   sensitivity: "base",
   numeric: true
 });
-
 function compareVaultNodes(a, b) {
-  return FILE_TREE_COLLATOR.compare(String((a && a.name) || ""), String((b && b.name) || ""));
+  return FILE_TREE_COLLATOR.compare(String(a && a.name || ""), String(b && b.name || ""));
 }
-
-/* 文件夹在文件树里的位置：从库根目录一路下来的同级序号，形如 [2, 0]。
- * 用它排序，层级关系自然保留，子模块永远跟着父模块。 */
 function vaultNodeRank(app, dir, cache) {
-  const store = cache || new Map();
+  const store = cache || /* @__PURE__ */ new Map();
   const path = String(dir || "").replace(/^\/+|\/+$/g, "");
   if (!path) return [];
   const key = path.toLowerCase();
   if (store.has(key)) return store.get(key);
-  store.set(key, null); // 防环
+  store.set(key, null);
   const vault = app && app.vault;
   if (!vault) return null;
   const node = vault.getAbstractFileByPath(path);
@@ -244,64 +278,60 @@ function vaultNodeRank(app, dir, cache) {
   if (!parent || !Array.isArray(parent.children)) return null;
   const parentRank = parentPath ? vaultNodeRank(app, parentPath, store) : [];
   if (!parentRank) return null;
-  const siblings = parent.children
-    .filter((child) => Array.isArray(child.children))
-    .sort(compareVaultNodes);
+  const siblings = parent.children.filter((child) => Array.isArray(child.children)).sort(compareVaultNodes);
   const index = siblings.indexOf(node);
   if (index < 0) return null;
   const rank = parentRank.concat(index);
   store.set(key, rank);
   return rank;
 }
-
-const DEFAULT_MODULES = [
+var DEFAULT_MODULES = [
   {
     id: "learning",
-    name: "学习提升",
+    name: "\u5B66\u4E60\u63D0\u5347",
     icon: "graduation-cap",
     module: "learning",
     types: ["topic", "course", "lesson"],
-    keywords: ["学习", "课程", "专题", "知识"]
+    keywords: ["\u5B66\u4E60", "\u8BFE\u7A0B", "\u4E13\u9898", "\u77E5\u8BC6"]
   },
   {
     id: "reading",
-    name: "读书阅览",
+    name: "\u8BFB\u4E66\u9605\u89C8",
     icon: "book-open",
     module: "reading",
     types: ["book", "highlight"],
     folder: "Clippings",
-    keywords: ["读书", "阅读", "书摘", "书评", "摘录"]
+    keywords: ["\u8BFB\u4E66", "\u9605\u8BFB", "\u4E66\u6458", "\u4E66\u8BC4", "\u6458\u5F55"]
   },
   {
     id: "media",
-    name: "自媒体创作",
+    name: "\u81EA\u5A92\u4F53\u521B\u4F5C",
     icon: "pen-line",
     module: "media",
     types: ["idea", "script", "post"],
-    keywords: ["自媒体", "创作", "选题", "脚本", "公众号", "视频"]
+    keywords: ["\u81EA\u5A92\u4F53", "\u521B\u4F5C", "\u9009\u9898", "\u811A\u672C", "\u516C\u4F17\u53F7", "\u89C6\u9891"]
   },
   {
     id: "invest",
-    name: "投资学习",
+    name: "\u6295\u8D44\u5B66\u4E60",
     icon: "trending-up",
     module: "invest",
     types: ["company", "investment", "thesis"],
-    keywords: ["投资", "理财", "公司", "行业", "财报"]
+    keywords: ["\u6295\u8D44", "\u7406\u8D22", "\u516C\u53F8", "\u884C\u4E1A", "\u8D22\u62A5"]
   },
   {
     id: "writing",
-    name: "文章写作",
+    name: "\u6587\u7AE0\u5199\u4F5C",
     icon: "file-text",
     module: "writing",
     types: ["article", "draft"],
-    keywords: ["写作", "文章", "草稿", "长文"]
+    keywords: ["\u5199\u4F5C", "\u6587\u7AE0", "\u8349\u7A3F", "\u957F\u6587"]
   }
 ];
-
-const DEFAULT_SETTINGS = {
+var DEFAULT_SETTINGS = {
   modules: DEFAULT_MODULES,
   focusOnOpen: false,
-  workspaceName: "个人工作台",
+  workspaceName: "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0",
   navCollapsed: false,
   // 上次退出时卡片笔记右侧栏是否开着，用于重启后恢复
   novalSidebarOpen: false,
@@ -314,110 +344,123 @@ const DEFAULT_SETTINGS = {
   // 素材归属表：路径 -> 模块 id。
   // 素材没有 frontmatter，归入模块后靠这张表记住归属；
   // 收件箱据此判断是否已处理，模块页据此决定素材属于谁。
-  inboxAssigned: {}
+  inboxAssigned: {},
+  // 画布集封面配色覆盖：画布路径 -> 色板 key；缺省时按所在文件夹自动取色
+  boardTints: {},
+  // 画布收藏：画布路径 -> true
+  boardStars: {}
 };
-
-const ACTIVE_STATUSES = [
+var ACTIVE_STATUSES = [
   "active",
   "reading",
   "draft",
   "idea",
   "doing",
   "in-progress",
-  "进行中",
-  "在读",
-  "草稿"
+  "\u8FDB\u884C\u4E2D",
+  "\u5728\u8BFB",
+  "\u8349\u7A3F"
 ];
-
 function getFm(app, file) {
   try {
     const cache = app.metadataCache.getFileCache(file);
-    return (cache && cache.frontmatter) || {};
+    return cache && cache.frontmatter || {};
   } catch (e) {
     return {};
   }
 }
-
 function getTags(fm) {
   let tags = fm && fm.tags;
   if (Array.isArray(tags)) {
     return tags.map((t) => String(t).replace(/^#/, "")).filter(Boolean);
   }
   if (typeof tags === "string") {
-    return tags
-      .split(/[,\s]+/)
-      .map((t) => t.replace(/^#/, ""))
-      .filter(Boolean);
+    return tags.split(/[,\s]+/).map((t) => t.replace(/^#/, "")).filter(Boolean);
   }
   return [];
 }
-
 function formatTime(ts) {
-  const diff = (Date.now() - ts) / 1000;
-  if (diff < 60) return "刚刚";
-  if (diff < 3600) return Math.floor(diff / 60) + " 分钟前";
-  if (diff < 86400) return Math.floor(diff / 3600) + " 小时前";
-  if (diff < 86400 * 7) return Math.floor(diff / 86400) + " 天前";
+  const diff = (Date.now() - ts) / 1e3;
+  if (diff < 60) return "\u521A\u521A";
+  if (diff < 3600) return Math.floor(diff / 60) + " \u5206\u949F\u524D";
+  if (diff < 86400) return Math.floor(diff / 3600) + " \u5C0F\u65F6\u524D";
+  if (diff < 86400 * 7) return Math.floor(diff / 86400) + " \u5929\u524D";
   const d = new Date(ts);
   return d.getMonth() + 1 + "-" + d.getDate();
 }
-
-/** 把模块色（#rrggbb）转成带透明度的 rgba，供首页彩色底纹使用。 */
 function hmRgba(hex, alpha) {
   const value = String(hex || "").replace("#", "");
   if (value.length !== 6) return "rgba(255,255,255," + alpha + ")";
   const n = parseInt(value, 16);
-  return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + alpha + ")";
+  return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + alpha + ")";
 }
-
-function statusClass(status) {
-  const v = String(status || "").toLowerCase();
-  if (["done", "published", "finished", "已读", "已发布", "完成", "归档"].includes(v)) {
-    return "cl-done";
-  }
-  if (["reading", "active", "draft", "doing", "in-progress", "进行中", "在读", "草稿"].includes(v)) {
-    return "cl-reading";
-  }
-  if (["want", "todo", "planned", "想读", "计划中", "待办"].includes(v)) {
-    return "cl-want";
-  }
-  return "cl-pause";
-}
-
 function isContentFile(file) {
   return !isIgnoredPath(file.path);
 }
-
-/* ---------------- 网格缩略图工具 ----------------
- * 收件箱和模块页共用同一套缩略图规则：
- *   - 图片铺真实图片；
- *   - 视频显示首帧 + 播放角标；
- *   - 笔记读取正文，优先展示内嵌的图片 / 视频，否则展示正文片段；
- *   - 音频 / 文档 / 其他交给调用方渲染类型图标。
- */
-const THUMB_IMAGE_EXT = new Set([
-  "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif", "heic", "heif", "ico", "tif", "tiff"
+var THUMB_IMAGE_EXT = /* @__PURE__ */ new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "svg",
+  "bmp",
+  "avif",
+  "heic",
+  "heif",
+  "ico",
+  "tif",
+  "tiff"
 ]);
-const THUMB_VIDEO_EXT = new Set([
-  "mp4", "mov", "webm", "mkv", "avi", "m4v", "flv", "wmv", "mpeg", "mpg"
+var THUMB_VIDEO_EXT = /* @__PURE__ */ new Set([
+  "mp4",
+  "mov",
+  "webm",
+  "mkv",
+  "avi",
+  "m4v",
+  "flv",
+  "wmv",
+  "mpeg",
+  "mpg"
 ]);
-const THUMB_AUDIO_EXT = new Set([
-  "mp3", "wav", "m4a", "ogg", "flac", "aac", "opus", "wma", "aiff"
+var THUMB_AUDIO_EXT = /* @__PURE__ */ new Set([
+  "mp3",
+  "wav",
+  "m4a",
+  "ogg",
+  "flac",
+  "aac",
+  "opus",
+  "wma",
+  "aiff"
 ]);
-const THUMB_DOC_EXT = new Set([
-  "pdf", "doc", "docx", "xls", "xlsx", "csv", "ppt", "pptx", "epub", "odt", "ods", "odp", "rtf", "txt"
+var THUMB_DOC_EXT = /* @__PURE__ */ new Set([
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "csv",
+  "ppt",
+  "pptx",
+  "epub",
+  "odt",
+  "ods",
+  "odp",
+  "rtf",
+  "txt"
 ]);
-const THUMB_KIND_LABELS = {
-  note: "笔记",
-  image: "图片",
-  video: "视频",
-  audio: "音频",
-  doc: "文档",
-  other: "文件"
+var THUMB_KIND_LABELS = {
+  note: "\u7B14\u8BB0",
+  image: "\u56FE\u7247",
+  video: "\u89C6\u9891",
+  audio: "\u97F3\u9891",
+  doc: "\u6587\u6863",
+  other: "\u6587\u4EF6"
 };
-
 function fileKind(file) {
-  const ext = String((file && file.extension) || "").toLowerCase();
+  const ext = String(file && file.extension || "").toLowerCase();
   if (ext === "md") return "note";
   if (THUMB_IMAGE_EXT.has(ext)) return "image";
   if (THUMB_VIDEO_EXT.has(ext)) return "video";
@@ -425,15 +468,11 @@ function fileKind(file) {
   if (THUMB_DOC_EXT.has(ext)) return "doc";
   return "other";
 }
-
-// 去掉 note 的 frontmatter，只留正文
 function stripNoteBody(raw) {
   const text = String(raw || "").replace(/^\uFEFF/, "");
   const fm = text.match(/^---\r?\n[\s\S]*?\r?\n---[ \t]*\r?\n?/);
   return fm ? text.slice(fm[0].length) : text;
 }
-
-// 正文片段：去掉代码块、嵌入、链接、标题、列表、强调符后压成一段纯文本
 function noteSnippet(body) {
   let text = String(body || "");
   text = text.replace(/```[\s\S]*?```/g, " ");
@@ -450,19 +489,16 @@ function noteSnippet(body) {
   text = text.replace(/\s+/g, " ").trim();
   return text.slice(0, 220);
 }
-
-// 从正文里找第一个能解析到本地文件的图片 / 视频嵌入
 function findNoteMedia(app, body, sourcePath) {
   const re = /!\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]|!\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)/g;
   let m;
-  while ((m = re.exec(body))) {
+  while (m = re.exec(body)) {
     let link = String(m[1] || m[2] || "").trim();
     if (!link) continue;
     if (m[2]) {
       try {
         link = decodeURI(link);
       } catch (e) {
-        // 保持原样
       }
     }
     let target = null;
@@ -477,7 +513,6 @@ function findNoteMedia(app, body, sourcePath) {
   }
   return null;
 }
-
 function paintMediaThumb(app, thumb, file, kind) {
   let src = "";
   try {
@@ -509,7 +544,6 @@ function paintMediaThumb(app, thumb, file, kind) {
       thumb.removeClass("cl-md-thumb-media");
       setIcon(thumb, "video");
     };
-    // #t=0.1 让浏览器把第一帧解出来，否则某些视频只显示黑底
     video.setAttribute("src", src + "#t=0.1");
     const play = thumb.createDiv({ cls: "cl-md-play" });
     setIcon(play, "play");
@@ -518,10 +552,8 @@ function paintMediaThumb(app, thumb, file, kind) {
   thumb.removeClass("cl-md-thumb-media");
   return false;
 }
-
 function paintNoteThumb(app, thumb, file) {
   app.vault.cachedRead(file).then((raw) => {
-    // 渲染期间可能已切页 / 重渲染，丢弃过期的异步结果
     if (!thumb.isConnected) return;
     const body = stripNoteBody(raw);
     const media = findNoteMedia(app, body, file.path);
@@ -537,21 +569,7 @@ function paintNoteThumb(app, thumb, file) {
     if (thumb.isConnected) setIcon(thumb, "file-text");
   });
 }
-
-/* ---------------- 提示框去重：只保留 Obsidian 的黑色提示框 ----------------
- * 根因（已核对 Obsidian 核心 obsidian.asar）：
- *   - Obsidian 的黑色 .tooltip 由核心读取 aria-label 生成（setTooltip 只写
- *     aria-label，从不写 title；触发函数也只读 aria-label）。
- *   - 浏览器 / Electron 的原生白色提示框读取 title 属性生成。
- *   - Obsidian 核心不会移除 title，所以一个元素同时有 aria-label 和 title
- *     时，悬停就会同时冒出黑、白两个提示框。
- * Noval 的功能按钮（回看 / 筛选 / 更多 / 卡片右上角 ··· / 侧栏
- * Noval 视图等）恰好同时写了这两个属性。这里把本插件视图内所有 title
- * 统一转成 aria-label：已有 aria-label 的只删 title（保留黑色提示文案），
- * 只有 title 的把文案搬到 aria-label 再删 title。作用域严格限定在本插件
- * 的视图容器内，不碰 Obsidian 核心和其他插件。
- */
-const WB_TOOLTIP_SCOPE = [
+var WB_TOOLTIP_SCOPE = [
   ".noval-view",
   ".qm-view",
   ".qm-root",
@@ -565,7 +583,6 @@ const WB_TOOLTIP_SCOPE = [
   ".noval-ai-modal",
   ".noval-settings"
 ].join(",");
-
 function wbInTooltipScope(el) {
   try {
     return !!(el && el.closest && el.closest(WB_TOOLTIP_SCOPE));
@@ -573,34 +590,24 @@ function wbInTooltipScope(el) {
     return false;
   }
 }
-
 function wbNormalizeTitle(el) {
   if (!el || el.nodeType !== 1 || !el.hasAttribute || !el.hasAttribute("title")) return;
   if (!wbInTooltipScope(el)) return;
   const t = el.getAttribute("title") || "";
   if (!el.hasAttribute("aria-label")) {
-    // 原本只有 title：把提示文案搬到 aria-label，并标记是我们派生的，
-    // 之后若 title 被代码原地更新，aria-label 也跟着同步。
     el.setAttribute("aria-label", t);
     el.setAttribute("data-cl-tt", "1");
   } else if (el.getAttribute("data-cl-tt") === "1") {
     el.setAttribute("aria-label", t);
   }
-  // 已有自己 aria-label 的元素（如回看按钮 aria-label="回看"）不动其文案，
-  // 只删掉 title，黑色提示框保持原样。
   el.removeAttribute("title");
 }
-
 function wbNormalizeTree(root) {
   if (!root || root.nodeType !== 1) return;
   wbNormalizeTitle(root);
   const list = root.querySelectorAll("[title]");
   for (let i = 0; i < list.length; i++) wbNormalizeTitle(list[i]);
 }
-
-/** 把菜单精确锚定到按钮正下方：紧贴按钮底边；菜单会盖住按钮不溢出。
- *  showAtPosition 在有 transform/缩放的容器里坐标会偏，且右侧按钮默认左对齐会把
- *  菜单顶出屏幕——这里渲染后按真实宽度重算 left，右侧放不下就右对齐。 */
 function anchorMenuBelow(menu, anchor) {
   if (!anchor || typeof anchor.getBoundingClientRect !== "function") {
     menu.showAtPosition({ x: 8, y: 8 });
@@ -618,8 +625,7 @@ function anchorMenuBelow(menu, anchor) {
     dom.style.top = Math.round(rect.bottom) + "px";
   }
 }
-
-const MODULE_ICONS = [
+var MODULE_ICONS = [
   "file-text",
   "graduation-cap",
   "book-open",
@@ -637,8 +643,7 @@ const MODULE_ICONS = [
   "map",
   "coffee"
 ];
-
-const MODULE_COLORS = [
+var MODULE_COLORS = [
   "#7c6df2",
   "#3f9c6d",
   "#d9834a",
@@ -646,9 +651,6 @@ const MODULE_COLORS = [
   "#c2568a",
   "#8a6d3b"
 ];
-
-/* 逐级建目录，父级不存在时一并补上；创建后文件树会自动出现。
- * 放在顶层，供各个视图/弹窗共用，避免某个类里漏定义直接报 is not a function。 */
 async function ensureVaultFolder(app, path) {
   const parts = String(path || "").split("/").filter(Boolean);
   let cur = "";
@@ -656,56 +658,40 @@ async function ensureVaultFolder(app, path) {
     cur = cur ? cur + "/" + part : part;
     const found = app.vault.getAbstractFileByPath(cur);
     if (!found) await app.vault.createFolder(cur);
-    else if (!Array.isArray(found.children)) throw new Error("「" + cur + "」已被同名文件占用");
+    else if (!Array.isArray(found.children)) throw new Error("\u300C" + cur + "\u300D\u5DF2\u88AB\u540C\u540D\u6587\u4EF6\u5360\u7528");
   }
   return cur;
 }
-
-/* 模块的唯一标识：优先 id，其次旧字段 module / name。
- * 归属表、frontmatter、导航都用它，避免各处取值顺序不一致。 */
 function moduleIdOf(mod) {
-  return String((mod && (mod.id || mod.module || mod.name)) || "").trim();
+  return String(mod && (mod.id || mod.module || mod.name) || "").trim();
 }
-
-/* 模块编辑器：名称 / 图标 / 颜色 / 文件夹。
- * 保存时会把模块文件夹同步创建到文件树；删除模块只删配置，不动笔记文件。 */
-class ModuleEditorModal extends Modal {
+var ModuleEditorModal = class extends Modal {
   constructor(app, options) {
     super(app);
     this.options = options || {};
     this.module = this.options.module || null;
     this.initialName = this.options.initialName || "";
-    this.icon = (this.module && this.module.icon) || MODULE_ICONS[0];
-    this.color = (this.module && this.module.color) || this.options.initialColor || MODULE_COLORS[0];
+    this.icon = this.module && this.module.icon || MODULE_ICONS[0];
+    this.color = this.module && this.module.color || this.options.initialColor || MODULE_COLORS[0];
     this.deleteArmed = false;
   }
-
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("cl-modaleditor");
-    contentEl.createEl("h2", { text: this.module ? "编辑模块" : "新建模块" });
+    contentEl.createEl("h2", { text: this.module ? "\u7F16\u8F91\u6A21\u5757" : "\u65B0\u5EFA\u6A21\u5757" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "模块就是文件夹：保存时会同步在文件树里创建对应目录，模块内容只认这个目录里的文件。"
+      text: "\u6A21\u5757\u5C31\u662F\u6587\u4EF6\u5939\uFF1A\u4FDD\u5B58\u65F6\u4F1A\u540C\u6B65\u5728\u6587\u4EF6\u6811\u91CC\u521B\u5EFA\u5BF9\u5E94\u76EE\u5F55\uFF0C\u6A21\u5757\u5185\u5BB9\u53EA\u8BA4\u8FD9\u4E2A\u76EE\u5F55\u91CC\u7684\u6587\u4EF6\u3002"
     });
-
     let name = this.module ? this.module.name || "" : this.initialName;
-    let folder = (this.module && this.module.folder) || "";
-
-    new Setting(contentEl)
-      .setName("名称")
-      .setDesc("显示在导航里的名字")
-      .addText((t) =>
-        t
-          .setValue(name)
-          .setPlaceholder("例如：健身记录")
-          .onChange((v) => {
-            name = v;
-          })
-      );
-
+    let folder = this.module && this.module.folder || "";
+    new Setting(contentEl).setName("\u540D\u79F0").setDesc("\u663E\u793A\u5728\u5BFC\u822A\u91CC\u7684\u540D\u5B57").addText(
+      (t) => t.setValue(name).setPlaceholder("\u4F8B\u5982\uFF1A\u5065\u8EAB\u8BB0\u5F55").onChange((v) => {
+        name = v;
+      })
+    );
     const iconRow = contentEl.createDiv({ cls: "cl-modalfield" });
-    iconRow.createDiv({ cls: "cl-modalfield-label", text: "图标" });
+    iconRow.createDiv({ cls: "cl-modalfield-label", text: "\u56FE\u6807" });
     const iconGrid = iconRow.createDiv({ cls: "cl-iconpick" });
     const iconButtons = [];
     MODULE_ICONS.forEach((name2) => {
@@ -720,9 +706,8 @@ class ModuleEditorModal extends Modal {
       };
       iconButtons.push(btn);
     });
-
     const colorRow = contentEl.createDiv({ cls: "cl-modalfield" });
-    colorRow.createDiv({ cls: "cl-modalfield-label", text: "颜色" });
+    colorRow.createDiv({ cls: "cl-modalfield-label", text: "\u989C\u8272" });
     const swatches = colorRow.createDiv({ cls: "cl-colorpick" });
     const colorDots = [];
     MODULE_COLORS.forEach((color) => {
@@ -737,64 +722,50 @@ class ModuleEditorModal extends Modal {
       };
       colorDots.push(dot);
     });
-
     let folderInput = null;
-    new Setting(contentEl)
-      .setName("模块文件夹")
-      .setDesc("保存时自动创建。不填则用模块名；填写多级路径（如 媒体文件/客户）也可以。")
-      .addText((t) => {
-        folderInput = t;
-        t.setValue(folder)
-          .setPlaceholder("未选择")
-          .onChange((v) => {
-            folder = v;
-          });
-      })
-      .addButton((b) => {
-        b.setButtonText("选择").onClick(() => {
-          new FolderPickerModal(this.app, {
-            current: String(folder || "").trim(),
-            onPick: (path) => {
-              folder = path;
-              if (folderInput) folderInput.setValue(path);
-            }
-          }).open();
-        });
+    new Setting(contentEl).setName("\u6A21\u5757\u6587\u4EF6\u5939").setDesc("\u4FDD\u5B58\u65F6\u81EA\u52A8\u521B\u5EFA\u3002\u4E0D\u586B\u5219\u7528\u6A21\u5757\u540D\uFF1B\u586B\u5199\u591A\u7EA7\u8DEF\u5F84\uFF08\u5982 \u5A92\u4F53\u6587\u4EF6/\u5BA2\u6237\uFF09\u4E5F\u53EF\u4EE5\u3002").addText((t) => {
+      folderInput = t;
+      t.setValue(folder).setPlaceholder("\u672A\u9009\u62E9").onChange((v) => {
+        folder = v;
       });
-
+    }).addButton((b) => {
+      b.setButtonText("\u9009\u62E9").onClick(() => {
+        new FolderPickerModal(this.app, {
+          current: String(folder || "").trim(),
+          onPick: (path) => {
+            folder = path;
+            if (folderInput) folderInput.setValue(path);
+          }
+        }).open();
+      });
+    });
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
-
     if (this.module && this.options.onDelete) {
-      const del = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "删除模块" });
+      const del = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664\u6A21\u5757" });
       del.onclick = () => {
         if (!this.deleteArmed) {
           this.deleteArmed = true;
-          del.setText("再点一次确认删除");
+          del.setText("\u518D\u70B9\u4E00\u6B21\u786E\u8BA4\u5220\u9664");
           setTimeout(() => {
             this.deleteArmed = false;
-            del.setText("删除模块");
-          }, 3000);
+            del.setText("\u5220\u9664\u6A21\u5757");
+          }, 3e3);
           return;
         }
         this.close();
         this.options.onDelete(this.module);
       };
     }
-
-    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
-
-    const save = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "保存" });
+    const save = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u4FDD\u5B58" });
     save.onclick = () => {
       const finalName = String(name || "").trim();
       if (!finalName) {
-        new Notice("请先填写模块名称");
+        new Notice("\u8BF7\u5148\u586B\u5199\u6A21\u5757\u540D\u79F0");
         return;
       }
-      // 模块 = 文件夹：文件夹可以不存在，保存时统一创建（见 onSave）
-      const folderValue = String(folder || "")
-        .trim()
-        .replace(/^\/+|\/+$/g, "");
+      const folderValue = String(folder || "").trim().replace(/^\/+|\/+$/g, "");
       const id = this.module && this.module.id ? this.module.id : "mod-" + Date.now().toString(36);
       const next = Object.assign({}, this.module || {}, {
         id,
@@ -808,120 +779,96 @@ class ModuleEditorModal extends Modal {
       if (this.options.onSave) this.options.onSave(next);
     };
   }
-
   onClose() {
     this.contentEl.empty();
   }
-}
-
-/* 删除确认：收集箱里的笔记和附件都走这里，先确认再移入回收站。 */
-class DeleteFilesModal extends Modal {
+};
+var DeleteFilesModal = class extends Modal {
   constructor(app, files, onConfirm) {
     super(app);
     this.files = files || [];
     this.onConfirm = onConfirm;
   }
-
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("cl-modaleditor");
     contentEl.createEl("h2", {
-      text: this.files.length === 1 ? "删除这个文件？" : "删除这 " + this.files.length + " 个文件？"
+      text: this.files.length === 1 ? "\u5220\u9664\u8FD9\u4E2A\u6587\u4EF6\uFF1F" : "\u5220\u9664\u8FD9 " + this.files.length + " \u4E2A\u6587\u4EF6\uFF1F"
     });
-    const names = this.files.slice(0, 3).map((f) => f.basename).join("、");
+    const names = this.files.slice(0, 3).map((f) => f.basename).join("\u3001");
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text:
-        this.files.length > 3
-          ? "会移到系统回收站：" + names + " 等 " + this.files.length + " 个文件。"
-          : "会移到系统回收站：" + names + "。"
+      text: this.files.length > 3 ? "\u4F1A\u79FB\u5230\u7CFB\u7EDF\u56DE\u6536\u7AD9\uFF1A" + names + " \u7B49 " + this.files.length + " \u4E2A\u6587\u4EF6\u3002" : "\u4F1A\u79FB\u5230\u7CFB\u7EDF\u56DE\u6536\u7AD9\uFF1A" + names + "\u3002"
     });
-
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
-    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
-    const remove = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "删除" });
+    const remove = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664" });
     remove.onclick = () => {
       this.close();
       if (this.onConfirm) this.onConfirm();
     };
   }
-
   onClose() {
     this.contentEl.empty();
   }
-}
-
-/* 删除模块确认：和 Obsidian 删除文件夹保持一致，
- * 整个文件夹连同里面的文件和子文件夹一起按仓库的删除设置处理。 */
-class DeleteModuleModal extends Modal {
+};
+var DeleteModuleModal = class extends Modal {
   constructor(app, info, onConfirm) {
     super(app);
     this.info = info || {};
     this.onConfirm = onConfirm;
   }
-
   finish(value) {
     const callback = this.onConfirm;
     this.onConfirm = null;
     if (callback) callback(value);
   }
-
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("cl-modaleditor");
-    contentEl.createEl("h2", { text: "删除模块「" + (this.info.name || "") + "」？" });
-
+    contentEl.createEl("h2", { text: "\u5220\u9664\u6A21\u5757\u300C" + (this.info.name || "") + "\u300D\uFF1F" });
     const parts = [];
-    if (this.info.fileCount) parts.push(this.info.fileCount + " 个文件");
-    if (this.info.folderCount) parts.push(this.info.folderCount + " 个子文件夹");
+    if (this.info.fileCount) parts.push(this.info.fileCount + " \u4E2A\u6587\u4EF6");
+    if (this.info.folderCount) parts.push(this.info.folderCount + " \u4E2A\u5B50\u6587\u4EF6\u5939");
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: parts.length
-        ? "会连同 " + parts.join("、") +
-          "（含子模块）一起，按 Obsidian「文件与链接 → 删除文件」的设置处理。"
-        : "这个模块文件夹是空的，会按 Obsidian「文件与链接 → 删除文件」的设置处理并移除模块。"
+      text: parts.length ? "\u4F1A\u8FDE\u540C " + parts.join("\u3001") + "\uFF08\u542B\u5B50\u6A21\u5757\uFF09\u4E00\u8D77\uFF0C\u6309 Obsidian\u300C\u6587\u4EF6\u4E0E\u94FE\u63A5 \u2192 \u5220\u9664\u6587\u4EF6\u300D\u7684\u8BBE\u7F6E\u5904\u7406\u3002" : "\u8FD9\u4E2A\u6A21\u5757\u6587\u4EF6\u5939\u662F\u7A7A\u7684\uFF0C\u4F1A\u6309 Obsidian\u300C\u6587\u4EF6\u4E0E\u94FE\u63A5 \u2192 \u5220\u9664\u6587\u4EF6\u300D\u7684\u8BBE\u7F6E\u5904\u7406\u5E76\u79FB\u9664\u6A21\u5757\u3002"
     });
-
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
-    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => {
       this.finish(false);
       this.close();
     };
-    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "删除文件夹和模块" });
+    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664\u6587\u4EF6\u5939\u548C\u6A21\u5757" });
     ok.onclick = () => {
       this.finish(true);
       this.close();
     };
   }
-
   onClose() {
     this.contentEl.empty();
     this.finish(false);
   }
-}
-
-/* 重命名模块：同时重命名文件树里的文件夹，保持两者一致。 */
-class RenameModuleModal extends Modal {
+};
+var RenameModuleModal = class extends Modal {
   constructor(app, name, onSubmit) {
     super(app);
     this.name = name || "";
     this.onSubmit = onSubmit;
   }
-
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("cl-modaleditor");
-    contentEl.createEl("h2", { text: "重命名模块" });
+    contentEl.createEl("h2", { text: "\u91CD\u547D\u540D\u6A21\u5757" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "会同步重命名文件树中的文件夹，模块里的笔记和子模块会一起改名。"
+      text: "\u4F1A\u540C\u6B65\u91CD\u547D\u540D\u6587\u4EF6\u6811\u4E2D\u7684\u6587\u4EF6\u5939\uFF0C\u6A21\u5757\u91CC\u7684\u7B14\u8BB0\u548C\u5B50\u6A21\u5757\u4F1A\u4E00\u8D77\u6539\u540D\u3002"
     });
-
     let value = this.name;
     let inputEl = null;
-    new Setting(contentEl).setName("新名称").addText((text) => {
+    new Setting(contentEl).setName("\u65B0\u540D\u79F0").addText((text) => {
       text.setValue(this.name).onChange((next) => {
         value = next;
       });
@@ -933,11 +880,10 @@ class RenameModuleModal extends Modal {
         }
       });
     });
-
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
-    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
-    const ok = foot.createEl("button", { cls: "cl-btn mod-cta", text: "重命名" });
+    const ok = foot.createEl("button", { cls: "cl-btn mod-cta", text: "\u91CD\u547D\u540D" });
     ok.onclick = () => this.submit(value);
     window.setTimeout(() => {
       if (inputEl) {
@@ -946,26 +892,21 @@ class RenameModuleModal extends Modal {
       }
     }, 0);
   }
-
   submit(value) {
     const callback = this.onSubmit;
     this.onSubmit = null;
     if (callback) callback(String(value || "").trim());
     this.close();
   }
-
   onClose() {
     this.contentEl.empty();
   }
-}
-
-/* 选择保存文件夹：可以挑已有的目录，也可以直接新建一个。 */
-class FolderPickerModal extends Modal {
+};
+var FolderPickerModal = class extends Modal {
   constructor(app, options) {
     super(app);
     this.options = options || {};
   }
-
   listFolders() {
     const out = [];
     const walk = (folder) => {
@@ -979,36 +920,32 @@ class FolderPickerModal extends Modal {
     if (root) walk(root);
     return out.sort((a, b) => a.localeCompare(b, "zh"));
   }
-
   // 逐级建目录，父级不存在时一并补上；创建后文件树会自动出现
   async ensureFolder(path) {
     return ensureVaultFolder(this.app, path);
   }
-
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("cl-modaleditor");
-    contentEl.createEl("h2", { text: "选择保存文件夹" });
+    contentEl.createEl("h2", { text: "\u9009\u62E9\u4FDD\u5B58\u6587\u4EF6\u5939" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "选一个已有的文件夹，或点下面的「新建文件夹」直接建一个。"
+      text: "\u9009\u4E00\u4E2A\u5DF2\u6709\u7684\u6587\u4EF6\u5939\uFF0C\u6216\u70B9\u4E0B\u9762\u7684\u300C\u65B0\u5EFA\u6587\u4EF6\u5939\u300D\u76F4\u63A5\u5EFA\u4E00\u4E2A\u3002"
     });
-
     const pickWrap = contentEl.createDiv();
     const input = pickWrap.createEl("input", {
       cls: "cl-modalfilter",
-      attr: { type: "text", placeholder: "筛选文件夹…" }
+      attr: { type: "text", placeholder: "\u7B5B\u9009\u6587\u4EF6\u5939\u2026" }
     });
     const listEl = pickWrap.createDiv({ cls: "cl-picklist" });
     const empty = pickWrap.createDiv({ cls: "cl-modal-hint" });
-
     const folders = this.listFolders();
     const draw = () => {
       const q = String(input.value || "").trim().toLowerCase();
       const rows = folders.filter((p) => !q || p.toLowerCase().includes(q));
       listEl.empty();
       empty.setText(
-        folders.length ? "没有匹配的文件夹。" : "库里还没有文件夹，点下面的「新建文件夹」建一个。"
+        folders.length ? "\u6CA1\u6709\u5339\u914D\u7684\u6587\u4EF6\u5939\u3002" : "\u5E93\u91CC\u8FD8\u6CA1\u6709\u6587\u4EF6\u5939\uFF0C\u70B9\u4E0B\u9762\u7684\u300C\u65B0\u5EFA\u6587\u4EF6\u5939\u300D\u5EFA\u4E00\u4E2A\u3002"
       );
       empty.toggle(rows.length === 0);
       rows.forEach((path) => {
@@ -1025,55 +962,48 @@ class FolderPickerModal extends Modal {
     };
     input.addEventListener("input", draw);
     draw();
-
-    // 新建文件夹：内联展开，创建成功后直接选中它的路径
     const form = contentEl.createDiv({ cls: "cl-foldernew is-hidden" });
-    form.createDiv({ cls: "cl-modalfield-label", text: "新文件夹路径" });
+    form.createDiv({ cls: "cl-modalfield-label", text: "\u65B0\u6587\u4EF6\u5939\u8DEF\u5F84" });
     const nameInput = form.createEl("input", {
       cls: "cl-modalfilter",
-      attr: { type: "text", placeholder: "例如：01-Notes 或 10-Modules/健身记录" }
+      attr: { type: "text", placeholder: "\u4F8B\u5982\uFF1A01-Notes \u6216 10-Modules/\u5065\u8EAB\u8BB0\u5F55" }
     });
     form.createDiv({
       cls: "cl-modal-hint",
-      text: "支持多级路径，创建后会立即出现在 Obsidian 文件树里。"
+      text: "\u652F\u6301\u591A\u7EA7\u8DEF\u5F84\uFF0C\u521B\u5EFA\u540E\u4F1A\u7ACB\u5373\u51FA\u73B0\u5728 Obsidian \u6587\u4EF6\u6811\u91CC\u3002"
     });
     const formFoot = form.createDiv({ cls: "cl-modalfoot" });
-    const backBtn = formFoot.createEl("button", { cls: "cl-btn", text: "返回" });
+    const backBtn = formFoot.createEl("button", { cls: "cl-btn", text: "\u8FD4\u56DE" });
     const okBtn = formFoot.createEl("button", {
       cls: "cl-btn cl-btn-accent",
-      text: "创建并使用"
+      text: "\u521B\u5EFA\u5E76\u4F7F\u7528"
     });
-
     const showForm = (on) => {
       form.classList.toggle("is-hidden", !on);
       pickWrap.classList.toggle("is-hidden", on);
       if (on) nameInput.focus();
     };
     backBtn.onclick = () => showForm(false);
-
     okBtn.onclick = async () => {
-      const value = String(nameInput.value || "")
-        .trim()
-        .replace(/\\/g, "/")
-        .replace(/^\/+|\/+$/g, "");
+      const value = String(nameInput.value || "").trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
       if (!value) {
-        new Notice("请输入文件夹名称");
+        new Notice("\u8BF7\u8F93\u5165\u6587\u4EF6\u5939\u540D\u79F0");
         return;
       }
       if (value.split("/").some((part) => !part || part === "." || part === "..")) {
-        new Notice("路径不合法，请重新填写");
+        new Notice("\u8DEF\u5F84\u4E0D\u5408\u6CD5\uFF0C\u8BF7\u91CD\u65B0\u586B\u5199");
         return;
       }
       const found = this.app.vault.getAbstractFileByPath(value);
       if (found && !Array.isArray(found.children)) {
-        new Notice("「" + value + "」已被同名文件占用");
+        new Notice("\u300C" + value + "\u300D\u5DF2\u88AB\u540C\u540D\u6587\u4EF6\u5360\u7528");
         return;
       }
       if (!found) {
         try {
           await this.ensureFolder(value);
         } catch (error) {
-          new Notice("创建失败：" + (error && error.message ? error.message : error));
+          new Notice("\u521B\u5EFA\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
           return;
         }
       }
@@ -1083,45 +1013,37 @@ class FolderPickerModal extends Modal {
     nameInput.addEventListener("keydown", (evt) => {
       if (evt.key === "Enter") okBtn.click();
     });
-
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
     const create = foot.createEl("button", {
       cls: "cl-btn cl-btn-accent cl-foldernew-btn",
-      text: "新建文件夹"
+      text: "\u65B0\u5EFA\u6587\u4EF6\u5939"
     });
     create.onclick = () => {
       showForm(true);
       nameInput.focus();
     };
-    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
   }
-
   onClose() {
     this.contentEl.empty();
   }
-}
-
-/* 归入模块：按文件树层级展开，点任意一级模块即可归入。 */
-class ModulePickerModal extends Modal {
+};
+var ModulePickerModal = class extends Modal {
   constructor(app, options) {
     super(app);
     this.options = options || {};
-    this.expanded = new Set();
+    this.expanded = /* @__PURE__ */ new Set();
   }
-
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("cl-modaleditor");
-    contentEl.createEl("h2", { text: "归入模块" });
+    contentEl.createEl("h2", { text: "\u5F52\u5165\u6A21\u5757" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "按文件树层级展示，点任意一级模块即可归入。选中的文件会移动到该模块的保存文件夹，并记录归属；笔记同时写入 module 字段。"
+      text: "\u6309\u6587\u4EF6\u6811\u5C42\u7EA7\u5C55\u793A\uFF0C\u70B9\u4EFB\u610F\u4E00\u7EA7\u6A21\u5757\u5373\u53EF\u5F52\u5165\u3002\u9009\u4E2D\u7684\u6587\u4EF6\u4F1A\u79FB\u52A8\u5230\u8BE5\u6A21\u5757\u7684\u4FDD\u5B58\u6587\u4EF6\u5939\uFF0C\u5E76\u8BB0\u5F55\u5F52\u5C5E\uFF1B\u7B14\u8BB0\u540C\u65F6\u5199\u5165 module \u5B57\u6BB5\u3002"
     });
-
     this.listEl = contentEl.createDiv({ cls: "cl-picklist cl-modtree cl-modpick" });
-
-    // 默认全部展开，方便直接看到子模块；点箭头仍可收起
     const expandAll = (mod) => {
       const children = this.options.getChildren ? this.options.getChildren(mod) : [];
       if (!children.length) return;
@@ -1131,36 +1053,31 @@ class ModulePickerModal extends Modal {
     const roots = this.options.getRootModules ? this.options.getRootModules() : [];
     roots.forEach(expandAll);
     this.renderList();
-
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
-    const create = foot.createEl("button", { cls: "cl-btn", text: "新建模块…" });
+    const create = foot.createEl("button", { cls: "cl-btn", text: "\u65B0\u5EFA\u6A21\u5757\u2026" });
     create.onclick = () => {
       this.close();
       if (this.options.onCreate) this.options.onCreate();
     };
-    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
   }
-
   renderList() {
     const list = this.listEl;
     if (!list) return;
     list.empty();
     const roots = this.options.getRootModules ? this.options.getRootModules() : [];
     if (!roots.length) {
-      list.createDiv({ cls: "cl-modal-hint", text: "还没有模块，点下面的「新建模块…」。" });
+      list.createDiv({ cls: "cl-modal-hint", text: "\u8FD8\u6CA1\u6709\u6A21\u5757\uFF0C\u70B9\u4E0B\u9762\u7684\u300C\u65B0\u5EFA\u6A21\u5757\u2026\u300D\u3002" });
       return;
     }
     const all = this.options.getAllModules ? this.options.getAllModules() : roots;
-
     const draw = (mod, depth) => {
       const key = moduleIdOf(mod);
       const children = this.options.getChildren ? this.options.getChildren(mod) : [];
       const isOpen = this.expanded.has(key);
-
       const row = list.createDiv({ cls: "cl-modrow" });
       row.style.paddingLeft = 8 + depth * 18 + "px";
-
       const toggle = row.createDiv({ cls: "cl-modrow-toggle" });
       if (children.length) {
         setIcon(toggle, isOpen ? "chevron-down" : "chevron-right");
@@ -1173,87 +1090,70 @@ class ModulePickerModal extends Modal {
       } else {
         toggle.addClass("is-blank");
       }
-
       const iconEl = row.createDiv({ cls: "cl-pickicon" });
       const index = all.indexOf(mod);
       const tint = index >= 0 ? index % 5 : depth % 5;
       iconEl.addClass("cl-tint-" + tint);
       iconEl.style.setProperty("--dot-color", mod.color || "var(--tint)");
       setIcon(iconEl, mod.icon || (children.length ? "folder" : "file-text"));
-
       const main = row.createDiv({ cls: "cl-modrow-main" });
       main.createDiv({ cls: "cl-modrow-name", text: mod.name });
       const folder = this.options.getFolder ? this.options.getFolder(mod) : mod.folder || "";
       if (folder && folder !== mod.name) main.createDiv({ cls: "cl-modrow-path", text: folder });
-
-      row.createDiv({ cls: "cl-modpick-go", text: "归入" });
+      row.createDiv({ cls: "cl-modpick-go", text: "\u5F52\u5165" });
       row.onclick = () => {
         this.close();
         if (this.options.onPick) this.options.onPick(mod);
       };
-
       if (children.length && isOpen) children.forEach((child) => draw(child, depth + 1));
     };
-
     roots.forEach((mod) => draw(mod, 0));
   }
-
   onClose() {
     this.contentEl.empty();
   }
-}
-
-/* 管理模块：按文件树层级展示，每一级都可以编辑或删除。
- * 删除和 Obsidian 删除文件夹一致：整个文件夹连同子模块一起按删除设置处理。 */
-class ModuleManagerModal extends Modal {
+};
+var ModuleManagerModal = class extends Modal {
   constructor(app, options) {
     super(app);
     this.options = options || {};
-    this.expanded = new Set();
+    this.expanded = /* @__PURE__ */ new Set();
   }
-
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("cl-modaleditor");
-    contentEl.createEl("h2", { text: "管理模块" });
+    contentEl.createEl("h2", { text: "\u7BA1\u7406\u6A21\u5757" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "按文件树层级展示。删除模块和 Obsidian 删除文件夹一致：整个文件夹连同文件和子文件夹（含子模块）一起按「删除文件」设置处理。"
+      text: "\u6309\u6587\u4EF6\u6811\u5C42\u7EA7\u5C55\u793A\u3002\u5220\u9664\u6A21\u5757\u548C Obsidian \u5220\u9664\u6587\u4EF6\u5939\u4E00\u81F4\uFF1A\u6574\u4E2A\u6587\u4EF6\u5939\u8FDE\u540C\u6587\u4EF6\u548C\u5B50\u6587\u4EF6\u5939\uFF08\u542B\u5B50\u6A21\u5757\uFF09\u4E00\u8D77\u6309\u300C\u5220\u9664\u6587\u4EF6\u300D\u8BBE\u7F6E\u5904\u7406\u3002"
     });
-
     this.listEl = contentEl.createDiv({ cls: "cl-picklist cl-modtree" });
     this.renderList();
-
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
-    const create = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "新建模块" });
+    const create = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u65B0\u5EFA\u6A21\u5757" });
     create.onclick = () => {
       this.close();
       if (this.options.onCreate) this.options.onCreate();
     };
-    const close = foot.createEl("button", { cls: "cl-btn", text: "关闭" });
+    const close = foot.createEl("button", { cls: "cl-btn", text: "\u5173\u95ED" });
     close.onclick = () => this.close();
   }
-
   renderList() {
     const list = this.listEl;
     if (!list) return;
     list.empty();
     const roots = this.options.getRootModules ? this.options.getRootModules() : [];
     if (!roots.length) {
-      list.createDiv({ cls: "cl-modal-hint", text: "还没有模块，点下面的「新建模块」。" });
+      list.createDiv({ cls: "cl-modal-hint", text: "\u8FD8\u6CA1\u6709\u6A21\u5757\uFF0C\u70B9\u4E0B\u9762\u7684\u300C\u65B0\u5EFA\u6A21\u5757\u300D\u3002" });
       return;
     }
-    // 默认全部收起，和导航保持一致，点箭头才展开
     const all = this.options.getAllModules ? this.options.getAllModules() : roots;
-
     const draw = (mod, depth) => {
       const key = moduleIdOf(mod);
       const children = this.options.getChildren ? this.options.getChildren(mod) : [];
       const isOpen = this.expanded.has(key);
-
       const row = list.createDiv({ cls: "cl-modrow" });
       row.style.paddingLeft = 8 + depth * 18 + "px";
-
       const toggle = row.createDiv({ cls: "cl-modrow-toggle" });
       if (children.length) {
         setIcon(toggle, isOpen ? "chevron-down" : "chevron-right");
@@ -1265,71 +1165,59 @@ class ModuleManagerModal extends Modal {
       } else {
         toggle.addClass("is-blank");
       }
-
-      // 图标与颜色完全对齐左侧导航：一样的默认图标、一样的预设色板
       const iconEl = row.createDiv({ cls: "cl-pickicon" });
       const index = all.indexOf(mod);
       const tint = index >= 0 ? index % 5 : depth % 5;
       iconEl.addClass("cl-tint-" + tint);
       iconEl.style.setProperty("--dot-color", mod.color || "var(--tint)");
       setIcon(iconEl, mod.icon || (children.length ? "folder" : "file-text"));
-
       const main = row.createDiv({ cls: "cl-modrow-main" });
       main.createDiv({ cls: "cl-modrow-name", text: mod.name });
       const folder = this.options.getFolder ? this.options.getFolder(mod) : mod.folder || "";
       if (folder) main.createDiv({ cls: "cl-modrow-path", text: folder });
-
-      const edit = row.createEl("button", { cls: "cl-btn", text: "编辑" });
+      const edit = row.createEl("button", { cls: "cl-btn", text: "\u7F16\u8F91" });
       edit.onclick = () => {
         this.close();
         if (this.options.onEdit) this.options.onEdit(mod);
       };
-
-      const del = row.createEl("button", { cls: "cl-btn cl-btn-danger", text: "删除" });
+      const del = row.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664" });
       del.onclick = async () => {
         if (!this.options.onDelete) return;
         await this.options.onDelete(mod);
         this.renderList();
       };
-
       if (children.length && isOpen) children.forEach((child) => draw(child, depth + 1));
     };
-
     roots.forEach((mod) => draw(mod, 0));
   }
-
   onClose() {
     this.contentEl.empty();
   }
-}
-
-/* 轻量命名弹窗：新建子模块这类只需要一个名字的操作。 */
-class NamePromptModal extends Modal {
+};
+var NamePromptModal = class extends Modal {
   constructor(app, options) {
     super(app);
     this.options = options || {};
   }
-
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("cl-modaleditor");
-    contentEl.createEl("h2", { text: this.options.title || "新建" });
+    contentEl.createEl("h2", { text: this.options.title || "\u65B0\u5EFA" });
     if (this.options.hint) {
       contentEl.createDiv({ cls: "cl-modal-hint", text: this.options.hint });
     }
     const input = contentEl.createEl("input", {
       cls: "cl-modalfilter",
-      attr: { type: "text", placeholder: this.options.placeholder || "请输入名称" }
+      attr: { type: "text", placeholder: this.options.placeholder || "\u8BF7\u8F93\u5165\u540D\u79F0" }
     });
-
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
-    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
-    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "创建" });
+    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u521B\u5EFA" });
     ok.onclick = () => {
       const value = String(input.value || "").trim();
       if (!value) {
-        new Notice("请输入名称");
+        new Notice("\u8BF7\u8F93\u5165\u540D\u79F0");
         input.focus();
         return;
       }
@@ -1341,42 +1229,36 @@ class NamePromptModal extends Modal {
     });
     window.setTimeout(() => input.focus(), 0);
   }
-
   onClose() {
     this.contentEl.empty();
   }
-}
-
-/* 归入文件：从库里挑笔记，移进当前模块（写 module 字段并移动文件）。 */
-class AddFilesModal extends Modal {
+};
+var AddFilesModal = class extends Modal {
   constructor(app, files, onConfirm) {
     super(app);
     this.files = files || [];
     this.onConfirm = onConfirm;
-    this.selected = new Set();
+    this.selected = /* @__PURE__ */ new Set();
   }
-
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("cl-modaleditor");
-    contentEl.createEl("h2", { text: "归入文件" });
+    contentEl.createEl("h2", { text: "\u5F52\u5165\u6587\u4EF6" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "勾选要移进当前模块的笔记，确认后会写入 module 字段并移动到模块文件夹。"
+      text: "\u52FE\u9009\u8981\u79FB\u8FDB\u5F53\u524D\u6A21\u5757\u7684\u7B14\u8BB0\uFF0C\u786E\u8BA4\u540E\u4F1A\u5199\u5165 module \u5B57\u6BB5\u5E76\u79FB\u52A8\u5230\u6A21\u5757\u6587\u4EF6\u5939\u3002"
     });
-
     const filter = contentEl.createEl("input", {
       cls: "cl-modalfilter",
-      attr: { type: "text", placeholder: "筛选标题或路径…" }
+      attr: { type: "text", placeholder: "\u7B5B\u9009\u6807\u9898\u6216\u8DEF\u5F84\u2026" }
     });
     const list = contentEl.createDiv({ cls: "cl-picklist" });
     const empty = contentEl.createDiv({ cls: "cl-modal-hint" });
-
     const draw = () => {
       const q = String(filter.value || "").trim().toLowerCase();
       const rows = this.files.filter((f) => !q || f.path.toLowerCase().includes(q));
       list.empty();
-      empty.setText(this.files.length ? "没有匹配的笔记。" : "库里没有可归入的笔记。");
+      empty.setText(this.files.length ? "\u6CA1\u6709\u5339\u914D\u7684\u7B14\u8BB0\u3002" : "\u5E93\u91CC\u6CA1\u6709\u53EF\u5F52\u5165\u7684\u7B14\u8BB0\u3002");
       empty.toggle(rows.length === 0);
       rows.forEach((file) => {
         const row = list.createDiv({ cls: "cl-pickitem" });
@@ -1397,28 +1279,592 @@ class AddFilesModal extends Modal {
     };
     filter.addEventListener("input", draw);
     draw();
-
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
-    const cancel = foot.createEl("button", { cls: "cl-btn", text: "取消" });
+    const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
-    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "归入" });
+    const ok = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u5F52\u5165" });
     ok.onclick = () => {
       const chosen = this.files.filter((file) => this.selected.has(file.path));
       if (!chosen.length) {
-        new Notice("请先勾选笔记");
+        new Notice("\u8BF7\u5148\u52FE\u9009\u7B14\u8BB0");
         return;
       }
       this.close();
       if (this.onConfirm) this.onConfirm(chosen);
     };
   }
-
   onClose() {
     this.contentEl.empty();
   }
+};
+/* ==================== Noval 全局搜索（仅插件内） ====================
+   完全独立于 Obsidian 搜索：自绘 Modal、只读插件范围内的文件、
+   不注册全局热键、不读写 Obsidian 搜索状态。 */
+var NVGS_KIND_LABEL = { note: "笔记", canvas: "画布", card: "速记", module: "模块" };
+var NVGS_KIND_ICON = { note: "file-text", canvas: "layout-grid", card: "sticky-note", module: "folder" };
+
+function openGlobalSearch(view) {
+  if (!view) return;
+  try {
+    new NovalGlobalSearchModal(view.app, view).open();
+  } catch (e) {
+  }
 }
 
-class NovalView extends ItemView {
+/** 跳到模块页后定位到具体笔记，滚动并短暂高亮 */
+function nvFocusNote(view, modId, path) {
+  if (!view) return;
+  view.go(modId);
+  const find = () => {
+    const nodes = view.contentEl.querySelectorAll(".cl-md-tile[data-path], .cl-mdv-row[data-path]");
+    for (const node of nodes) {
+      if (node.dataset.path === path) return node;
+    }
+    return null;
+  };
+  const attempt = (left) => {
+    const el = find();
+    if (!el) {
+      if (left > 0) window.setTimeout(() => attempt(left - 1), 70);
+      return;
+    }
+    try {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+    } catch (e) {
+      el.scrollIntoView();
+    }
+    el.classList.add("is-flash");
+    new Notice("已定位到笔记「" + String(path.split("/").pop() || "").replace(/\.md$/i, "") + "」");
+    window.setTimeout(() => el.classList.remove("is-flash"), 1900);
+  };
+  window.setTimeout(() => attempt(16), 50);
+}
+
+function nvSearchBody(raw) {
+  return String(raw || "").replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+}
+
+function nvAsList(value) {
+  if (Array.isArray(value)) return value.map((v) => String(v || "").trim()).filter(Boolean);
+  if (typeof value === "string") return value.split(/[,，\s]+/).map((v) => v.trim()).filter(Boolean);
+  return [];
+}
+
+function nvHighlight(text, words) {
+  const raw = String(text == null ? "" : text);
+  const esc = raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const list = (words || []).filter(Boolean);
+  if (!list.length) return esc;
+  const pattern = list
+    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .sort((a, b) => b.length - a.length)
+    .join("|");
+  if (!pattern) return esc;
+  try {
+    return esc.replace(new RegExp("(" + pattern + ")", "gi"), "<mark>$1</mark>");
+  } catch (e) {
+    return esc;
+  }
+}
+
+function nvSearchSnippet(text, words) {
+  const raw = String(text || "");
+  if (!raw) return "";
+  const lower = raw.toLowerCase();
+  let at = -1;
+  for (const word of words || []) {
+    const i = lower.indexOf(String(word).toLowerCase());
+    if (i >= 0 && (at < 0 || i < at)) at = i;
+  }
+  if (at < 0) return raw.replace(/\s+/g, " ").slice(0, 70);
+  const start = Math.max(0, at - 26);
+  const end = Math.min(raw.length, at + 44);
+  return (start > 0 ? "…" : "") + raw.slice(start, end).replace(/\s+/g, " ") + (end < raw.length ? "…" : "");
+}
+
+function nvParseSearchQuery(raw) {
+  const tokens = String(raw || "").trim().split(/\s+/).filter(Boolean);
+  const out = { text: [], tags: [], kinds: [] };
+  for (const token of tokens) {
+    if (token.startsWith("#") && token.length > 1) {
+      out.tags.push(token.slice(1).toLowerCase());
+    } else if (/^kind:(note|canvas|card|module)$/i.test(token)) {
+      out.kinds.push(token.split(":")[1].toLowerCase());
+    } else {
+      out.text.push(token.toLowerCase());
+    }
+  }
+  return out;
+}
+
+function nvDocScore(doc, q) {
+  if (q.kinds.length && !q.kinds.includes(doc.kind)) return -1;
+  for (const tag of q.tags) {
+    if (!doc.tags.some((item) => String(item).toLowerCase().includes(tag))) return -1;
+  }
+  let score = 0;
+  const title = String(doc.title || "").toLowerCase();
+  for (const word of q.text) {
+    const inTitle = title.indexOf(word);
+    if (inTitle >= 0) {
+      score += inTitle === 0 ? (title === word ? 1000 : 800) : 620;
+      continue;
+    }
+    if (doc.aliases.some((item) => item.toLowerCase().includes(word))) { score += 500; continue; }
+    if (doc.tags.some((item) => item.toLowerCase().includes(word))) { score += 460; continue; }
+    if (doc.headings.some((item) => item.toLowerCase().includes(word))) { score += 420; continue; }
+    if (String(doc.path || "").toLowerCase().includes(word)) { score += 280; continue; }
+    const body = doc.text || "";
+    if (body.indexOf(word) < 0) return -1;
+    let hits = 0;
+    let from = 0;
+    while (hits < 8) {
+      const i = body.indexOf(word, from);
+      if (i < 0) break;
+      hits += 1;
+      from = i + word.length;
+    }
+    score += 160 + hits * 18;
+  }
+  if (doc.starred) score += 24;
+  return score + Math.min(30, Math.max(0, (Number(doc.mtime) || 0) / 1e12 * 4));
+}
+
+function nvModuleForPath(view, path, modules) {
+  let best = null;
+  let bestLen = -1;
+  for (const mod of modules || view.getModules()) {
+    const folder = String(view.moduleTargetFolder(mod) || "").replace(/^\/+|\/+$/g, "");
+    if (!folder) continue;
+    if ((path === folder || path.startsWith(folder + "/")) && folder.length > bestLen) {
+      best = mod;
+      bestLen = folder.length;
+    }
+  }
+  return best;
+}
+
+async function nvBuildSearchDocs(view) {
+  const app = view.app;
+  const plugin = view.plugin;
+  const docs = [];
+  const seen = new Set();
+  const modules = view.getModules();
+  const notesPlugin = (plugin && plugin.childPlugins && plugin.childPlugins[NOTES_ID]) ||
+    (app.plugins && app.plugins.plugins && app.plugins.plugins[LEGACY.notesId]);
+  const cardFolder = String((notesPlugin && notesPlugin.settings && notesPlugin.settings.folderPath) || CARD_FOLDER)
+    .replace(/^\/+|\/+$/g, "");
+
+  const addNote = (file) => {
+    if (!file || seen.has(file.path)) return;
+    if (String(file.extension || "").toLowerCase() !== "md") return;
+    if (cardFolder && (file.path === cardFolder || String(file.path || "").startsWith(cardFolder + "/"))) return;
+    seen.add(file.path);
+    docs.push({
+      key: "note:" + file.path,
+      kind: "note",
+      title: file.basename,
+      subtitle: "",
+      path: file.path,
+      moduleName: "",
+      group: "",
+      tags: [],
+      aliases: [],
+      headings: [],
+      text: "",
+      mtime: (file.stat && file.stat.mtime) || 0,
+      file
+    });
+  };
+
+  for (const mod of modules) {
+    docs.push({
+      key: "module:" + (mod.id || mod.name),
+      kind: "module",
+      title: mod.name || mod.folder || mod.id,
+      subtitle: "模块",
+      path: String(view.moduleTargetFolder(mod) || ""),
+      moduleName: mod.name || "",
+      group: "",
+      tags: [],
+      aliases: [],
+      headings: [],
+      text: String(mod.name || "") + " " + String(mod.folder || ""),
+      mtime: 0,
+      modId: mod.id,
+      mod
+    });
+    const dir = String(view.moduleTargetFolder(mod) || "");
+    if (!dir) continue;
+    let files = [];
+    try {
+      files = view.folderFiles(dir, true);
+    } catch (e) {
+      files = [];
+    }
+    for (const file of files) addNote(file);
+  }
+
+  try {
+    for (const file of view.inboxFiles()) addNote(file);
+  } catch (e) {
+  }
+
+  const noteDocs = docs.filter((doc) => doc.kind === "note");
+  await Promise.all(noteDocs.map(async (doc) => {
+    const mod = nvModuleForPath(view, doc.path, modules);
+    doc.moduleName = mod ? mod.name : "";
+    doc.subtitle = doc.moduleName || "收件箱";
+    try {
+      const raw = await app.vault.cachedRead(doc.file);
+      const body = nvSearchBody(raw);
+      doc.text = body.toLowerCase();
+      doc.sample = body;
+      const cache = app.metadataCache.getFileCache(doc.file);
+      const fm = (cache && cache.frontmatter) || {};
+      doc.aliases = nvAsList(fm.aliases || fm.alias);
+      doc.tags = nvAsList(fm.tags)
+        .concat(((cache && cache.tags) || []).map((item) => String((item && item.tag) || "")))
+        .map((tag) => tag.replace(/^#/, ""))
+        .filter(Boolean);
+      doc.headings = ((cache && cache.headings) || [])
+        .map((item) => String((item && item.heading) || ""))
+        .filter(Boolean);
+    } catch (e) {
+    }
+  }));
+
+  const rootFolder = String((plugin && plugin.novalFolder) || "").replace(/^\/+|\/+$/g, "");
+  const boards = app.vault.getFiles().filter((file) => {
+    if (String(file.extension || "").toLowerCase() !== BOARD_EXT) return false;
+    if (!rootFolder) return true;
+    return String(file.path || "").startsWith(rootFolder + "/");
+  });
+  for (const file of boards) {
+    let text = "";
+    try {
+      const data = JSON.parse(await app.vault.cachedRead(file));
+      const list = Array.isArray(data && data.nodes) ? data.nodes : [];
+      const parts = [];
+      for (const node of list) {
+        if (!node) continue;
+        if (node.text) parts.push(String(node.text));
+        if (node.label) parts.push(String(node.label));
+        if (node.file) parts.push(String(node.file));
+        if (parts.join(" ").length > 4000) break;
+      }
+      text = parts.join(" ");
+    } catch (e) {
+    }
+    const rel = rootFolder ? String(file.path || "").slice(rootFolder.length + 1) : String(file.path || "");
+    const slash = rel.lastIndexOf("/");
+    const group = slash > 0 ? rel.slice(0, slash) : "";
+    const stars = (plugin && plugin.settings && plugin.settings.boardStars) || {};
+    docs.push({
+      key: "canvas:" + file.path,
+      kind: "canvas",
+      title: file.basename,
+      subtitle: group || "画布",
+      path: file.path,
+      moduleName: "",
+      group,
+      tags: [],
+      aliases: [],
+      headings: [],
+      text: text.toLowerCase(),
+      sample: text,
+      mtime: (file.stat && file.stat.mtime) || 0,
+      starred: !!stars[file.path],
+      file
+    });
+  }
+
+  try {
+    if (notesPlugin && typeof notesPlugin.readAllCards === "function") {
+      const cards = await notesPlugin.readAllCards();
+      for (const card of cards || []) {
+        if (!card) continue;
+        const text = String(card.body != null ? card.body : card.text || "").trim();
+        const title = text ? text.split(/\n/)[0].slice(0, 46) : "速记 " + (card.date || "") + " " + (card.time || "");
+        const stamp = Date.parse(String(card.date || "") + "T" + String(card.time || "00:00")) || 0;
+        const filePath = card.filePath || (card.file && card.file.path ? card.file.path : String(card.file || ""));
+        docs.push({
+          key: "card:" + filePath + ":" + (card.date || "") + ":" + (card.time || "") + ":" + (card.id || ""),
+          kind: "card",
+          title,
+          subtitle: [card.date, card.time].filter(Boolean).join(" "),
+          path: filePath,
+          moduleName: "速记",
+          group: "",
+          tags: (card.tags || []).map((tag) => String(tag)),
+          aliases: [],
+          headings: [],
+          text: String(card.bodyLower || text.toLowerCase()),
+          sample: text,
+          mtime: stamp,
+          card
+        });
+      }
+    }
+  } catch (e) {
+  }
+
+  return docs;
+}
+
+async function nvEnsureSearchDocs(view) {
+  if (view._nvSearchDocs && !view._nvSearchDirty) return view._nvSearchDocs;
+  view._nvSearchDocs = await nvBuildSearchDocs(view);
+  view._nvSearchDirty = false;
+  return view._nvSearchDocs;
+}
+
+var NovalGlobalSearchModal = class extends Modal {
+  constructor(app, view) {
+    super(app);
+    this.view = view;
+    this.filter = "all";
+    this.docs = null;
+    this.query = "";
+    this.rows = [];
+    this.sel = 0;
+    this.loading = false;
+  }
+  onOpen() {
+    this.modalEl.addClass("nvgs-modal");
+    this.contentEl.addClass("nvgs-body");
+    this.contentEl.empty();
+
+    const head = this.contentEl.createDiv({ cls: "nvgs-head" });
+    const headIcon = head.createSpan({ cls: "nvgs-headico" });
+    setIcon(headIcon, "search");
+    this.input = head.createEl("input", {
+      cls: "nvgs-input",
+      attr: { type: "text", placeholder: "搜索笔记、画布、速记、模块…", spellcheck: "false" }
+    });
+    this.countEl = head.createSpan({ cls: "nvgs-headcount" });
+    head.createEl("kbd", { cls: "nvgs-esckbd", text: "Esc" });
+
+    const chips = this.contentEl.createDiv({ cls: "nvgs-chips" });
+    this.chipEls = new Map();
+    for (const item of [
+      { key: "all", label: "全部" },
+      { key: "note", label: "笔记" },
+      { key: "canvas", label: "画布" },
+      { key: "card", label: "速记" },
+      { key: "module", label: "模块" }
+    ]) {
+      const chip = chips.createDiv({ cls: "nvgs-chip" + (item.key === "all" ? " is-on" : ""), text: item.label });
+      chip.onclick = () => {
+        this.filter = item.key;
+        this.syncChips();
+        this.runQuery();
+      };
+      this.chipEls.set(item.key, chip);
+    }
+
+    this.listEl = this.contentEl.createDiv({ cls: "nvgs-list" });
+    this.listEl.createDiv({ cls: "nvgs-empty", text: "正在建立搜索索引…" });
+
+    const foot = this.contentEl.createDiv({ cls: "nvgs-foot" });
+    foot.createSpan({ text: "↑↓ 选择" });
+    foot.createSpan({ text: "↵ 打开" });
+    foot.createSpan({ text: "⌘↵ 新标签" });
+    foot.createSpan({ text: "#标签 / kind:note 精确筛选" });
+
+    this.input.addEventListener("input", () => {
+      this.query = this.input.value;
+      this.runQuery();
+    });
+    this.input.addEventListener("keydown", (event) => this.onKey(event));
+    window.setTimeout(() => {
+      if (this.input) this.input.focus();
+    }, 0);
+    this.loadIndex();
+  }
+  onClose() {
+    this.contentEl.empty();
+    this.input = null;
+  }
+  syncChips() {
+    for (const [key, el] of this.chipEls) el.classList.toggle("is-on", key === this.filter);
+  }
+  async loadIndex() {
+    this.loading = true;
+    try {
+      this.docs = await nvEnsureSearchDocs(this.view);
+    } catch (e) {
+      this.docs = [];
+    }
+    this.loading = false;
+    this.runQuery();
+  }
+  runQuery() {
+    if (!this.docs || this.loading) return;
+    const q = nvParseSearchQuery(this.query);
+    const pool = this.filter === "all" ? this.docs : this.docs.filter((doc) => doc.kind === this.filter);
+    const matched = [];
+    for (const doc of pool) {
+      const score = nvDocScore(doc, q);
+      if (score >= 0) matched.push({ doc, score });
+    }
+    matched.sort((a, b) => b.score - a.score || (Number(b.doc.mtime) || 0) - (Number(a.doc.mtime) || 0));
+    const limited = [];
+    const perKind = {};
+    for (const item of matched) {
+      const kind = item.doc.kind;
+      perKind[kind] = perKind[kind] || 0;
+      if (perKind[kind] >= 8) continue;
+      limited.push(item.doc);
+      perKind[kind] += 1;
+      if (limited.length >= 48) break;
+    }
+    this.rows = limited;
+    this.sel = 0;
+    this.renderList(q.text);
+  }
+  renderList(words) {
+    const list = this.listEl;
+    if (!list) return;
+    list.empty();
+    const hasQuery = !!String(this.query || "").trim();
+    this.countEl.setText(hasQuery ? String(this.rows.length) + " 项" : "");
+    if (this.loading) {
+      list.createDiv({ cls: "nvgs-empty", text: "正在建立搜索索引…" });
+      return;
+    }
+    if (!hasQuery) {
+      const map = new Map((this.docs || []).map((doc) => [doc.key, doc]));
+      const recent = (this.view.plugin._nvSearchRecent || [])
+        .map((key) => map.get(key))
+        .filter((doc) => doc && (this.filter === "all" || doc.kind === this.filter));
+      this.rows = recent;
+      this.sel = 0;
+      if (!recent.length) {
+        list.createDiv({
+          cls: "nvgs-empty",
+          text: "输入关键词开始搜索：标题、正文、#标签、kind:note"
+        });
+        return;
+      }
+      list.createDiv({ cls: "nvgs-ghead", text: "最近访问" });
+      recent.forEach((doc, index) => this.renderRow(doc, index, words));
+      this.markSelection();
+      return;
+    }
+    if (!this.rows.length) {
+      list.createDiv({ cls: "nvgs-empty", text: "没有匹配的结果" });
+      return;
+    }
+    let lastKind = "";
+    this.rows.forEach((doc, index) => {
+      if (this.filter === "all" && doc.kind !== lastKind) {
+        lastKind = doc.kind;
+        list.createDiv({ cls: "nvgs-ghead", text: NVGS_KIND_LABEL[doc.kind] || "" });
+      }
+      this.renderRow(doc, index, words);
+    });
+    this.markSelection();
+  }
+  renderRow(doc, index, words) {
+    const row = this.listEl.createDiv({ cls: "nvgs-row" });
+    row.dataset.index = String(index);
+    const icon = row.createSpan({ cls: "nvgs-rowico nvgs-kind-" + doc.kind });
+    setIcon(icon, NVGS_KIND_ICON[doc.kind] || "file");
+    const main = row.createDiv({ cls: "nvgs-rowmain" });
+    const title = main.createDiv({ cls: "nvgs-rowtitle" });
+    title.innerHTML = nvHighlight(doc.title, words);
+    const snippet = words.length && doc.kind !== "card" ? nvSearchSnippet(doc.sample || doc.text, words) : "";
+    const sub = main.createDiv({ cls: "nvgs-rowsub" });
+    sub.innerHTML = nvHighlight(snippet || doc.subtitle || doc.path || "", words);
+    row.createSpan({
+      cls: "nvgs-rowmeta",
+      text: doc.kind === "note" ? (doc.moduleName || "收件箱") : (doc.subtitle || "")
+    });
+    row.onclick = () => {
+      this.sel = index;
+      this.openRow(index, false);
+    };
+    row.onauxclick = (event) => {
+      if (event.button === 1) {
+        event.preventDefault();
+        this.openRow(index, true);
+      }
+    };
+    row.onmouseenter = () => {
+      this.sel = index;
+      this.markSelection();
+    };
+  }
+  markSelection() {
+    if (!this.listEl) return;
+    const rows = this.listEl.querySelectorAll(".nvgs-row");
+    rows.forEach((el) => {
+      const on = Number(el.dataset.index) === this.sel;
+      el.classList.toggle("is-sel", on);
+      if (on) el.scrollIntoView({ block: "nearest" });
+    });
+  }
+  onKey(event) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      this.move(1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      this.move(-1);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      this.openRow(this.sel, event.metaKey || event.ctrlKey);
+    }
+  }
+  move(step) {
+    if (!this.rows.length) return;
+    this.sel = (this.sel + step + this.rows.length) % this.rows.length;
+    this.markSelection();
+  }
+  openRow(index, newTab) {
+    const doc = this.rows[index];
+    if (!doc) return;
+    this.remember(doc);
+    this.close();
+    const view = this.view;
+    const app = this.app;
+    try {
+      if (doc.kind === "module") {
+        view.go(doc.modId);
+        return;
+      }
+      if (doc.kind === "card") {
+        if (newTab) {
+          const path = doc.path;
+          if (path) app.workspace.openLinkText(path + (doc.card && doc.card.id ? "#^" + doc.card.id : ""), "", true);
+        } else {
+          view.openCardInNotes(doc.card);
+        }
+        return;
+      }
+      if (doc.kind === "canvas" || newTab) {
+        app.workspace.getLeaf("tab").openFile(doc.file);
+        return;
+      }
+      const mod = view.moduleForFile ? view.moduleForFile(doc.file) : null;
+      if (mod) {
+        nvFocusNote(view, moduleIdOf(mod), doc.path);
+        return;
+      }
+      app.workspace.getLeaf("tab").openFile(doc.file);
+    } catch (e) {
+    }
+  }
+  remember(doc) {
+    const plugin = this.view && this.view.plugin;
+    if (!plugin) return;
+    const list = Array.isArray(plugin._nvSearchRecent) ? plugin._nvSearchRecent : [];
+    plugin._nvSearchRecent = [doc.key].concat(list.filter((key) => key !== doc.key)).slice(0, 10);
+  }
+};
+
+var NovalView = class extends ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -1428,40 +1874,46 @@ class NovalView extends ItemView {
     this._mdFiles = [];
     this._contentFiles = [];
     this._ownership = null;
-    // 视图不可见时收到的刷新请求：先记成脏状态，等切回本视图再真正刷新
     this._needsRefresh = false;
     this.gallery = null;
     this.notes = null;
-    // 左侧模块树里手动展开的节点（当前模块的祖先会自动展开，不依赖这里）
-    this._navExpanded = new Set();
+    this._navExpanded = /* @__PURE__ */ new Set();
   }
-
   getViewType() {
     return VIEW_TYPE;
   }
-
   getDisplayText() {
     return "Noval";
   }
-
   getIcon() {
     return PLUGIN_ICON_ID;
   }
-
   async onOpen() {
     this.containerEl.addClass("noval-view");
     this.contentEl.addClass("cl-content");
     this.render();
     this.watchWidth();
-    // 新建笔记会打开一个新标签，本视图随即被隐藏，那时的刷新只能记成脏状态。
-    // 从别的标签切回本视图时补一次刷新，列表就能立刻出现新文件。
+    const markSearchDirty = () => {
+      this._nvSearchDirty = true;
+    };
+    this.registerEvent(this.app.vault.on("create", markSearchDirty));
+    this.registerEvent(this.app.vault.on("modify", markSearchDirty));
+    this.registerEvent(this.app.vault.on("delete", markSearchDirty));
+    this.registerEvent(this.app.vault.on("rename", markSearchDirty));
+    this.registerDomEvent(this.containerEl, "keydown", (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+      if (String(event.key || "").toLowerCase() !== "k") return;
+      const target = event.target;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      event.preventDefault();
+      openGlobalSearch(this);
+    });
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf) => {
         if (leaf === this.leaf && this._needsRefresh) this.refresh();
       })
     );
   }
-
   async onClose() {
     if (this._ro) {
       this._ro.disconnect();
@@ -1472,7 +1924,6 @@ class NovalView extends ItemView {
     this.destroyGallery();
     this.destroyNotes();
   }
-
   /* 侧栏一展开，视图宽度就变，但窗口宽度不变，所以断点必须量视图自身。
      ResizeObserver 盯着视图容器，实时把宽度换算成三档类名和一个留白变量。 */
   watchWidth() {
@@ -1481,7 +1932,6 @@ class NovalView extends ItemView {
     this._ro = new ResizeObserver(() => this.applyLayout());
     this._ro.observe(this.containerEl);
   }
-
   applyLayout() {
     const app = this.appEl;
     if (!app) return;
@@ -1495,54 +1945,38 @@ class NovalView extends ItemView {
     app.classList.toggle("is-compact", w < 1120);
     app.classList.toggle("is-mini", w < 940);
     app.classList.toggle("is-nav-collapsed", !!this.navCollapsed);
-    // 左右留白跟着宽度连续变化：宽视图 28px，窄视图收到 12px，两边始终对称
     const pad = Math.max(12, Math.min(28, Math.round(w * 0.026)));
     app.style.setProperty("--cl-pad", pad + "px");
   }
-
   getModules() {
     const list = this.plugin.settings.modules;
-    // 空数组是合法状态：用户可以把模块全删掉，不能回落到内置模块
     if (Array.isArray(list)) return list;
     return DEFAULT_MODULES;
   }
-
   contentFiles() {
-    return this._contentFiles.length
-      ? this._contentFiles
-      : this.app.vault.getMarkdownFiles().filter(isContentFile);
+    return this._contentFiles.length ? this._contentFiles : this.app.vault.getMarkdownFiles().filter(isContentFile);
   }
-
   /* 收件箱 / 模块归属用的全量清单：
    * 整个 vault 的 Markdown 都算，只排除卡片笔记的月度聚合文件。
    * 白板是 .noval，不在 getMarkdownFiles() 里，天然被排除。
    * 不再按顶层文件夹白名单过滤，避免文件在文件树里一挪位置就“消失”。 */
   vaultFiles() {
-    return this.app.vault
-      .getMarkdownFiles()
-      .filter(
-        (file) =>
-          !isIgnoredPath(file.path) && !file.path.startsWith(CARD_FOLDER + "/")
-      );
+    return this.app.vault.getMarkdownFiles().filter(
+      (file) => !isIgnoredPath(file.path) && !file.path.startsWith(CARD_FOLDER + "/")
+    );
   }
-
   moduleKeys(mod) {
-    return [mod.id, mod.module, mod.name]
-      .filter(Boolean)
-      .map((v) => String(v).trim().toLowerCase())
-      .filter(Boolean);
+    return [mod.id, mod.module, mod.name].filter(Boolean).map((v) => String(v).trim().toLowerCase()).filter(Boolean);
   }
-
   // frontmatter 的 module 字段：英文 id 和中文名都认，数组写法也认。
   explicitModule(fm) {
     const raw = fm ? fm.module : null;
     if (Array.isArray(raw)) {
       return raw.map((v) => String(v).trim().toLowerCase()).filter(Boolean);
     }
-    const value = raw === null || raw === undefined ? "" : String(raw).trim().toLowerCase();
+    const value = raw === null || raw === void 0 ? "" : String(raw).trim().toLowerCase();
     return value ? [value] : [];
   }
-
   /* 素材归属表只作为「归入」的附加记录（path -> 模块 id）。
    * 模块内容以文件夹为准；这张表服务于后续可切换的 unassigned 收件箱策略。 */
   ownershipMap() {
@@ -1552,16 +1986,14 @@ class NovalView extends ItemView {
     }
     return settings.inboxAssigned;
   }
-
   // 模块没有单独设置文件夹时，用模块名建一个同名目录。
   moduleTargetFolder(mod) {
     return moduleFolderOf(mod);
   }
-
   // 目标同名时加 -1 / -2，避免覆盖模块目录里已有的文件。
   uniqueFilePath(dir, file) {
     const ext = file.extension ? "." + file.extension : "";
-    const name = file.basename || file.name || "未命名";
+    const name = file.basename || file.name || "\u672A\u547D\u540D";
     const prefix = dir ? dir + "/" : "";
     let path = prefix + name + ext;
     let n = 1;
@@ -1571,7 +2003,6 @@ class NovalView extends ItemView {
     }
     return path;
   }
-
   /* 模块页收录范围（与 Obsidian 文件树一致）：
    *   - 只认模块文件夹里「直接」存放的文件；
    *   - 子文件夹的内容属于子模块，不向上汇总；
@@ -1579,7 +2010,6 @@ class NovalView extends ItemView {
   moduleFiles(mod) {
     return this.folderFiles(this.moduleTargetFolder(mod), false);
   }
-
   /* 读取文件夹下的直接子文件。folder 不存在时返回空数组，不报错。 */
   folderFiles(dir, includeChildren) {
     const target = String(dir || "").replace(/^\/+|\/+$/g, "");
@@ -1599,7 +2029,6 @@ class NovalView extends ItemView {
     walk(node);
     return out;
   }
-
   /* ---------------- 模块层级（完全跟随文件树） ----------------
    * 模块 = 文件夹；子模块 = 该文件夹下真实存在的直接子文件夹。
    * 不再依赖 settings 里的 parent 字段，文件夹移到哪，层级就跟到哪。
@@ -1611,7 +2040,6 @@ class NovalView extends ItemView {
       (item) => String(item || "").replace(/^\/+|\/+$/g, "").toLowerCase() === dir
     );
   }
-
   // 只排除工具/AI 目录、速记卡目录和用户手动删掉的目录；
   // 附件、媒体文件夹同样是模块，按文件树正常显示
   isModuleFolderIgnored(path) {
@@ -1622,14 +2050,12 @@ class NovalView extends ItemView {
     if (isToolFolder(dir)) return true;
     return this.isHiddenModuleFolder(dir);
   }
-
   /* 画布文件夹归白板工作区使用，不再作为模块出现在导航里。
    * 路径跟随画布子插件的设置，默认「画布」。 */
   isCanvasModuleFolder(path) {
     const folder = this.plugin.canvasFolderPath();
     return String(path || "").replace(/^\/+|\/+$/g, "").toLowerCase() === folder.toLowerCase();
   }
-
   /* 文件夹 → 模块：优先复用 settings 里的配置（名称/图标/颜色），
    * 没有配置时生成一个临时模块（id = dir:路径），文件树里的文件夹也能直接进入。 */
   moduleForFolder(path) {
@@ -1637,8 +2063,7 @@ class NovalView extends ItemView {
     if (!dir) return null;
     if (this.isCanvasModuleFolder(dir)) return null;
     const configured = this.getModules().find(
-      (mod) =>
-        this.moduleTargetFolder(mod).toLowerCase() === dir.toLowerCase()
+      (mod) => this.moduleTargetFolder(mod).toLowerCase() === dir.toLowerCase()
     );
     if (configured) return configured;
     if (this.isModuleFolderIgnored(dir)) return null;
@@ -1653,7 +2078,6 @@ class NovalView extends ItemView {
       implicit: true
     };
   }
-
   // 文件属于哪个模块：从文件所在文件夹逐级往上找，命中的最近一层就是归属
   // （包含没写进配置的隐式子文件夹，保证深层笔记也能在首页/归入逻辑里定位）
   moduleForFile(file) {
@@ -1666,7 +2090,6 @@ class NovalView extends ItemView {
     }
     return null;
   }
-
   moduleById(id) {
     const direct = this.getModules().find((mod) => moduleIdOf(mod) === id);
     if (direct) return direct;
@@ -1674,30 +2097,21 @@ class NovalView extends ItemView {
     if (value.startsWith("dir:")) return this.moduleForFolder(value.slice(4));
     return null;
   }
-
   submodulesOf(mod) {
     const dir = this.moduleTargetFolder(mod);
     if (!dir) return [];
     const node = this.app.vault.getAbstractFileByPath(dir);
     if (!node || !Array.isArray(node.children)) return [];
-    // 子模块顺序同样跟文件树一致，而不是单独按名字排
-    return node.children
-      .filter((child) => Array.isArray(child.children))
-      .filter((child) => !this.isModuleFolderIgnored(child.path))
-      .sort(compareVaultNodes)
-      .map((child) => this.moduleForFolder(child.path))
-      .filter(Boolean);
+    return node.children.filter((child) => Array.isArray(child.children)).filter((child) => !this.isModuleFolderIgnored(child.path)).sort(compareVaultNodes).map((child) => this.moduleForFolder(child.path)).filter(Boolean);
   }
-
   moduleNoteFiles(mod) {
     return this.moduleFiles(mod).filter(
       (file) => String(file.extension || "").toLowerCase() === "md"
     );
   }
-
   // 含所有后代的笔记数；循环引用时用 visited 兜底，避免死循环
   moduleTreeNoteFiles(mod, visited) {
-    const seenIds = visited || new Set();
+    const seenIds = visited || /* @__PURE__ */ new Set();
     const id = moduleIdOf(mod);
     if (!id || seenIds.has(id)) return [];
     seenIds.add(id);
@@ -1707,14 +2121,11 @@ class NovalView extends ItemView {
     });
     return out;
   }
-
   /* 导航根节点：没有被别的模块文件夹包含的配置模块。
    * 顶层模块是用户挑出来的「入口」，入口以下则完全镜像文件树。 */
   rootModules() {
     const mods = this.getModules();
-    const dirs = mods
-      .map((mod) => this.moduleTargetFolder(mod))
-      .filter(Boolean);
+    const dirs = mods.map((mod) => this.moduleTargetFolder(mod)).filter(Boolean);
     return mods.filter((mod) => {
       const dir = this.moduleTargetFolder(mod);
       if (dir && this.isCanvasModuleFolder(dir)) return false;
@@ -1722,7 +2133,6 @@ class NovalView extends ItemView {
       return !dirs.some((other) => other && other !== dir && dir.startsWith(other + "/"));
     });
   }
-
   // 从根模块到当前文件夹的链路，用于面包屑和导航展开
   modulePath(mod) {
     const dir = this.moduleTargetFolder(mod);
@@ -1739,15 +2149,11 @@ class NovalView extends ItemView {
     const chain = [root];
     if (dir !== rootDir) {
       let acc = rootDir;
-      dir
-        .slice(rootDir.length + 1)
-        .split("/")
-        .filter(Boolean)
-        .forEach((seg) => {
-          acc += "/" + seg;
-          const node = this.moduleForFolder(acc);
-          if (node) chain.push(node);
-        });
+      dir.slice(rootDir.length + 1).split("/").filter(Boolean).forEach((seg) => {
+        acc += "/" + seg;
+        const node = this.moduleForFolder(acc);
+        if (node) chain.push(node);
+      });
       const last = chain[chain.length - 1];
       if (last && last.id !== mod.id) chain.push(mod);
     } else if (root.id !== mod.id) {
@@ -1755,19 +2161,16 @@ class NovalView extends ItemView {
     }
     return chain;
   }
-
   promptSubmodule(parent) {
     const parentDir = this.moduleTargetFolder(parent);
     new NamePromptModal(this.app, {
-      title: "新建子模块",
-      hint:
-        "会在「" + (parentDir || "库根目录") + "」下新建同名文件夹；子模块跟随文件夹，不会重复存层级配置。",
-      placeholder: "例如：客户",
+      title: "\u65B0\u5EFA\u5B50\u6A21\u5757",
+      hint: "\u4F1A\u5728\u300C" + (parentDir || "\u5E93\u6839\u76EE\u5F55") + "\u300D\u4E0B\u65B0\u5EFA\u540C\u540D\u6587\u4EF6\u5939\uFF1B\u5B50\u6A21\u5757\u8DDF\u968F\u6587\u4EF6\u5939\uFF0C\u4E0D\u4F1A\u91CD\u590D\u5B58\u5C42\u7EA7\u914D\u7F6E\u3002",
+      placeholder: "\u4F8B\u5982\uFF1A\u5BA2\u6237",
       onSubmit: async (raw) => {
         const name = sanitizeFolderName(raw);
         if (!name) return;
         const dir = parentDir ? parentDir + "/" + name : name;
-        // 该文件夹已经有模块配置时直接进入，避免两个模块指向同一个目录
         const existing = this.getModules().find(
           (mod) => this.moduleTargetFolder(mod) === dir
         );
@@ -1778,7 +2181,7 @@ class NovalView extends ItemView {
         try {
           await ensureVaultFolder(this.app, dir);
         } catch (error) {
-          new Notice("创建文件夹失败：" + (error && error.message ? error.message : error));
+          new Notice("\u521B\u5EFA\u6587\u4EF6\u5939\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
           return;
         }
         const id = "mod-" + Date.now().toString(36);
@@ -1789,37 +2192,28 @@ class NovalView extends ItemView {
           name,
           folder: dir,
           icon: "folder",
-          color: parent.color || undefined
+          color: parent.color || void 0
         });
         this.plugin.settings.modules = list;
-        // 重新建出来的文件夹要能从「已隐藏」里恢复
-        this.plugin.settings.hiddenModuleFolders = (
-          this.plugin.settings.hiddenModuleFolders || []
-        ).filter((path) => path !== dir);
+        this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => path !== dir);
         this._ownership = null;
         await this.plugin.saveSettings();
         this.go(id);
       }
     }).open();
   }
-
   addFilesToModule(mod) {
     const dir = this.moduleTargetFolder(mod);
     const own = new Set(this.folderFiles(dir, false).map((file) => file.path));
-    const candidates = this.app.vault
-      .getFiles()
-      .filter((file) => !own.has(file.path) && this.isInboxFile(file))
-      .sort((a, b) => b.stat.mtime - a.stat.mtime);
+    const candidates = this.app.vault.getFiles().filter((file) => !own.has(file.path) && this.isInboxFile(file)).sort((a, b) => b.stat.mtime - a.stat.mtime);
     new AddFilesModal(this.app, candidates, (files) => this.assignToModule(files, mod)).open();
   }
-
   // 收件箱也收录附件：图片 / 视频 / PDF / 音频等，排除白板和隐藏目录。
   // 只收白名单里的扩展名，白板的历史备份（xxx.volis.json、xxx.noval.bak）
   // 这类复合后缀不会再混进来。
   vaultAttachments() {
     return this.app.vault.getFiles().filter((file) => {
       if (file.extension === "md") return false;
-      // 新旧白板与 Obsidian 原生 canvas 都属于画布，不当作附件素材
       if (["noval", "volis", "canvas"].includes(file.extension.toLowerCase())) return false;
       const lower = file.path.toLowerCase();
       if (lower.includes(".volis.") || lower.includes(".noval.")) return false;
@@ -1827,7 +2221,6 @@ class NovalView extends ItemView {
       return !isIgnoredPath(file.path);
     });
   }
-
   /* 收件箱策略接口：
    *   root       —— 默认。只收库根目录下散落的文件（不在任何文件夹里的）；
    *   unassigned —— 旧口径：按 frontmatter module 是否已归属来判断；
@@ -1837,12 +2230,10 @@ class NovalView extends ItemView {
     const value = String(this.plugin.settings.inboxPolicy || "").toLowerCase();
     return value === "unassigned" || value === "all" ? value : "root";
   }
-
   // 库根目录文件：路径里没有 "/"（也就是不在任何文件夹里）
   rootFiles() {
     return this.app.vault.getFiles().filter((file) => String(file.path).indexOf("/") === -1);
   }
-
   isInboxFile(file) {
     if (!file) return false;
     const ext = String(file.extension || "").toLowerCase();
@@ -1853,28 +2244,16 @@ class NovalView extends ItemView {
     if (file.path.startsWith(CARD_FOLDER + "/")) return false;
     return true;
   }
-
   inboxFiles() {
     const policy = this.inboxPolicy();
-
     if (policy === "root") {
-      // 与文件树一致：只看根目录里没被文件夹收走的文件，
-      // 不再关心 frontmatter / 附件归属表。
-      return this.rootFiles()
-        .filter((file) => this.isInboxFile(file))
-        .sort((a, b) => b.stat.mtime - a.stat.mtime);
+      return this.rootFiles().filter((file) => this.isInboxFile(file)).sort((a, b) => b.stat.mtime - a.stat.mtime);
     }
-
     if (policy === "all") {
-      return this.app.vault
-        .getFiles()
-        .filter((file) => this.isInboxFile(file))
-        .sort((a, b) => b.stat.mtime - a.stat.mtime);
+      return this.app.vault.getFiles().filter((file) => this.isInboxFile(file)).sort((a, b) => b.stat.mtime - a.stat.mtime);
     }
-
-    // unassigned：保留旧口径，方便以后切回“按归属判断”
     const md = this.vaultFiles();
-    const known = new Set();
+    const known = /* @__PURE__ */ new Set();
     this.getModules().forEach((mod) => {
       this.moduleKeys(mod).forEach((k) => known.add(k));
     });
@@ -1888,19 +2267,16 @@ class NovalView extends ItemView {
       const owner = assigned[file.path];
       return !(owner && known.has(String(owner).trim().toLowerCase()));
     });
-    return pending
-      .concat(attachments)
-      .sort((a, b) => b.stat.mtime - a.stat.mtime);
+    return pending.concat(attachments).sort((a, b) => b.stat.mtime - a.stat.mtime);
   }
-
   // 文件里写了 module，但没有任何模块配置认领这个值（且用户没点过忽略）。
   unknownModuleValues() {
-    const known = new Set();
+    const known = /* @__PURE__ */ new Set();
     this.getModules().forEach((mod) => this.moduleKeys(mod).forEach((k) => known.add(k)));
     const ignored = new Set(
       (this.plugin.settings.ignoredModuleValues || []).map((v) => String(v).toLowerCase())
     );
-    const groups = new Map();
+    const groups = /* @__PURE__ */ new Map();
     for (const file of this.vaultFiles()) {
       const values = this.explicitModule(getFm(this.app, file));
       values.forEach((value) => {
@@ -1911,12 +2287,10 @@ class NovalView extends ItemView {
     }
     return groups;
   }
-
   openFile(file) {
     if (!file) return;
     this.app.workspace.getLeaf("tab").openFile(file);
   }
-
   /* 删除模块 = Obsidian 删除文件夹：
    * 整个文件夹连同子文件夹、子模块、笔记与附件一起，按仓库「删除文件」的设置处理
    * （回收站或永久删除），同时移除这一层及以下的所有模块配置。 */
@@ -1924,15 +2298,12 @@ class NovalView extends ItemView {
     if (!target) return;
     const folder = this.moduleTargetFolder(target);
     const node = folder ? this.app.vault.getAbstractFileByPath(folder) : null;
-
-    // 文件夹已经不存在：只清理配置和隐藏记录
     if (!folder || !node || !Array.isArray(node.children)) {
       await this.removeModuleSubtreeConfigs(folder, target);
-      new Notice("已移除模块「" + target.name + "」");
+      new Notice("\u5DF2\u79FB\u9664\u6A21\u5757\u300C" + target.name + "\u300D");
       this.render();
       return;
     }
-
     const counts = this.countModuleTree(node);
     const confirmed = await new Promise((resolve) => {
       new DeleteModuleModal(
@@ -1942,8 +2313,6 @@ class NovalView extends ItemView {
       ).open();
     });
     if (!confirmed) return;
-
-    // 和文件树删除文件夹走同一个入口：由 Obsidian 按「删除文件」设置处理
     try {
       if (this.app.fileManager && typeof this.app.fileManager.trashFile === "function") {
         await this.app.fileManager.trashFile(node);
@@ -1951,20 +2320,15 @@ class NovalView extends ItemView {
         await this.app.vault.trash(node, true);
       }
     } catch (error) {
-      new Notice("删除失败：" + (error && error.message ? error.message : error));
+      new Notice("\u5220\u9664\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
       return;
     }
-
     await this.removeModuleSubtreeConfigs(folder, target);
     this.render();
     new Notice(
-      "已删除模块「" + target.name + "」：" +
-        (counts.files ? counts.files + " 个文件" : "无文件") +
-        (counts.folders ? "、" + counts.folders + " 个子文件夹" : "") +
-        "已按 Obsidian 删除设置处理"
+      "\u5DF2\u5220\u9664\u6A21\u5757\u300C" + target.name + "\u300D\uFF1A" + (counts.files ? counts.files + " \u4E2A\u6587\u4EF6" : "\u65E0\u6587\u4EF6") + (counts.folders ? "\u3001" + counts.folders + " \u4E2A\u5B50\u6587\u4EF6\u5939" : "") + "\u5DF2\u6309 Obsidian \u5220\u9664\u8BBE\u7F6E\u5904\u7406"
     );
   }
-
   /* 递归统计文件夹里的文件和子文件夹数量，弹窗里给用户看清影响范围 */
   countModuleTree(node) {
     let files = 0;
@@ -1982,7 +2346,6 @@ class NovalView extends ItemView {
     walk(node);
     return { files, folders };
   }
-
   /* 移除被删文件夹这一层及以下的所有模块配置与隐藏记录 */
   async removeModuleSubtreeConfigs(folder, target) {
     const dir = String(folder || "").replace(/^\/+|\/+$/g, "").toLowerCase();
@@ -1991,19 +2354,13 @@ class NovalView extends ItemView {
       if (!dir) return false;
       return value === dir || value.startsWith(dir + "/");
     };
-
     const all = this.getModules();
-    const removed = all.filter((mod) =>
-      dir ? inTree(this.moduleTargetFolder(mod)) : mod.id === target.id
+    const removed = all.filter(
+      (mod) => dir ? inTree(this.moduleTargetFolder(mod)) : mod.id === target.id
     );
     const removedIds = new Set(removed.map((mod) => mod.id));
     this.plugin.settings.modules = all.filter((mod) => !removedIds.has(mod.id));
-
-    this.plugin.settings.hiddenModuleFolders = (
-      this.plugin.settings.hiddenModuleFolders || []
-    ).filter((path) => !inTree(path));
-
-    // 当前打开的模块在被删子树里：回到首页
+    this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => !inTree(path));
     const activeId = String(this.active || "");
     let activeGone = removedIds.has(activeId);
     if (!activeGone && activeId.startsWith("dir:")) {
@@ -2013,40 +2370,34 @@ class NovalView extends ItemView {
     this._ownership = null;
     await this.plugin.saveSettings();
   }
-
   /* 模块右键菜单：和文件树一样，就地重命名或删除，操作同步到文件夹。 */
   showModuleMenu(mod, event) {
     if (!mod) return;
     const menu = new Menu();
-    menu.addItem((item) =>
-      item.setTitle("重命名…").setIcon("pencil").onClick(() => this.renameModule(mod))
+    menu.addItem(
+      (item) => item.setTitle("\u91CD\u547D\u540D\u2026").setIcon("pencil").onClick(() => this.renameModule(mod))
     );
-    menu.addItem((item) =>
-      item.setTitle("编辑模块…").setIcon("settings").onClick(() => this.openModuleEditor(mod))
+    menu.addItem(
+      (item) => item.setTitle("\u7F16\u8F91\u6A21\u5757\u2026").setIcon("settings").onClick(() => this.openModuleEditor(mod))
     );
     menu.addSeparator();
-    menu.addItem((item) =>
-      item
-        .setTitle("删除模块…")
-        .setIcon("trash")
-        .onClick(() => {
-          void this.deleteModule(mod);
-        })
+    menu.addItem(
+      (item) => item.setTitle("\u5220\u9664\u6A21\u5757\u2026").setIcon("trash").onClick(() => {
+        void this.deleteModule(mod);
+      })
     );
     menu.showAtMouseEvent(event);
   }
-
   renameModule(mod) {
     if (!mod) return;
     const oldFolder = this.moduleTargetFolder(mod);
     new RenameModuleModal(this.app, mod.name || oldFolder.split("/").pop(), async (value) => {
       const name = sanitizeFolderName(value);
       if (!name) {
-        new Notice("名称不能为空，也不能包含 \\ / : * ? \" < > | 等字符。");
+        new Notice('\u540D\u79F0\u4E0D\u80FD\u4E3A\u7A7A\uFF0C\u4E5F\u4E0D\u80FD\u5305\u542B \\ / : * ? " < > | \u7B49\u5B57\u7B26\u3002');
         return;
       }
-      const parent =
-        oldFolder.indexOf("/") === -1 ? "" : oldFolder.slice(0, oldFolder.lastIndexOf("/"));
+      const parent = oldFolder.indexOf("/") === -1 ? "" : oldFolder.slice(0, oldFolder.lastIndexOf("/"));
       const newFolder = parent ? parent + "/" + name : name;
       if (!oldFolder) {
         mod.name = name;
@@ -2056,10 +2407,9 @@ class NovalView extends ItemView {
         return;
       }
       if (newFolder === oldFolder && name === mod.name) return;
-      // Windows 上大小写不敏感，只有真正换了路径才检查重名
       if (newFolder.toLowerCase() !== oldFolder.toLowerCase()) {
         if (this.app.vault.getAbstractFileByPath(newFolder)) {
-          new Notice("已存在同名文件夹：" + newFolder);
+          new Notice("\u5DF2\u5B58\u5728\u540C\u540D\u6587\u4EF6\u5939\uFF1A" + newFolder);
           return;
         }
       }
@@ -2068,15 +2418,13 @@ class NovalView extends ItemView {
         try {
           await this.app.fileManager.renameFile(node, newFolder);
         } catch (error) {
-          new Notice("重命名失败：" + (error && error.message ? error.message : error));
+          new Notice("\u91CD\u547D\u540D\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
           return;
         }
       }
       this.plugin.remapModuleFolder(oldFolder, newFolder);
       mod.name = name;
       mod.folder = newFolder;
-
-      // 隐式模块的 id 跟着路径走，当前选中和展开状态也要迁移
       const oldId = "dir:" + oldFolder;
       const newId = "dir:" + newFolder;
       const remapId = (id) => {
@@ -2085,16 +2433,14 @@ class NovalView extends ItemView {
         return id;
       };
       this.active = remapId(this.active);
-      const expanded = new Set();
+      const expanded = /* @__PURE__ */ new Set();
       this._navExpanded.forEach((id) => expanded.add(remapId(id)));
       this._navExpanded = expanded;
-
       await this.plugin.saveSettings();
       this.render();
-      new Notice("已重命名为「" + name + "」");
+      new Notice("\u5DF2\u91CD\u547D\u540D\u4E3A\u300C" + name + "\u300D");
     }).open();
   }
-
   openModuleEditor(mod, initialName) {
     const mods = this.getModules();
     const index = mod ? mods.findIndex((m) => m.id === mod.id) : -1;
@@ -2107,20 +2453,15 @@ class NovalView extends ItemView {
       onSave: async (next) => {
         const folder = this.moduleTargetFolder(next);
         try {
-          // 模块 = 文件夹：保存时同步创建，父模块同样会出现在文件树里
           await ensureVaultFolder(this.app, folder);
         } catch (error) {
-          new Notice("创建模块文件夹失败：" + (error && error.message ? error.message : error));
+          new Notice("\u521B\u5EFA\u6A21\u5757\u6587\u4EF6\u5939\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
           return;
         }
         next.folder = folder;
-        this.plugin.settings.hiddenModuleFolders = (
-          this.plugin.settings.hiddenModuleFolders || []
-        ).filter((path) => path !== folder);
-
+        this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => path !== folder);
         const list = this.getModules().slice();
         let idx = list.findIndex((m) => m.id === next.id);
-        // 同一文件夹只保留一个模块：新建时撞到已有目录就合并到那条配置上
         if (idx < 0) {
           idx = list.findIndex((m) => this.moduleTargetFolder(m) === folder);
         }
@@ -2129,22 +2470,17 @@ class NovalView extends ItemView {
         this.plugin.settings.modules = list;
         this._ownership = null;
         await this.plugin.saveSettings();
-        new Notice("已保存模块「" + next.name + "」");
-
-        // 从“归入模块 → 新建模块…”进来的：建完直接把待归入的笔记写进去
+        new Notice("\u5DF2\u4FDD\u5B58\u6A21\u5757\u300C" + next.name + "\u300D");
         const pending = this._pendingAssign;
         this._pendingAssign = null;
         if (pending && pending.length) this.assignToModule(pending, next);
         else if (!mod) this.go(next.id);
       },
-      onDelete: mod
-        ? async (target) => {
-            await this.deleteModule(target);
-          }
-        : null
+      onDelete: mod ? async (target) => {
+        await this.deleteModule(target);
+      } : null
     }).open();
   }
-
   openModuleManager() {
     new ModuleManagerModal(this.app, {
       getRootModules: () => this.rootModules(),
@@ -2158,7 +2494,6 @@ class NovalView extends ItemView {
       }
     }).open();
   }
-
   openModulePicker(files) {
     if (!files || !files.length) return;
     new ModulePickerModal(this.app, {
@@ -2173,7 +2508,6 @@ class NovalView extends ItemView {
       }
     }).open();
   }
-
   // 等 Obsidian 的元数据缓存刷新，避免刚写完 module 又被旧缓存判成未归类
   waitForMetadata(file, timeout = 800) {
     const cache = this.app.metadataCache;
@@ -2186,7 +2520,6 @@ class NovalView extends ItemView {
         try {
           if (ref) cache.offref(ref);
         } catch (e) {
-          // 事件引用已失效时忽略
         }
         resolve();
       };
@@ -2196,7 +2529,6 @@ class NovalView extends ItemView {
       setTimeout(finish, timeout);
     });
   }
-
   /* 归入模块（与文件树一致）：
    *   - 文件直接移动到模块文件夹，归入后自然出现在该模块页；
    *   - 笔记顺手写 module 字段（只是元数据，模块归属仍以文件夹为准）；
@@ -2209,7 +2541,7 @@ class NovalView extends ItemView {
     try {
       if (dir) await ensureVaultFolder(this.app, dir);
     } catch (e) {
-      new Notice("无法创建模块文件夹「" + dir + "」：" + (e.message || e));
+      new Notice("\u65E0\u6CD5\u521B\u5EFA\u6A21\u5757\u6587\u4EF6\u5939\u300C" + dir + "\u300D\uFF1A" + (e.message || e));
       return;
     }
     let done = 0;
@@ -2221,7 +2553,6 @@ class NovalView extends ItemView {
       try {
         const oldPath = file.path;
         const isNote = String(file.extension || "").toLowerCase() === "md";
-        // 媒体文件没有 frontmatter，只有 Markdown 需要写归属字段。
         if (isNote) {
           await this.app.fileManager.processFrontMatter(file, (fm) => {
             fm.module = value;
@@ -2232,7 +2563,6 @@ class NovalView extends ItemView {
         if (target && oldPath !== target) {
           await this.app.fileManager.renameFile(file, target);
           moved += 1;
-          // 附件靠这份记录离开收件箱；旧路径的记录一并清掉
           if (!isNote) {
             delete assigned[oldPath];
             assigned[target] = value;
@@ -2242,21 +2572,18 @@ class NovalView extends ItemView {
         }
         done += 1;
       } catch (e) {
-        // 单个文件失败不阻塞其余文件，但要把原因带出来，避免"看起来没反应"
         failed += 1;
-        if (!firstError) firstError = (e && e.message) || String(e);
+        if (!firstError) firstError = e && e.message || String(e);
       }
     }
     await this.plugin.saveSettings();
     this._ownership = null;
-    this._inboxSel = new Set();
+    this._inboxSel = /* @__PURE__ */ new Set();
     new Notice(
-      "已归入「" + mod.name + "」：" + done + " 项" + (moved ? "（移动 " + moved + " 项）" : "") +
-        (failed ? "；失败 " + failed + " 项：" + firstError : "")
+      "\u5DF2\u5F52\u5165\u300C" + mod.name + "\u300D\uFF1A" + done + " \u9879" + (moved ? "\uFF08\u79FB\u52A8 " + moved + " \u9879\uFF09" : "") + (failed ? "\uFF1B\u5931\u8D25 " + failed + " \u9879\uFF1A" + firstError : "")
     );
     this.render();
   }
-
   // 按标签 / 文件夹名 / 文件名给未归类笔记猜一个模块，只做建议，不自动改文件
   suggestModuleFor(file) {
     if (file.extension !== "md") return null;
@@ -2264,25 +2591,19 @@ class NovalView extends ItemView {
     const tags = getTags(fm).map((t) => t.toLowerCase());
     const segs = file.parent ? file.parent.path.split("/").map((s) => s.toLowerCase()) : [];
     const base = file.basename.toLowerCase();
-
     for (const mod of this.getModules()) {
-      const names = [mod.name, mod.id, mod.module]
-        .filter(Boolean)
-        .map((s) => String(s).toLowerCase());
+      const names = [mod.name, mod.id, mod.module].filter(Boolean).map((s) => String(s).toLowerCase());
       if (tags.some((t) => names.some((n) => t === n || t.startsWith(n + "/")))) return mod;
       if (segs.some((s) => names.some((n) => s === n))) return mod;
-
       const keywords = (mod.keywords || []).map((k) => String(k).toLowerCase()).filter(Boolean);
       if (tags.some((t) => keywords.some((k) => t === k || t.startsWith(k + "/")))) return mod;
       if (keywords.some((k) => k.length >= 2 && base.includes(k))) return mod;
     }
     return null;
   }
-
   // 一次性采纳收集箱里的全部归属建议
   async applyAllSuggestions(files) {
-    // 与文件树一致：归入 = 真正把文件移进模块文件夹，而不是只写 frontmatter。
-    const groups = new Map();
+    const groups = /* @__PURE__ */ new Map();
     for (const file of files) {
       if (file.extension !== "md") continue;
       const mod = this.suggestModuleFor(file);
@@ -2292,14 +2613,13 @@ class NovalView extends ItemView {
       groups.get(key).files.push(file);
     }
     if (!groups.size) {
-      new Notice("没有可归入的笔记");
+      new Notice("\u6CA1\u6709\u53EF\u5F52\u5165\u7684\u7B14\u8BB0");
       return;
     }
     for (const group of groups.values()) {
       await this.assignToModule(group.files, group.mod);
     }
   }
-
   // 删除收集箱条目：笔记和附件都移入系统回收站，可随时恢复
   deleteFiles(files, onDone) {
     if (!files || !files.length) return;
@@ -2318,24 +2638,121 @@ class NovalView extends ItemView {
             delete this.plugin.settings.inboxAssigned[file.path];
           }
         } catch (e) {
-          // 单个文件失败不阻塞其余
         }
       }
       await this.plugin.saveSettings();
       this._ownership = null;
-      new Notice("已删除 " + done + " 个文件，可在回收站恢复");
+      new Notice("\u5DF2\u5220\u9664 " + done + " \u4E2A\u6587\u4EF6\uFF0C\u53EF\u5728\u56DE\u6536\u7AD9\u6062\u590D");
       if (typeof onDone === "function") onDone(done);
       else this.render();
     }).open();
   }
-
+  showFileMenu(event, file) {
+    const menu = new Menu();
+    menu.addItem(
+      (item) => item.setTitle("\u91CD\u547D\u540D\u2026").setIcon("pencil").onClick(() => this.promptRenameFile(file, "\u91CD\u547D\u540D\u7B14\u8BB0"))
+    );
+    menu.addSeparator();
+    menu.addItem(
+      (item) => item.setTitle("\u5220\u9664").setIcon("trash-2").onClick(() => this.deleteFiles([file]))
+    );
+    anchorMenuBelow(menu, event.currentTarget ?? event.target);
+  }
+  promptRenameFile(file, heading) {
+    new RenameFileModal(this.app, file.basename, (value) => {
+      void this.renameNoteFile(file, value);
+    }, heading).open();
+  }
+  async renameNoteFile(file, value) {
+    if (!value || value === file.basename) return;
+    const folder = file.parent ? file.parent.path : "";
+    const nextPath = (folder && folder !== "/" ? folder + "/" : "") + value + "." + (file.extension || "md");
+    try {
+      await this.app.fileManager.renameFile(file, nextPath);
+      this.refresh();
+    } catch (e) {
+      new Notice("\u91CD\u547D\u540D\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u662F\u5426\u91CD\u540D\u6216\u542B\u975E\u6CD5\u5B57\u7B26");
+    }
+  }
+  startFileDrag(event, file, paths) {
+    const list = paths && paths.length ? paths : this._mdMulti && this._mdSel.has(file.path) ? Array.from(this._mdSel) : [file.path];
+    this._dragPaths = list;
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", list.join("\n"));
+    }
+  }
+  endFileDrag() {
+    this._dragPaths = null;
+    this.clearDropHighlights();
+  }
+  clearDropHighlights() {
+    this.containerEl.querySelectorAll(".is-drop-target").forEach((el) => el.removeClass("is-drop-target"));
+  }
+  bindDropTarget(el, mode, mod) {
+    el.addEventListener("dragover", (evt) => {
+      if (!this._dragPaths || !this._dragPaths.length) return;
+      evt.preventDefault();
+      if (evt.dataTransfer) evt.dataTransfer.dropEffect = "move";
+      el.addClass("is-drop-target");
+    });
+    el.addEventListener("dragleave", (evt) => {
+      const next = evt.relatedTarget;
+      if (!next || !el.contains(next)) el.removeClass("is-drop-target");
+    });
+    el.addEventListener("drop", (evt) => {
+      if (!this._dragPaths || !this._dragPaths.length) return;
+      evt.preventDefault();
+      evt.stopPropagation();
+      el.removeClass("is-drop-target");
+      const paths = this._dragPaths.slice();
+      this._dragPaths = null;
+      const files = paths.map((p) => this.app.vault.getAbstractFileByPath(p)).filter((f) => f && f.extension !== void 0);
+      if (!files.length) return;
+      if (mode === "root") void this.moveFilesToRoot(files);
+      else void this.assignToModule(files, mod);
+    });
+  }
+  async moveFilesToRoot(files) {
+    if (!files || !files.length) return;
+    const assigned = this.ownershipMap();
+    let done = 0;
+    let failed = 0;
+    for (const file of files) {
+      try {
+        const oldPath = file.path;
+        const isNote = String(file.extension || "").toLowerCase() === "md";
+        if (isNote) {
+          await this.app.fileManager.processFrontMatter(file, (fm) => {
+            delete fm.module;
+          });
+          await this.waitForMetadata(file);
+        }
+        const target = this.uniqueFilePath("", file);
+        if (target && target !== oldPath) {
+          await this.app.fileManager.renameFile(file, target);
+          delete assigned[oldPath];
+          delete assigned[target];
+        } else {
+          delete assigned[oldPath];
+        }
+        done += 1;
+      } catch (e) {
+        failed += 1;
+      }
+    }
+    this._ownership = null;
+    if (this._mdSel) this._mdSel.clear();
+    await this.plugin.saveSettings();
+    new Notice("\u5DF2\u79FB\u56DE\u5E93\u6839\u76EE\u5F55\uFF1A" + done + " \u9879" + (failed ? "\uFF0C\u5931\u8D25 " + failed + " \u9879" : ""));
+    this.render();
+  }
   ignoreModuleValue(value) {
     const list = (this.plugin.settings.ignoredModuleValues || []).slice();
     if (!list.includes(value)) list.push(value);
     this.plugin.settings.ignoredModuleValues = list;
     this.plugin.saveSettings();
   }
-
   runCommand(id) {
     try {
       return this.app.commands.executeCommandById(id);
@@ -2343,7 +2760,6 @@ class NovalView extends ItemView {
       return false;
     }
   }
-
   openNoval() {
     const ok = this.runCommand(NOTES_ID + ":open-cards");
     if (ok) return;
@@ -2352,59 +2768,46 @@ class NovalView extends ItemView {
       leaf.setViewState({ type: "qm-cards-view", active: true });
       this.app.workspace.revealLeaf(leaf);
     } else {
-      new Notice("没有找到 Noval 视图");
+      new Notice("\u6CA1\u6709\u627E\u5230 Noval \u89C6\u56FE");
     }
   }
-
   quickCapture() {
     if (!this.runCommand(NOTES_ID + ":quick-capture")) {
-      new Notice("未找到 Noval 的快速记录命令");
+      new Notice("\u672A\u627E\u5230 Noval \u7684\u5FEB\u901F\u8BB0\u5F55\u547D\u4EE4");
     }
   }
-
   // 画布集现在就是「白板」页本身，所有入口都切到这一页，不再开新标签。
   openNovalGallery() {
     this.go("canvas");
   }
-
   openSettings() {
     try {
       this.app.setting.open();
       this.app.setting.openTabById(this.plugin.manifest.id);
     } catch (e) {
-      new Notice("请手动打开设置 → Noval");
+      new Notice("\u8BF7\u624B\u52A8\u6253\u5F00\u8BBE\u7F6E \u2192 Noval");
     }
   }
-
   setFocus(on) {
     this.focus = on;
     document.body.classList.toggle("noval-focus", on);
     this.render();
   }
-
   setNavCollapsed(on) {
     this.navCollapsed = !!on;
     this.plugin.settings.navCollapsed = this.navCollapsed;
     if (this.plugin.persistSettings) this.plugin.persistSettings();
     this.applyLayout();
   }
-
   refresh() {
     if (!this.containerEl) return;
-    const shown =
-      typeof this.containerEl.isShown === "function"
-        ? this.containerEl.isShown()
-        : this.containerEl.offsetParent !== null;
+    const shown = typeof this.containerEl.isShown === "function" ? this.containerEl.isShown() : this.containerEl.offsetParent !== null;
     if (!shown) {
-      // 视图在别的标签页：先记为待刷新，切回本视图时由 active-leaf-change 补刷
       this._needsRefresh = true;
       return;
     }
     this._needsRefresh = false;
-    // 文件增删改后归属会变，旧缓存必须清掉，否则新笔记会被旧归属表挡在外面
     this._ownership = null;
-    // 白板页是 Noval 画布集本体的实时镜像；卡片笔记页直接刷新面板，
-    // 都不重建整页，避免滚动位置和输入内容丢失。
     if (this.active === "canvas" && this.gallery) {
       this.gallery.refresh();
       return;
@@ -2415,7 +2818,6 @@ class NovalView extends ItemView {
     }
     this.render();
   }
-
   /** 卡片文件写入后只刷新卡片数据，通知里有文件路径时不再整页 load */
   applyFileCards(path, content) {
     if (this.active === "notes" && this.notes) {
@@ -2424,7 +2826,6 @@ class NovalView extends ItemView {
     }
     this._needsRefresh = true;
   }
-
   /** 只有界面文字变化（没有写入）时调用，不重读文件 */
   rerender() {
     if (this.active === "notes" && this.notes) {
@@ -2433,80 +2834,55 @@ class NovalView extends ItemView {
     }
     this.refresh();
   }
-
   go(id) {
     if (this.active === "canvas" && id !== "canvas") this.destroyGallery();
     if (this.active === "notes" && id !== "notes") this.destroyNotes();
     const mod = this.moduleById(id);
     const builtin = ["home", "inbox", "canvas", "notes"].includes(id);
     if (!mod && !builtin) {
-      // 文件夹被删除 / 改名后，原 id 失效，回首页而不是停在空白页
       this.active = "home";
     } else {
       this.active = id;
-      // 只在“进入模块”时展开祖先链路（不含自身）：自身是否展开由点击行为决定，
-      // 这样父模块点击第二次才能折叠（否则这里会把自身又塞回展开集合）。
       if (mod) {
-        this.modulePath(mod)
-          .slice(0, -1)
-          .forEach((node) => this._navExpanded.add(moduleIdOf(node)));
+        this.modulePath(mod).slice(0, -1).forEach((node) => this._navExpanded.add(moduleIdOf(node)));
       }
     }
     this.render();
   }
-
   destroyGallery() {
     if (this.gallery) this.gallery.destroy();
   }
-
   destroyNotes() {
     if (this.notes) this.notes.destroy();
   }
-
   getBoardFiles() {
-    return this.app.vault
-      .getFiles()
-      .filter((f) => f.extension === BOARD_EXT)
-      .sort((a, b) => b.stat.mtime - a.stat.mtime);
+    return this.app.vault.getFiles().filter((f) => f.extension === BOARD_EXT).sort((a, b) => b.stat.mtime - a.stat.mtime);
   }
-
   getCardFiles() {
-    return this.app.vault
-      .getFiles()
-      .filter((f) => f.extension === "md" && f.path.startsWith(CARD_FOLDER + "/"))
-      .sort((a, b) => b.stat.mtime - a.stat.mtime);
+    return this.app.vault.getFiles().filter((f) => f.extension === "md" && f.path.startsWith(CARD_FOLDER + "/")).sort((a, b) => b.stat.mtime - a.stat.mtime);
   }
-
   // 卡片总数只有读文件才知道，导航先渲染，数字到了再补进徽标。
   fillCardCount(item) {
-    const noval =
-      (this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID]) ||
-      (this.app.plugins.plugins && this.app.plugins.plugins[LEGACY.notesId]);
+    const noval = this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID] || this.app.plugins.plugins && this.app.plugins.plugins[LEGACY.notesId];
     if (!noval || typeof noval.readAllCards !== "function") return;
-    noval
-      .readAllCards()
-      .then((cards) => {
-        const total = Array.isArray(cards) ? cards.length : 0;
-        this._cardCount = total;
-        if (!item.isConnected) return;
-        let badge = item.querySelector(".cl-navcount");
-        if (!total) {
-          if (badge) badge.remove();
-          return;
-        }
-        if (!badge) badge = item.createDiv({ cls: "cl-navcount" });
-        badge.setText(String(total));
-      })
-      .catch(() => {
-        // 读取失败就不显示数字，不影响导航本身
-      });
+    noval.readAllCards().then((cards) => {
+      const total = Array.isArray(cards) ? cards.length : 0;
+      this._cardCount = total;
+      if (!item.isConnected) return;
+      let badge = item.querySelector(".cl-navcount");
+      if (!total) {
+        if (badge) badge.remove();
+        return;
+      }
+      if (!badge) badge = item.createDiv({ cls: "cl-navcount" });
+      badge.setText(String(total));
+    }).catch(() => {
+    });
   }
-
   parseCards(text, file) {
     const lines = text.split(/\r?\n/);
     const cards = [];
     let date = "";
-
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const heading = line.match(/^##\s+(\d{4}-\d{2}-\d{2})/);
@@ -2514,38 +2890,26 @@ class NovalView extends ItemView {
         date = heading[1];
         continue;
       }
-
       const start = line.match(/^-\s+(\d{2}:\d{2})\s+(.*)$/);
       if (!start) continue;
-
       let body = start[2];
       let j = i + 1;
-      while (
-        j < lines.length &&
-        !/^-\s+\d{2}:\d{2}\s+/.test(lines[j]) &&
-        !/^##\s+/.test(lines[j])
-      ) {
+      while (j < lines.length && !/^-\s+\d{2}:\d{2}\s+/.test(lines[j]) && !/^##\s+/.test(lines[j])) {
         body += "\n" + lines[j];
         j++;
       }
       i = j - 1;
-
       let id = "";
       const idMatch = body.match(/\s\^([A-Za-z0-9]+)\s*$/);
       if (idMatch) {
         id = idMatch[1];
         body = body.replace(/\s*\^[A-Za-z0-9]+\s*$/, "");
       }
-
       const tags = [];
-      body = body
-        .replace(/#([^\s#]+)/g, (all, tag) => {
-          tags.push(tag);
-          return "";
-        })
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
-
+      body = body.replace(/#([^\s#]+)/g, (all, tag) => {
+        tags.push(tag);
+        return "";
+      }).replace(/\n{3,}/g, "\n\n").trim();
       cards.push({
         date,
         time: start[1],
@@ -2556,10 +2920,8 @@ class NovalView extends ItemView {
         sortKey: date + " " + start[1]
       });
     }
-
     return cards;
   }
-
   async getRecentCards(limit) {
     const files = this.getCardFiles().slice(0, 3);
     let cards = [];
@@ -2572,23 +2934,20 @@ class NovalView extends ItemView {
       }
       cards = cards.concat(this.parseCards(text, file));
     }
-    cards.sort((a, b) => (a.sortKey < b.sortKey ? 1 : -1));
+    cards.sort((a, b) => a.sortKey < b.sortKey ? 1 : -1);
     return cards.slice(0, limit || 6);
   }
-
   openCard(card) {
     if (!card) return;
     const sub = card.id ? "#^" + card.id : "";
     this.app.workspace.openLinkText(card.file.path + sub, "", true);
   }
-
   /** 首页速记卡片：切到卡片笔记页，并定位到具体这一条。 */
   openCardInNotes(card) {
     if (!card) return;
     this.go("notes");
     if (this.notes) this.notes.focusCard(card);
   }
-
   async readBoard(file) {
     try {
       const text = await this.app.vault.cachedRead(file);
@@ -2596,19 +2955,16 @@ class NovalView extends ItemView {
       const nodes = Array.isArray(data.nodes) ? data.nodes : [];
       const edges = Array.isArray(data.edges) ? data.edges : [];
       const first = nodes.find((n) => n && n.type === "text" && n.text);
-      const preview = first
-        ? String(first.text).replace(/\s+/g, " ").slice(0, 26)
-        : "空白白板";
+      const preview = first ? String(first.text).replace(/\s+/g, " ").slice(0, 26) : "\u7A7A\u767D\u767D\u677F";
       return {
         nodes: nodes.length,
         edges: edges.length,
-        summary: nodes.length + " 个节点 · " + preview
+        summary: nodes.length + " \u4E2A\u8282\u70B9 \xB7 " + preview
       };
     } catch (e) {
-      return { nodes: 0, edges: 0, summary: "无法读取白板" };
+      return { nodes: 0, edges: 0, summary: "\u65E0\u6CD5\u8BFB\u53D6\u767D\u677F" };
     }
   }
-
   render() {
     this._mdFiles = this.app.vault.getMarkdownFiles();
     this._contentFiles = this._mdFiles.filter(isContentFile);
@@ -2616,19 +2972,14 @@ class NovalView extends ItemView {
     if (this.active !== "notes") this.destroyNotes();
     this.contentEl.empty();
     this.contentEl.addClass("cl-content");
-
     const root = this.contentEl.createDiv({ cls: "cl-app" });
     this.appEl = root;
     this.renderNav(root);
-
     const main = root.createDiv({ cls: "cl-main" });
-
-    // 侧栏收起后从主区域左上角浮出，用来恢复导航
     const restore = main.createDiv({ cls: "cl-navrestore" });
-    restore.setAttribute("aria-label", "展开 Noval 侧栏");
+    restore.setAttribute("aria-label", "\u5C55\u5F00 Noval \u4FA7\u680F");
     setIcon(restore, "chevrons-right");
     restore.onclick = () => this.setNavCollapsed(false);
-
     const scroll = main.createDiv({ cls: "cl-scroll" });
     if (this.active === "inbox") {
       this.renderInbox(scroll);
@@ -2645,37 +2996,41 @@ class NovalView extends ItemView {
     }
     this.applyLayout();
   }
-
   renderNav(root) {
     const nav = root.createDiv({ cls: "cl-nav" });
-
     const brand = nav.createDiv({ cls: "cl-brand" });
     brand.createDiv({ cls: "cl-mark", text: "C" });
-    const brandName = this.plugin.settings.workspaceName || "个人工作台";
+    const brandName = this.plugin.settings.workspaceName || "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0";
     const brandText = brand.createDiv({ cls: "cl-brand-txt" });
     brandText.createDiv({ cls: "cl-brand-name", text: brandName });
     brandText.createDiv({
       cls: "cl-brand-sub",
-      text: brandName === "个人工作台" ? "Noval Workspace" : "个人工作台"
+      text: brandName === "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0" ? "Noval Workspace" : "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0"
     });
-
-    // 收起按钮固定在品牌行右侧：导航的开关放在导航的起始位置
     const collapseBtn = brand.createDiv({ cls: "cl-navtoggle" });
-    collapseBtn.setAttribute("aria-label", "收起 Noval 侧栏");
+    collapseBtn.setAttribute("aria-label", "\u6536\u8D77 Noval \u4FA7\u680F");
     setIcon(collapseBtn, "chevrons-left");
     collapseBtn.onclick = () => this.setNavCollapsed(true);
-
+    const navSearch = nav.createDiv({
+      cls: "cl-navsearch",
+      attr: { role: "button", tabindex: "0", "aria-label": "搜索工作台" }
+    });
+    setIcon(navSearch.createSpan({ cls: "cl-navsearch-ico" }), "search");
+    navSearch.createSpan({ cls: "cl-navsearch-ph", text: "搜索工作台…" });
+    navSearch.createEl("kbd", { cls: "cl-navsearch-kbd", text: "⌘K" });
+    navSearch.onclick = () => openGlobalSearch(this);
+    navSearch.onkeydown = (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openGlobalSearch(this);
+      }
+    };
     const navList = nav.createDiv({ cls: "cl-navlist" });
-
-    // 分为三组：总览 / 模块 / 工作区。组标题只是视觉分层，不参与交互。
     const group = (caption) => {
       const g = navList.createDiv({ cls: "cl-navgroup" });
       g.createDiv({ cls: "cl-navcap", text: caption });
       return g;
     };
-
-    // 统一的行工厂：count 为 0 时不渲染数字，避免像文件树那样一列 0。
-    // chevron / depth 用来画模块层级（父模块 → 子模块），其他入口不传即可。
     const addItem = (parent, { label, icon, tile, color, active, count, onClick, onContextMenu, depth = 0, chevron = false, hasChildren = false, expanded = false, onToggle }) => {
       const item = parent.createDiv({
         cls: "cl-navitem" + (active ? " is-active" : "") + (depth > 0 ? " is-sub" : "")
@@ -2695,7 +3050,6 @@ class NovalView extends ItemView {
       const iconEl = item.createDiv({
         cls: "cl-navicon" + (tile ? " cl-navtile " + tile : "")
       });
-      // 自定义模块用自己选的颜色；内置模块仍按顺序取预设色
       if (color) iconEl.style.setProperty("--tint", color);
       setIcon(iconEl, icon);
       item.createDiv({ cls: "cl-navlabel", text: label });
@@ -2710,48 +3064,41 @@ class NovalView extends ItemView {
       }
       return item;
     };
-
     const overview = group("OVERVIEW");
     addItem(overview, {
-      label: "首页",
+      label: "\u9996\u9875",
       icon: "home",
       active: this.active === "home",
       onClick: () => this.go("home")
     });
-    addItem(overview, {
-      label: "收集箱",
+    const inboxItem = addItem(overview, {
+      label: "\u6536\u96C6\u7BB1",
       icon: "inbox",
       active: this.active === "inbox",
       count: this.inboxFiles().length,
       onClick: () => this.go("inbox")
     });
-
-    // 模块组的标题行右侧放「新建」「管理」两个小按钮，像 Notion 一样收在标题里
+    this.bindDropTarget(inboxItem, "root");
     const modules = navList.createDiv({ cls: "cl-navgroup" });
     const capRow = modules.createDiv({ cls: "cl-navcap-row" });
     capRow.createDiv({ cls: "cl-navcap", text: "MODULES" });
     const capActs = capRow.createDiv({ cls: "cl-navcap-acts" });
-
     const addModule = capActs.createDiv({ cls: "cl-navcap-btn" });
-    addModule.setAttribute("aria-label", "新建模块");
+    addModule.setAttribute("aria-label", "\u65B0\u5EFA\u6A21\u5757");
     setIcon(addModule, "plus");
     addModule.onclick = () => this.openModuleEditor(null);
-
     const manageModule = capActs.createDiv({ cls: "cl-navcap-btn" });
-    manageModule.setAttribute("aria-label", "管理模块");
+    manageModule.setAttribute("aria-label", "\u7BA1\u7406\u6A21\u5757");
     setIcon(manageModule, "more-horizontal");
     manageModule.onclick = () => this.openModuleManager();
-
     const allModules = this.getModules();
-    // 顶层 = 没有被别的模块文件夹包住的模块；下面完全镜像真实子文件夹。
-    // 默认全部收起，只有用户点击模块行或箭头时才展开。
     const roots = this.rootModules();
     const drawModule = (mod, depth) => {
       const key = moduleIdOf(mod);
       const children = this.submodulesOf(mod);
       const expanded = this._navExpanded.has(key);
       const index = allModules.indexOf(mod);
-      addItem(modules, {
+      const navItem = addItem(modules, {
         label: mod.name,
         icon: mod.icon || (children.length ? "folder" : "file-text"),
         tile: "cl-tint-" + (index >= 0 ? index % 5 : depth % 5),
@@ -2777,44 +3124,40 @@ class NovalView extends ItemView {
           this.go(key);
         }
       });
+      this.bindDropTarget(navItem, "module", mod);
       if (expanded) children.forEach((child) => drawModule(child, depth + 1));
     };
     roots.forEach((mod) => drawModule(mod, 0));
-
     const workspace = group("WORKSPACE");
     addItem(workspace, {
-      label: "画布",
+      label: "\u753B\u5E03",
       icon: "presentation",
       active: this.active === "canvas",
       count: this.getBoardFiles().length,
       onClick: () => this.go("canvas")
     });
     const cardsItem = addItem(workspace, {
-      label: "卡片笔记",
+      label: "\u5361\u7247\u7B14\u8BB0",
       icon: "sticky-note",
       active: this.active === "notes",
       count: this._cardCount || 0,
       onClick: () => this.go("notes")
     });
     this.fillCardCount(cardsItem);
-
     const foot = nav.createDiv({ cls: "cl-navfoot" });
-
     const focusBtn = foot.createDiv({ cls: "cl-navitem" });
-    focusBtn.setAttribute("aria-label", this.focus ? "退出专注" : "专注模式");
+    focusBtn.setAttribute("aria-label", this.focus ? "\u9000\u51FA\u4E13\u6CE8" : "\u4E13\u6CE8\u6A21\u5F0F");
     const focusIcon = focusBtn.createDiv({ cls: "cl-navicon" });
     setIcon(focusIcon, this.focus ? "minimize" : "maximize");
-    focusBtn.createDiv({ cls: "cl-navlabel", text: this.focus ? "退出专注" : "专注模式" });
+    focusBtn.createDiv({ cls: "cl-navlabel", text: this.focus ? "\u9000\u51FA\u4E13\u6CE8" : "\u4E13\u6CE8\u6A21\u5F0F" });
     focusBtn.onclick = () => this.setFocus(!this.focus);
-
     const settingsBtn = foot.createDiv({ cls: "cl-navitem" });
-    settingsBtn.setAttribute("aria-label", "设置");
+    settingsBtn.setAttribute("aria-label", "\u8BBE\u7F6E");
     const settingsIcon = settingsBtn.createDiv({ cls: "cl-navicon" });
     setIcon(settingsIcon, "settings");
-    settingsBtn.createDiv({ cls: "cl-navlabel", text: "设置" });
+    settingsBtn.createDiv({ cls: "cl-navlabel", text: "\u8BBE\u7F6E" });
     settingsBtn.onclick = () => this.openSettings();
   }
-
   renderHome(el) {
     el.addClass("cl-hm-scroll");
     const page = el.createDiv({ cls: "cl-hm-page" });
@@ -2822,85 +3165,57 @@ class NovalView extends ItemView {
     aurora.createEl("i", { cls: "cl-hm-a1" });
     aurora.createEl("i", { cls: "cl-hm-a2" });
     aurora.createEl("i", { cls: "cl-hm-a3" });
-
     const boards = this.getBoardFiles();
     const inbox = this.inboxFiles();
     const modules = this.getModules();
-    const workspaceName = this.plugin.settings.workspaceName || "个人工作台";
-
-    const now = new Date();
+    const workspaceName = this.plugin.settings.workspaceName || "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0";
+    const now = /* @__PURE__ */ new Date();
     const hour = now.getHours();
-    const greet =
-      hour < 5 ? "凌晨好"
-        : hour < 9 ? "早上好"
-          : hour < 12 ? "上午好"
-            : hour < 14 ? "中午好"
-              : hour < 18 ? "下午好" : "晚上好";
+    const greet = hour < 5 ? "\u51CC\u6668\u597D" : hour < 9 ? "\u65E9\u4E0A\u597D" : hour < 12 ? "\u4E0A\u5348\u597D" : hour < 14 ? "\u4E2D\u5348\u597D" : hour < 18 ? "\u4E0B\u5348\u597D" : "\u665A\u4E0A\u597D";
     const WEEKNAMES = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
     const MONTHNAMES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-
     let captureInput = null;
-
-    /* 顶栏：面包屑 / 快速记录 / 设置 / 身份 */
-    const top = page.createDiv({ cls: "cl-hm-top" });
-    const crumb = top.createDiv({ cls: "cl-hm-crumb" });
-    crumb.createEl("b", { text: "总览" });
-    crumb.createSpan({ text: " / 首页" });
-    top.createDiv({ cls: "cl-hm-topspace" });
-
-    const cmd = top.createDiv({ cls: "cl-hm-cmd" });
-    setIcon(cmd.createDiv({ cls: "cl-hm-cmdico" }), "search");
-    cmd.createSpan({ text: "快速记一条" });
-    cmd.createDiv({ cls: "cl-hm-kbd", text: "↵" });
-    cmd.onclick = () => {
-      if (captureInput) captureInput.focus();
-    };
-
-    const gear = top.createDiv({ cls: "cl-hm-iconbtn" });
-    gear.setAttribute("aria-label", "设置");
-    setIcon(gear, "settings");
-    gear.onclick = () => this.openSettings();
-
-    top.createDiv({
-      cls: "cl-hm-avatar",
-      text: workspaceName.slice(0, 2) || "C"
-    });
-
+    const top = page.createDiv({ cls: "cl-hm-top cl-hm-topbot" });
+    const topBranch = top.createDiv({ cls: "cl-hm-branch" });
+    topBranch.innerHTML = '<svg viewBox="0 0 60 36" aria-hidden="true"><path d="M3 33C17 29 31 21 46 6" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/><g fill="currentColor"><ellipse cx="17" cy="27" rx="7" ry="2.8" transform="rotate(-38 17 27)" opacity=".55"/><ellipse cx="25" cy="22" rx="7" ry="2.8" transform="rotate(-42 25 22)" opacity=".42"/><ellipse cx="28" cy="29" rx="6" ry="2.5" transform="rotate(-14 28 29)" opacity=".36"/><ellipse cx="33" cy="16" rx="6.5" ry="2.6" transform="rotate(-48 33 16)" opacity=".5"/><ellipse cx="40" cy="11" rx="5.5" ry="2.4" transform="rotate(-52 40 11)" opacity=".34"/></g></svg>';
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const weekNoTop = Math.ceil(((now - yearStart) / 864e5 + yearStart.getDay() + 1) / 7);
+    top.createDiv({ cls: "cl-hm-topmid", text: MONTHNAMES[now.getMonth()] + " \u00B7 \u7B2C " + weekNoTop + " \u5468" });
+    const topClock = top.createDiv({ cls: "cl-hm-topclk" });
+    topClock.createEl("b", { text: String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0") });
+    topClock.createSpan({ text: "\u5468" + "\u65E5\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D"[now.getDay()] });
+    const topGear = top.createDiv({ cls: "cl-hm-topgear" });
+    topGear.setAttribute("aria-label", "\u8BBE\u7F6E");
+    setIcon(topGear, "more-horizontal");
+    topGear.onclick = () => this.openSettings();
     const grid = page.createDiv({ cls: "cl-hm-bento" });
-
-    /* Hero：日期 + 问候 + 内联速记 */
     const hero = grid.createDiv({ cls: "cl-hm-card cl-hm-hero cl-hm-s5" });
     hero.createDiv({ cls: "cl-hm-bigdate", text: String(now.getDate()) });
-
     const heroTop = hero.createDiv({ cls: "cl-hm-herotop" });
     heroTop.createDiv({ cls: "cl-hm-live" });
-    heroTop.createSpan({ text: WEEKNAMES[now.getDay()] + " · " + MONTHNAMES[now.getMonth()] + " " + now.getDate() });
-
+    heroTop.createSpan({ text: WEEKNAMES[now.getDay()] + " \xB7 " + MONTHNAMES[now.getMonth()] + " " + now.getDate() });
     const heroMid = hero.createDiv({ cls: "cl-hm-heromid" });
     const hello = heroMid.createEl("h1", { cls: "cl-hm-hello" });
-    hello.createSpan({ text: greet + "，" });
+    hello.createSpan({ text: greet + "\uFF0C" });
     hello.createSpan({ cls: "cl-hm-gradtext", text: workspaceName });
-
     const meta = heroMid.createDiv({ cls: "cl-hm-herometa" });
     const metaPart = (value, label) => {
       meta.createSpan({ text: "" }).createEl("b", { text: String(value) });
       meta.createSpan({ text: " " + label });
     };
-    metaPart(modules.length, "个模块");
+    metaPart(modules.length, "\u4E2A\u6A21\u5757");
     meta.createDiv({ cls: "cl-hm-sep" });
-    metaPart(boards.length, "块白板");
+    metaPart(boards.length, "\u5757\u767D\u677F");
     meta.createDiv({ cls: "cl-hm-sep" });
-    metaPart(inbox.length, "条待整理");
-
+    metaPart(inbox.length, "\u6761\u5F85\u6574\u7406");
     const capture = hero.createDiv({ cls: "cl-hm-capture" });
     setIcon(capture.createDiv({ cls: "cl-hm-captico" }), "plus");
     captureInput = capture.createEl("input", {
       cls: "cl-hm-captinput",
-      attr: { type: "text", placeholder: "记一条速记，回车保存…" }
+      attr: { type: "text", placeholder: "\u8BB0\u4E00\u6761\u901F\u8BB0\uFF0C\u56DE\u8F66\u4FDD\u5B58\u2026" }
     });
     const sendBtn = capture.createDiv({ cls: "cl-hm-go" });
     setIcon(sendBtn, "arrow-right");
-
     const submitCapture = async () => {
       const text = String(captureInput.value || "").trim();
       if (!text) {
@@ -2927,88 +3242,110 @@ class NovalView extends ItemView {
       }
     });
     sendBtn.onclick = submitCapture;
-
-    /* 本周节奏：12 周热力图 */
     const weekCard = grid.createDiv({ cls: "cl-hm-card cl-hm-week cl-hm-s4" });
-    const weekHead = weekCard.createDiv({ cls: "cl-hm-head" });
-    weekHead.createDiv({ cls: "cl-hm-title", text: "本周节奏" });
-    weekHead.createDiv({ cls: "cl-hm-sub", text: "过去 12 周" });
-
-    const dayMs = 86400000;
-    const today = new Date();
+    const dayMs = 864e5;
+    const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
     const todayTime = today.getTime();
-    const monday = todayTime - ((today.getDay() + 6) % 7) * dayMs;
-
-    const buckets = new Map();
+    const monday = todayTime - (today.getDay() + 6) % 7 * dayMs;
+    const onejan = new Date(today.getFullYear(), 0, 1);
+    const weekNo = Math.ceil((((today - onejan) / dayMs) + onejan.getDay() + 1) / 7);
+    const weekCn = "\u65E5\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D"[today.getDay()];
+    const weekHead = weekCard.createDiv({ cls: "cl-hm-head" });
+    weekHead.createDiv({ cls: "cl-hm-title", text: "\u672C\u5468\u8282\u594F" });
+    weekHead.createDiv({ cls: "cl-hm-sub", text: "\u7B2C " + weekNo + " \u5468 \u00B7 " + (today.getMonth() + 1) + "/" + today.getDate() + " \u5468" + weekCn });
+    const buckets = /* @__PURE__ */ new Map();
     let recentCount = 0;
-    let prevCount = 0;
     const recentFrom = todayTime - 6 * dayMs;
-    const prevFrom = todayTime - 13 * dayMs;
     for (const file of [...this._contentFiles, ...boards]) {
       const d = new Date(file.stat.mtime);
       d.setHours(0, 0, 0, 0);
       const key = d.getTime();
       buckets.set(key, (buckets.get(key) || 0) + 1);
       if (key >= recentFrom) recentCount += 1;
-      else if (key >= prevFrom) prevCount += 1;
     }
-
-    const trend = prevCount ? Math.round(((recentCount - prevCount) / prevCount) * 100) : null;
-    const weekNum = weekCard.createDiv({ cls: "cl-hm-weeknum" });
-    weekNum.createEl("strong", { text: String(recentCount) });
-    weekNum.createSpan({ text: "次编辑" });
-    const trendEl = weekNum.createDiv({
-      cls: "cl-hm-trend" + (trend !== null && trend < 0 ? " is-down" : ""),
-      text: trend === null ? "—" : (trend > 0 ? "+" : "") + trend + "%"
-    });
-
-    const heat = weekCard.createDiv({ cls: "cl-hm-heat" });
-    const levels = [0, 1, 2, 4, 6];
-    for (let i = 0; i < 84; i++) {
-      const weekIndex = Math.floor(i / 7);
-      const weekday = i % 7;
-      const time = monday - (11 - weekIndex) * 7 * dayMs + weekday * dayMs;
-      const cell = heat.createEl("i");
-      if (time > todayTime) {
-        cell.addClass("is-future");
+    const weekCounts = [];
+    for (let i = 0; i < 7; i++) weekCounts.push(buckets.get(monday + i * dayMs) || 0);
+    const todayIdx = (today.getDay() + 6) % 7;
+    const todayCount = weekCounts[todayIdx] || 0;
+    let streak = 0;
+    for (let i = todayIdx; i >= 0; i--) { if (weekCounts[i] > 0) streak++; else break; }
+    let thisWeekActive = 0;
+    for (let i = 0; i <= todayIdx; i++) if (weekCounts[i] > 0) thisWeekActive++;
+    let lastWeekActive = 0;
+    for (let i = 0; i <= todayIdx; i++) if ((buckets.get(monday - 7 * dayMs + i * dayMs) || 0) > 0) lastWeekActive++;
+    const dayDelta = thisWeekActive - lastWeekActive;
+    const wkTop = weekCard.createDiv({ cls: "cl-hm-wktop" });
+    const wkNum = wkTop.createDiv({ cls: "cl-hm-wknum" });
+    wkNum.createEl("strong", { text: String(recentCount) });
+    wkNum.createSpan({ text: "\u6B21\u7F16\u8F91" });
+    const wkStats = wkTop.createDiv({ cls: "cl-hm-wkstats" });
+    wkStats.createDiv({ cls: "cl-hm-streak", text: "\uD83D\uDD25 \u8FDE\u7EED " + streak + " \u5929" });
+    const cmpCls = dayDelta > 0 ? "cl-hm-cmp up" : dayDelta < 0 ? "cl-hm-cmp down" : "cl-hm-cmp";
+    const cmpText = dayDelta > 0 ? "\u25B2 \u8F83\u4E0A\u5468 +" + dayDelta + " \u5929" : dayDelta < 0 ? "\u25BC \u8F83\u4E0A\u5468 " + dayDelta + " \u5929" : "\u2014 \u8F83\u4E0A\u5468 \u6301\u5E73";
+    wkStats.createDiv({ cls: cmpCls, text: cmpText });
+    const wkChart = weekCard.createDiv({ cls: "cl-hm-wkchart" });
+    const maxC = Math.max(1, ...weekCounts);
+    const W = 300, H = 74, baseY = 66, maxH = 56, barW = 22;
+    let svgInner = '<defs><linearGradient id="wkBarGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fbf6f"/><stop offset="1" stop-color="#6f9a5e"/></linearGradient></defs>';
+    svgInner += '<line x1="0" y1="' + baseY + '" x2="' + W + '" y2="' + baseY + '" stroke="var(--hm-line)" stroke-width="1"/>';
+    for (let i = 0; i < 7; i++) {
+      const x = 13 + i * 42;
+      const isToday = i === todayIdx;
+      const isFuture = i > todayIdx;
+      const c = weekCounts[i];
+      if (isFuture) {
+        svgInner += '<rect x="' + x + '" y="60" width="' + barW + '" height="6" rx="4" fill="none" stroke="var(--hm-line-strong)" stroke-dasharray="2 2"/>';
       } else {
-        const count = buckets.get(time) || 0;
-        let level = 0;
-        for (let k = 1; k < levels.length; k++) {
-          if (count >= levels[k]) level = k;
+        const h = Math.max(4, Math.round(maxH * c / maxC));
+        const y = baseY - h;
+        const fill = isToday ? "url(#wkBarGrad)" : c > 0 ? "rgba(169,201,138,0.55)" : "var(--hm-track)";
+        svgInner += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + h + '" rx="4" fill="' + fill + '"/>';
+        if (isToday) {
+          const cx = x + barW / 2;
+          svgInner += '<line x1="' + cx + '" y1="4" x2="' + cx + '" y2="8" stroke="#6f9a5e" stroke-width="1.5"/>';
+          svgInner += '<circle cx="' + cx + '" cy="4" r="2.5" fill="#6f9a5e"/>';
         }
-        if (level) cell.addClass("l" + level);
       }
     }
-    const heatFoot = weekCard.createDiv({ cls: "cl-hm-heatfoot" });
-    heatFoot.createSpan({ text: "少" });
-    const legend = heatFoot.createDiv({ cls: "cl-hm-legend" });
-    for (let i = 0; i < 5; i++) legend.createEl("i", { cls: "l" + i });
-    heatFoot.createSpan({ text: "多" });
-
-    /* 收件箱 */
+    wkChart.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' + svgInner + '</svg>';
+    const wkLabels = wkChart.createDiv({ cls: "cl-hm-wklabels" });
+    const dayLabels = ["\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D", "\u65E5"];
+    for (let i = 0; i < 7; i++) {
+      const sp = wkLabels.createSpan({ text: dayLabels[i] + (i === todayIdx ? " \u00B7 \u4ECA\u5929" : "") });
+      if (i === todayIdx) sp.addClass("is-today");
+    }
+    const wkFoot = weekCard.createDiv({ cls: "cl-hm-wkfoot" });
+    const todayEl = wkFoot.createDiv({ cls: "cl-hm-wktoday" + (todayCount > 0 ? "" : " idle") });
+    todayEl.createSpan({ cls: "dot" });
+    todayEl.createSpan({ text: todayCount > 0 ? "\u4ECA\u65E5\u5DF2\u7F16\u8F91 " + todayCount + " \u4E2A\u6587\u4EF6" : "\u4ECA\u65E5\u8FD8\u6CA1\u52A8\u7B14" });
+    const prog = wkFoot.createDiv({ cls: "cl-hm-wkprog" });
+    prog.createSpan({ text: "\u672C\u5468\u6D3B\u8DC3" });
+    const progBar = prog.createSpan({ cls: "bar" });
+    progBar.createEl("i").style.width = Math.round(thisWeekActive / 7 * 100) + "%";
+    prog.createEl("b", { text: thisWeekActive + "/7 \u5929" });
+    if (todayCount === 0) {
+      const nudge = weekCard.createDiv({ cls: "cl-hm-wknudge", text: "\u4ECA\u5929\u8FD8\u6CA1\u52A8\u7B14\uFF0C\u53BB\u901F\u8BB0\u4E00\u6761 \u2192" });
+      nudge.onclick = () => { if (captureInput) captureInput.focus(); };
+    }
     const inboxCard = grid.createDiv({ cls: "cl-hm-card cl-hm-inbox cl-hm-s3" });
     const inboxHead = inboxCard.createDiv({ cls: "cl-hm-head" });
-    inboxHead.createDiv({ cls: "cl-hm-title", text: "收件箱" });
-    inboxHead.createDiv({ cls: "cl-hm-sub", text: "未归属" });
-    const inboxMore = inboxHead.createDiv({ cls: "cl-hm-more", text: "全部 ›" });
+    inboxHead.createDiv({ cls: "cl-hm-title", text: "\u6536\u4EF6\u7BB1" });
+    inboxHead.createDiv({ cls: "cl-hm-sub", text: "\u672A\u5F52\u5C5E" });
+    const inboxMore = inboxHead.createDiv({ cls: "cl-hm-more", text: "\u5168\u90E8 \u203A" });
     inboxMore.onclick = () => this.go("inbox");
-
     const mdTotal = this.vaultFiles().length;
     const inboxMd = inbox.filter((f) => f.extension === "md").length;
     const handled = Math.max(0, mdTotal - inboxMd);
-    const pct = mdTotal ? Math.max(6, Math.round((handled / mdTotal) * 100)) : 100;
-
+    const pct = mdTotal ? Math.max(6, Math.round(handled / mdTotal * 100)) : 100;
     const ringWrap = inboxCard.createDiv({ cls: "cl-hm-ringwrap" });
     const ring = ringWrap.createDiv({ cls: "cl-hm-ring" });
     ring.style.setProperty("--p", pct + "%");
     ring.createEl("b", { text: String(inbox.length) });
     const ringSide = ringWrap.createDiv({ cls: "cl-hm-ringside" });
     const ringK = ringSide.createDiv({ cls: "cl-hm-ringk" });
-    ringK.createDiv({ text: "条笔记" });
-    ringK.createEl("strong", { text: "等你决定去向" });
-
+    ringK.createDiv({ text: "\u6761\u7B14\u8BB0" });
+    ringK.createEl("strong", { text: "\u7B49\u4F60\u51B3\u5B9A\u53BB\u5411" });
     const first = inbox[0];
     const firstMod = first ? this.suggestModuleFor(first) : null;
     if (first) {
@@ -3021,14 +3358,13 @@ class NovalView extends ItemView {
       }
       item.onclick = () => this.go("inbox");
     } else {
-      inboxCard.createDiv({ cls: "cl-hm-inboxempty", text: "收件箱已清空，今天很干净。" });
+      inboxCard.createDiv({ cls: "cl-hm-inboxempty", text: "\u6536\u4EF6\u7BB1\u5DF2\u6E05\u7A7A\uFF0C\u4ECA\u5929\u5F88\u5E72\u51C0\u3002" });
     }
-
     const inboxLink = inboxCard.createDiv({ cls: "cl-hm-inboxlink" });
     if (inbox.length) {
-      inboxLink.createSpan({ text: "按建议归入 " });
-      inboxLink.createEl("b", { text: inbox.length + " 条" });
-      inboxLink.createSpan({ text: " →" });
+      inboxLink.createSpan({ text: "\u6309\u5EFA\u8BAE\u5F52\u5165 " });
+      inboxLink.createEl("b", { text: inbox.length + " \u6761" });
+      inboxLink.createSpan({ text: " \u2192" });
       inboxLink.onclick = () => {
         const list = inbox.slice();
         const suggestions = list.filter((f) => this.suggestModuleFor(f));
@@ -3036,77 +3372,54 @@ class NovalView extends ItemView {
         else this.go("inbox");
       };
     } else {
-      inboxLink.createSpan({ text: "打开收集箱 →" });
+      inboxLink.createSpan({ text: "\u6253\u5F00\u6536\u96C6\u7BB1 \u2192" });
       inboxLink.onclick = () => this.go("inbox");
     }
-
-    /* 继续：2×2 文件卡 */
     const resumeCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s6" });
     const resumeHead = resumeCard.createDiv({ cls: "cl-hm-head" });
-    resumeHead.createDiv({ cls: "cl-hm-title", text: "继续" });
-    resumeHead.createDiv({ cls: "cl-hm-sub", text: "最近编辑" });
-
+    resumeHead.createDiv({ cls: "cl-hm-title", text: "\u7EE7\u7EED" });
+    resumeHead.createDiv({ cls: "cl-hm-sub", text: "\u6700\u8FD1\u7F16\u8F91" });
     const resumeGrid = resumeCard.createDiv({ cls: "cl-hm-resumes" });
-    const recentFiles = [...this._contentFiles, ...boards]
-      .filter((file) => !/^未命名笔记/.test(file.basename))
-      .filter((file) => !file.path.startsWith(CARD_FOLDER + "/"))
-      .sort((a, b) => b.stat.mtime - a.stat.mtime)
-      .slice(0, 4);
-
+    const recentFiles = [...this._contentFiles, ...boards].filter((file) => !/^未命名笔记/.test(file.basename)).filter((file) => !file.path.startsWith(CARD_FOLDER + "/")).sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, 4);
     if (!recentFiles.length) {
-      resumeGrid.createDiv({ cls: "cl-hm-empty", text: "还没有可继续的内容。" });
+      resumeGrid.createDiv({ cls: "cl-hm-empty", text: "\u8FD8\u6CA1\u6709\u53EF\u7EE7\u7EED\u7684\u5185\u5BB9\u3002" });
     }
-
     for (const file of recentFiles) {
       const isBoard = file.extension === "noval";
       const mod = isBoard ? null : this.moduleForFile(file);
-      const color = isBoard ? "#9b8cff" : (mod && mod.color) || "#3f7fd1";
+      const color = isBoard ? "#9b8cff" : mod && mod.color || "#3f7fd1";
       const fm = isBoard ? {} : getFm(this.app, file);
-      const typeText = isBoard
-        ? "BOARD"
-        : fm && fm.status ? String(fm.status).toUpperCase() : "NOTE";
-
+      const typeText = isBoard ? "BOARD" : fm && fm.status ? String(fm.status).toUpperCase() : "NOTE";
       const cell = resumeGrid.createDiv({ cls: "cl-hm-file" });
       cell.style.setProperty("--hm-c", color);
       cell.style.setProperty("--hm-cb", hmRgba(color, 0.16));
-
       const cellTop = cell.createDiv({ cls: "cl-hm-filetop" });
       const iconWrap = cellTop.createDiv({ cls: "cl-hm-fileico" });
       setIcon(iconWrap, isBoard ? "presentation" : "file-text");
       cellTop.createDiv({ cls: "cl-hm-filetype", text: typeText });
-
       cell.createDiv({ cls: "cl-hm-filetree", text: file.basename });
-
       const fileMeta = cell.createDiv({ cls: "cl-hm-filemeta" });
       const modSpan = fileMeta.createDiv({ cls: "cl-hm-filemod" });
       const dot = modSpan.createDiv({ cls: "cl-hm-filedot" });
       dot.style.background = color;
-      modSpan.createSpan({ text: isBoard ? "白板" : (mod && mod.name) || "未归属" });
+      modSpan.createSpan({ text: isBoard ? "\u767D\u677F" : mod && mod.name || "\u672A\u5F52\u5C5E" });
       fileMeta.createDiv({ cls: "cl-hm-filedtime", text: formatTime(file.stat.mtime) });
-
       cell.onclick = () => this.openFile(file);
     }
-
-    /* 模块脉搏：彩色拼图 */
     const modCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s6" });
     const modHead = modCard.createDiv({ cls: "cl-hm-head" });
-    modHead.createDiv({ cls: "cl-hm-title", text: "模块脉搏" });
-    modHead.createDiv({ cls: "cl-hm-sub", text: "按活跃度" });
-    const modMore = modHead.createDiv({ cls: "cl-hm-more", text: "管理 ›" });
+    modHead.createDiv({ cls: "cl-hm-title", text: "\u6A21\u5757\u8109\u640F" });
+    modHead.createDiv({ cls: "cl-hm-sub", text: "\u6309\u6D3B\u8DC3\u5EA6" });
+    const modMore = modHead.createDiv({ cls: "cl-hm-more", text: "\u7BA1\u7406 \u203A" });
     modMore.onclick = () => this.openSettings();
-
     const modGrid = modCard.createDiv({ cls: "cl-hm-mods" });
-    const ranked = modules
-      .map((mod) => {
-        const files = this.moduleNoteFiles(mod);
-        const active = files.filter((f) =>
-          ACTIVE_STATUSES.includes(String(getFm(this.app, f).status || "").toLowerCase())
-        ).length;
-        return { mod, total: files.length, active };
-      })
-      .sort((a, b) => b.active - a.active || b.total - a.total)
-      .slice(0, 5);
-
+    const ranked = modules.map((mod) => {
+      const files = this.moduleNoteFiles(mod);
+      const active = files.filter(
+        (f) => ACTIVE_STATUSES.includes(String(getFm(this.app, f).status || "").toLowerCase())
+      ).length;
+      return { mod, total: files.length, active };
+    }).sort((a, b) => b.active - a.active || b.total - a.total).slice(0, 5);
     ranked.forEach((entry, index) => {
       const color = entry.mod.color || MODULE_COLORS[index % MODULE_COLORS.length];
       const tile = modGrid.createDiv({ cls: "cl-hm-mod" });
@@ -3120,27 +3433,23 @@ class NovalView extends ItemView {
         cls: "cl-hm-modcount",
         text: String(entry.total).padStart(2, "0")
       });
-      row.createSpan({ cls: "cl-hm-modunit", text: "篇" });
-      row.createSpan({ cls: "cl-hm-modlive", text: entry.active + " 进行中" });
+      row.createSpan({ cls: "cl-hm-modunit", text: "\u7BC7" });
+      row.createSpan({ cls: "cl-hm-modlive", text: entry.active + " \u8FDB\u884C\u4E2D" });
       const bar = tile.createDiv({ cls: "cl-hm-modbar" });
       const fill = bar.createEl("i");
-      fill.style.width = (entry.total ? Math.round((entry.active / entry.total) * 100) : 0) + "%";
+      fill.style.width = (entry.total ? Math.round(entry.active / entry.total * 100) : 0) + "%";
       tile.onclick = () => this.go(entry.mod.id);
     });
-
     const addTile = modGrid.createDiv({ cls: "cl-hm-mod cl-hm-modadd" });
     setIcon(addTile.createDiv(), "plus");
-    addTile.createSpan({ text: "新建模块" });
+    addTile.createSpan({ text: "\u65B0\u5EFA\u6A21\u5757" });
     addTile.onclick = () => this.openModuleEditor(null);
-
-    /* 最近白板 */
     const boardCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s7" });
     const boardHead = boardCard.createDiv({ cls: "cl-hm-head" });
-    boardHead.createDiv({ cls: "cl-hm-title", text: "最近白板" });
-    boardHead.createDiv({ cls: "cl-hm-sub", text: boards.length + " 块" });
-    const boardMore = boardHead.createDiv({ cls: "cl-hm-more", text: "画布集 ›" });
+    boardHead.createDiv({ cls: "cl-hm-title", text: "\u6700\u8FD1\u753B\u5E03" });
+    boardHead.createDiv({ cls: "cl-hm-sub", text: boards.length + " \u5757" });
+    const boardMore = boardHead.createDiv({ cls: "cl-hm-more", text: "\u753B\u5E03\u96C6 \u203A" });
     boardMore.onclick = () => this.openNovalGallery();
-
     const boardGrid = boardCard.createDiv({ cls: "cl-hm-boards" });
     const boardEls = [];
     boards.slice(0, 3).forEach((file, index) => {
@@ -3148,33 +3457,27 @@ class NovalView extends ItemView {
       const art = board.createDiv({ cls: "cl-hm-art" });
       this.renderBoardArt(art, index % 3);
       board.createDiv({ cls: "cl-hm-shade" });
-      const badge = board.createDiv({ cls: "cl-hm-badge", text: "读取中…" });
+      const badge = board.createDiv({ cls: "cl-hm-badge", text: "\u8BFB\u53D6\u4E2D\u2026" });
       const info = board.createDiv({ cls: "cl-hm-boardinfo" });
       info.createDiv({ cls: "cl-hm-boardname", text: file.basename });
-      const metaEl = info.createDiv({ cls: "cl-hm-boardmeta", text: "读取中…" });
+      const metaEl = info.createDiv({ cls: "cl-hm-boardmeta", text: "\u8BFB\u53D6\u4E2D\u2026" });
       board.onclick = () => this.openFile(file);
       boardEls.push({ file, badge, metaEl });
     });
-
     if (!boards.length) {
-      boardGrid.createDiv({ cls: "cl-hm-empty", text: "还没有白板，去画布集新建一张。" });
+      boardGrid.createDiv({ cls: "cl-hm-empty", text: "\u8FD8\u6CA1\u6709\u767D\u677F\uFF0C\u53BB\u753B\u5E03\u96C6\u65B0\u5EFA\u4E00\u5F20\u3002" });
     }
-
-    /* 速记卡片 */
     const noteCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s5" });
     const noteHead = noteCard.createDiv({ cls: "cl-hm-head" });
-    noteHead.createDiv({ cls: "cl-hm-title", text: "速记" });
-    noteHead.createDiv({ cls: "cl-hm-sub", text: (this._cardCount || 0) + " 条卡片" });
-    const noteMore = noteHead.createDiv({ cls: "cl-hm-more", text: "打开 ›" });
+    noteHead.createDiv({ cls: "cl-hm-title", text: "\u901F\u8BB0" });
+    noteHead.createDiv({ cls: "cl-hm-sub", text: (this._cardCount || 0) + " \u6761\u5361\u7247" });
+    const noteMore = noteHead.createDiv({ cls: "cl-hm-more", text: "\u6253\u5F00 \u203A" });
     noteMore.onclick = () => this.go("notes");
     const noteWrap = noteCard.createDiv({ cls: "cl-hm-notes" });
-
-    page.createDiv({ cls: "cl-hm-foot", text: "数据实时读取 · Noval v" + this.plugin.manifest.version });
-
+    page.createDiv({ cls: "cl-hm-foot", text: "\u6570\u636E\u5B9E\u65F6\u8BFB\u53D6 \xB7 Noval v" + this.plugin.manifest.version });
     this.fillHomeBoards(boardEls);
     this.fillHomeCards(noteWrap);
   }
-
   /* 白板封面：三种抽象画布缩略图，纯 SVG，不依赖外部资源。 */
   renderBoardArt(wrap, variant) {
     const NS = "http://www.w3.org/2000/svg";
@@ -3225,31 +3528,27 @@ class NovalView extends ItemView {
     svg.innerHTML = art[variant % art.length];
     wrap.appendChild(svg);
   }
-
   async fillHomeBoards(items) {
     for (const item of items) {
       const data = await this.readBoard(item.file);
       if (!item.metaEl.isConnected) return;
-      item.badge.setText(data.nodes + " 节点");
+      item.badge.setText(data.nodes + " \u8282\u70B9");
       item.metaEl.setText(
-        (data.edges ? data.edges + " 条连线 · " : "") + formatTime(item.file.stat.mtime)
+        (data.edges ? data.edges + " \u6761\u8FDE\u7EBF \xB7 " : "") + formatTime(item.file.stat.mtime)
       );
     }
   }
-
   async fillHomeCards(container) {
     const cards = await this.getRecentCards(2);
     if (!container.isConnected || this.active !== "home") return;
     container.empty();
-
     if (!cards.length) {
       container.createDiv({
         cls: "cl-hm-empty",
-        text: "还没有速记卡片。在上面记一条，它会出现在这里。"
+        text: "\u8FD8\u6CA1\u6709\u901F\u8BB0\u5361\u7247\u3002\u5728\u4E0A\u9762\u8BB0\u4E00\u6761\uFF0C\u5B83\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC\u3002"
       });
       return;
     }
-
     for (const card of cards) {
       const row = container.createDiv({ cls: "cl-hm-note" });
       const meta = row.createDiv({ cls: "cl-hm-notedate" });
@@ -3262,7 +3561,6 @@ class NovalView extends ItemView {
       row.onclick = () => this.openCardInNotes(card);
     }
   }
-
   makePanel(parent, title, actionText, onAction) {
     const panel = parent.createDiv({ cls: "cl-panel" });
     const head = panel.createDiv({ cls: "cl-panel-head" });
@@ -3274,19 +3572,12 @@ class NovalView extends ItemView {
     }
     return panel;
   }
-
   async fillTasks(container) {
     const app = this.app;
-    let files = this._contentFiles
-      .filter((f) => f.path.startsWith("00-Inbox/"))
-      .sort((a, b) => b.stat.mtime - a.stat.mtime)
-      .slice(0, 15);
+    let files = this._contentFiles.filter((f) => f.path.startsWith("00-Inbox/")).sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, 15);
     if (!files.length) {
-      files = [...this._contentFiles]
-        .sort((a, b) => b.stat.mtime - a.stat.mtime)
-        .slice(0, 15);
+      files = [...this._contentFiles].sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, 15);
     }
-
     const tasks = [];
     for (const file of files) {
       let text = "";
@@ -3304,15 +3595,12 @@ class NovalView extends ItemView {
       }
       if (tasks.length >= 6) break;
     }
-
     if (!container.isConnected || this.active !== "home") return;
     container.empty();
-
     if (!tasks.length) {
-      container.createDiv({ cls: "cl-empty", text: "没有未完成任务，收件箱是空的。" });
+      container.createDiv({ cls: "cl-empty", text: "\u6CA1\u6709\u672A\u5B8C\u6210\u4EFB\u52A1\uFF0C\u6536\u4EF6\u7BB1\u662F\u7A7A\u7684\u3002" });
       return;
     }
-
     for (const task of tasks) {
       const row = container.createDiv({ cls: "cl-task" });
       row.createDiv({ cls: "cl-check" });
@@ -3320,20 +3608,17 @@ class NovalView extends ItemView {
       row.onclick = () => this.openFile(task.file);
     }
   }
-
   async fillCards(container) {
     const cards = await this.getRecentCards(6);
     if (!container.isConnected || this.active !== "home") return;
     container.empty();
-
     if (!cards.length) {
       container.createDiv({
         cls: "cl-empty",
-        text: "还没有速记卡片。用 Noval 记一条，它会出现在这里。"
+        text: "\u8FD8\u6CA1\u6709\u901F\u8BB0\u5361\u7247\u3002\u7528 Noval \u8BB0\u4E00\u6761\uFF0C\u5B83\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC\u3002"
       });
       return;
     }
-
     for (const card of cards) {
       const row = container.createDiv({ cls: "cl-feed" });
       const meta = row.createDiv({ cls: "cl-feed-meta" });
@@ -3349,101 +3634,91 @@ class NovalView extends ItemView {
       row.onclick = () => this.openCard(card);
     }
   }
-
   fillBoards(container, limit) {
     const boards = this.getBoardFiles().slice(0, limit || 6);
     container.empty();
-
     if (!boards.length) {
       container.createDiv({
         cls: "cl-empty",
-        text: "还没有 .noval 白板。去画布集新建一张。"
+        text: "\u8FD8\u6CA1\u6709 .noval \u767D\u677F\u3002\u53BB\u753B\u5E03\u96C6\u65B0\u5EFA\u4E00\u5F20\u3002"
       });
       return;
     }
-
     for (const file of boards) {
       const row = container.createDiv({ cls: "cl-board-row" });
       const icon = row.createDiv({ cls: "cl-board-icon" });
       setIcon(icon, "presentation");
       const info = row.createDiv({ cls: "cl-board-info" });
       info.createDiv({ cls: "cl-board-name", text: file.basename });
-      const sub = info.createDiv({ cls: "cl-board-sub", text: "读取中…" });
+      const sub = info.createDiv({ cls: "cl-board-sub", text: "\u8BFB\u53D6\u4E2D\u2026" });
       row.onclick = () => this.openFile(file);
       this.readBoard(file).then((data) => {
         if (sub.isConnected) sub.setText(data.summary);
       });
     }
   }
-
   renderInbox(el) {
     const files = this.inboxFiles();
-    if (!this._inboxSel) this._inboxSel = new Set();
+    if (!this._inboxSel) this._inboxSel = /* @__PURE__ */ new Set();
     const alive = new Set(files.map((f) => f.path));
     Array.from(this._inboxSel).forEach((p) => {
       if (!alive.has(p)) this._inboxSel.delete(p);
     });
-
-    const suggestions = new Map();
+    const suggestions = /* @__PURE__ */ new Map();
     files.forEach((f) => {
       const mod = this.suggestModuleFor(f);
       if (mod) suggestions.set(f.path, mod);
     });
-
     el.addClass("cl-inbox-scroll");
     const page = el.createDiv({ cls: "cl-inbox-page" });
-
     const head = page.createDiv({ cls: "cl-inbox-head" });
     const headMain = head.createDiv({ cls: "cl-inbox-head-main" });
     const titleRow = headMain.createDiv({ cls: "cl-inbox-title-row" });
-    titleRow.createEl("h1", { text: "收件箱" });
+    titleRow.createEl("h1", { text: "\u6536\u4EF6\u7BB1" });
     if (files.length) {
-      titleRow.createDiv({ cls: "cl-inbox-count", text: files.length + " 待处理" });
+      titleRow.createDiv({ cls: "cl-inbox-count", text: files.length + " \u5F85\u5904\u7406" });
     }
     headMain.createDiv({
       cls: "cl-inbox-sub",
-      text: "只显示散落在库根目录、还没进任何文件夹的文件；归入模块后自动离开"
+      text: "\u53EA\u663E\u793A\u6563\u843D\u5728\u5E93\u6839\u76EE\u5F55\u3001\u8FD8\u6CA1\u8FDB\u4EFB\u4F55\u6587\u4EF6\u5939\u7684\u6587\u4EF6\uFF1B\u5F52\u5165\u6A21\u5757\u540E\u81EA\u52A8\u79BB\u5F00"
     });
     const headActions = head.createDiv({ cls: "cl-inbox-head-actions" });
     const refreshBtn = headActions.createEl("button", { cls: "cl-inbox-refresh" });
     setIcon(refreshBtn, "refresh-cw");
-    refreshBtn.setAttribute("aria-label", "刷新收件箱");
+    refreshBtn.setAttribute("aria-label", "\u5237\u65B0\u6536\u4EF6\u7BB1");
     refreshBtn.onclick = () => this.refresh();
-
     const weekCount = files.filter(
-      (f) => Date.now() - f.stat.mtime < 7 * 86400000
+      (f) => Date.now() - f.stat.mtime < 7 * 864e5
     ).length;
     const stats = page.createDiv({ cls: "cl-inbox-stats" });
     [
-      ["根目录待处理", files.length],
-      ["有归属建议", suggestions.size],
-      ["本周新增", weekCount]
+      ["\u6839\u76EE\u5F55\u5F85\u5904\u7406", files.length],
+      ["\u6709\u5F52\u5C5E\u5EFA\u8BAE", suggestions.size],
+      ["\u672C\u5468\u65B0\u589E", weekCount]
     ].forEach(([label, value]) => {
       const cell = stats.createDiv({ cls: "cl-inbox-stat" });
       cell.createDiv({ cls: "cl-inbox-stat-value", text: String(value) });
       cell.createDiv({ cls: "cl-inbox-stat-label", text: label });
     });
-
     const controls = page.createDiv({ cls: "cl-inbox-controls" });
     const search = controls.createDiv({ cls: "cl-inbox-search" });
     setIcon(search.createDiv({ cls: "cl-inbox-searchico" }), "search");
     const query = search.createEl("input", {
       cls: "cl-inbox-query",
-      attr: { type: "text", placeholder: "筛选标题或路径" }
+      attr: { type: "text", placeholder: "\u7B5B\u9009\u6807\u9898\u6216\u8DEF\u5F84" }
     });
     query.value = this._inboxQuery || "";
-
     const seg = controls.createDiv({ cls: "cl-inbox-seg" });
     const kinds = [
-      ["all", "全部"],
-      ["note", "笔记"],
-      ["image", "图片"],
-      ["video", "视频"],
-      ["doc", "文档"],
-      ["audio", "音频"],
-      ["other", "其他"]
+      ["all", "\u5168\u90E8"],
+      ["note", "\u7B14\u8BB0"],
+      ["image", "\u56FE\u7247"],
+      ["video", "\u89C6\u9891"],
+      ["doc", "\u6587\u6863"],
+      ["audio", "\u97F3\u9891"],
+      ["other", "\u5176\u4ED6"]
     ];
-    const segButtons = new Map();
+    const segButtons = /* @__PURE__ */ new Map();
     kinds.forEach(([key, label]) => {
       const btn = seg.createEl("button", { cls: "cl-inbox-segbtn", text: label });
       btn.onclick = () => {
@@ -3455,13 +3730,11 @@ class NovalView extends ItemView {
     });
     if (!this._inboxFilter) this._inboxFilter = "all";
     segButtons.get(this._inboxFilter).classList.add("is-active");
-
-    // 视图切换：和模块页保持一致，列表 / 网格
     const viewSeg = controls.createDiv({ cls: "cl-inbox-viewseg" });
-    const viewButtons = new Map();
+    const viewButtons = /* @__PURE__ */ new Map();
     [
-      ["list", "列表"],
-      ["grid", "网格"]
+      ["list", "\u5217\u8868"],
+      ["grid", "\u7F51\u683C"]
     ].forEach(([key, label]) => {
       const btn = viewSeg.createEl("button", { cls: "cl-inbox-segbtn", text: label });
       btn.onclick = () => {
@@ -3477,67 +3750,54 @@ class NovalView extends ItemView {
       viewButtons.forEach((btn, key) => btn.classList.toggle("is-active", key === mode));
     };
     syncView();
-
     const sortWrap = controls.createDiv({ cls: "cl-inbox-sort" });
     const sortBtn = sortWrap.createEl("button", { cls: "cl-inbox-sortbtn" });
     const sortLabel = sortBtn.createSpan({
-      text: (this._inboxSort || "recent") === "name" ? "名称" : "最近更新"
+      text: (this._inboxSort || "recent") === "name" ? "\u540D\u79F0" : "\u6700\u8FD1\u66F4\u65B0"
     });
     setIcon(sortBtn.createSpan({ cls: "cl-inbox-sortico" }), "chevron-down");
     sortBtn.onclick = () => {
       const menu = new Menu();
-      [["recent", "最近更新"], ["name", "名称"]].forEach(([value, label]) => {
+      [["recent", "\u6700\u8FD1\u66F4\u65B0"], ["name", "\u540D\u79F0"]].forEach(([value, label]) => {
         menu.addItem((item) => {
-          item
-            .setTitle(label)
-            .setChecked((this._inboxSort || "recent") === value)
-            .onClick(() => {
-              this._inboxSort = value;
-              sortLabel.setText(label);
-              paint();
-            });
+          item.setTitle(label).setChecked((this._inboxSort || "recent") === value).onClick(() => {
+            this._inboxSort = value;
+            sortLabel.setText(label);
+            paint();
+          });
         });
       });
       anchorMenuBelow(menu, sortBtn);
     };
-
     const banners = page.createDiv({ cls: "cl-inbox-banners" });
     banners.hidden = true;
-
     const bulk = page.createDiv({ cls: "cl-inbox-bulk" });
     bulk.hidden = true;
     const bulkLabel = bulk.createSpan({ cls: "cl-inbox-bulkcount" });
     setIcon(bulkLabel.createSpan({ cls: "cl-inbox-bulkico" }), "check");
-    bulkLabel.createSpan({ text: "已选 " });
+    bulkLabel.createSpan({ text: "\u5DF2\u9009 " });
     const bulkNum = bulkLabel.createEl("b", { text: "0" });
-    bulkLabel.createSpan({ text: " 项" });
+    bulkLabel.createSpan({ text: " \u9879" });
     bulk.createDiv({ cls: "cl-inbox-bulkspace" });
     const bulkAssign = bulk.createEl("button", {
       cls: "cl-btn cl-btn-accent",
-      text: "归入选中"
+      text: "\u5F52\u5165\u9009\u4E2D"
     });
     const bulkDelete = bulk.createEl("button", {
       cls: "cl-btn cl-inbox-danger",
-      text: "删除选中"
+      text: "\u5220\u9664\u9009\u4E2D"
     });
-
     const list = page.createDiv({ cls: "cl-inbox-list" });
     const foot = page.createDiv({ cls: "cl-inbox-foot" });
     foot.createSpan({
-      text:
-        this.inboxPolicy() === "root"
-          ? "库根目录 " + this.rootFiles().length + " 个文件 · 文件夹内的文件不进入收件箱"
-          : "全库扫描 " + (this.vaultFiles().length + this.vaultAttachments().length) + " 个文件"
+      text: this.inboxPolicy() === "root" ? "\u5E93\u6839\u76EE\u5F55 " + this.rootFiles().length + " \u4E2A\u6587\u4EF6 \xB7 \u6587\u4EF6\u5939\u5185\u7684\u6587\u4EF6\u4E0D\u8FDB\u5165\u6536\u4EF6\u7BB1" : "\u5168\u5E93\u626B\u63CF " + (this.vaultFiles().length + this.vaultAttachments().length) + " \u4E2A\u6587\u4EF6"
     });
     foot.createSpan({
       cls: "cl-inbox-footright",
-      text: "共 " + files.length + " 条待处理"
+      text: "\u5171 " + files.length + " \u6761\u5F85\u5904\u7406"
     });
-
     const selectedFiles = () => files.filter((f) => this._inboxSel.has(f.path));
-
     bulkAssign.onclick = () => {
-      // 笔记和素材都允许批量归入：素材没有 frontmatter，归入时移到模块文件夹。
       const chosen = selectedFiles();
       if (chosen.length) this.openModulePicker(chosen);
     };
@@ -3546,41 +3806,36 @@ class NovalView extends ItemView {
       this._inboxQuery = query.value;
       paint();
     };
-
     if (!files.length) bulk.remove();
-
     const typeInfo = (file) => {
       const key = fileKind(file);
       const ext = String(file.extension || "").toLowerCase();
       let icon = {
-        note: "file-text", image: "image", video: "video",
-        audio: "music", doc: "file-text", other: "file"
+        note: "file-text",
+        image: "image",
+        video: "video",
+        audio: "music",
+        doc: "file-text",
+        other: "file"
       }[key] || "file";
       if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) icon = "archive";
       return { key, icon };
     };
-
     const groupFor = (ts) => {
-      const now = new Date();
+      const now = /* @__PURE__ */ new Date();
       const date = new Date(ts);
-      if (date.toDateString() === now.toDateString()) return "今天";
-      if (now.getTime() - ts < 7 * 86400000) return "本周";
-      return "更早";
+      if (date.toDateString() === now.toDateString()) return "\u4ECA\u5929";
+      if (now.getTime() - ts < 7 * 864e5) return "\u672C\u5468";
+      return "\u66F4\u65E9";
     };
-
     let current = [];
-
     const matches = (file) => {
       const kind = this._inboxFilter || "all";
       if (kind !== "all" && typeInfo(file).key !== kind) return false;
       const q = String(this._inboxQuery || "").trim().toLowerCase();
       if (!q) return true;
-      return (
-        file.basename.toLowerCase().includes(q) ||
-        file.path.toLowerCase().includes(q)
-      );
+      return file.basename.toLowerCase().includes(q) || file.path.toLowerCase().includes(q);
     };
-
     const updateBulk = () => {
       const n = this._inboxSel.size;
       bulk.hidden = n === 0;
@@ -3588,9 +3843,6 @@ class NovalView extends ItemView {
       bulkAssign.disabled = n === 0;
       bulkDelete.disabled = n === 0;
     };
-
-    // 网格视图：和模块页同一套缩略图与卡片结构，额外挂选择框、建议和建议采纳、
-    // 悬停操作（归入 / 打开 / 删除），保证收件箱原有的操作在网格里也能完成。
     const renderGrid = (parent, items) => {
       const grid = parent.createDiv({ cls: "cl-md-grid" });
       items.forEach((file) => {
@@ -3599,6 +3851,12 @@ class NovalView extends ItemView {
         const tile = grid.createDiv({
           cls: "cl-md-tile cl-inbox-tile cl-md-kind-" + info.key + (selected ? " is-selected" : "")
         });
+        tile.setAttribute("draggable", "true");
+        tile.addEventListener("dragstart", (event) => {
+          const paths = this._inboxSel.has(file.path) ? current.filter((f) => this._inboxSel.has(f.path)).map((f) => f.path) : null;
+          this.startFileDrag(event, file, paths);
+        });
+        tile.addEventListener("dragend", () => this.endFileDrag());
         const thumb = tile.createDiv({ cls: "cl-md-thumb" });
         if (info.key === "note") {
           paintNoteThumb(this.app, thumb, file);
@@ -3607,10 +3865,9 @@ class NovalView extends ItemView {
         } else {
           setIcon(thumb, info.icon);
         }
-
         const check = tile.createDiv({ cls: "cl-inbox-tilecheck" });
         const box = check.createEl("input", {
-          attr: { type: "checkbox", "aria-label": "选择 " + file.basename }
+          attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + file.basename }
         });
         box.checked = selected;
         box.onclick = (evt) => {
@@ -3620,22 +3877,20 @@ class NovalView extends ItemView {
           tile.classList.toggle("is-selected", box.checked);
           updateBulk();
         };
-
         tile.createDiv({ cls: "cl-md-tilename", text: file.basename });
         const tileMeta = tile.createDiv({ cls: "cl-md-tilemeta" });
-        tileMeta.createSpan({ text: THUMB_KIND_LABELS[info.key] || "文件" });
+        tileMeta.createSpan({ text: THUMB_KIND_LABELS[info.key] || "\u6587\u4EF6" });
         tileMeta.createSpan({ text: formatTime(file.stat.mtime) });
-
         const suggest = suggestions.get(file.path);
         if (suggest) {
           const sug = tile.createDiv({ cls: "cl-inbox-tilesug" });
           const chip = sug.createSpan({ cls: "cl-inbox-suggest" });
           const dot = chip.createSpan({ cls: "cl-inbox-dot" });
           dot.style.setProperty("--dot", suggest.color || "var(--interactive-accent)");
-          chip.createSpan({ text: "建议 · " + suggest.name });
+          chip.createSpan({ text: "\u5EFA\u8BAE \xB7 " + suggest.name });
           const accept = sug.createEl("button", {
             cls: "cl-inbox-adopt",
-            attr: { "aria-label": "采纳建议：" + suggest.name }
+            attr: { "aria-label": "\u91C7\u7EB3\u5EFA\u8BAE\uFF1A" + suggest.name }
           });
           setIcon(accept, "check");
           accept.onclick = (evt) => {
@@ -3643,12 +3898,11 @@ class NovalView extends ItemView {
             this.assignToModule([file], suggest);
           };
         }
-
         const acts = tile.createDiv({ cls: "cl-inbox-tileacts" });
         if (file.extension === "md") {
           const assign = acts.createEl("button", { cls: "cl-inbox-act" });
           setIcon(assign, "folder");
-          assign.setAttribute("aria-label", "归入模块");
+          assign.setAttribute("aria-label", "\u5F52\u5165\u6A21\u5757");
           assign.onclick = (evt) => {
             evt.stopPropagation();
             this.openModulePicker([file]);
@@ -3656,57 +3910,51 @@ class NovalView extends ItemView {
         }
         const open = acts.createEl("button", { cls: "cl-inbox-act" });
         setIcon(open, "corner-up-right");
-        open.setAttribute("aria-label", "打开");
+        open.setAttribute("aria-label", "\u6253\u5F00");
         open.onclick = (evt) => {
           evt.stopPropagation();
           this.openFile(file);
         };
         const remove = acts.createEl("button", { cls: "cl-inbox-act is-danger" });
         setIcon(remove, "trash-2");
-        remove.setAttribute("aria-label", "删除");
+        remove.setAttribute("aria-label", "\u5220\u9664");
         remove.onclick = (evt) => {
           evt.stopPropagation();
           this.deleteFiles([file]);
         };
-
         tile.onclick = () => this.openFile(file);
       });
     };
-
     const paint = () => {
       current = files.filter(matches).slice();
       const sortBy = this._inboxSort || "recent";
-      current.sort((a, b) =>
-        sortBy === "name"
-          ? a.basename.localeCompare(b.basename, "zh")
-          : b.stat.mtime - a.stat.mtime
+      current.sort(
+        (a, b) => sortBy === "name" ? a.basename.localeCompare(b.basename, "zh") : b.stat.mtime - a.stat.mtime
       );
       while (list.firstChild) list.removeChild(list.firstChild);
       const gridMode = (this._inboxView || "list") === "grid";
       list.classList.toggle("is-grid", gridMode);
-
       if (!files.length) {
         const empty = list.createDiv({ cls: "cl-inbox-empty" });
         const art = empty.createDiv({ cls: "cl-inbox-emptyart" });
         setIcon(art, "inbox");
-        empty.createEl("h2", { text: "收件箱已清空" });
+        empty.createEl("h2", { text: "\u6536\u4EF6\u7BB1\u5DF2\u6E05\u7A7A" });
         empty.createDiv({
           cls: "cl-inbox-emptysub",
-          text: "所有笔记都已归入模块。新的散落文件会自动出现在这里。"
+          text: "\u6240\u6709\u7B14\u8BB0\u90FD\u5DF2\u5F52\u5165\u6A21\u5757\u3002\u65B0\u7684\u6563\u843D\u6587\u4EF6\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u8FD9\u91CC\u3002"
         });
         const acts = empty.createDiv({ cls: "cl-inbox-emptyacts" });
-        const home = acts.createEl("button", { cls: "cl-btn cl-btn-accent", text: "回到首页" });
+        const home = acts.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u56DE\u5230\u9996\u9875" });
         home.onclick = () => this.go("home");
-        const again = acts.createEl("button", { cls: "cl-btn", text: "刷新" });
+        const again = acts.createEl("button", { cls: "cl-btn", text: "\u5237\u65B0" });
         again.onclick = () => this.refresh();
         updateBulk();
         return;
       }
-
       if (!current.length) {
         const none = list.createDiv({ cls: "cl-inbox-nomatch" });
-        none.createSpan({ text: "没有匹配的条目" });
-        const clear = none.createEl("button", { cls: "cl-inbox-clear", text: "清除筛选" });
+        none.createSpan({ text: "\u6CA1\u6709\u5339\u914D\u7684\u6761\u76EE" });
+        const clear = none.createEl("button", { cls: "cl-inbox-clear", text: "\u6E05\u9664\u7B5B\u9009" });
         clear.onclick = () => {
           this._inboxQuery = "";
           this._inboxFilter = "all";
@@ -3715,19 +3963,16 @@ class NovalView extends ItemView {
         updateBulk();
         return;
       }
-
       if (gridMode) {
         renderGrid(list, current);
         updateBulk();
         return;
       }
-
-      const buckets = [["今天", []], ["本周", []], ["更早", []]];
+      const buckets = [["\u4ECA\u5929", []], ["\u672C\u5468", []], ["\u66F4\u65E9", []]];
       current.forEach((file) => {
         const bucket = buckets.find((b) => b[0] === groupFor(file.stat.mtime));
         if (bucket) bucket[1].push(file);
       });
-
       buckets.forEach(([label, items]) => {
         if (!items.length) return;
         const group = list.createDiv({ cls: "cl-inbox-group" });
@@ -3735,16 +3980,20 @@ class NovalView extends ItemView {
         groupHead.createSpan({ cls: "cl-inbox-group-name", text: label });
         groupHead.createSpan({ cls: "cl-inbox-group-count", text: String(items.length) });
         groupHead.createSpan({ cls: "cl-inbox-group-line" });
-
         items.forEach((file) => {
           const selected = this._inboxSel.has(file.path);
           const card = group.createDiv({
             cls: "cl-inbox-card" + (selected ? " is-selected" : "")
           });
-
+          card.setAttribute("draggable", "true");
+          card.addEventListener("dragstart", (event) => {
+            const paths = this._inboxSel.has(file.path) ? current.filter((f) => this._inboxSel.has(f.path)).map((f) => f.path) : null;
+            this.startFileDrag(event, file, paths);
+          });
+          card.addEventListener("dragend", () => this.endFileDrag());
           const check = card.createDiv({ cls: "cl-inbox-check" });
           const box = check.createEl("input", {
-            attr: { type: "checkbox", "aria-label": "选择 " + file.basename }
+            attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + file.basename }
           });
           box.checked = selected;
           box.onclick = (evt) => {
@@ -3754,25 +4003,22 @@ class NovalView extends ItemView {
             card.classList.toggle("is-selected", box.checked);
             updateBulk();
           };
-
           const info = typeInfo(file);
           const ico = card.createDiv({ cls: "cl-inbox-type is-" + info.key });
           setIcon(ico, info.icon);
-
           const main = card.createDiv({ cls: "cl-inbox-main" });
           main.createDiv({ cls: "cl-inbox-name", text: file.basename });
           main.createDiv({ cls: "cl-inbox-path", text: file.path });
-
           const swap = card.createDiv({ cls: "cl-inbox-suggestwrap" });
           const suggest = suggestions.get(file.path);
           if (suggest) {
             const chip = swap.createSpan({ cls: "cl-inbox-suggest" });
             const dot = chip.createSpan({ cls: "cl-inbox-dot" });
             dot.style.setProperty("--dot", suggest.color || "var(--interactive-accent)");
-            chip.createSpan({ text: "建议 · " + suggest.name });
+            chip.createSpan({ text: "\u5EFA\u8BAE \xB7 " + suggest.name });
             const accept = swap.createEl("button", {
               cls: "cl-inbox-adopt",
-              attr: { "aria-label": "采纳建议：" + suggest.name }
+              attr: { "aria-label": "\u91C7\u7EB3\u5EFA\u8BAE\uFF1A" + suggest.name }
             });
             setIcon(accept, "check");
             accept.onclick = (evt) => {
@@ -3780,49 +4026,40 @@ class NovalView extends ItemView {
               this.assignToModule([file], suggest);
             };
           } else {
-            swap.createSpan({ cls: "cl-inbox-nosug", text: "暂无建议" });
+            swap.createSpan({ cls: "cl-inbox-nosug", text: "\u6682\u65E0\u5EFA\u8BAE" });
           }
-
           card.createDiv({ cls: "cl-inbox-time", text: formatTime(file.stat.mtime) });
-
           const acts = card.createDiv({ cls: "cl-inbox-actions" });
-
           if (file.extension === "md") {
             const assign = acts.createEl("button", { cls: "cl-inbox-act" });
             setIcon(assign, "folder");
-            assign.setAttribute("aria-label", "归入模块");
+            assign.setAttribute("aria-label", "\u5F52\u5165\u6A21\u5757");
             assign.onclick = (evt) => {
               evt.stopPropagation();
               this.openModulePicker([file]);
             };
           }
-
           const open = acts.createEl("button", { cls: "cl-inbox-act" });
           setIcon(open, "corner-up-right");
-          open.setAttribute("aria-label", "打开");
+          open.setAttribute("aria-label", "\u6253\u5F00");
           open.onclick = (evt) => {
             evt.stopPropagation();
             this.openFile(file);
           };
-
           const remove = acts.createEl("button", { cls: "cl-inbox-act is-danger" });
           setIcon(remove, "trash-2");
-          remove.setAttribute("aria-label", "删除");
+          remove.setAttribute("aria-label", "\u5220\u9664");
           remove.onclick = (evt) => {
             evt.stopPropagation();
             this.deleteFiles([file]);
           };
-
           card.onclick = () => this.openFile(file);
         });
       });
-
       updateBulk();
     };
-
     paint();
   }
-
   // 未知 module 值：不自动建导航，只在这里提示，让用户显式决定。
   renderUnknownBanners(el) {
     const groups = this.unknownModuleValues();
@@ -3830,27 +4067,23 @@ class NovalView extends ItemView {
       const banner = el.createDiv({ cls: "cl-banner" });
       banner.createDiv({
         cls: "cl-banner-text",
-        text: "未知模块值「" + value + "」· " + groupFiles.length + " 篇"
+        text: "\u672A\u77E5\u6A21\u5757\u503C\u300C" + value + "\u300D\xB7 " + groupFiles.length + " \u7BC7"
       });
       const actions = banner.createDiv({ cls: "cl-banner-actions" });
-
       const create = actions.createEl("button", {
         cls: "cl-btn cl-btn-accent",
-        text: "新建模块"
+        text: "\u65B0\u5EFA\u6A21\u5757"
       });
       create.onclick = () => this.openModuleEditor(null, value);
-
-      const pick = actions.createEl("button", { cls: "cl-btn", text: "归入现有模块" });
+      const pick = actions.createEl("button", { cls: "cl-btn", text: "\u5F52\u5165\u73B0\u6709\u6A21\u5757" });
       pick.onclick = () => this.openModulePicker(groupFiles);
-
-      const ignore = actions.createEl("button", { cls: "cl-btn", text: "忽略" });
+      const ignore = actions.createEl("button", { cls: "cl-btn", text: "\u5FFD\u7565" });
       ignore.onclick = () => {
         this.ignoreModuleValue(value);
         this.render();
       };
     });
   }
-
   renderModule(el, mod) {
     const allNotes = this.moduleNoteFiles(mod).sort((a, b) => b.stat.mtime - a.stat.mtime);
     const children = this.submodulesOf(mod);
@@ -3858,39 +4091,35 @@ class NovalView extends ItemView {
     const tintPalette = ["#b394af", "#e9c77e", "#ce7379", "#7fa9b6", "#5d86a4"];
     const modIndex = mods.findIndex((m) => m.id === mod.id);
     const tint = mod.color || tintPalette[(modIndex < 0 ? 0 : modIndex) % tintPalette.length];
-    const childHue = (child, index) =>
-      child.color || tintPalette[(Math.max(modIndex, 0) + 1 + index) % tintPalette.length];
-
-    // ====== 完整重写：owner 直接用现成的 moduleForFile ======
-    // 它从文件所在文件夹逐级往上找，含隐式子文件夹，完全正确
-    const treeFiles = children.length
-      ? this.moduleTreeNoteFiles(mod).sort((a, b) => b.stat.mtime - a.stat.mtime)
-      : [];
+    const childHue = (child, index) => child.color || tintPalette[(Math.max(modIndex, 0) + 1 + index) % tintPalette.length];
+    const treeFiles = children.length ? this.moduleTreeNoteFiles(mod).sort((a, b) => b.stat.mtime - a.stat.mtime) : [];
     const parentDir = String(this.moduleTargetFolder(mod) || "").replace(/\/+$/, "");
-    // 对每条文件做 annotate：计算 depth 和 owner
     const annotate = (file) => {
       const fileDir = String(file.parent ? file.parent.path : "").replace(/\/+$/, "");
       let depth = 0;
       if (parentDir && fileDir && fileDir !== parentDir && fileDir.startsWith(parentDir + "/")) {
         depth = fileDir.slice(parentDir.length + 1).split("/").length;
       }
-      // 只在当前模块层级树里找 owner
-      // 注意：moduleForFile 会一路找到根，但我们只接受在 parentDir 之下的那个模块
       let owner = null;
       let dir = fileDir;
       while (dir && (!parentDir || dir !== parentDir)) {
         if (parentDir && parentDir !== "" && dir.startsWith(parentDir + "/")) {
           const cand = this.moduleForFolder(dir);
-          if (cand) { owner = cand; break; }
+          if (cand) {
+            owner = cand;
+            break;
+          }
         } else if (!parentDir || parentDir === "") {
           const cand = this.moduleForFolder(dir);
-          if (cand) { owner = cand; break; }
+          if (cand) {
+            owner = cand;
+            break;
+          }
         }
         const parts = dir.split("/");
         parts.pop();
         dir = parts.join("/");
       }
-      // 如果没有显式模块但路径还在 parentDir 之下，owner 就是隐式模块
       if (!owner && depth > 0) {
         owner = this.moduleForFolder(fileDir);
       }
@@ -3898,13 +4127,11 @@ class NovalView extends ItemView {
     };
     const wrappedSelf = allNotes.map((file) => ({ file, depth: 0, owner: null }));
     const wrappedTree = treeFiles.map(annotate);
-
-
-    const today = new Date();
+    const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
     const todayTs = today.getTime();
-    const weekTs = todayTs - 6 * 86400000;
-    const groupOf = (ts) => (ts >= todayTs ? "今天" : ts >= weekTs ? "本周" : "更早");
+    const weekTs = todayTs - 6 * 864e5;
+    const groupOf = (ts) => ts >= todayTs ? "\u4ECA\u5929" : ts >= weekTs ? "\u672C\u5468" : "\u66F4\u65E9";
     const pad2 = (n) => String(n).padStart(2, "0");
     const fmtDate = (ts) => {
       const d = new Date(ts);
@@ -3913,7 +4140,7 @@ class NovalView extends ItemView {
     };
     const fmtSize = (bytes) => {
       const n = Number(bytes || 0);
-      if (!n) return "—";
+      if (!n) return "\u2014";
       if (n < 1024) return n + " B";
       const units = ["KB", "MB", "GB", "TB"];
       let value = n / 1024;
@@ -3924,39 +4151,32 @@ class NovalView extends ItemView {
       }
       return (value >= 10 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, "")) + " " + units[i];
     };
-
     let mode = mod.view === "grid" ? "grid" : "list";
     let query = "";
     let searching = false;
     const liveToday = allNotes.some((file) => file.stat.mtime >= todayTs);
-
-    // 多选状态挂到视图上：打开笔记再切回来时仍然保留；换模块自动清空
     if (this._mdSelModule !== mod.id) {
       this._mdSelModule = mod.id;
       this._mdMulti = false;
-      this._mdSel = new Set();
+      this._mdSel = /* @__PURE__ */ new Set();
       this._mdIncludeChildren = false;
     }
     const selected = this._mdSel;
     let includeChildren = !!this._mdIncludeChildren;
     const depthHuePalette = ["#b394af", "#e9c77e", "#ce7379", "#7fa9b6", "#5d86a4"];
-    // 当前可见数据源：draw / selDelete / selectAll 都用它
     const currentPoolOf = () => includeChildren ? wrappedTree : wrappedSelf;
     const toggleSelect = (path) => {
       if (selected.has(path)) selected.delete(path);
       else selected.add(path);
       draw();
     };
-
     el.empty();
     el.addClass("cl-md-scroll");
     const page = el.createDiv({ cls: "cl-md-page cl-mdv" });
-
-    /* ---------- 面包屑 ---------- */
     const crumbs = page.createDiv({ cls: "cl-mdv-crumbs" });
     const homeChip = crumbs.createSpan({
       cls: "cl-mdv-chip",
-      text: this.plugin.settings.workspaceName || "工作台"
+      text: this.plugin.settings.workspaceName || "\u5DE5\u4F5C\u53F0"
     });
     homeChip.onclick = () => this.go("home");
     const chain = this.modulePath(mod);
@@ -3969,102 +4189,88 @@ class NovalView extends ItemView {
         chip.onclick = () => this.go(node.id);
       }
     });
-
-    /* ---------- 标题区 ---------- */
     const head = page.createDiv({ cls: "cl-mdv-head" });
     const headMain = head.createDiv({ cls: "cl-mdv-headmain" });
     const titleRow = headMain.createDiv({ cls: "cl-mdv-title" });
     titleRow.createEl("h1", { text: mod.name });
-    titleRow.createSpan({ cls: "cl-mdv-num", text: "本层 " + allNotes.length + " 篇" });
+    titleRow.createSpan({ cls: "cl-mdv-num", text: "\u672C\u5C42 " + allNotes.length + " \u7BC7" });
     if (liveToday) {
       const live = titleRow.createSpan({ cls: "cl-mdv-live" });
       live.createEl("i");
-      live.appendText("今天有更新");
+      live.appendText("\u4ECA\u5929\u6709\u66F4\u65B0");
     }
-
     const treeNotes = children.length ? this.moduleTreeNoteFiles(mod).length : allNotes.length;
-    const newest = allNotes.length
-      ? allNotes.reduce((max, file) => Math.max(max, file.stat.mtime), 0)
-      : 0;
+    const newest = allNotes.length ? allNotes.reduce((max, file) => Math.max(max, file.stat.mtime), 0) : 0;
     const meta = headMain.createDiv({ cls: "cl-mdv-meta" });
     const metaPart = (text) => meta.createSpan({ text });
-    const metaDot = () => meta.createSpan({ cls: "cl-mdv-dotsep", text: "·" });
-    metaPart(children.length + " 个子模块");
+    const metaDot = () => meta.createSpan({ cls: "cl-mdv-dotsep", text: "\xB7" });
+    metaPart(children.length + " \u4E2A\u5B50\u6A21\u5757");
     if (children.length) {
       metaDot();
-      metaPart("含子模块 " + treeNotes + " 篇");
+      metaPart("\u542B\u5B50\u6A21\u5757 " + treeNotes + " \u7BC7");
     } else if (newest) {
       metaDot();
-      metaPart("最后活动 " + fmtDate(newest));
+      metaPart("\u6700\u540E\u6D3B\u52A8 " + fmtDate(newest));
     }
-
     const acts = head.createDiv({ cls: "cl-mdv-acts" });
     const searchBtn = acts.createDiv({
       cls: "cl-mdv-ibtn" + (searching ? " is-on" : ""),
-      attr: { "aria-label": "筛选笔记", role: "button" }
+      attr: { "aria-label": "\u7B5B\u9009\u7B14\u8BB0", role: "button" }
     });
     setIcon(searchBtn, "search");
-
     const moreBtn = acts.createDiv({
       cls: "cl-mdv-ibtn",
-      attr: { "aria-label": "更多操作", role: "button" }
+      attr: { "aria-label": "\u66F4\u591A\u64CD\u4F5C", role: "button" }
     });
     setIcon(moreBtn, "more-horizontal");
     moreBtn.onclick = () => {
       const menu = new Menu();
-      menu.addItem((item) =>
-        item.setTitle("编辑模块").setIcon("settings").onClick(() => this.openModuleEditor(mod))
+      menu.addItem(
+        (item) => item.setTitle("\u7F16\u8F91\u6A21\u5757").setIcon("settings").onClick(() => this.openModuleEditor(mod))
       );
-      menu.addItem((item) =>
-        item.setTitle("重命名模块…").setIcon("pencil").onClick(() => this.renameModule(mod))
+      menu.addItem(
+        (item) => item.setTitle("\u91CD\u547D\u540D\u6A21\u5757\u2026").setIcon("pencil").onClick(() => this.renameModule(mod))
       );
-      menu.addItem((item) =>
-        item.setTitle("删除模块…").setIcon("trash").onClick(() => {
+      menu.addItem(
+        (item) => item.setTitle("\u5220\u9664\u6A21\u5757\u2026").setIcon("trash").onClick(() => {
           void this.deleteModule(mod);
         })
       );
       menu.addSeparator();
-      menu.addItem((item) =>
-        item
-          .setTitle(this._mdMulti ? "退出多选" : "多选删除")
-          .setIcon("list-checks")
-          .setChecked(this._mdMulti)
-          .onClick(() => {
-            this._mdMulti = !this._mdMulti;
-            if (!this._mdMulti) this._mdSel.clear();
-            draw();
-          })
+      menu.addItem(
+        (item) => item.setTitle(this._mdMulti ? "\u9000\u51FA\u591A\u9009" : "\u591A\u9009\u5220\u9664").setIcon("list-checks").setChecked(this._mdMulti).onClick(() => {
+          this._mdMulti = !this._mdMulti;
+          if (!this._mdMulti) this._mdSel.clear();
+          draw();
+        })
       );
-      menu.addItem((item) =>
-        item.setTitle("管理模块").setIcon("folder-cog").onClick(() => this.openModuleManager())
+      menu.addItem(
+        (item) => item.setTitle("\u7BA1\u7406\u6A21\u5757").setIcon("folder-cog").onClick(() => this.openModuleManager())
       );
       anchorMenuBelow(menu, moreBtn);
     };
-
     const newBtn = acts.createEl("button", { cls: "cl-mdv-btn is-primary" });
     setIcon(newBtn.createSpan({ cls: "cl-mdv-btnico" }), "plus");
-    newBtn.appendText("新建");
+    newBtn.appendText("\u65B0\u5EFA");
     setIcon(newBtn.createSpan({ cls: "cl-mdv-caret" }), "chevron-down");
     newBtn.onclick = () => {
       const menu = new Menu();
-      menu.addItem((item) =>
-        item.setTitle("新建笔记").setIcon("file-plus").onClick(() => this.createModuleNote(mod))
+      menu.addItem(
+        (item) => item.setTitle("\u65B0\u5EFA\u7B14\u8BB0").setIcon("file-plus").onClick(() => this.createModuleNote(mod))
       );
-      menu.addItem((item) =>
-        item.setTitle("新建子模块").setIcon("folder-plus").onClick(() => this.promptSubmodule(mod))
+      menu.addItem(
+        (item) => item.setTitle("\u65B0\u5EFA\u5B50\u6A21\u5757").setIcon("folder-plus").onClick(() => this.promptSubmodule(mod))
       );
       menu.addSeparator();
-      menu.addItem((item) =>
-        item.setTitle("归入文件").setIcon("download").onClick(() => this.addFilesToModule(mod))
+      menu.addItem(
+        (item) => item.setTitle("\u5F52\u5165\u6587\u4EF6").setIcon("download").onClick(() => this.addFilesToModule(mod))
       );
       anchorMenuBelow(menu, newBtn);
     };
-
-    /* 搜索条：默认收起，点放大镜才出现 */
     const searchWrap = page.createDiv({ cls: "cl-mdv-search" + (searching ? " is-on" : "") });
     const queryInput = searchWrap.createEl("input", {
       cls: "cl-mdv-searchinput",
-      attr: { type: "text", placeholder: "筛选本层笔记…" }
+      attr: { type: "text", placeholder: "\u7B5B\u9009\u672C\u5C42\u7B14\u8BB0\u2026" }
     });
     queryInput.addEventListener("input", () => {
       query = queryInput.value;
@@ -4076,24 +4282,19 @@ class NovalView extends ItemView {
       searchBtn.classList.toggle("is-on", searching);
       if (searching) queryInput.focus();
     };
-
-    /* ---------- 子模块 ---------- */
     const subSec = page.createDiv({ cls: "cl-mdv-sec" });
-    subSec.createEl("h3", { text: "子模块" });
+    subSec.createEl("h3", { text: "\u5B50\u6A21\u5757" });
     subSec.createSpan({ cls: "cl-mdv-count", text: String(children.length) });
     subSec.createSpan({ cls: "cl-mdv-line" });
     if (children.length) {
-      const manage = subSec.createSpan({ cls: "cl-mdv-secact", text: "管理" });
+      const manage = subSec.createSpan({ cls: "cl-mdv-secact", text: "\u7BA1\u7406" });
       manage.onclick = () => this.openModuleManager();
     }
-
     if (children.length) {
       const grid = page.createDiv({ cls: "cl-mdv-mods" });
       children.forEach((child, index) => {
         const childTree = this.moduleTreeNoteFiles(child);
-        const childNewest = childTree.length
-          ? childTree.reduce((max, file) => Math.max(max, file.stat.mtime), 0)
-          : 0;
+        const childNewest = childTree.length ? childTree.reduce((max, file) => Math.max(max, file.stat.mtime), 0) : 0;
         const card = grid.createDiv({ cls: "cl-mdv-modcard" });
         card.style.setProperty("--hue", childHue(child, index));
         card.createDiv({ cls: "cl-mdv-wash" });
@@ -4103,10 +4304,10 @@ class NovalView extends ItemView {
         top.createSpan({ cls: "cl-mdv-mcname", text: child.name });
         const num = card.createDiv({ cls: "cl-mdv-mcnum" });
         num.appendText(String(this.moduleNoteFiles(child).length));
-        num.createSpan({ text: "篇" });
+        num.createSpan({ text: "\u7BC7" });
         card.createDiv({
           cls: "cl-mdv-mcmeta",
-          text: childNewest ? "最近 " + fmtDate(childNewest) : "暂无笔记"
+          text: childNewest ? "\u6700\u8FD1 " + fmtDate(childNewest) : "\u6682\u65E0\u7B14\u8BB0"
         });
         card.onclick = () => this.go(child.id);
         card.oncontextmenu = (event) => {
@@ -4118,64 +4319,54 @@ class NovalView extends ItemView {
       const addCard = grid.createDiv({ cls: "cl-mdv-modcard is-add" });
       const addInner = addCard.createDiv({ cls: "cl-mdv-addinner" });
       setIcon(addInner.createSpan({ cls: "cl-mdv-addicon" }), "plus");
-      addInner.appendText("新建子模块");
+      addInner.appendText("\u65B0\u5EFA\u5B50\u6A21\u5757");
       addCard.onclick = () => this.promptSubmodule(mod);
     } else {
       const shelf = page.createDiv({ cls: "cl-mdv-shelf" });
       const shelfIcon = shelf.createDiv({ cls: "cl-mdv-shelf-icon" });
       setIcon(shelfIcon, "folder-plus");
       const shelfText = shelf.createDiv({ cls: "cl-mdv-shelf-text" });
-      shelfText.createDiv({ cls: "cl-mdv-shelf-title", text: "还没有子模块" });
+      shelfText.createDiv({ cls: "cl-mdv-shelf-title", text: "\u8FD8\u6CA1\u6709\u5B50\u6A21\u5757" });
       shelfText.createDiv({
         cls: "cl-mdv-shelf-sub",
-        text: "子模块就是文件夹，用来继续分层。也可以不建，直接在这一层写笔记。"
+        text: "\u5B50\u6A21\u5757\u5C31\u662F\u6587\u4EF6\u5939\uFF0C\u7528\u6765\u7EE7\u7EED\u5206\u5C42\u3002\u4E5F\u53EF\u4EE5\u4E0D\u5EFA\uFF0C\u76F4\u63A5\u5728\u8FD9\u4E00\u5C42\u5199\u7B14\u8BB0\u3002"
       });
       const shelfBtn = shelf.createEl("button", { cls: "cl-mdv-shelf-btn" });
       setIcon(shelfBtn.createSpan({ cls: "cl-mdv-addicon" }), "plus");
-      shelfBtn.appendText("新建子模块");
+      shelfBtn.appendText("\u65B0\u5EFA\u5B50\u6A21\u5757");
       shelfBtn.onclick = () => this.promptSubmodule(mod);
     }
-
-    /* ---------- 本层笔记 ---------- */
     const noteSec = page.createDiv({ cls: "cl-mdv-sec" });
-    noteSec.createEl("h3", { text: "本层笔记" });
+    noteSec.createEl("h3", { text: "\u672C\u5C42\u7B14\u8BB0" });
     const noteCount = noteSec.createSpan({ cls: "cl-mdv-count", text: String(allNotes.length) });
     noteSec.createSpan({ cls: "cl-mdv-line" });
-
-    // 包含子模块开关：只在有子模块时出现；无子模块时整个控件不渲染
     let treeBtn = null;
     if (children.length) {
       treeBtn = noteSec.createSpan({ cls: "cl-mdv-treebtn" + (includeChildren ? " is-on" : "") });
       const treeDot = treeBtn.createSpan({ cls: "cl-mdv-treedot" });
       setIcon(treeDot, includeChildren ? "check" : "chevron-down");
-      treeBtn.createSpan({ cls: "cl-mdv-treetxt", text: "包含子模块" });
+      treeBtn.createSpan({ cls: "cl-mdv-treetxt", text: "\u5305\u542B\u5B50\u6A21\u5757" });
       treeBtn.onclick = () => {
         includeChildren = !includeChildren;
         this._mdIncludeChildren = includeChildren;
         draw();
       };
     }
-
     const viewSw = noteSec.createSpan({ cls: "cl-mdv-viewsw" });
-    const listBtn = viewSw.createSpan({ text: "列表" });
-    const gridBtn = viewSw.createSpan({ text: "卡片" });
-
+    const listBtn = viewSw.createSpan({ text: "\u5217\u8868" });
+    const gridBtn = viewSw.createSpan({ text: "\u5361\u7247" });
     const body = page.createDiv({ cls: "cl-md-body cl-mdv-body" });
-
-    /* 多选悬浮条：挂到滚动容器上，absolute 固定在面板底部，不随笔记滚动 */
     const selBar = el.createDiv({ cls: "cl-md-selbar" });
     const selCount = selBar.createSpan({ cls: "cl-md-selcount" });
-    const selCancel = selBar.createEl("button", { cls: "cl-md-btn", text: "取消" });
+    const selCancel = selBar.createEl("button", { cls: "cl-md-btn", text: "\u53D6\u6D88" });
     selCancel.onclick = () => {
       this._mdMulti = false;
       this._mdSel.clear();
       draw();
     };
-    const selDelete = selBar.createEl("button", { cls: "cl-md-btn cl-md-btn-danger", text: "删除所选" });
+    const selDelete = selBar.createEl("button", { cls: "cl-md-btn cl-md-btn-danger", text: "\u5220\u9664\u6240\u9009" });
     selDelete.onclick = () => {
-      const chosen = currentPoolOf()
-        .map((entry) => entry.file)
-        .filter((file) => this._mdSel.has(file.path));
+      const chosen = currentPoolOf().map((entry) => entry.file).filter((file) => this._mdSel.has(file.path));
       if (!chosen.length) return;
       this.deleteFiles(chosen, () => {
         this._mdMulti = false;
@@ -4183,9 +4374,8 @@ class NovalView extends ItemView {
         this.refresh();
       });
     };
-
     const renderList = (items) => {
-      const groups = new Map([["今天", []], ["本周", []], ["更早", []]]);
+      const groups = /* @__PURE__ */ new Map([["\u4ECA\u5929", []], ["\u672C\u5468", []], ["\u66F4\u65E9", []]]);
       items.forEach((entry) => groups.get(groupOf(entry.file.stat.mtime)).push(entry));
       groups.forEach((list, name) => {
         if (!list.length) return;
@@ -4196,29 +4386,27 @@ class NovalView extends ItemView {
           const row = body.createDiv({
             cls: "cl-mdv-row" + (this._mdMulti && picked ? " is-selected" : "")
           });
-          // 子孙模块的笔记用 owner 颜色；本体用父模块颜色
-          const rowHue = entry.owner && entry.owner.color
-            ? entry.owner.color
-            : depthHuePalette[(entry.depth || 0) % depthHuePalette.length];
+          row.setAttribute("draggable", "true");
+          row.dataset.path = file.path;
+          row.addEventListener("dragstart", (event) => this.startFileDrag(event, file));
+          row.addEventListener("dragend", () => this.endFileDrag());
+          const rowHue = entry.owner && entry.owner.color ? entry.owner.color : depthHuePalette[(entry.depth || 0) % depthHuePalette.length];
           row.style.setProperty("--hue", entry.depth > 0 ? rowHue : tint);
-
-          // 子模块徽标（父模块自己的笔记不加）
           if (entry.depth > 0 && entry.owner) {
             const badge = row.createDiv({ cls: "cl-mdv-rowmod" });
             badge.createSpan({ cls: "cl-mdv-rowmodico" });
             badge.createSpan({ cls: "cl-mdv-rowmodname", text: entry.owner.name });
-            badge.title = "跳转到「" + entry.owner.name + "」";
+            badge.title = "\u8DF3\u8F6C\u5230\u300C" + entry.owner.name + "\u300D";
             badge.onclick = (event) => {
               event.stopPropagation();
               this.go(this.moduleIdOf(entry.owner));
             };
             row.classList.add("has-child-note");
           }
-
           const glyph = row.createDiv({ cls: "cl-mdv-glyph" });
           if (this._mdMulti) {
             const box = glyph.createEl("input", {
-              attr: { type: "checkbox", "aria-label": "选择 " + file.basename }
+              attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + file.basename }
             });
             box.checked = picked;
             box.onclick = (event) => {
@@ -4237,14 +4425,14 @@ class NovalView extends ItemView {
           });
           row.createDiv({ cls: "cl-mdv-date", text: fmtDate(file.stat.mtime) });
           if (!this._mdMulti) {
-            const del = row.createDiv({
-              cls: "cl-mdv-del",
-              attr: { "aria-label": "删除 " + file.basename, role: "button" }
+            const more = row.createDiv({
+              cls: "cl-mdv-more",
+              attr: { "aria-label": "\u66F4\u591A " + file.basename, role: "button" }
             });
-            setIcon(del, "trash-2");
-            del.onclick = (event) => {
+            setIcon(more, "more-horizontal");
+            more.onclick = (event) => {
               event.stopPropagation();
-              this.deleteFiles([file]);
+              this.showFileMenu(event, file);
             };
           }
           row.onclick = () => {
@@ -4254,8 +4442,6 @@ class NovalView extends ItemView {
         });
       });
     };
-
-    /* 网格视图：沿用原有 .cl-md-grid / .cl-md-tile，外观保持不变 */
     const renderGrid = (items) => {
       const grid = body.createDiv({ cls: "cl-md-grid" });
       items.forEach((entry) => {
@@ -4264,12 +4450,16 @@ class NovalView extends ItemView {
         const tile = grid.createDiv({
           cls: "cl-md-tile cl-md-kind-note" + (this._mdMulti && picked ? " is-selected" : "")
         });
+        tile.setAttribute("draggable", "true");
+        tile.dataset.path = file.path;
+        tile.addEventListener("dragstart", (event) => this.startFileDrag(event, file));
+        tile.addEventListener("dragend", () => this.endFileDrag());
         const thumb = tile.createDiv({ cls: "cl-md-thumb" });
         paintNoteThumb(this.app, thumb, file);
         if (this._mdMulti) {
           const check = tile.createDiv({ cls: "cl-md-tilecheck" });
           const box = check.createEl("input", {
-            attr: { type: "checkbox", "aria-label": "选择 " + file.basename }
+            attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + file.basename }
           });
           box.checked = picked;
           box.onclick = (event) => {
@@ -4279,26 +4469,23 @@ class NovalView extends ItemView {
         }
         tile.createDiv({ cls: "cl-md-tilename", text: file.basename });
         const tileMeta = tile.createDiv({ cls: "cl-md-tilemeta" });
-        tileMeta.createSpan({ text: "笔记" });
+        tileMeta.createSpan({ text: "\u7B14\u8BB0" });
         tileMeta.createSpan({ text: fmtSize(file.stat.size) });
-
-        // 子模块徽标：左上角
         if (entry.depth > 0 && entry.owner) {
           const badge = tile.createDiv({ cls: "cl-md-tilemod" });
           badge.createSpan({ cls: "cl-md-tilemodico" });
           badge.createSpan({ cls: "cl-md-tilemodname", text: entry.owner.name });
           tile.classList.add("has-child-note");
         }
-
         if (!this._mdMulti) {
-          const del = tile.createEl("button", {
-            cls: "cl-md-tiledel",
-            attr: { "aria-label": "删除 " + file.basename }
+          const more = tile.createEl("button", {
+            cls: "cl-md-tilemore",
+            attr: { "aria-label": "\u66F4\u591A " + file.basename }
           });
-          setIcon(del, "trash-2");
-          del.onclick = (event) => {
+          setIcon(more, "more-horizontal");
+          more.onclick = (event) => {
             event.stopPropagation();
-            this.deleteFiles([file]);
+            this.showFileMenu(event, file);
           };
         }
         tile.onclick = () => {
@@ -4307,7 +4494,6 @@ class NovalView extends ItemView {
         };
       });
     };
-
     const draw = () => {
       listBtn.classList.toggle("is-on", mode === "list");
       gridBtn.classList.toggle("is-on", mode === "grid");
@@ -4318,10 +4504,9 @@ class NovalView extends ItemView {
       }
       const currentPool = currentPoolOf();
       selBar.classList.toggle("is-on", !!this._mdMulti && currentPool.length > 0);
-      selCount.setText("已选 " + selected.size + " 项");
+      selCount.setText("\u5DF2\u9009 " + selected.size + " \u9879");
       selDelete.disabled = selected.size === 0;
       noteCount.setText(String(currentPool.length));
-
       const q = query.trim().toLowerCase();
       const items = currentPool.filter((entry) => !q || entry.file.path.toLowerCase().includes(q));
       body.empty();
@@ -4331,30 +4516,29 @@ class NovalView extends ItemView {
         setIcon(blankIcon, "file-text");
         const blankText = blank.createDiv({ cls: "cl-mdv-blank-text" });
         if (includeChildren) {
-          blankText.createDiv({ cls: "cl-mdv-blank-title", text: "这个模块（含子模块）还没有笔记" });
+          blankText.createDiv({ cls: "cl-mdv-blank-title", text: "\u8FD9\u4E2A\u6A21\u5757\uFF08\u542B\u5B50\u6A21\u5757\uFF09\u8FD8\u6CA1\u6709\u7B14\u8BB0" });
           blankText.createDiv({
             cls: "cl-mdv-blank-sub",
-            text: "关掉「包含子模块」可以只看本层；或在本层直接新建笔记。"
+            text: "\u5173\u6389\u300C\u5305\u542B\u5B50\u6A21\u5757\u300D\u53EF\u4EE5\u53EA\u770B\u672C\u5C42\uFF1B\u6216\u5728\u672C\u5C42\u76F4\u63A5\u65B0\u5EFA\u7B14\u8BB0\u3002"
           });
         } else {
-          blankText.createDiv({ cls: "cl-mdv-blank-title", text: "这一层还没有笔记" });
+          blankText.createDiv({ cls: "cl-mdv-blank-title", text: "\u8FD9\u4E00\u5C42\u8FD8\u6CA1\u6709\u7B14\u8BB0" });
           blankText.createDiv({
             cls: "cl-mdv-blank-sub",
-            text: "直接在父模块写可以；也可以点上面的子模块继续分层。"
+            text: "\u76F4\u63A5\u5728\u7236\u6A21\u5757\u5199\u53EF\u4EE5\uFF1B\u4E5F\u53EF\u4EE5\u70B9\u4E0A\u9762\u7684\u5B50\u6A21\u5757\u7EE7\u7EED\u5206\u5C42\u3002"
           });
         }
-        const blankBtn = blank.createEl("button", { cls: "cl-mdv-blank-btn", text: "新建笔记" });
+        const blankBtn = blank.createEl("button", { cls: "cl-mdv-blank-btn", text: "\u65B0\u5EFA\u7B14\u8BB0" });
         blankBtn.onclick = () => this.createModuleNote(mod);
         return;
       }
       if (!items.length) {
-        body.createDiv({ cls: "cl-mdv-nomatch", text: "没有匹配的笔记" });
+        body.createDiv({ cls: "cl-mdv-nomatch", text: "\u6CA1\u6709\u5339\u914D\u7684\u7B14\u8BB0" });
         return;
       }
       if (mode === "grid") renderGrid(items);
       else renderList(items);
     };
-
     listBtn.onclick = () => {
       mode = "list";
       mod.view = "list";
@@ -4367,13 +4551,10 @@ class NovalView extends ItemView {
       this.plugin.persistSettings();
       draw();
     };
-
     draw();
   }
-
   // 在模块里新建笔记：用模块的文件夹，不存在就补建。
   async createModuleNote(mod) {
-    // 模块 = 文件夹：文件夹不存在就直接补建，避免“模块还在、文件没地方放”
     const dir = this.moduleTargetFolder(mod);
     if (!dir) {
       this.pickModuleFolder(mod);
@@ -4382,281 +4563,180 @@ class NovalView extends ItemView {
     try {
       await ensureVaultFolder(this.app, dir);
     } catch (error) {
-      new Notice("创建模块文件夹失败：" + (error && error.message ? error.message : error));
+      new Notice("\u521B\u5EFA\u6A21\u5757\u6587\u4EF6\u5939\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
       return;
     }
     this.createNoteInFolder(mod, dir);
   }
-
   pickModuleFolder(mod) {
     new FolderPickerModal(this.app, {
       current: String(mod.folder || ""),
       onPick: (path) => {
-        // 选过一次就记到模块上，下次新建不再追问
         mod.folder = path;
         this.plugin.persistSettings();
         this.createNoteInFolder(mod, path);
       }
     }).open();
   }
-
   async createNoteInFolder(mod, dir) {
     const folder = String(dir || "").replace(/^\/+|\/+$/g, "");
-
-    const now = new Date();
-    const stamp =
-      now.getFullYear() +
-      String(now.getMonth() + 1).padStart(2, "0") +
-      String(now.getDate()).padStart(2, "0") +
-      "-" +
-      String(now.getHours()).padStart(2, "0") +
-      String(now.getMinutes()).padStart(2, "0");
-
-    let path = folder + "/未命名笔记 " + stamp + ".md";
+    const now = /* @__PURE__ */ new Date();
+    const stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, "0") + String(now.getDate()).padStart(2, "0") + "-" + String(now.getHours()).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0");
+    let path = folder + "/\u672A\u547D\u540D\u7B14\u8BB0 " + stamp + ".md";
     let n = 1;
     while (this.app.vault.getAbstractFileByPath(path)) {
-      path = folder + "/未命名笔记 " + stamp + "-" + n + ".md";
+      path = folder + "/\u672A\u547D\u540D\u7B14\u8BB0 " + stamp + "-" + n + ".md";
       n += 1;
     }
-
     const moduleValue = String(mod.id || "").startsWith("dir:") ? mod.name : mod.id || mod.name;
-    const content =
-      "---\nmodule: " +
-      moduleValue +
-      "\nstatus: 草稿\ncreated: " +
-      now.toISOString().slice(0, 10) +
-      "\n---\n\n";
-
+    const content = "---\nmodule: " + moduleValue + "\nstatus: \u8349\u7A3F\ncreated: " + now.toISOString().slice(0, 10) + "\n---\n\n";
     try {
       const file = await this.app.vault.create(path, content);
-      // 新建文件会改变模块归属，先清缓存；若此时视图被新标签挡住，
-      // 刷新会记为待刷新，切回本视图时立即重建列表。
       this._ownership = null;
       await this.app.workspace.getLeaf("tab").openFile(file);
-      // 等元数据缓存索引完成后再刷新，避免新笔记暂时不出现
       setTimeout(() => this.refresh(), 350);
     } catch (e) {
-      new Notice("新建笔记失败：" + (e && e.message ? e.message : e));
+      new Notice("\u65B0\u5EFA\u7B14\u8BB0\u5931\u8D25\uFF1A" + (e && e.message ? e.message : e));
     }
   }
-
   renderCanvas(el) {
     el.addClass("cl-scroll-canvas");
-    const novalBoard =
-      this.plugin.childPlugins && this.plugin.childPlugins[BOARD_ID];
-
+    const novalBoard = this.plugin.childPlugins && this.plugin.childPlugins[BOARD_ID];
     if (!novalBoard) {
       const head = el.createDiv({ cls: "cl-pagehead" });
-      head.createEl("h1", { text: "白板" });
+      head.createEl("h1", { text: "\u767D\u677F" });
       head.createDiv({
         cls: "cl-sub",
-        text: "Noval 画布集没有加载成功，请打开控制台查看 [noval] 日志。"
+        text: "Noval \u753B\u5E03\u96C6\u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u6253\u5F00\u63A7\u5236\u53F0\u67E5\u770B [noval] \u65E5\u5FD7\u3002"
       });
       return;
     }
-
     if (!this.gallery) this.gallery = new NovalGalleryPanel(this.app, novalBoard);
     this.gallery.mount(el);
   }
-
   renderNotes(el) {
     el.addClass("cl-scroll-notes");
-    const noval =
-      (this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID]) ||
-      (this.app.plugins.plugins && this.app.plugins.plugins[LEGACY.notesId]);
-
+    const noval = this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID] || this.app.plugins.plugins && this.app.plugins.plugins[LEGACY.notesId];
     if (!noval) {
       const head = el.createDiv({ cls: "cl-pagehead" });
-      head.createEl("h1", { text: "卡片笔记" });
+      head.createEl("h1", { text: "\u5361\u7247\u7B14\u8BB0" });
       head.createDiv({
         cls: "cl-sub",
-        text: "Noval 没有加载成功，请打开控制台查看 [noval] 日志。"
+        text: "Noval \u6CA1\u6709\u52A0\u8F7D\u6210\u529F\uFF0C\u8BF7\u6253\u5F00\u63A7\u5236\u53F0\u67E5\u770B [noval] \u65E5\u5FD7\u3002"
       });
       return;
     }
-
     if (!this.notes) this.notes = new NovalNotesPanel(this.app, noval, this);
     this.notes.mount(el);
   }
-}
-
-class NovalSettingTab extends PluginSettingTab {
+};
+var NovalSettingTab = class extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
-
   display() {
     const { containerEl } = this;
     containerEl.empty();
-
-    // ---- 常规 ----
-    new Setting(containerEl).setName("常规").setHeading();
-
-    new Setting(containerEl)
-      .setName("工作台名称")
-      .setDesc("显示在左侧导航顶部的名称。留空则使用「个人工作台」。")
-      .addText((text) =>
-        text
-          .setPlaceholder("个人工作台")
-          .setValue(this.plugin.settings.workspaceName || "")
-          .onChange(async (value) => {
-            this.plugin.settings.workspaceName = value.trim() || "个人工作台";
-            await this.plugin.persistSettings();
-            // 名称直接影响导航，需要重建视图
-            this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach((leaf) => {
-              if (leaf.view && leaf.view.render) leaf.view.render();
-            });
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("打开时进入专注模式")
-      .setDesc("隐藏左侧栏、标签栏和状态栏，保留右侧栏，方便同时使用 Noval 和其他面板。")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.focusOnOpen).onChange(async (value) => {
-          this.plugin.settings.focusOnOpen = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    // ---- 模块 ----
-    new Setting(containerEl).setName("模块").setHeading();
-
-    new Setting(containerEl)
-      .setName("模块与文件树")
-      .setDesc(
-        "模块与文件夹一一对应：模块页只显示该文件夹下直接存放的笔记，子文件夹会自动成为子模块。新建模块时会同步创建同名文件夹。"
-      );
-
-    new Setting(containerEl)
-      .setName("管理模块")
-      .setDesc("新建、编辑、删除模块，或查看模块对应的文件树层级。")
-      .addButton((button) =>
-        button.setButtonText("打开模块管理").onClick(() => {
-          const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
-          if (leaf && leaf.view && leaf.view.openModuleManager) {
-            leaf.view.openModuleManager();
-          } else {
-            new Notice("请先打开 Noval 工作台，再管理模块。");
-          }
-        })
-      );
-
-    // ---- 收件箱 ----
-    new Setting(containerEl).setName("收件箱").setHeading();
-
-    new Setting(containerEl)
-      .setName("收录范围")
-      .setDesc("决定收件箱显示哪些文件。默认只显示库根目录中散落的文件。")
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOption("root", "仅库根目录（推荐）")
-          .addOption("unassigned", "旧版未归属笔记（兼容）")
-          .addOption("all", "全库所有文件（谨慎）")
-          .setValue(this.plugin.settings.inboxPolicy || "root")
-          .onChange(async (value) => {
-            this.plugin.settings.inboxPolicy = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
+    new Setting(containerEl).setName("\u5E38\u89C4").setHeading();
+    new Setting(containerEl).setName("\u5DE5\u4F5C\u53F0\u540D\u79F0").setDesc("\u663E\u793A\u5728\u5DE6\u4FA7\u5BFC\u822A\u9876\u90E8\u7684\u540D\u79F0\u3002\u7559\u7A7A\u5219\u4F7F\u7528\u300C\u4E2A\u4EBA\u5DE5\u4F5C\u53F0\u300D\u3002").addText(
+      (text) => text.setPlaceholder("\u4E2A\u4EBA\u5DE5\u4F5C\u53F0").setValue(this.plugin.settings.workspaceName || "").onChange(async (value) => {
+        this.plugin.settings.workspaceName = value.trim() || "\u4E2A\u4EBA\u5DE5\u4F5C\u53F0";
+        await this.plugin.persistSettings();
+        this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach((leaf) => {
+          if (leaf.view && leaf.view.render) leaf.view.render();
+        });
+      })
+    );
+    new Setting(containerEl).setName("\u6253\u5F00\u65F6\u8FDB\u5165\u4E13\u6CE8\u6A21\u5F0F").setDesc("\u9690\u85CF\u5DE6\u4FA7\u680F\u3001\u6807\u7B7E\u680F\u548C\u72B6\u6001\u680F\uFF0C\u4FDD\u7559\u53F3\u4FA7\u680F\uFF0C\u65B9\u4FBF\u540C\u65F6\u4F7F\u7528 Noval \u548C\u5176\u4ED6\u9762\u677F\u3002").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.focusOnOpen).onChange(async (value) => {
+        this.plugin.settings.focusOnOpen = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new Setting(containerEl).setName("\u6A21\u5757").setHeading();
+    new Setting(containerEl).setName("\u6A21\u5757\u4E0E\u6587\u4EF6\u6811").setDesc(
+      "\u6A21\u5757\u4E0E\u6587\u4EF6\u5939\u4E00\u4E00\u5BF9\u5E94\uFF1A\u6A21\u5757\u9875\u53EA\u663E\u793A\u8BE5\u6587\u4EF6\u5939\u4E0B\u76F4\u63A5\u5B58\u653E\u7684\u7B14\u8BB0\uFF0C\u5B50\u6587\u4EF6\u5939\u4F1A\u81EA\u52A8\u6210\u4E3A\u5B50\u6A21\u5757\u3002\u65B0\u5EFA\u6A21\u5757\u65F6\u4F1A\u540C\u6B65\u521B\u5EFA\u540C\u540D\u6587\u4EF6\u5939\u3002"
+    );
+    new Setting(containerEl).setName("\u7BA1\u7406\u6A21\u5757").setDesc("\u65B0\u5EFA\u3001\u7F16\u8F91\u3001\u5220\u9664\u6A21\u5757\uFF0C\u6216\u67E5\u770B\u6A21\u5757\u5BF9\u5E94\u7684\u6587\u4EF6\u6811\u5C42\u7EA7\u3002").addButton(
+      (button) => button.setButtonText("\u6253\u5F00\u6A21\u5757\u7BA1\u7406").onClick(() => {
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+        if (leaf && leaf.view && leaf.view.openModuleManager) {
+          leaf.view.openModuleManager();
+        } else {
+          new Notice("\u8BF7\u5148\u6253\u5F00 Noval \u5DE5\u4F5C\u53F0\uFF0C\u518D\u7BA1\u7406\u6A21\u5757\u3002");
+        }
+      })
+    );
+    new Setting(containerEl).setName("\u6536\u4EF6\u7BB1").setHeading();
+    new Setting(containerEl).setName("\u6536\u5F55\u8303\u56F4").setDesc("\u51B3\u5B9A\u6536\u4EF6\u7BB1\u663E\u793A\u54EA\u4E9B\u6587\u4EF6\u3002\u9ED8\u8BA4\u53EA\u663E\u793A\u5E93\u6839\u76EE\u5F55\u4E2D\u6563\u843D\u7684\u6587\u4EF6\u3002").addDropdown(
+      (dropdown) => dropdown.addOption("root", "\u4EC5\u5E93\u6839\u76EE\u5F55\uFF08\u63A8\u8350\uFF09").addOption("unassigned", "\u65E7\u7248\u672A\u5F52\u5C5E\u7B14\u8BB0\uFF08\u517C\u5BB9\uFF09").addOption("all", "\u5168\u5E93\u6240\u6709\u6587\u4EF6\uFF08\u8C28\u614E\uFF09").setValue(this.plugin.settings.inboxPolicy || "root").onChange(async (value) => {
+        this.plugin.settings.inboxPolicy = value;
+        await this.plugin.saveSettings();
+      })
+    );
     containerEl.createEl("p", {
       cls: "cl-settings-hint",
-      text: "文件移入模块文件夹后会自动离开收件箱。该策略保留为可切换接口，后续规则可以继续扩展。"
+      text: "\u6587\u4EF6\u79FB\u5165\u6A21\u5757\u6587\u4EF6\u5939\u540E\u4F1A\u81EA\u52A8\u79BB\u5F00\u6536\u4EF6\u7BB1\u3002\u8BE5\u7B56\u7565\u4FDD\u7559\u4E3A\u53EF\u5207\u6362\u63A5\u53E3\uFF0C\u540E\u7EED\u89C4\u5219\u53EF\u4EE5\u7EE7\u7EED\u6269\u5C55\u3002"
     });
-
-    // ---- 卡片笔记 ----
-    new Setting(containerEl).setName("卡片笔记").setHeading();
-
-    new Setting(containerEl)
-      .setName("卡片存放位置")
-      .setDesc(
-        "所有卡片和从画布转换的卡片都写入这个文件夹。固定路径可以避免卡片散落、被算进模块，或在不同设备上分成两处。"
-      )
-      .addText((text) => text.setValue(CARD_FOLDER).setDisabled(true));
-
+    new Setting(containerEl).setName("\u5361\u7247\u7B14\u8BB0").setHeading();
+    new Setting(containerEl).setName("\u5361\u7247\u5B58\u653E\u4F4D\u7F6E").setDesc(
+      "\u6240\u6709\u5361\u7247\u548C\u4ECE\u753B\u5E03\u8F6C\u6362\u7684\u5361\u7247\u90FD\u5199\u5165\u8FD9\u4E2A\u6587\u4EF6\u5939\u3002\u56FA\u5B9A\u8DEF\u5F84\u53EF\u4EE5\u907F\u514D\u5361\u7247\u6563\u843D\u3001\u88AB\u7B97\u8FDB\u6A21\u5757\uFF0C\u6216\u5728\u4E0D\u540C\u8BBE\u5907\u4E0A\u5206\u6210\u4E24\u5904\u3002"
+    ).addText((text) => text.setValue(CARD_FOLDER).setDisabled(true));
     containerEl.createEl("p", {
       cls: "cl-settings-hint",
-      text: "该目录不会出现在模块导航里，也不会进入收件箱。把卡片文件移出这个目录，它就会变成普通笔记。"
+      text: "\u8BE5\u76EE\u5F55\u4E0D\u4F1A\u51FA\u73B0\u5728\u6A21\u5757\u5BFC\u822A\u91CC\uFF0C\u4E5F\u4E0D\u4F1A\u8FDB\u5165\u6536\u4EF6\u7BB1\u3002\u628A\u5361\u7247\u6587\u4EF6\u79FB\u51FA\u8FD9\u4E2A\u76EE\u5F55\uFF0C\u5B83\u5C31\u4F1A\u53D8\u6210\u666E\u901A\u7B14\u8BB0\u3002"
     });
-
-    // ---- 画布 ----
-    new Setting(containerEl).setName("画布").setHeading();
-
-    const board =
-      this.plugin.childPlugins && this.plugin.childPlugins[BOARD_ID];
+    new Setting(containerEl).setName("\u753B\u5E03").setHeading();
+    const board = this.plugin.childPlugins && this.plugin.childPlugins[BOARD_ID];
     if (!board) {
       containerEl.createEl("p", {
         cls: "cl-settings-hint",
-        text: "画布组件未加载，暂时无法配置画布和 AI。请重载插件后再试。"
+        text: "\u753B\u5E03\u7EC4\u4EF6\u672A\u52A0\u8F7D\uFF0C\u6682\u65F6\u65E0\u6CD5\u914D\u7F6E\u753B\u5E03\u548C AI\u3002\u8BF7\u91CD\u8F7D\u63D2\u4EF6\u540E\u518D\u8BD5\u3002"
       });
       return;
     }
-
     let boardFolderTimer = null;
-    new Setting(containerEl)
-      .setName("画布文件夹")
-      .setDesc("新建画布时保存到这个文件夹，默认「画布」。修改后该文件夹不会作为模块出现。")
-      .addText((text) =>
-        text
-          .setPlaceholder("画布")
-          .setValue((board.settings.noval && board.settings.noval.boardFolder) || "")
-          .onChange((value) => {
-            if (boardFolderTimer) window.clearTimeout(boardFolderTimer);
-            boardFolderTimer = window.setTimeout(async () => {
-              board.settings.noval = board.settings.noval || {};
-              board.settings.noval.boardFolder = value.trim();
-              await board.saveSettings();
-              if (this.plugin.syncModulesFromVault()) {
-                await this.plugin.persistSettings();
-              }
-              this.plugin.refreshAll();
-            }, 600);
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("节点角标")
-      .setDesc("在画布卡片节点上显示日期角标，只影响画布显示，不改动卡片正文。")
-      .addToggle((toggle) =>
-        toggle.setValue(!!board.settings.showBadge).onChange(async (value) => {
-          board.settings.showBadge = value;
+    new Setting(containerEl).setName("\u753B\u5E03\u6587\u4EF6\u5939").setDesc("\u65B0\u5EFA\u753B\u5E03\u65F6\u4FDD\u5B58\u5230\u8FD9\u4E2A\u6587\u4EF6\u5939\uFF0C\u9ED8\u8BA4\u300C\u753B\u5E03\u300D\u3002\u4FEE\u6539\u540E\u8BE5\u6587\u4EF6\u5939\u4E0D\u4F1A\u4F5C\u4E3A\u6A21\u5757\u51FA\u73B0\u3002").addText(
+      (text) => text.setPlaceholder("\u753B\u5E03").setValue(board.settings.noval && board.settings.noval.boardFolder || "").onChange((value) => {
+        if (boardFolderTimer) window.clearTimeout(boardFolderTimer);
+        boardFolderTimer = window.setTimeout(async () => {
+          board.settings.noval = board.settings.noval || {};
+          board.settings.noval.boardFolder = value.trim();
           await board.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("角标内容")
-      .setDesc("精简只显示日期；完整显示标签、日期和时间。")
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOption("date", "精简（11-11）")
-          .addOption("full", "完整（#标签 11-11 11:08）")
-          .setValue(board.settings.badgeFormat === "full" ? "full" : "date")
-          .onChange(async (value) => {
-            board.settings.badgeFormat = value === "full" ? "full" : "date";
-            await board.saveSettings();
-          })
-      );
-
-    // AI 配置沿用画布组件原有的设置界面（启用、思考模式、模型配置、内容分配）
+          if (this.plugin.syncModulesFromVault()) {
+            await this.plugin.persistSettings();
+          }
+          this.plugin.refreshAll();
+        }, 600);
+      })
+    );
+    new Setting(containerEl).setName("\u8282\u70B9\u89D2\u6807").setDesc("\u5728\u753B\u5E03\u5361\u7247\u8282\u70B9\u4E0A\u663E\u793A\u65E5\u671F\u89D2\u6807\uFF0C\u53EA\u5F71\u54CD\u753B\u5E03\u663E\u793A\uFF0C\u4E0D\u6539\u52A8\u5361\u7247\u6B63\u6587\u3002").addToggle(
+      (toggle) => toggle.setValue(!!board.settings.showBadge).onChange(async (value) => {
+        board.settings.showBadge = value;
+        await board.saveSettings();
+      })
+    );
+    new Setting(containerEl).setName("\u89D2\u6807\u5185\u5BB9").setDesc("\u7CBE\u7B80\u53EA\u663E\u793A\u65E5\u671F\uFF1B\u5B8C\u6574\u663E\u793A\u6807\u7B7E\u3001\u65E5\u671F\u548C\u65F6\u95F4\u3002").addDropdown(
+      (dropdown) => dropdown.addOption("date", "\u7CBE\u7B80\uFF0811-11\uFF09").addOption("full", "\u5B8C\u6574\uFF08#\u6807\u7B7E 11-11 11:08\uFF09").setValue(board.settings.badgeFormat === "full" ? "full" : "date").onChange(async (value) => {
+        board.settings.badgeFormat = value === "full" ? "full" : "date";
+        await board.saveSettings();
+      })
+    );
     const boardTab = board._settingTab;
     if (boardTab && typeof boardTab.renderAI === "function") {
       boardTab.renderAI(containerEl);
     } else {
       containerEl.createEl("p", {
         cls: "cl-settings-hint",
-        text: "AI 设置界面未就绪，请重载插件后再试。"
+        text: "AI \u8BBE\u7F6E\u754C\u9762\u672A\u5C31\u7EEA\uFF0C\u8BF7\u91CD\u8F7D\u63D2\u4EF6\u540E\u518D\u8BD5\u3002"
       });
     }
   }
-}
-
+};
 module.exports = class NovalPlugin extends Plugin {
   async onload() {
     const saved = await this.readHostData();
-    // 全新安装：从文件树同步模块，不预置占位模块
     const firstRun = !saved || !Array.isArray(saved.modules);
     this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
     let settingsDirty = false;
@@ -4666,11 +4746,9 @@ module.exports = class NovalPlugin extends Plugin {
       this.settings.modules = this.settings.modules.map((mod) => {
         const base = DEFAULT_MODULES.find((d) => d.id === mod.id);
         const merged = Object.assign({}, base || {}, mod);
-        // 老配置只有 name、没有 folder：补成同名目录，保证模块与文件树的映射完整
         if (!merged.folder) merged.folder = sanitizeFolderName(merged.name);
         return merged;
       });
-      // 清理上一版自动同步进来的工具/AI 目录（id 以 dir: 开头的是自动生成的模块）
       const kept = this.settings.modules.filter(
         (mod) => !(String(mod.id || "").startsWith("dir:") && isToolFolder(mod.folder))
       );
@@ -4678,8 +4756,7 @@ module.exports = class NovalPlugin extends Plugin {
         this.settings.modules = kept;
         settingsDirty = true;
       }
-      // 同一个文件夹只保留一条模块配置，避免导航里出现重复入口
-      const seenFolders = new Set();
+      const seenFolders = /* @__PURE__ */ new Set();
       const deduped = this.settings.modules.filter((mod) => {
         const key = String(mod.folder || "").replace(/^\/+|\/+$/g, "").toLowerCase();
         if (!key) return true;
@@ -4692,40 +4769,29 @@ module.exports = class NovalPlugin extends Plugin {
         settingsDirty = true;
       }
     }
-
-    // 每次启动都补齐文件树里新增的文件夹；已删除的模块靠 hiddenModuleFolders 保持隐藏
     if (this.syncModulesFromVault()) settingsDirty = true;
-    // 库里没有任何可用文件夹时，给一组默认入口
     if (firstRun && !this.settings.modules.length) {
       this.settings.modules = DEFAULT_MODULES;
       settingsDirty = true;
     }
     if (settingsDirty) await this.persistSettings();
-
     this.requestRefresh = debounce(() => this.refreshAll(), 700, true);
-
     this.registerView(VIEW_TYPE, (leaf) => new NovalView(leaf, this));
-
-    // 先注册图标，addRibbonIcon 和视图标签页才认得这个名字
     if (PLUGIN_ICON_SVG) addIcon(PLUGIN_ICON_ID, PLUGIN_ICON_SVG);
-
-    this.addRibbonIcon(PLUGIN_ICON_ID, "打开 Noval", () => this.activateView());
-
+    this.addRibbonIcon(PLUGIN_ICON_ID, "\u6253\u5F00 Noval", () => this.activateView());
     this.addCommand({
       id: "open-noval",
-      name: "打开 Noval",
+      name: "\u6253\u5F00 Noval",
       callback: () => this.activateView()
     });
-
     this.addCommand({
       id: "open-noval-focus",
-      name: "打开 Noval（专注模式）",
+      name: "\u6253\u5F00 Noval\uFF08\u4E13\u6CE8\u6A21\u5F0F\uFF09",
       callback: () => this.activateView(true)
     });
-
     this.addCommand({
       id: "toggle-noval-focus",
-      name: "切换 Noval 专注模式",
+      name: "\u5207\u6362 Noval \u4E13\u6CE8\u6A21\u5F0F",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (leaf && leaf.view && leaf.view.setFocus) {
@@ -4733,10 +4799,9 @@ module.exports = class NovalPlugin extends Plugin {
         }
       }
     });
-
     this.addCommand({
       id: "toggle-noval-nav",
-      name: "切换 Noval 侧栏",
+      name: "\u5207\u6362 Noval \u4FA7\u680F",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (leaf && leaf.view && leaf.view.setNavCollapsed) {
@@ -4744,45 +4809,44 @@ module.exports = class NovalPlugin extends Plugin {
         }
       }
     });
-
     this.addCommand({
       id: "open-noval-notes",
-      name: "打开卡片笔记",
+      name: "\u6253\u5F00\u5361\u7247\u7B14\u8BB0",
       callback: async () => {
         await this.activateView();
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (leaf && leaf.view && leaf.view.go) leaf.view.go("notes");
       }
     });
-
     this.addCommand({
       id: "quick-capture",
-      name: "快速记一条（Noval）",
+      name: "\u5FEB\u901F\u8BB0\u4E00\u6761\uFF08Noval\uFF09",
       callback: () => {
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (leaf && leaf.view && leaf.view.quickCapture) leaf.view.quickCapture();
       }
     });
-
     this.addCommand({
       id: "open-canvas-gallery",
-      name: "打开 Noval 画布集",
+      name: "\u6253\u5F00 Noval \u753B\u5E03\u96C6",
       callback: async () => {
         await this.activateView();
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (leaf && leaf.view && leaf.view.go) leaf.view.go("canvas");
       }
     });
-
+    this.addCommand({
+      id: "global-search",
+      name: "\u5168\u5C40\u641C\u7D22",
+      callback: async () => {
+        await this.activateView();
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+        if (leaf && leaf.view) openGlobalSearch(leaf.view);
+      }
+    });
     this.addSettingTab(new NovalSettingTab(this.app, this));
-
     await this.loadBundledPlugins();
-
-    // 画布子插件加载后才能读到自定义画布目录，再同步一次，避免它被当成模块
     if (this.syncModulesFromVault()) await this.persistSettings();
-
-    // 提示框去重：监听本插件视图里 title 属性的增改与节点插入，统一转成
-    // aria-label，去掉浏览器原生的白色提示框，只留 Obsidian 的黑色提示框。
     this._ttObserver = new MutationObserver((mutations) => {
       for (let i = 0; i < mutations.length; i++) {
         const m = mutations[i];
@@ -4810,28 +4874,18 @@ module.exports = class NovalPlugin extends Plugin {
       }
     });
     this.app.workspace.onLayoutReady(() => wbNormalizeTree(document.body));
-
-    // 旧版独立插件留下的旧视图，重启时收掉；
-    // 卡片笔记的 qm-cards-view 是正式侧栏，不在这里处理。
     this.app.workspace.onLayoutReady(() => this.closeLegacyViews());
-
-    // 白板后缀由 .volis 统一迁到 .noval，只需在布局就绪后跑一次。
     this.app.workspace.onLayoutReady(() => this.migrateBoardExtension());
-
-    // 卡片笔记右侧栏：跟随上次退出时的状态恢复。用户主动关掉后不会再自己弹出来。
     this.registerEvent(
       this.app.workspace.on("layout-change", () => this.syncNovalSidebarState())
     );
     this.app.workspace.onLayoutReady(() => this.restoreNovalSidebar());
-
     this.registerEvent(this.app.vault.on("modify", () => this.requestRefresh()));
     this.registerEvent(
       this.app.vault.on("create", (file) => {
         this.requestRefresh();
-        const path = String((file && file.path) || "");
-        // 文件树里新建顶层文件夹时，同步成模块，不用重启插件
+        const path = String(file && file.path || "");
         if (file && Array.isArray(file.children) && path && path.indexOf("/") === -1) {
-          // 重建了以前删过的同名文件夹：解除隐藏，让它重新成为模块
           const hidden = this.settings.hiddenModuleFolders || [];
           if (hidden.includes(path)) {
             this.settings.hiddenModuleFolders = hidden.filter((item) => item !== path);
@@ -4843,7 +4897,6 @@ module.exports = class NovalPlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
         this.dropOwnership(file.path);
-        // 删掉文件夹时，对应的自动模块一起收掉
         if (file && Array.isArray(file.children) && this.pruneMissingAutoModules()) {
           this.persistSettings();
         }
@@ -4858,7 +4911,6 @@ module.exports = class NovalPlugin extends Plugin {
       })
     );
     this.registerEvent(this.app.metadataCache.on("resolved", () => this.requestRefresh()));
-
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf) => {
         const type = leaf && leaf.view ? leaf.view.getViewType() : null;
@@ -4870,7 +4922,6 @@ module.exports = class NovalPlugin extends Plugin {
       })
     );
   }
-
   // 素材归属表跟着文件改名 / 删除走，避免记录指向不存在的旧路径。
   remapOwnership(oldPath, newPath) {
     const map = this.settings && this.settings.inboxAssigned;
@@ -4880,17 +4931,15 @@ module.exports = class NovalPlugin extends Plugin {
     delete map[oldPath];
     this.saveSettings();
   }
-
   dropOwnership(path) {
     const map = this.settings && this.settings.inboxAssigned;
     if (!map || !path || !(path in map)) return;
     delete map[path];
     this.saveSettings();
   }
-
   // 模块的保存文件夹被整体改名 / 移动时，同步更新配置里的路径。
   remapModuleFolder(oldPath, newPath) {
-    const modules = (this.settings && this.settings.modules) || [];
+    const modules = this.settings && this.settings.modules || [];
     if (!oldPath || !newPath || oldPath === newPath) return;
     let changed = false;
     for (const mod of modules) {
@@ -4904,8 +4953,7 @@ module.exports = class NovalPlugin extends Plugin {
         changed = true;
       }
     }
-    // 隐藏列表也按同样的路径规则迁移，否则改名后旧目录会被当成新模块冒出来
-    const hidden = (this.settings && this.settings.hiddenModuleFolders) || [];
+    const hidden = this.settings && this.settings.hiddenModuleFolders || [];
     const nextHidden = hidden.map((path) => {
       const value = String(path || "");
       if (value === oldPath) return newPath;
@@ -4918,18 +4966,14 @@ module.exports = class NovalPlugin extends Plugin {
     }
     if (changed) this.saveSettings();
   }
-
   onunload() {
     document.body.classList.remove("noval-focus");
     this.unloadBundledPlugins();
   }
-
   // 处理更名前留在工作区里的旧标签页。
   // 注意：qm-cards-view 现在是内置 Noval 的正式右侧栏，不能再当旧视图清掉，
   // 否则每次启动都会把上次开着的卡片笔记关掉。
   closeLegacyViews() {
-    // 能一一对应的直接换成新类型，标签页原地复活；其余（旧画布文件视图等）
-    // 直接关掉——视图类型已经注销，留着就是一个打不开的空页。
     const remap = { "collis-view": VIEW_TYPE, "collis-gallery": "noval-gallery" };
     const drop = new Set(LEGACY.viewTypes.concat(["volis-board", "volis-workbench"]));
     const leaves = [];
@@ -4939,13 +4983,9 @@ module.exports = class NovalPlugin extends Plugin {
       leaves.length = 0;
     }
     for (const leaf of leaves) {
-      // 未注册的视图类型取不到 getViewType，退回读保存的 state.type
       let type = "";
       try {
-        type =
-          (leaf.view && typeof leaf.view.getViewType === "function" && leaf.view.getViewType()) ||
-          (typeof leaf.getViewState === "function" && leaf.getViewState().type) ||
-          "";
+        type = leaf.view && typeof leaf.view.getViewType === "function" && leaf.view.getViewType() || typeof leaf.getViewState === "function" && leaf.getViewState().type || "";
       } catch (error) {
         type = "";
       }
@@ -4954,27 +4994,25 @@ module.exports = class NovalPlugin extends Plugin {
           leaf.setViewState({ type: remap[type], active: false });
           continue;
         } catch (error) {
-          console.error("[noval] 迁移旧视图失败: " + type, error);
+          console.error("[noval] \u8FC1\u79FB\u65E7\u89C6\u56FE\u5931\u8D25: " + type, error);
         }
       }
       if (drop.has(type)) {
         try {
           leaf.detach();
         } catch (error) {
-          console.error("[noval] 关闭旧视图失败: " + type, error);
+          console.error("[noval] \u5173\u95ED\u65E7\u89C6\u56FE\u5931\u8D25: " + type, error);
         }
       }
     }
-    // 兜底：按类型整体清一遍，覆盖上面取不到类型的情况。
     for (const type of drop) {
       try {
         this.app.workspace.detachLeavesOfType(type);
       } catch (error) {
-        console.error("[noval] 清理旧视图失败: " + type, error);
+        console.error("[noval] \u6E05\u7406\u65E7\u89C6\u56FE\u5931\u8D25: " + type, error);
       }
     }
   }
-
   /* 卡片笔记右侧栏的启动恢复。
    * Obsidian 本身会保存工作区布局，但自定义视图注册较晚时可能被丢掉，
    * 所以这里再用一个布尔标记兜底：上次开着就恢复，上次关了就不动。 */
@@ -4982,7 +5020,6 @@ module.exports = class NovalPlugin extends Plugin {
     this._novalLayoutReady = true;
     const leaves = this.app.workspace.getLeavesOfType(QM_VIEW_TYPE);
     if (leaves.length) {
-      // 已经由 Obsidian 恢复，只需确保右侧栏是展开状态
       if (!this.settings.novalSidebarOpen) {
         this.settings.novalSidebarOpen = true;
         this.persistSettings();
@@ -4993,7 +5030,6 @@ module.exports = class NovalPlugin extends Plugin {
     if (!this.settings.novalSidebarOpen) return;
     this.openNovalSidebar();
   }
-
   syncNovalSidebarState() {
     if (!this._novalLayoutReady) return;
     const open = this.app.workspace.getLeavesOfType(QM_VIEW_TYPE).length > 0;
@@ -5001,27 +5037,21 @@ module.exports = class NovalPlugin extends Plugin {
     this.settings.novalSidebarOpen = open;
     this.persistSettings();
   }
-
   openNovalSidebar() {
     try {
       if (this.app.commands.executeCommandById(NOTES_ID + ":open-cards")) return;
     } catch (error) {
-      // 命令不存在时走下面的兜底
     }
     const leaf = this.app.workspace.getRightLeaf(false);
     if (!leaf) return;
     leaf.setViewState({ type: QM_VIEW_TYPE, active: true });
     this.app.workspace.revealLeaf(leaf);
   }
-
   /* 一次性迁移：插件更名为 Noval 后，白板后缀从 .volis 改成 .noval。
    * 只改扩展名，不碰文件内容；目标同名文件已存在时跳过，避免覆盖。 */
   async migrateBoardExtension() {
-    // .volis 是合并前、.collis 是更名前，两种旧后缀统一换成 .noval。
     const oldExt = LEGACY.boardExt.map((ext) => "." + ext);
-    const legacy = this.app.vault
-      .getFiles()
-      .filter((file) => oldExt.includes("." + file.extension.toLowerCase()));
+    const legacy = this.app.vault.getFiles().filter((file) => oldExt.includes("." + file.extension.toLowerCase()));
     if (!legacy.length) return;
     let moved = 0;
     let skipped = 0;
@@ -5036,33 +5066,30 @@ module.exports = class NovalPlugin extends Plugin {
         moved += 1;
       } catch (error) {
         skipped += 1;
-        console.error("[noval] 白板后缀迁移失败: " + file.path, error);
+        console.error("[noval] \u767D\u677F\u540E\u7F00\u8FC1\u79FB\u5931\u8D25: " + file.path, error);
       }
     }
     if (moved) {
-      new Notice("已把 " + moved + " 张白板的扩展名更新为 .noval");
+      new Notice("\u5DF2\u628A " + moved + " \u5F20\u767D\u677F\u7684\u6269\u5C55\u540D\u66F4\u65B0\u4E3A .noval");
     }
     if (skipped) {
-      console.warn("[noval] 有 " + skipped + " 张白板未能迁移，请检查同名文件");
+      console.warn("[noval] \u6709 " + skipped + " \u5F20\u767D\u677F\u672A\u80FD\u8FC1\u79FB\uFF0C\u8BF7\u68C0\u67E5\u540C\u540D\u6587\u4EF6");
     }
   }
-
   async readHostData() {
     if (!this.hostData) {
-      const raw = (await this.loadData()) || {};
+      const raw = await this.loadData() || {};
       this.hostData = raw;
-      // 更名前后的设置键都在这一个入口搬完，读写只有一处，不会漏。
       if (this.migrateLegacyKeys(raw)) await this.writeHostData();
     }
     return this.hostData;
   }
-
   // 把旧键原样搬到新键（不复制内容，只换键名），旧键删掉。
   migrateLegacyKeys(data) {
     let changed = false;
     const move = (from, to) => {
-      if (from === to || data[from] === undefined) return;
-      if (data[to] === undefined) data[to] = data[from];
+      if (from === to || data[from] === void 0) return;
+      if (data[to] === void 0) data[to] = data[from];
       delete data[from];
       changed = true;
     };
@@ -5071,11 +5098,9 @@ module.exports = class NovalPlugin extends Plugin {
     move(LEGACY.sidebarKey, "novalSidebarOpen");
     return changed;
   }
-
   async writeHostData() {
     await this.saveData(this.hostData || {});
   }
-
   async loadBundledPlugins() {
     this.bundled = [];
     await this.migrateLegacySettings();
@@ -5083,19 +5108,16 @@ module.exports = class NovalPlugin extends Plugin {
       await this.loadBundledPlugin(spec);
     }
   }
-
   // 旧版独立插件的设置分别在各自文件夹的 data.json。
   // 第一次启动时搬进 noval/data.json，搬完后那些文件夹可以随时删掉。
   async migrateLegacySettings() {
     const data = await this.readHostData();
     let dirty = false;
-    // 画布子插件早期叫 volis：把旧键搬过来，避免丢 AI 配置。
     if (!data[BOARD_ID] && data.volis) {
       data[BOARD_ID] = data.volis;
       delete data.volis;
       dirty = true;
     }
-    // 只有宿主里还没有这份设置时，才去旧目录捞一次。
     for (const [id, legacyId] of [
       [NOTES_ID, LEGACY.notesId],
       [BOARD_ID, LEGACY.boardId]
@@ -5113,17 +5135,13 @@ module.exports = class NovalPlugin extends Plugin {
             break;
           }
         } catch (error) {
-          // 没有旧数据就交给子插件使用自己的默认值
         }
       }
     }
     if (dirty) await this.writeHostData();
   }
-
   isStandaloneEnabled(id) {
     try {
-      // 内置子模块的 id 与宿主 id 已经错开（noval / noval-notes / noval-board），
-      // 这里保留排除自身的判断：万一以后再把 id 改成一样，也不会自己把自己当独立插件跳过。
       if (id === this.manifest.id) return false;
       const plugins = this.app.plugins && this.app.plugins.plugins;
       return !!(plugins && plugins[id] && plugins[id] !== this);
@@ -5131,7 +5149,6 @@ module.exports = class NovalPlugin extends Plugin {
       return false;
     }
   }
-
   // 子插件的读写重定向到 noval 的 data.json，键名分别是 noval / noval-board。
   attachChildSettings(child, id) {
     child.loadData = async () => {
@@ -5144,44 +5161,37 @@ module.exports = class NovalPlugin extends Plugin {
       await this.writeHostData();
     };
   }
-
   async loadBundledPlugin(spec) {
     if (this.isStandaloneEnabled(spec.id)) {
-      console.log("[noval] 独立插件已启用，跳过内置 " + spec.id);
+      console.log("[noval] \u72EC\u7ACB\u63D2\u4EF6\u5DF2\u542F\u7528\uFF0C\u8DF3\u8FC7\u5185\u7F6E " + spec.id);
       return;
     }
     try {
       const PluginClass = resolvePluginClass(spec.bundle, spec.className);
       if (typeof PluginClass !== "function") {
-        throw new Error("未找到可用的插件类");
+        throw new Error("\u672A\u627E\u5230\u53EF\u7528\u7684\u63D2\u4EF6\u7C7B");
       }
       const manifest = Object.assign({}, spec.manifest);
       manifest.dir = this.manifest.dir || this.app.vault.configDir + "/plugins/noval";
       const child = new PluginClass(this.app, manifest);
       this.attachChildSettings(child, spec.id);
-      // 内置子插件只作为功能模块存在，不再单独出现在界面上：
-      // 不挂 ribbon 图标、状态栏；设置页不单独注册，但保留实例，
-      // 由 Noval 设置页复用画布组件原有的 AI 配置界面。
       const noElement = () => document.createElement("div");
       child.addRibbonIcon = noElement;
       child.addStatusBarItem = noElement;
       child.addSettingTab = (tab) => {
         child._settingTab = tab;
       };
-      // 手动托管的组件不会走 Obsidian 的启用流程，先标记录入状态，
-      // 这样 onunload 时 Component.unload() 才能正确清理事件与视图。
       child._loaded = true;
       this.bundled.push(child);
       await child.onload();
       this.childPlugins = this.childPlugins || {};
       this.childPlugins[spec.id] = child;
-      console.log("[noval] 已加载内置插件 " + manifest.id);
+      console.log("[noval] \u5DF2\u52A0\u8F7D\u5185\u7F6E\u63D2\u4EF6 " + manifest.id);
     } catch (error) {
-      console.error("[noval] 内置插件启动失败: " + spec.id, error);
-      new Notice("Noval：内置 " + spec.id + " 启动失败，请查看控制台");
+      console.error("[noval] \u5185\u7F6E\u63D2\u4EF6\u542F\u52A8\u5931\u8D25: " + spec.id, error);
+      new Notice("Noval\uFF1A\u5185\u7F6E " + spec.id + " \u542F\u52A8\u5931\u8D25\uFF0C\u8BF7\u67E5\u770B\u63A7\u5236\u53F0");
     }
   }
-
   unloadBundledPlugins() {
     const list = this.bundled || [];
     this.bundled = [];
@@ -5189,25 +5199,23 @@ module.exports = class NovalPlugin extends Plugin {
       try {
         child.unload();
       } catch (error) {
-        console.error("[noval] 内置插件卸载失败", error);
+        console.error("[noval] \u5185\u7F6E\u63D2\u4EF6\u5378\u8F7D\u5931\u8D25", error);
       }
     }
   }
-
   /* 画布文件夹路径：跟随画布子插件的设置，未加载时按默认「画布」。 */
   canvasFolderPath() {
     const board = this.childPlugins && this.childPlugins[BOARD_ID];
-    const folder = String((board && board.novalFolder) || "画布").replace(/^\/+|\/+$/g, "");
-    return folder || "画布";
+    const folder = String(board && board.novalFolder || "\u753B\u5E03").replace(/^\/+|\/+$/g, "");
+    return folder || "\u753B\u5E03";
   }
-
   /* 按文件树顺序重排模块配置：
    *   - 同一层级按文件夹在文件树里的先后排，子模块紧跟父模块；
    *   - 文件树里找不到的模块排在同级最后，保持原有相对顺序。 */
   orderModulesByFileTree(list) {
     const mods = Array.isArray(list) ? list.slice() : [];
     if (mods.length < 2) return mods;
-    const cache = new Map();
+    const cache = /* @__PURE__ */ new Map();
     const entries = mods.map((mod, index) => {
       const dir = moduleFolderOf(mod);
       return { mod, index, rank: dir ? vaultNodeRank(this.app, dir, cache) : null };
@@ -5216,8 +5224,8 @@ module.exports = class NovalPlugin extends Plugin {
       if (a.rank && b.rank) {
         const len = Math.max(a.rank.length, b.rank.length);
         for (let i = 0; i < len; i += 1) {
-          if (a.rank[i] === undefined) return -1; // 父文件夹排在子模块前面
-          if (b.rank[i] === undefined) return 1;
+          if (a.rank[i] === void 0) return -1;
+          if (b.rank[i] === void 0) return 1;
           if (a.rank[i] !== b.rank[i]) return a.rank[i] - b.rank[i];
         }
         return a.index - b.index;
@@ -5228,7 +5236,6 @@ module.exports = class NovalPlugin extends Plugin {
     });
     return entries.map((entry) => entry.mod);
   }
-
   /* 启动同步：把库根目录下已有的文件夹同步成模块入口。
    * 只跳过工具/AI/构建目录（vault-scripts、node_modules、.claude …）和画布目录；
    * 附件、媒体文件等普通文件夹同样同步。子文件夹由模块页按文件树自动生成，
@@ -5238,9 +5245,7 @@ module.exports = class NovalPlugin extends Plugin {
     const root = this.app.vault.getRoot && this.app.vault.getRoot();
     if (!root || !Array.isArray(root.children)) return false;
     const normalize = (value) => String(value || "").replace(/^\/+|\/+$/g, "");
-    // 路径比较统一忽略大小写，兼容 Windows 上大小写不一致的旧配置
     const keyOf = (value) => normalize(value).toLowerCase();
-    // 画布文件夹归白板工作区，任何情况下都不作为模块；顺手清掉历史自动配置
     const canvasKey = keyOf(this.canvasFolderPath());
     const beforeCount = (this.settings.modules || []).length;
     this.settings.modules = (this.settings.modules || []).filter(
@@ -5251,28 +5256,24 @@ module.exports = class NovalPlugin extends Plugin {
     const configured = new Set(
       (this.settings.modules || []).map((mod) => keyOf(mod.folder)).filter(Boolean)
     );
-    root.children
-      .filter((child) => child && Array.isArray(child.children))
-      .filter((child) => {
-        const path = String(child.path || "");
-        if (!path || path.split("/").some((part) => part.startsWith("."))) return false;
-        if (keyOf(path) === canvasKey) return false;
-        return !isToolFolder(path);
-      })
-      .forEach((folder) => {
-        const path = normalize(folder.path);
-        const key = keyOf(path);
-        if (!path || configured.has(key) || hidden.has(key)) return;
-        this.settings.modules.push({
-          id: "dir:" + path,
-          name: folder.name,
-          icon: "folder",
-          folder: path
-        });
-        configured.add(key);
-        changed = true;
+    root.children.filter((child) => child && Array.isArray(child.children)).filter((child) => {
+      const path = String(child.path || "");
+      if (!path || path.split("/").some((part) => part.startsWith("."))) return false;
+      if (keyOf(path) === canvasKey) return false;
+      return !isToolFolder(path);
+    }).forEach((folder) => {
+      const path = normalize(folder.path);
+      const key = keyOf(path);
+      if (!path || configured.has(key) || hidden.has(key)) return;
+      this.settings.modules.push({
+        id: "dir:" + path,
+        name: folder.name,
+        icon: "folder",
+        folder: path
       });
-    // 顺序跟随文件树：文件树里谁在前，模块就排在前面（子模块跟着父模块）
+      configured.add(key);
+      changed = true;
+    });
     const ordered = this.orderModulesByFileTree(this.settings.modules);
     if (ordered.some((mod, index) => mod !== this.settings.modules[index])) {
       this.settings.modules = ordered;
@@ -5280,7 +5281,6 @@ module.exports = class NovalPlugin extends Plugin {
     }
     return changed;
   }
-
   /* 文件树里的文件夹被删掉后，清掉对应的自动模块；
    * 手动创建的模块保留配置，等文件夹恢复后还能继续用。 */
   pruneMissingAutoModules() {
@@ -5294,7 +5294,6 @@ module.exports = class NovalPlugin extends Plugin {
     });
     return this.settings.modules.length !== before;
   }
-
   async persistSettings() {
     const data = await this.readHostData();
     data.modules = this.settings.modules;
@@ -5308,18 +5307,15 @@ module.exports = class NovalPlugin extends Plugin {
     data.hiddenModuleFolders = this.settings.hiddenModuleFolders || [];
     await this.writeHostData();
   }
-
   async saveSettings() {
     await this.persistSettings();
     this.refreshAll();
   }
-
   refreshAll() {
     this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach((leaf) => {
       if (leaf.view && leaf.view.refresh) leaf.view.refresh();
     });
   }
-
   async activateView(forceFocus) {
     let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
     if (!leaf) {
@@ -5327,7 +5323,6 @@ module.exports = class NovalPlugin extends Plugin {
       await leaf.setViewState({ type: VIEW_TYPE, active: true });
     }
     this.app.workspace.revealLeaf(leaf);
-
     if ((forceFocus || this.settings.focusOnOpen) && leaf.view && leaf.view.setFocus) {
       leaf.view.setFocus(true);
     }

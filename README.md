@@ -74,14 +74,22 @@
 npm install --save-dev esbuild
 # 或指定已有 esbuild 可执行文件：ESBUILD=/path/to/esbuild
 
-# 2. 打包（生成 dist/main.js、dist/styles.css、dist/manifest.json、dist/versions.json）
+# 2. 打包（生成 dist/main.js、dist/styles.css、dist/manifest.json、dist/versions.json，
+#    并把同名的三个发布资产自动同步到仓库根目录）
 node build/build.js
 
 # 3. 本地验证（不启动 Obsidian，仅校验 bundle 能加载）
 node build/verify.js
+
+# 4. 发布前体检（版本号、产物、源码指纹、敏感信息是否一致）
+node build/check.js
 ```
 
-把 `dist/` 里的三个文件拷到 `.obsidian/plugins/noval/` 即可在 Obsidian 里加载测试。
+把 `dist/` 里的三个文件拷到 `.obsidian/plugins/noval/` 即可在 Obsidian 里加载测试；
+也可以用 `OBSIDIAN_PLUGIN_DIR=<vault>/.obsidian/plugins/noval node build/install.js` 同步。
+
+> **改功能只改 `src/`、`vendor/`、`build/*.css`，不要直接改 `main.js` 或 `styles.css`。**
+> 这两个是打包产物，直接改会在下次 `node build/build.js` 时被覆盖。
 
 ### 目录结构
 

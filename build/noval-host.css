@@ -2432,78 +2432,57 @@ body.noval-focus .workspace-leaf-resize-handle {
   z-index: 1;
 }
 
-/* 顶栏 */
+/* 顶栏 · 植物线描装饰 */
 .noval-view .cl-hm-top {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 10px;
+  height: 44px;
+  margin-bottom: 12px;
 }
 
-.noval-view .cl-hm-crumb { font-size: 11px; color: var(--hm-muted); letter-spacing: 0.04em; }
-.noval-view .cl-hm-crumb b { color: var(--hm-text); font-weight: 600; }
-.noval-view .cl-hm-topspace { flex: 1; }
+.noval-view .cl-hm-branch { display: flex; flex: none; color: #7fa268; }
+.noval-view .cl-hm-branch svg { display: block; width: 52px; height: 30px; }
 
-.noval-view .cl-hm-cmd {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  width: 250px;
-  padding: 0 11px;
-  border-radius: 10px;
-  border: 1px solid var(--hm-line);
-  background: var(--hm-panel);
+.noval-view .cl-hm-topmid {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.2em;
   color: var(--hm-faint);
-  font-size: 11.5px;
-  cursor: text;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.noval-view .cl-hm-cmd:hover { border-color: var(--hm-line-strong); }
-.noval-view .cl-hm-cmdico { display: flex; }
-.noval-view .cl-hm-cmdico svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.noval-view .cl-hm-topclk { flex: none; text-align: right; line-height: 1.15; }
 
-.noval-view .cl-hm-kbd {
-  margin-left: auto;
-  font-size: 9.5px;
-  padding: 2px 5px;
-  border-radius: 4px;
-  border: 1px solid var(--hm-line);
-  color: var(--hm-faint);
+.noval-view .cl-hm-topclk b {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
-.noval-view .cl-hm-iconbtn {
-  width: 32px;
-  height: 32px;
+.noval-view .cl-hm-topclk span { font-size: 9px; letter-spacing: 0.08em; color: var(--hm-faint); }
+
+.noval-view .cl-hm-topgear {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  border: 1px solid var(--hm-line);
-  background: var(--hm-panel);
-  color: var(--hm-muted);
+  flex: none;
+  color: var(--hm-faint);
+  opacity: 0.55;
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
-.noval-view .cl-hm-iconbtn:hover {
-  color: var(--hm-text);
-  border-color: var(--hm-line-strong);
-  transform: translateY(-1px);
-}
-
-.noval-view .cl-hm-iconbtn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.7; }
-
-.noval-view .cl-hm-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--hm-grad);
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  font-weight: 800;
-  color: #0c1507;
-}
+.noval-view .cl-hm-topgear:hover { opacity: 1; color: var(--hm-text); background: var(--hm-panel); }
+.noval-view .cl-hm-topgear svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
 
 /* Bento */
 .noval-view .cl-hm-bento {
@@ -2683,76 +2662,114 @@ body.noval-focus .workspace-leaf-resize-handle {
 /* 本周节奏 */
 .noval-view .cl-hm-week { display: flex; flex-direction: column; }
 
-.noval-view .cl-hm-weeknum {
+.noval-view .cl-hm-wktop {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 2px 0 12px;
+  align-items: flex-end;
+  gap: 14px;
+  margin: 2px 0 14px;
 }
 
-.noval-view .cl-hm-weeknum strong {
+.noval-view .cl-hm-wknum { display: flex; align-items: baseline; gap: 6px; }
+
+.noval-view .cl-hm-wknum strong {
   font-size: 34px;
   font-weight: 720;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
-.noval-view .cl-hm-weeknum > span { font-size: 10.5px; color: var(--hm-muted); }
+.noval-view .cl-hm-wknum > span { font-size: 10.5px; color: var(--hm-muted); }
 
-.noval-view .cl-hm-trend {
+.noval-view .cl-hm-wkstats {
   margin-left: auto;
-  font-size: 10px;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: rgba(169, 201, 138, 0.12);
-  color: var(--hm-accent);
-  border: 1px solid rgba(169, 201, 138, 0.25);
-}
-
-.noval-view .cl-hm-trend.is-down {
-  color: #ff8b8b;
-  background: rgba(255, 110, 110, 0.1);
-  border-color: rgba(255, 110, 110, 0.25);
-}
-
-.noval-view .cl-hm-heat {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(7, 9px);
-  gap: 4px;
-  flex: 1;
-  align-content: center;
-}
-
-.noval-view .cl-hm-heat i {
-  display: block;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.055);
-}
-
-
-.noval-view .cl-hm-heat i.is-future { background: transparent; }
-.noval-view .cl-hm-heat i.l1 { background: rgba(169, 201, 138, 0.22); }
-.noval-view .cl-hm-heat i.l2 { background: rgba(169, 201, 138, 0.42); }
-.noval-view .cl-hm-heat i.l3 { background: rgba(169, 201, 138, 0.62); }
-.noval-view .cl-hm-heat i.l4 { background: var(--hm-accent); box-shadow: none; }
-
-.noval-view .cl-hm-heatfoot {
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--hm-muted);
   display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
+}
+
+.noval-view .cl-hm-streak {
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 10px;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--hm-accent);
+  background: rgba(169, 201, 138, 0.16);
+  border: 1px solid rgba(169, 201, 138, 0.3);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.noval-view .cl-hm-cmp { font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.noval-view .cl-hm-cmp.up { color: #6fbd7f; }
+.noval-view .cl-hm-cmp.down { color: #ff8b8b; }
+
+.noval-view .cl-hm-wkchart { margin-bottom: 13px; }
+.noval-view .cl-hm-wkchart svg { display: block; width: 100%; height: 74px; }
+
+.noval-view .cl-hm-wklabels {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
   font-size: 9.5px;
   color: var(--hm-faint);
+  margin-top: 5px;
+}
+.noval-view .cl-hm-wklabels .is-today { color: var(--hm-accent); font-weight: 700; }
+
+.noval-view .cl-hm-wkfoot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 11px;
+  border-top: 1px dashed var(--hm-line);
+  font-size: 11px;
 }
 
-.noval-view .cl-hm-legend { margin-left: auto; display: flex; gap: 3px; align-items: center; }
-.noval-view .cl-hm-legend i { width: 8px; height: 8px; border-radius: 2px; display: block; background: rgba(255, 255, 255, 0.07); }
+.noval-view .cl-hm-wktoday { display: flex; align-items: center; gap: 6px; color: var(--hm-muted); }
+.noval-view .cl-hm-wktoday .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #5fae6e;
+  box-shadow: 0 0 0 3px rgba(95, 174, 110, 0.16);
+}
+.noval-view .cl-hm-wktoday.idle .dot {
+  background: #e0a04a;
+  box-shadow: 0 0 0 3px rgba(224, 160, 74, 0.16);
+}
 
-.noval-view .cl-hm-legend i.l1 { background: rgba(169, 201, 138, 0.25); }
-.noval-view .cl-hm-legend i.l2 { background: rgba(169, 201, 138, 0.45); }
-.noval-view .cl-hm-legend i.l3 { background: rgba(169, 201, 138, 0.65); }
-.noval-view .cl-hm-legend i.l4 { background: var(--hm-accent); }
+.noval-view .cl-hm-wkprog {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--hm-muted);
+}
+.noval-view .cl-hm-wkprog .bar {
+  width: 70px; height: 5px; border-radius: 3px;
+  background: var(--hm-track);
+  overflow: hidden;
+}
+.noval-view .cl-hm-wkprog .bar i {
+  display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, #a9c98a, var(--hm-accent));
+}
+.noval-view .cl-hm-wkprog b { color: var(--hm-text); font-variant-numeric: tabular-nums; }
+
+.noval-view .cl-hm-wknudge {
+  margin-top: 9px;
+  font-size: 10.5px;
+  color: #e0a04a;
+  background: rgba(224, 160, 74, 0.1);
+  border: 1px solid rgba(224, 160, 74, 0.25);
+  border-radius: 9px;
+  padding: 5px 9px;
+  cursor: pointer;
+}
 
 /* 收件箱 */
 .noval-view .cl-hm-inbox { display: flex; flex-direction: column; }
@@ -3149,13 +3166,96 @@ body.noval-focus .workspace-leaf-resize-handle {
 }
 
 @container (max-width: 620px) {
-  .noval-view .cl-hm-cmd { display: none; }
   .noval-view .cl-hm-resumes { grid-template-columns: 1fr; }
   .noval-view .cl-hm-mods { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .noval-view .cl-hm-boards { grid-template-columns: 1fr 1fr; }
   .noval-view .cl-hm-board:nth-child(3) { display: none; }
   .noval-view .cl-hm-hello { font-size: 26px; }
 }
+
+/* =====================================================================
+   首页 · 宽屏单屏适配
+   容器 ≥ 901px 时：页面高度铺满，三行板块按比例分配高度，
+   板块尺寸固定、内容超出由卡片自身裁切，整页不出现滚动条。
+   窄屏仍走原有滚动。数值整体等比缩小约 25%。
+   ===================================================================== */
+.noval-view .cl-scroll.cl-hm-scroll { container-type: inline-size; }
+
+@container (min-width: 901px) {
+  .noval-view .cl-hm-page {
+    box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 18px 8px;
+  }
+
+  .noval-view .cl-hm-topbot { height: 40px; margin-bottom: 9px; }
+  .noval-view .cl-hm-branch svg { width: 46px; height: 26px; }
+
+  .noval-view .cl-hm-bento {
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-template-rows: 1.16fr 0.96fr 0.92fr;
+    gap: 11px;
+  }
+
+  .noval-view .cl-hm-card { min-height: 0; padding: 12px 13px; }
+  .noval-view .cl-hm-head { margin-bottom: 8px; }
+
+  /* hero */
+  .noval-view .cl-hm-hero { min-height: 0; padding: 12px 14px 11px; }
+  .noval-view .cl-hm-bigdate { font-size: 72px; top: 6px; right: 8px; }
+  .noval-view .cl-hm-hello { font-size: 22px; }
+  .noval-view .cl-hm-herometa { margin-top: 5px; font-size: 10px; }
+  .noval-view .cl-hm-capture { margin-top: 8px; height: 30px; }
+
+  /* 本周节奏 */
+  .noval-view .cl-hm-wktop { margin: 0 0 7px; }
+  .noval-view .cl-hm-wknum strong { font-size: 24px; }
+  .noval-view .cl-hm-wkchart { margin-bottom: 6px; }
+  .noval-view .cl-hm-wkchart svg { height: 46px; }
+  .noval-view .cl-hm-wklabels { margin-top: 2px; font-size: 9px; }
+  .noval-view .cl-hm-wkfoot { padding-top: 6px; font-size: 10px; }
+  .noval-view .cl-hm-wkprog .bar { width: 46px; }
+  .noval-view .cl-hm-wknudge { margin-top: 6px; padding: 4px 8px; font-size: 9.5px; }
+
+  /* 收件箱 */
+  .noval-view .cl-hm-ring { width: 44px; height: 44px; }
+  .noval-view .cl-hm-ring b { font-size: 15px; }
+  .noval-view .cl-hm-ringwrap { margin: 0 0 7px; gap: 9px; }
+  .noval-view .cl-hm-ringk { font-size: 10px; }
+  .noval-view .cl-hm-inboxitem { padding: 6px 8px; }
+  .noval-view .cl-hm-inboxname { font-size: 10px; }
+  .noval-view .cl-hm-inboxlink { padding-top: 6px; font-size: 9.5px; }
+
+  /* 继续 */
+  .noval-view .cl-hm-resumes { gap: 6px; }
+  .noval-view .cl-hm-file { padding: 7px 9px; border-radius: 10px; }
+  .noval-view .cl-hm-filetop { margin-bottom: 4px; }
+  .noval-view .cl-hm-filetree { font-size: 10px; }
+  .noval-view .cl-hm-filemeta { margin-top: 4px; font-size: 8.5px; }
+
+  /* 模块脉搏 */
+  .noval-view .cl-hm-mods { gap: 6px; }
+  .noval-view .cl-hm-mod { padding: 8px 8px 7px; border-radius: 11px; }
+  .noval-view .cl-hm-modico { width: 20px; height: 20px; margin-bottom: 5px; }
+  .noval-view .cl-hm-modcount { font-size: 15px; }
+  .noval-view .cl-hm-modbar { margin-top: 4px; }
+
+  /* 白板 / 速记 */
+  .noval-view .cl-hm-boards { gap: 7px; }
+  .noval-view .cl-hm-board { border-radius: 11px; }
+  .noval-view .cl-hm-art { aspect-ratio: 16 / 9; }
+  .noval-view .cl-hm-notes { gap: 6px; }
+  .noval-view .cl-hm-note { padding: 8px 10px 8px 14px; border-radius: 11px; }
+  .noval-view .cl-hm-note::before { font-size: 20px; }
+
+  .noval-view .cl-hm-foot { margin-top: 6px; font-size: 8.5px; }
+}
+
+body.theme-light .noval-view .cl-hm-branch { color: #6e9460; }
 
 /* =====================================================================
    工作台外壳 · 左侧导航配色
@@ -4987,8 +5087,9 @@ body.theme-light .noval-view .cl-hm-note {
   color: var(--text-error);
 }
 
-/* 网格卡片右上角删除：悬停才出现，避免遮挡缩略图 */
-.noval-view .cl-md-tiledel {
+/* 网格卡片右上角操作：悬停才出现，避免遮挡缩略图 */
+.noval-view .cl-md-tiledel,
+.noval-view .cl-md-tilemore {
   position: absolute;
   top: 14px;
   right: 14px;
@@ -5010,13 +5111,17 @@ body.theme-light .noval-view .cl-hm-note {
 }
 
 .noval-view .cl-md-tile:hover .cl-md-tiledel,
-.noval-view .cl-md-tiledel:focus {
+.noval-view .cl-md-tile:hover .cl-md-tilemore,
+.noval-view .cl-md-tiledel:focus,
+.noval-view .cl-md-tilemore:focus {
   opacity: 1;
   visibility: visible;
 }
 
 .noval-view .cl-md-tiledel:hover { color: var(--text-error); }
-.noval-view .cl-md-tiledel svg { width: 13px; height: 13px; }
+.noval-view .cl-md-tilemore:hover { color: var(--text-normal); }
+.noval-view .cl-md-tiledel svg,
+.noval-view .cl-md-tilemore svg { width: 13px; height: 13px; }
 
 /* ---------- 网格视图 ---------- */
 .noval-view .cl-md-grid {
@@ -5188,6 +5293,42 @@ body.theme-light .noval-view .cl-hm-note {
   color: var(--text-faint);
 }
 
+/* ---------- 模块页 · 卡片视图：与画布集卡片同尺寸 ----------
+   16:9 全幅封面 + 同字号/圆角/内边距，收件箱等其他复用 .cl-md-tile 的
+   区域不受影响（这里用 .cl-mdv-body 限定作用范围）。 */
+.noval-view .cl-mdv-body .cl-md-grid {
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 12px;
+}
+
+.noval-view .cl-mdv-body .cl-md-tile {
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.noval-view .cl-mdv-body .cl-md-thumb {
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border-radius: 0;
+}
+
+.noval-view .cl-mdv-body .cl-md-tilename {
+  margin: 9px 10px 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.noval-view .cl-mdv-body .cl-md-tilemeta {
+  margin: 3px 10px 10px;
+  font-size: 11px;
+}
+
+.noval-view .cl-mdv-body .cl-md-tilemore {
+  top: 7px;
+  right: 7px;
+}
+
 /* ---------- 页脚 ---------- */
 .noval-view .cl-md-foot {
   display: flex;
@@ -5303,6 +5444,7 @@ body.theme-light .noval-view .cl-hm-note {
     border-top: 1px solid var(--background-modifier-border);
   }
   .noval-view .cl-md-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .noval-view .cl-mdv-body .cl-md-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 }
 
 @media (max-width: 620px) {
@@ -5830,8 +5972,9 @@ body.theme-light .noval-view .cl-hm-note {
   font-variant-numeric: tabular-nums;
 }
 
-/* 列表行的单条删除按钮：默认淡显，悬停整行时加深 */
-.noval-view .cl-mdv-del {
+/* 列表行的单条操作按钮：默认淡显，悬停整行时加深 */
+.noval-view .cl-mdv-del,
+.noval-view .cl-mdv-more {
   width: 26px;
   height: 26px;
   display: grid;
@@ -5842,14 +5985,19 @@ body.theme-light .noval-view .cl-hm-note {
   transition: opacity 0.14s ease, background 0.14s ease, color 0.14s ease;
 }
 
-.noval-view .cl-mdv-row:hover .cl-mdv-del { opacity: 1; }
+.noval-view .cl-mdv-row:hover .cl-mdv-del,
+.noval-view .cl-mdv-row:hover .cl-mdv-more { opacity: 1; }
 
-.noval-view .cl-mdv-del:hover {
+.noval-view .cl-mdv-del:hover,
+.noval-view .cl-mdv-more:hover {
   background: var(--background-modifier-hover);
-  color: var(--text-error, #b0453f);
 }
 
-.noval-view .cl-mdv-del svg { width: 14px; height: 14px; }
+.noval-view .cl-mdv-del:hover { color: var(--text-error, #b0453f); }
+.noval-view .cl-mdv-more:hover { color: var(--text-normal); }
+
+.noval-view .cl-mdv-del svg,
+.noval-view .cl-mdv-more svg { width: 14px; height: 14px; }
 
 /* ---------- 笔记空态 ---------- */
 .noval-view .cl-mdv-blank {
@@ -5958,8 +6106,8 @@ body.theme-light .noval-view .cl-hm-note {
    否则用户看到的主面板仍是 Obsidian 默认底色。 */
 .noval-view .cl-main .cl-scroll.cl-scroll-canvas,
 .noval-view .cl-main .cl-scroll.cl-scroll-canvas .cl-root,
-.noval-view .cl-main .cl-scroll.cl-scroll-canvas .cl-root .vw-frame,
-.noval-view .cl-main .cl-scroll.cl-scroll-canvas .cl-root .vw-toolbar {
+.noval-view .cl-main .cl-scroll.cl-scroll-canvas .cl-root .nvg-frame,
+.noval-view .cl-main .cl-scroll.cl-scroll-canvas .cl-root .nvg-top {
   background: var(--nv-pane);
 }
 

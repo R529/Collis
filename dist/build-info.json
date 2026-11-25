@@ -1,0 +1,10 @@
+{
+  "version": "0.8.3",
+  "sources": "d9e4d66b7f750313675e5c1eaf17024197fba05cf2c5abf733df993e8e2f09bb",
+  "esbuild": "0.28.2",
+  "products": {
+    "main.js": "8c71ae330f33d57834e61daa1975c05de6b177b8f248b1eedbf7c4ac9c1667f5",
+    "styles.css": "a2c0b099e9ee3b6a97bd006c6be74a0456f927e8594c8ad4969ed8809c936ef1",
+    "manifest.json": "c68c3ff6c3bc3f621524d6d2f68c763d4329f9c282633bfd708bb6eeec4929ca"
+  }
+}
