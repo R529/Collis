@@ -5912,6 +5912,10 @@ var require_noval_board_core = __commonJS({
         this.items = [];
         this.sortMode = "created";
         this.query = "";
+        this.filterMode = "all";
+        this.groupMode = "folder";
+        this.collapsed = /* @__PURE__ */ new Set();
+        this.dragPaths = null;
         this.multi = false;
         this.selected = /* @__PURE__ */ new Set();
         this.signature = "";
@@ -6058,16 +6062,16 @@ var require_noval_board_core = __commonJS({
         const root = this.rootEl();
         if (!root)
           return;
-        const scrolled = root.querySelector(".vw-scroll");
+        const scrolled = root.querySelector(".nvg-scroll");
         const scroll = scrolled ? scrolled.scrollTop : 0;
         this.clearRoot(root);
         root.classList.add("cl-root");
-        const frame = node("div", "vw-frame");
-        const toolbar = node("div", "vw-toolbar");
+        const frame = node("div", "nvg-frame");
+        const toolbar = node("div", "nvg-top");
         toolbar.appendChild(this.buildHead());
         frame.appendChild(toolbar);
-        const body = node("div", "vw-scroll");
-        const results = node("div", "vw-results");
+        const body = node("div", "nvg-scroll");
+        const results = node("div", "nvg-results");
         results.appendChild(this.buildResults());
         body.appendChild(results);
         frame.appendChild(body);
@@ -6080,34 +6084,181 @@ var require_noval_board_core = __commonJS({
         const root = this.rootEl();
         if (!root)
           return;
-        const results = root.querySelector(".vw-results");
-        const count2 = root.querySelector(".vw-count");
+        const results = root.querySelector(".nvg-results");
+        const count2 = root.querySelector(".nvg-count");
         if (!results)
           return;
         this.clearRoot(results);
         results.appendChild(this.buildResults());
         const visible = this.visibleItems();
         if (count2) {
-          count2.textContent = this.query ? `${visible.length} / ${this.items.length} \u5757` : `${this.items.length} \u5757`;
+          count2.textContent = visible.length === this.items.length ? `${this.items.length} \u5757` : `${visible.length} / ${this.items.length} \u5757`;
         }
+      }
+      matchesFilter(item) {
+        if (this.filterMode === "favorites")
+          return isFavoriteBoard(this.plugin && this.plugin.settings, item.file.path);
+        if (this.filterMode === "recent")
+          return Date.now() - item.mtime < 7 * 864e5;
+        return true;
       }
       visibleItems() {
         const q = this.query.trim().toLocaleLowerCase();
-        if (!q)
-          return this.items;
-        return this.items.filter(
-          (item) => [item.title, ...item.cover.nodes.map((box) => box.text)].some((text) => text.toLocaleLowerCase().includes(q))
-        );
+        return this.items.filter((item) => {
+          if (!this.matchesFilter(item))
+            return false;
+          if (!q)
+            return true;
+          return [item.title, ...item.cover.nodes.map((box) => box.text)].some(
+            (text) => text.toLocaleLowerCase().includes(q)
+          );
+        });
       }
       buildResults() {
         const visible = this.visibleItems();
-        if (!visible.length) {
-          return this.buildEmpty(this.query.trim().length > 0);
+        const extraKeys = this.filterMode === "all" && !this.query.trim()
+          ? boardFolderGroupKeys(this.app, this.plugin.novalFolder)
+          : [];
+        if (!visible.length && !(this.groupMode === "folder" && extraKeys.length)) {
+          return this.buildEmpty(this.query.trim().length > 0 || this.filterMode !== "all");
         }
-        const grid = node("div", "vw-grid");
-        for (const item of visible)
-          grid.appendChild(this.buildCard(item));
-        return grid;
+        if (this.groupMode !== "folder") {
+          const grid2 = node("div", "nvg-grid");
+          for (const item of visible)
+            grid2.appendChild(this.buildCard(item));
+          return grid2;
+        }
+        const wrap = node("div", "nvg-groups");
+        for (const group of boardGroupBoards(visible, this.plugin.novalFolder, extraKeys))
+          wrap.appendChild(this.buildGroupSection(group));
+        return wrap;
+      }
+      buildGroupSection(group) {
+        const section = node("div", "nvg-group");
+        const collapsed = this.collapsed.has(group.key);
+        if (collapsed)
+          section.classList.add("is-collapsed");
+        if (!group.key)
+          section.classList.add("is-root");
+        const head = node("div", "nvg-ghead");
+        const chev = node("button", "nvg-chev");
+        chev.setAttribute("title", collapsed ? "\u5C55\u5F00\u5206\u7EC4" : "\u6298\u53E0\u5206\u7EC4");
+        (0, import_obsidian3.setIcon)(chev, collapsed ? "chevron-right" : "chevron-down");
+        chev.addEventListener("click", () => this.toggleGroup(group.key));
+        const icon = node("span", "nvg-folder");
+        (0, import_obsidian3.setIcon)(icon, group.key ? "folder" : "folder-open");
+        const name = node("span", "nvg-gname");
+        name.textContent = group.label;
+        name.addEventListener("click", () => this.toggleGroup(group.key));
+        const count2 = node("span", "nvg-gcount");
+        count2.textContent = String(group.items.length);
+        head.appendChild(chev);
+        head.appendChild(icon);
+        head.appendChild(name);
+        head.appendChild(count2);
+        head.appendChild(node("span", "nvg-gline"));
+        if (group.key) {
+          const add = simpleButton("+ \u65B0\u5EFA\u5230\u6B64\u7EC4", "nvg-ghost nvg-add", () => {
+            void this.createBoardIn(group.key);
+          });
+          add.setAttribute("title", "\u5728\u6B64\u5206\u7EC4\u65B0\u5EFA\u753B\u5E03");
+          head.appendChild(add);
+          const del = node("button", "nvg-ghost nvg-gdel");
+          del.setAttribute("title", "\u5220\u9664\u5206\u7EC4");
+          del.setAttribute("aria-label", "\u5220\u9664\u5206\u7EC4");
+          (0, import_obsidian3.setIcon)(del, "trash-2");
+          del.addEventListener("click", (event) => {
+            event.stopPropagation();
+            this.toggleGroupDeleteConfirm(group, head);
+          });
+          head.appendChild(del);
+        }
+        head.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          head.classList.add("is-drop-target");
+        });
+        head.addEventListener("dragleave", () => head.classList.remove("is-drop-target"));
+        head.addEventListener("drop", (event) => {
+          event.preventDefault();
+          head.classList.remove("is-drop-target");
+          void this.dropIntoGroup(group.key);
+        });
+        section.appendChild(head);
+        if (!collapsed) {
+          const grid2 = node("div", "nvg-grid");
+          for (const item of group.items)
+            grid2.appendChild(this.buildCard(item));
+          section.appendChild(grid2);
+        }
+        if (!group.key && group.items.length) {
+          const hint = node("div", "nvg-roothint");
+          hint.textContent = "\u628A\u753B\u5E03\u62D6\u5230\u4E0A\u9762\u7684\u5206\u7EC4\uFF0C\u5373\u53EF\u5F52\u6863\u3002";
+          section.appendChild(hint);
+        }
+        return section;
+      }
+      toggleGroup(key) {
+        if (this.collapsed.has(key))
+          this.collapsed.delete(key);
+        else
+          this.collapsed.add(key);
+        this.updateResults();
+      }
+      setGroupMode(mode) {
+        if (this.groupMode === mode)
+          return;
+        this.groupMode = mode;
+        this.renderWall();
+      }
+      setFilter(mode) {
+        if (this.filterMode === mode)
+          return;
+        this.filterMode = mode;
+        this.renderWall();
+      }
+      async toggleFavorite(item) {
+        const settings = this.plugin && this.plugin.settings;
+        if (!settings)
+          return;
+        const map = { ...settings.boardStars || {} };
+        if (map[item.file.path])
+          delete map[item.file.path];
+        else
+          map[item.file.path] = true;
+        settings.boardStars = map;
+        await this.plugin.saveSettings();
+        this.renderWall();
+      }
+      async createBoardIn(groupKey) {
+        const root = boardRootFolder(this.plugin.novalFolder);
+        const folder = groupKey ? root ? root + "/" + groupKey : groupKey : root;
+        try {
+          await this.plugin.createGalleryBoardIn(folder);
+          await this.loadItems();
+        } catch (error) {
+          new import_obsidian3.Notice(error instanceof Error ? error.message : "\u65B0\u5EFA\u753B\u5E03\u5931\u8D25");
+        }
+      }
+      async dropIntoGroup(groupKey) {
+        const paths = this.dragPaths && this.dragPaths.length ? [...this.dragPaths] : [];
+        this.dragPaths = null;
+        if (!paths.length)
+          return;
+        const files = paths.map((path) => this.app.vault.getAbstractFileByPath(path)).filter(
+          (file) => file && file.extension === "noval"
+        );
+        let moved = 0;
+        for (const file of files) {
+          try {
+            if (await moveBoardToFolder(this.app, file, this.plugin.novalFolder, groupKey))
+              moved += 1;
+          } catch (e) {
+          }
+        }
+        if (moved) {
+          await this.loadItems();
+          new import_obsidian3.Notice(`\u5DF2\u79FB\u52A8 ${moved} \u5757\u753B\u5E03`);
+        }
       }
       buildEmpty(searching) {
         const empty = node("div", "vw-empty");
@@ -6122,13 +6273,17 @@ var require_noval_board_core = __commonJS({
         button.className = "vw-primary is-large";
         if (searching) {
           const label = document.createElement("span");
-          label.textContent = "\u6E05\u9664\u641C\u7D22";
+          label.textContent = this.filterMode !== "all" ? "\u67E5\u770B\u5168\u90E8" : "\u6E05\u9664\u641C\u7D22";
           button.appendChild(label);
           button.addEventListener("click", () => {
             var _a;
+            if (this.filterMode !== "all") {
+              this.setFilter("all");
+              return;
+            }
             this.query = "";
             this.renderWall();
-            const input = (_a = this.rootEl()) == null ? void 0 : _a.querySelector(".vw-search-input");
+            const input = (_a = this.rootEl()) == null ? void 0 : _a.querySelector(".nvg-search-input");
             if (input)
               input.focus();
           });
@@ -6150,58 +6305,61 @@ var require_noval_board_core = __commonJS({
         return empty;
       }
       buildHead() {
-        const head = node("div", "vw-head");
-        const intro = node("div", "vw-intro");
-        const title = node("div", "vw-title");
+        const head = node("header", "nvg-head");
+        const row1 = node("div", "nvg-row1");
+        const titleWrap = node("div", "nvg-titlewrap");
         const h1 = document.createElement("h1");
         h1.textContent = "\u753B\u5E03\u96C6";
-        const count2 = node("span", "vw-count");
+        const count2 = node("span", "nvg-count");
         const visible = this.visibleItems();
-        count2.textContent = this.query ? `${visible.length} / ${this.items.length} \u5757` : `${this.items.length} \u5757`;
-        title.appendChild(h1);
-        title.appendChild(count2);
-        intro.appendChild(title);
-        head.appendChild(intro);
-        const actions = node("div", "vw-actions");
+        count2.textContent = visible.length === this.items.length ? `${this.items.length} \u5757` : `${visible.length} / ${this.items.length} \u5757`;
+        titleWrap.appendChild(h1);
+        titleWrap.appendChild(count2);
+        row1.appendChild(titleWrap);
+        const actions = node("div", "nvg-actions");
         if (this.multi) {
-          const info = node("span", "vw-multi-count");
+          const info = node("span", "nvg-multi-count");
           info.textContent = `\u5DF2\u9009 ${this.selected.size} \u5757`;
           actions.appendChild(info);
-          actions.appendChild(simpleButton("\u5168\u9009", "vw-ghost", () => {
+          actions.appendChild(simpleButton("\u5168\u9009", "nvg-ghost", () => {
             for (const item of this.visibleItems())
               this.selected.add(item.file.path);
             this.syncSelectionUI();
           }));
-          const remove = simpleButton("\u5220\u9664\u6240\u9009", "vw-primary vw-danger", () => {
+          const remove = simpleButton("\u5220\u9664\u6240\u9009", "nvg-primary nvg-danger", () => {
             const chosen = this.items.filter((item) => this.selected.has(item.file.path));
             this.confirmDelete(chosen, true);
           });
           if (!this.selected.size)
             remove.disabled = true;
           actions.appendChild(remove);
-          actions.appendChild(simpleButton("\u9000\u51FA\u591A\u9009", "vw-ghost", () => this.setMulti(false)));
-          head.appendChild(actions);
+          actions.appendChild(simpleButton("\u9000\u51FA\u591A\u9009", "nvg-ghost", () => this.setMulti(false)));
+          row1.appendChild(actions);
+          head.appendChild(row1);
           return head;
         }
-        const search = node("div", "vw-search");
-        const glass = node("span", "vw-ico");
+        const search = node("label", "nvg-search");
+        const glass = node("span", "nvg-ico");
         (0, import_obsidian3.setIcon)(glass, "search");
         const input = document.createElement("input");
-        input.type = "search";
-        input.className = "vw-search-input";
-        input.placeholder = "\u641C\u7D22\u753B\u5E03";
-        input.style.cssText = "all: unset !important; display: block !important; width: 116px !important;padding: 0 !important; border: 0 !important; box-shadow: none !important;outline: none !important; background: transparent !important;font: inherit !important; font-size: 12px !important; line-height: 1.3 !important;color: var(--text-normal) !important; cursor: text !important;";
+        input.type = "text";
+        input.className = "nvg-search-input";
+        input.placeholder = "\u641C\u7D22\u753B\u5E03\u6807\u9898\u2026";
         input.value = this.query;
         input.addEventListener("input", () => {
           this.query = input.value;
           this.updateResults();
         });
+        const kbd = node("kbd", "nvg-kbd");
+        kbd.textContent = "\u2318K";
         search.appendChild(glass);
         search.appendChild(input);
+        search.appendChild(kbd);
         actions.appendChild(search);
+        const createWrap = node("div", "nvg-split");
         const create = document.createElement("button");
-        create.className = "vw-primary";
-        const plus = node("span", "vw-ico");
+        create.className = "nvg-primary nvg-new";
+        const plus = node("span", "nvg-ico");
         (0, import_obsidian3.setIcon)(plus, "plus");
         const createLabel = document.createElement("span");
         createLabel.textContent = "\u65B0\u5EFA\u753B\u5E03";
@@ -6210,21 +6368,67 @@ var require_noval_board_core = __commonJS({
         create.addEventListener("click", () => {
           void this.createBoard();
         });
-        actions.appendChild(create);
-        const more = node("button", "vw-sort vw-more");
+        const caret = document.createElement("button");
+        caret.className = "nvg-primary nvg-caret";
+        caret.setAttribute("title", "\u65B0\u5EFA\u5230\u5206\u7EC4");
+        caret.textContent = "\u25BE";
+        caret.addEventListener("click", (event) => this.showCreateMenu(event));
+        createWrap.appendChild(create);
+        createWrap.appendChild(caret);
+        actions.appendChild(createWrap);
+        const more = node("button", "nvg-iconbtn");
         more.setAttribute("title", "\u66F4\u591A\u64CD\u4F5C");
-        const moreIcon = node("span", "vw-ico");
-        (0, import_obsidian3.setIcon)(moreIcon, "more-horizontal");
-        more.appendChild(moreIcon);
+        (0, import_obsidian3.setIcon)(more, "more-horizontal");
         more.addEventListener("click", (event) => this.showMoreMenu(event));
         actions.appendChild(more);
-        head.appendChild(actions);
+        row1.appendChild(actions);
+        head.appendChild(row1);
+        const row2 = node("div", "nvg-row2");
+        const seg = node("div", "nvg-seg");
+        for (const [key, label] of [["all", "\u5168\u90E8"], ["recent", "\u6700\u8FD1"], ["favorites", "\u6536\u85CF"]]) {
+          const btn = document.createElement("button");
+          btn.textContent = label;
+          if (this.filterMode === key)
+            btn.classList.add("is-on");
+          btn.addEventListener("click", () => this.setFilter(key));
+          seg.appendChild(btn);
+        }
+        row2.appendChild(seg);
+        row2.appendChild(node("span", "nvg-spacer"));
+        row2.appendChild(
+          simpleButton(
+            this.groupMode === "folder" ? "\u6309\u6587\u4EF6\u5939\u5206\u7EC4" : "\u4E0D\u5206\u7EC4",
+            "nvg-ghost" + (this.groupMode === "folder" ? " is-on" : ""),
+            () => this.setGroupMode(this.groupMode === "folder" ? "flat" : "folder")
+          )
+        );
+        const sortLabel = this.sortMode === "created" ? "\u6309\u521B\u5EFA\u65F6\u95F4" : this.sortMode === "modified" ? "\u6309\u4FEE\u6539\u65F6\u95F4" : "\u6309\u540D\u79F0";
+        row2.appendChild(simpleButton(sortLabel, "nvg-ghost", (event) => this.showSortMenu(event)));
+        head.appendChild(row2);
         return head;
       }
-      /** The single "..." control holds sorting and multi-select, like the menu
-       *  at the top of Obsidian's file tree. */
-      showMoreMenu(event) {
-        var _a, _b;
+      showCreateMenu(event) {
+        const menu = new import_obsidian3.Menu();
+        menu.addItem((mi) => mi.setTitle("\u65B0\u5EFA\u7A7A\u767D\u753B\u5E03").setIcon("plus").onClick(() => {
+          void this.createBoard();
+        }));
+        const groups = boardGroupBoards(this.items, this.plugin.novalFolder, boardFolderGroupKeys(this.app, this.plugin.novalFolder));
+        if (groups.length) {
+          menu.addSeparator();
+          for (const group of groups) {
+            menu.addItem((mi) => mi.setTitle("\u65B0\u5EFA\u5230 " + group.label).setIcon("folder").onClick(() => {
+              void this.createBoardIn(group.key);
+            }));
+          }
+        }
+        const anchor = event.currentTarget ?? event.target;
+        const rect = anchor?.getBoundingClientRect?.();
+        if (rect)
+          this.placeMenuAtRight(menu, rect);
+        else
+          menu.showAtMouseEvent(event);
+      }
+      showSortMenu(event) {
         const menu = new import_obsidian3.Menu();
         const options = [
           ["created", "\u6309\u521B\u5EFA\u65F6\u95F4"],
@@ -6236,16 +6440,157 @@ var require_noval_board_core = __commonJS({
             (item) => item.setTitle(label).setChecked(this.sortMode === value).onClick(() => this.setSort(value))
           );
         }
-        menu.addSeparator();
-        menu.addItem(
-          (item) => item.setTitle(this.multi ? "\u9000\u51FA\u591A\u9009" : "\u591A\u9009").setChecked(this.multi).onClick(() => this.setMulti(!this.multi))
-        );
-        const anchor = (_a = event.currentTarget) != null ? _a : event.target;
-        const rect = (_b = anchor == null ? void 0 : anchor.getBoundingClientRect) == null ? void 0 : _b.call(anchor);
+        const anchor = event.currentTarget ?? event.target;
+        const rect = anchor?.getBoundingClientRect?.();
         if (rect)
           menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
         else
           menu.showAtMouseEvent(event);
+      }
+      /** 顶栏 ⋯ 只放全局动作；排序与多选在第二行各有一处入口，不重复。 */
+      showMoreMenu(event) {
+        const menu = new import_obsidian3.Menu();
+        menu.addItem((item) => item.setTitle("\u65B0\u5EFA\u5206\u7EC4\u2026").setIcon("folder-plus").onClick(() => {
+          void this.createGroup();
+        }));
+        menu.addItem((item) => item.setTitle("\u591A\u9009").setIcon("check").onClick(() => this.setMulti(true)));
+        menu.addSeparator();
+        menu.addItem((item) => item.setTitle("\u5237\u65B0\u5217\u8868").setIcon("refresh-cw").onClick(() => {
+          this.signature = "";
+          void this.loadItems();
+        }));
+        this.placeMenuRight(menu, event);
+      }
+      /** 贴右侧按钮的菜单右对齐，保证下拉不越出画布集面板。 */
+      placeMenuRight(menu, event, gap = 6) {
+        const anchor = event.currentTarget ?? event.target;
+        const rect = anchor?.getBoundingClientRect?.();
+        if (!rect) {
+          menu.showAtMouseEvent(event);
+          return;
+        }
+        this.placeMenuAtRight(menu, rect, gap);
+      }
+      placeMenuAtRight(menu, rect, gap = 6) {
+        const root = this.rootEl();
+        const rootRect = root ? root.getBoundingClientRect() : null;
+        const guess = 200;
+        menu.showAtPosition({ x: Math.max(rect.right - guess, 8), y: rect.bottom + gap });
+        const apply = () => {
+          const dom = menu.dom;
+          if (!dom) return;
+          const w = dom.offsetWidth;
+          const h = dom.offsetHeight;
+          if (!w) return;
+          let left = rect.right - w;
+          let top = rect.bottom + gap;
+          if (rootRect) {
+            left = Math.max(rootRect.left + 8, Math.min(left, rootRect.right - w - 8));
+            if (top + h > rootRect.bottom - 8)
+              top = Math.max(rootRect.top + 8, rect.top - h - gap);
+          }
+          dom.style.left = Math.round(left) + "px";
+          dom.style.top = Math.round(top) + "px";
+        };
+        apply();
+        window.requestAnimationFrame(apply);
+      }
+      createGroup() {
+        const root = boardRootFolder(this.plugin.novalFolder);
+        new RenameModal(this.app, "", (value) => {
+          void this.createGroupFolder(root, value);
+        }, "\u65B0\u5EFA\u5206\u7EC4", "\u65B0\u5EFA").open();
+      }
+      async createGroupFolder(root, value) {
+        const name = String(value || "").trim().replace(/[\\/:*?"<>|]/g, "").trim();
+        if (!name) {
+          new import_obsidian3.Notice("\u5206\u7EC4\u540D\u79F0\u4E0D\u80FD\u4E3A\u7A7A");
+          return;
+        }
+        const path = root ? root + "/" + name : name;
+        try {
+          if (this.app.vault.getAbstractFileByPath(path)) {
+            new import_obsidian3.Notice("\u540C\u540D\u5206\u7EC4\u5DF2\u5B58\u5728");
+            return;
+          }
+          await this.app.vault.createFolder(path);
+          this.groupMode = "folder";
+          this.signature = "";
+          await this.loadItems();
+        } catch (e) {
+          new import_obsidian3.Notice("\u65B0\u5EFA\u5206\u7EC4\u5931\u8D25\uFF1A" + (e && e.message ? e.message : e));
+        }
+      }
+      toggleGroupDeleteConfirm(group, head) {
+        if (!group || !group.key || !head) return;
+        const next = head.nextElementSibling;
+        if (next && next.classList.contains("nvg-gconfirm")) {
+          next.remove();
+          return;
+        }
+        const bar = node("div", "nvg-gconfirm");
+        const text = node("span", "nvg-gconfirm-text");
+        text.textContent = group.items.length
+          ? `删除分组「${group.label}」？组内 ${group.items.length} 块画布将移到未分组。`
+          : `删除空分组「${group.label}」？`;
+        const cancel = simpleButton("取消", "nvg-ghost", () => bar.remove());
+        const ok = simpleButton("删除分组", "nvg-ghost nvg-gdanger", () => {
+          bar.remove();
+          void this.deleteGroup(group);
+        });
+        bar.appendChild(text);
+        bar.appendChild(cancel);
+        bar.appendChild(ok);
+        head.insertAdjacentElement("afterend", bar);
+      }
+      async deleteGroup(group) {
+        if (!group || !group.key) return;
+        const root = boardRootFolder(this.plugin.novalFolder);
+        const path = root ? root + "/" + group.key : group.key;
+        const folder = this.app.vault.getAbstractFileByPath(path);
+        if (!folder) {
+          new import_obsidian3.Notice("分组文件夹不存在");
+          return;
+        }
+        const hasChildFolder = Array.isArray(folder.children) && folder.children.some(
+          (child) => child && Array.isArray(child.children) && typeof child.extension === "undefined"
+        );
+        if (hasChildFolder) {
+          new import_obsidian3.Notice("该分组下还有子分组，请先删除子分组");
+          return;
+        }
+        const items = [...group.items || []];
+        let moved = 0;
+        for (const item of items) {
+          try {
+            if (await moveBoardToFolder(this.app, item.file, this.plugin.novalFolder, "")) moved += 1;
+          } catch (e) {
+          }
+        }
+        if (moved < items.length) {
+          await this.loadItems();
+          new import_obsidian3.Notice("部分画布移动失败，已取消删除分组");
+          return;
+        }
+        let remaining = [];
+        try {
+          const listing = await this.app.vault.adapter.list(path);
+          remaining = [...listing.files || [], ...listing.folders || []];
+        } catch (e) {
+        }
+        if (remaining.length) {
+          await this.loadItems();
+          new import_obsidian3.Notice("分组文件夹里还有其它文件，已取消删除分组");
+          return;
+        }
+        try {
+          await this.app.vault.adapter.rmdir(path, true);
+          this.signature = "";
+          await this.loadItems();
+          new import_obsidian3.Notice(moved ? `分组已删除，${moved} 块画布已移到未分组` : "分组已删除");
+        } catch (e) {
+          new import_obsidian3.Notice("删除分组失败：" + (e && e.message ? e.message : e));
+        }
       }
       setSort(value) {
         if (this.sortMode === value)
@@ -6254,42 +6599,90 @@ var require_noval_board_core = __commonJS({
         void this.loadItems();
       }
       buildCard(item) {
-        const card = node("div", "vw-card");
+        const card = node("div", "nvg-card");
         card.setAttribute("data-path", item.file.path);
         if (this.multi && this.selected.has(item.file.path))
           card.classList.add("is-selected");
-        card.appendChild(this.buildCover(item));
+        const thumb = node("div", "nvg-thumb");
+        thumb.setAttribute("data-tint", boardTintFor(item.file, this.plugin && this.plugin.settings));
+        thumb.appendChild(this.buildCover(item));
         if (this.multi) {
-          const check = node("span", "vw-check");
+          const check = node("span", "nvg-check");
           (0, import_obsidian3.setIcon)(check, "check");
-          card.appendChild(check);
+          thumb.appendChild(check);
         }
-        const del = document.createElement("button");
-        del.className = "vw-card-del";
-        del.setAttribute("title", "\u5220\u9664\u753B\u5E03");
-        (0, import_obsidian3.setIcon)(del, "trash-2");
-        del.addEventListener("click", (event) => {
+        const acts = node("div", "nvg-acts");
+        if (!this.multi) {
+          const favorite = isFavoriteBoard(this.plugin.settings, item.file.path);
+          const star = node("button", "nvg-star" + (favorite ? " is-on" : ""));
+          star.setAttribute("title", favorite ? "\u53D6\u6D88\u6536\u85CF" : "\u6536\u85CF");
+          (0, import_obsidian3.setIcon)(star, "star");
+          star.addEventListener("click", (event) => {
+            event.stopPropagation();
+            void this.toggleFavorite(item);
+          });
+          acts.appendChild(star);
+        }
+        const more = node("button", "nvg-more");
+        more.setAttribute("title", "\u66F4\u591A");
+        (0, import_obsidian3.setIcon)(more, "more-horizontal");
+        more.addEventListener("click", (event) => {
           event.stopPropagation();
-          this.confirmDelete([item]);
+          const anchor = event.currentTarget ?? event.target;
+          const rect = anchor?.getBoundingClientRect?.();
+          const menu = new import_obsidian3.Menu();
+          menu.addItem(
+            (mi) => mi.setTitle("\u91CD\u547D\u540D\u2026").setIcon("pencil").onClick(() => this.promptRename(item))
+          );
+          menu.addItem(
+            (mi) => mi.setTitle(isFavoriteBoard(this.plugin.settings, item.file.path) ? "\u53D6\u6D88\u6536\u85CF" : "\u6536\u85CF").setIcon("star").onClick(() => {
+              void this.toggleFavorite(item);
+            })
+          );
+          menu.addItem(
+            (mi) => mi.setTitle("\u5C01\u9762\u914D\u8272").setIcon("palette").onClick(() => {
+              window.setTimeout(() => this.openTintMenu(rect, item), 0);
+            })
+          );
+          menu.addSeparator();
+          menu.addItem(
+            (mi) => mi.setTitle("\u5220\u9664").setIcon("trash-2").onClick(() => this.confirmDelete([item]))
+          );
+          this.placeMenuRight(menu, event);
         });
-        card.appendChild(del);
-        const body = node("div", "vw-card-body");
-        const head = node("div", "vw-card-head");
-        const icon = node("span", "vw-card-icon");
-        (0, import_obsidian3.setIcon)(icon, "layout-dashboard");
-        const title = node("div", "vw-card-title");
+        acts.appendChild(more);
+        thumb.appendChild(acts);
+        card.appendChild(thumb);
+        card.draggable = !this.multi;
+        card.addEventListener("dragstart", (event) => {
+          const paths = this.multi && this.selected.size ? [...this.selected] : [item.file.path];
+          this.dragPaths = paths;
+          card.classList.add("is-dragging");
+          if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", paths.join("\n"));
+          }
+        });
+        card.addEventListener("dragend", () => {
+          card.classList.remove("is-dragging");
+          this.dragPaths = null;
+        });
+        const body = node("div", "nvg-body");
+        const title = node("div", "nvg-title");
         title.textContent = item.title;
-        head.appendChild(icon);
-        head.appendChild(title);
-        body.appendChild(head);
-        const date = node("div", "vw-card-date");
-        date.textContent = item.updated;
-        body.appendChild(date);
-        const props = node("div", "vw-card-props");
-        props.appendChild(prop("square", item.nodes ? `${item.nodes} \u4E2A\u8282\u70B9` : "\u7A7A\u767D\u753B\u5E03"));
-        if (item.edges)
-          props.appendChild(prop("link", `${item.edges} \u6761\u8FDE\u7EBF`));
-        body.appendChild(props);
+        const meta = node("div", "nvg-meta");
+        const time = node("span", "nvg-time");
+        time.textContent = item.updated;
+        meta.appendChild(time);
+        const rootFolder = boardRootFolder(this.plugin.novalFolder);
+        const groupKey = boardGroupOf(item.file, rootFolder);
+        if (groupKey) {
+          const chip = node("span", "nvg-chip");
+          chip.textContent = groupKey.split("/").pop();
+          meta.appendChild(chip);
+        }
+        body.appendChild(title);
+        body.appendChild(meta);
         card.appendChild(body);
         card.addEventListener("click", () => {
           if (this.multi)
@@ -6303,11 +6696,11 @@ var require_noval_board_core = __commonJS({
        *  and the real text of its nodes, so a card can be recognised without
        *  opening it. */
       buildCover(item) {
-        const cover = node("div", "vw-cover");
+        const cover = node("div", "nvg-cover");
         const { nodes, edges } = item.cover;
         if (!nodes.length) {
           cover.classList.add("is-blank");
-          const ghost = node("span", "vw-cover-ghost");
+          const ghost = node("span", "nvg-cover-ghost");
           ghost.appendChild(novalMark());
           cover.appendChild(ghost);
           return cover;
@@ -6327,6 +6720,36 @@ var require_noval_board_core = __commonJS({
           cover.appendChild(chip);
         }
         return cover;
+      }
+      openTintMenu(rect, item) {
+        const map = this.plugin && this.plugin.settings.boardTints || {};
+        const current = map[item.file.path] || "";
+        const menu = new import_obsidian3.Menu();
+        for (const [key, label] of BOARD_TINT_LABELS) {
+          menu.addItem(
+            (mi) => mi.setTitle(label).setChecked(current === key).onClick(() => {
+              void this.setBoardTint(item, key);
+            })
+          );
+        }
+        menu.addSeparator();
+        menu.addItem(
+          (mi) => mi.setTitle("\u81EA\u52A8\uFF08\u8DDF\u968F\u6587\u4EF6\u5939\uFF09").setChecked(!current).onClick(() => {
+            void this.setBoardTint(item, "");
+          })
+        );
+        if (rect)
+          this.placeMenuAtRight(menu, rect);
+      }
+      async setBoardTint(item, key) {
+        const settings = this.plugin && this.plugin.settings;
+        if (!settings) return;
+        const map = { ...(settings.boardTints || {}) };
+        if (key) map[item.file.path] = key;
+        else delete map[item.file.path];
+        settings.boardTints = map;
+        await this.plugin.saveSettings();
+        this.renderWall();
       }
       openBoard(item) {
         void this.plugin.openBoardFile(item.file.path);
@@ -6355,10 +6778,10 @@ var require_noval_board_core = __commonJS({
           const path = (_a = card.getAttribute("data-path")) != null ? _a : "";
           card.classList.toggle("is-selected", this.selected.has(path));
         }
-        const count2 = root.querySelector(".vw-multi-count");
+        const count2 = root.querySelector(".nvg-multi-count");
         if (count2)
           count2.textContent = `\u5DF2\u9009 ${this.selected.size} \u5757`;
-        const remove = root.querySelector(".vw-danger");
+        const remove = root.querySelector(".nvg-danger");
         if (remove)
           remove.disabled = this.selected.size === 0;
       }
@@ -6368,6 +6791,23 @@ var require_noval_board_core = __commonJS({
         new DeleteBoardsModal(this.app, items.map((item) => item.title), () => {
           void this.deleteBoards(items.map((item) => item.file), exitMulti);
         }).open();
+      }
+      promptRename(item) {
+        new RenameModal(this.app, item.file.basename, (value) => {
+          void this.renameBoardFile(item.file, value);
+        }, "\u91CD\u547D\u540D\u767D\u677F").open();
+      }
+      async renameBoardFile(file, value) {
+        if (!value || value === file.basename)
+          return;
+        const folder = file.parent ? file.parent.path : "";
+        const nextPath = (folder && folder !== "/" ? folder + "/" : "") + value + "." + (file.extension || BOARD_EXTENSION);
+        try {
+          await this.app.fileManager.renameFile(file, nextPath);
+          await this.loadItems();
+        } catch (e) {
+          new import_obsidian3.Notice("\u91CD\u547D\u540D\u5931\u8D25\uFF1A" + (e && e.message ? e.message : e));
+        }
       }
       async deleteBoards(files, exitMulti = false) {
         let removed = 0;
@@ -6468,6 +6908,110 @@ var require_noval_board_core = __commonJS({
         el.style.setProperty("--tn", tone);
       else
         el.setAttribute("data-tone", tone);
+    }
+    /* 画布封面配色：自动按文件夹取色，单张画布可手动覆盖。
+     * 只影响画布集卡片封面，不写入画布文件，也不影响编辑器背景。 */
+    var BOARD_TINTS = ["olive", "teal", "sand", "violet", "clay", "mist"];
+    var BOARD_TINT_LABELS = [
+      ["olive", "\u6A44\u6984\u7EFF"],
+      ["teal", "\u9752\u7EFF"],
+      ["sand", "\u6C99\u7C73"],
+      ["violet", "\u7D2B\u7070"],
+      ["clay", "\u9676\u571F"],
+      ["mist", "\u96FE\u84DD"]
+    ];
+    function boardFolderKey(file) {
+      return file && file.parent ? String(file.parent.path || "") : "";
+    }
+    function autoBoardTint(folder) {
+      const text = String(folder || "\u753B\u5E03");
+      let hash = 0;
+      for (let i = 0; i < text.length; i += 1)
+        hash = (hash * 31 + text.charCodeAt(i)) % 100003;
+      return BOARD_TINTS[hash % BOARD_TINTS.length];
+    }
+    function boardTintFor(file, settings) {
+      const map = settings && settings.boardTints || {};
+      const picked = map[file ? file.path : ""];
+      if (BOARD_TINTS.indexOf(picked) >= 0)
+        return picked;
+      return autoBoardTint(boardFolderKey(file));
+    }
+    function boardRootFolder(folder) {
+      return String(folder || "").replace(/^\/+|\/+$/g, "");
+    }
+    function boardGroupOf(file, rootFolder) {
+      const root = boardRootFolder(rootFolder);
+      const parent = boardFolderKey(file);
+      if (!root) return parent;
+      if (parent === root) return "";
+      if (parent.startsWith(root + "/")) return parent.slice(root.length + 1);
+      return parent;
+    }
+    function boardGroupBoards(items, rootFolder, extraKeys) {
+      const map = /* @__PURE__ */ new Map();
+      for (const item of items) {
+        const key = boardGroupOf(item.file, rootFolder);
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(item);
+      }
+      for (const key of extraKeys || []) {
+        if (key && !map.has(key)) map.set(key, []);
+      }
+      return [...map.entries()].sort((a, b) => {
+        if (!a[0]) return 1;
+        if (!b[0]) return -1;
+        return a[0].localeCompare(b[0], "zh");
+      }).map(([key, list]) => ({
+        key,
+        label: key || "\u672A\u5206\u7EC4",
+        items: list
+      }));
+    }
+    /** 画布根目录下已有的子文件夹（含嵌套），用于把「新建但还没有画布」的分组也显示出来。 */
+    function boardFolderGroupKeys(app, rootFolder) {
+      const root = boardRootFolder(rootFolder);
+      const base = root ? app.vault.getAbstractFileByPath(root) : app.vault.getRoot();
+      const out = [];
+      if (!base || !Array.isArray(base.children)) return [];
+      const walk = (folder, prefix) => {
+        for (const child of folder.children) {
+          if (!child || !Array.isArray(child.children) || typeof child.extension !== "undefined") continue;
+          const key = prefix ? prefix + "/" + child.name : child.name;
+          out.push(key);
+          walk(child, key);
+        }
+      };
+      walk(base, "");
+      return out;
+    }
+    function isFavoriteBoard(settings, path) {
+      const stars = settings && settings.boardStars || {};
+      return stars[path] === true;
+    }
+    /** 把画布移到分组文件夹；重名自动加后缀。返回是否真的移动了。 */
+    async function moveBoardToFolder(app, file, rootFolder, groupKey) {
+      const root = boardRootFolder(rootFolder);
+      const target = groupKey ? root ? root + "/" + groupKey : groupKey : root;
+      if (boardFolderKey(file) === target) return false;
+      if (target) {
+        try {
+          await app.vault.createFolder(target);
+        } catch (e) {
+        }
+      }
+      const ext = file.extension;
+      const base = file.basename;
+      let name = base + "." + ext;
+      let path = target ? target + "/" + name : name;
+      let index = 1;
+      while (app.vault.getAbstractFileByPath(path)) {
+        name = base + "-" + index + "." + ext;
+        path = target ? target + "/" + name : name;
+        index += 1;
+      }
+      await app.fileManager.renameFile(file, path);
+      return true;
     }
     function node(tag, className) {
       const el = document.createElement(tag);
@@ -7285,15 +7829,16 @@ var require_noval_board_core = __commonJS({
     };
     var import_obsidian8 = require("obsidian");
     var RenameModal = class extends import_obsidian8.Modal {
-      constructor(app, initial, onSubmit) {
+      constructor(app, initial, onSubmit, heading, confirmText) {
         super(app);
         this.initial = initial;
         this.onSubmit = onSubmit;
-      }
-      onOpen() {
+        this.heading = heading || "\u91CD\u547D\u540D\u767D\u677F";
+        this.confirmText = confirmText || "\u91CD\u547D\u540D";
+      }      onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl("h3", { text: "\u91CD\u547D\u540D\u767D\u677F" });
+        contentEl.createEl("h3", { text: this.heading });
         const input = contentEl.createEl("input", { type: "text" });
         input.value = this.initial;
         input.addClass("noval-rename-input");
@@ -7317,7 +7862,7 @@ var require_noval_board_core = __commonJS({
           }
         });
         new import_obsidian8.Setting(contentEl).addButton(
-          (button) => button.setButtonText("\u91CD\u547D\u540D").setCta().onClick(submit)
+          (button) => button.setButtonText(this.confirmText).setCta().onClick(submit)
         );
       }
       onClose() {
@@ -15558,6 +16103,21 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
         await this.openBoardFile(file.path);
         this.refreshNoval();
       }
+      /** 新建画布到指定分组文件夹（空字符串表示画布根目录）。 */
+      async createGalleryBoardIn(folder) {
+        const target = String(folder || "").replace(/^\/+|\/+$/g, "");
+        if (target) {
+          try {
+            await this.app.vault.createFolder(target);
+          } catch (e) {
+          }
+        } else {
+          await this.ensureBoardFolder();
+        }
+        const file = await createBoardItem(this.app, target || this.novalFolder);
+        await this.openBoardFile(file.path);
+        this.refreshNoval();
+      }
       refreshNoval() {
         var _a;
         (_a = this.novalViewRef) == null ? void 0 : _a.refreshWall();
@@ -16175,7 +16735,7 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
 // src/noval-gallery.js
 var require_noval_gallery = __commonJS({
   "src/noval-gallery.js"(exports2, module2) {
-    var { Menu: Menu2, Modal: Modal2, Notice: Notice2, setIcon: setIcon2, TFile } = require("obsidian");
+    var { Menu: Menu2, Modal: Modal2, Notice: Notice2, setIcon: setIcon2, TFile, Setting: Setting2 } = require("obsidian");
     var SVG_NS = "http://www.w3.org/2000/svg";
     var BOARD_EXTENSION = "noval";
     var PAD = 7;
@@ -16414,6 +16974,103 @@ var require_noval_gallery = __commonJS({
       if (tone.startsWith("#")) el.style.setProperty("--tn", tone);
       else el.setAttribute("data-tone", tone);
     }
+    /* 画布封面配色：自动按文件夹取色，单张画布可手动覆盖。 */
+    var BOARD_TINTS = ["olive", "teal", "sand", "violet", "clay", "mist"];
+    var BOARD_TINT_LABELS = [
+      ["olive", "\u6A44\u6984\u7EFF"],
+      ["teal", "\u9752\u7EFF"],
+      ["sand", "\u6C99\u7C73"],
+      ["violet", "\u7D2B\u7070"],
+      ["clay", "\u9676\u571F"],
+      ["mist", "\u96FE\u84DD"]
+    ];
+    function boardFolderKey(file) {
+      return file && file.parent ? String(file.parent.path || "") : "";
+    }
+    function autoBoardTint(folder) {
+      const text = String(folder || "\u753B\u5E03");
+      let hash = 0;
+      for (let i = 0; i < text.length; i += 1) hash = (hash * 31 + text.charCodeAt(i)) % 100003;
+      return BOARD_TINTS[hash % BOARD_TINTS.length];
+    }
+    function boardTintFor(file, settings) {
+      const map = settings && settings.boardTints || {};
+      const picked = map[file ? file.path : ""];
+      if (BOARD_TINTS.indexOf(picked) >= 0) return picked;
+      return autoBoardTint(boardFolderKey(file));
+    }
+    function boardRootFolder(folder) {
+      return String(folder || "").replace(/^\/+|\/+$/g, "");
+    }
+    function boardGroupOf(file, rootFolder) {
+      const root = boardRootFolder(rootFolder);
+      const parent = boardFolderKey(file);
+      if (!root) return parent;
+      if (parent === root) return "";
+      if (parent.startsWith(root + "/")) return parent.slice(root.length + 1);
+      return parent;
+    }
+    function boardGroupBoards(items, rootFolder, extraKeys) {
+      const map = /* @__PURE__ */ new Map();
+      for (const item of items) {
+        const key = boardGroupOf(item.file, rootFolder);
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(item);
+      }
+      for (const key of extraKeys || []) {
+        if (key && !map.has(key)) map.set(key, []);
+      }
+      return [...map.entries()].sort((a, b) => {
+        if (!a[0]) return 1;
+        if (!b[0]) return -1;
+        return a[0].localeCompare(b[0], "zh");
+      }).map(([key, list]) => ({ key, label: key || "\u672A\u5206\u7EC4", items: list }));
+    }
+    /** 画布根目录下已有的子文件夹（含嵌套），用于把「新建但还没有画布」的分组也显示出来。 */
+    function boardFolderGroupKeys(app, rootFolder) {
+      const root = boardRootFolder(rootFolder);
+      const base = root ? app.vault.getAbstractFileByPath(root) : app.vault.getRoot();
+      const out = [];
+      if (!base || !Array.isArray(base.children)) return [];
+      const walk = (folder, prefix) => {
+        for (const child of folder.children) {
+          if (!child || !Array.isArray(child.children) || typeof child.extension !== "undefined") continue;
+          const key = prefix ? prefix + "/" + child.name : child.name;
+          out.push(key);
+          walk(child, key);
+        }
+      };
+      walk(base, "");
+      return out;
+    }
+    function isFavoriteBoard(settings, path) {
+      const stars = settings && settings.boardStars || {};
+      return stars[path] === true;
+    }
+    /** 把画布移到分组文件夹；重名自动加后缀。返回是否真的移动了。 */
+    async function moveBoardToFolder(app, file, rootFolder, groupKey) {
+      const root = boardRootFolder(rootFolder);
+      const target = groupKey ? (root ? root + "/" + groupKey : groupKey) : root;
+      if (boardFolderKey(file) === target) return false;
+      if (target) {
+        try {
+          await app.vault.createFolder(target);
+        } catch (e) {
+        }
+      }
+      const ext = file.extension;
+      const base = file.basename;
+      let name = base + "." + ext;
+      let path = target ? target + "/" + name : name;
+      let index = 1;
+      while (app.vault.getAbstractFileByPath(path)) {
+        name = base + "-" + index + "." + ext;
+        path = target ? target + "/" + name : name;
+        index += 1;
+      }
+      await app.fileManager.renameFile(file, path);
+      return true;
+    }
     function node(tag, className) {
       const el = document.createElement(tag);
       el.className = className;
@@ -16466,6 +17123,47 @@ var require_noval_gallery = __commonJS({
         while (el.firstChild) el.removeChild(el.firstChild);
       }
     };
+    var RenameBoardModal2 = class extends Modal2 {
+      constructor(app, initial, onSubmit, heading, confirmText) {
+        super(app);
+        this.initial = initial;
+        this.onSubmit = onSubmit;
+        this.heading = heading || "\u91CD\u547D\u540D\u767D\u677F";
+        this.confirmText = confirmText || "\u91CD\u547D\u540D";
+      }
+      onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.createEl("h3", { text: this.heading });
+        const input = contentEl.createEl("input", { type: "text" });
+        input.value = this.initial;
+        input.addClass("noval-rename-input");
+        input.focus();
+        input.select();
+        const submit = () => {
+          const value = input.value.trim();
+          if (!value) return;
+          this.close();
+          this.onSubmit(value);
+        };
+        input.addEventListener("keydown", (evt) => {
+          if (evt.key === "Enter") {
+            evt.preventDefault();
+            submit();
+          }
+          if (evt.key === "Escape") {
+            evt.preventDefault();
+            this.close();
+          }
+        });
+        new Setting2(contentEl).addButton(
+          (button) => button.setButtonText(this.confirmText).setCta().onClick(submit)
+        );
+      }
+      onClose() {
+        this.contentEl.empty();
+      }
+    };
     var NovalGalleryPanel2 = class {
       constructor(app, novalPlugin) {
         this.app = app;
@@ -16474,6 +17172,10 @@ var require_noval_gallery = __commonJS({
         this.items = [];
         this.sortMode = "created";
         this.query = "";
+        this.filterMode = "all";
+        this.groupMode = "folder";
+        this.collapsed = /* @__PURE__ */ new Set();
+        this.dragPaths = null;
         this.multi = false;
         this.selected = /* @__PURE__ */ new Set();
         this.signature = "";
@@ -16596,16 +17298,16 @@ var require_noval_gallery = __commonJS({
       renderWall() {
         const root = this.root;
         if (!root) return;
-        const scrolled = root.querySelector(".vw-scroll");
+        const scrolled = root.querySelector(".nvg-scroll");
         const scroll = scrolled ? scrolled.scrollTop : 0;
         this.clearRoot(root);
         root.classList.add("cl-root");
-        const frame = node("div", "vw-frame");
-        const toolbar = node("div", "vw-toolbar");
+        const frame = node("div", "nvg-frame");
+        const toolbar = node("div", "nvg-top");
         toolbar.appendChild(this.buildHead());
         frame.appendChild(toolbar);
-        const body = node("div", "vw-scroll");
-        const results = node("div", "vw-results");
+        const body = node("div", "nvg-scroll");
+        const results = node("div", "nvg-results");
         results.appendChild(this.buildResults());
         body.appendChild(results);
         frame.appendChild(body);
@@ -16617,31 +17319,164 @@ var require_noval_gallery = __commonJS({
       updateResults() {
         const root = this.root;
         if (!root) return;
-        const results = root.querySelector(".vw-results");
-        const count = root.querySelector(".vw-count");
+        const results = root.querySelector(".nvg-results");
+        const count = root.querySelector(".nvg-count");
         if (!results) return;
         this.clearRoot(results);
         results.appendChild(this.buildResults());
         const visible = this.visibleItems();
         if (count) {
-          count.textContent = this.query ? `${visible.length} / ${this.items.length} \u5757` : `${this.items.length} \u5757`;
+          count.textContent = visible.length === this.items.length ? `${this.items.length} \u5757` : `${visible.length} / ${this.items.length} \u5757`;
         }
+      }
+      matchesFilter(item) {
+        if (this.filterMode === "favorites") return isFavoriteBoard(this.noval && this.noval.settings, item.file.path);
+        if (this.filterMode === "recent") return Date.now() - item.mtime < 7 * 864e5;
+        return true;
       }
       visibleItems() {
         const q = this.query.trim().toLocaleLowerCase();
-        if (!q) return this.items;
-        return this.items.filter(
-          (item) => [item.title, ...item.cover.nodes.map((box) => box.text)].some((text) => text.toLocaleLowerCase().includes(q))
-        );
+        return this.items.filter((item) => {
+          if (!this.matchesFilter(item)) return false;
+          if (!q) return true;
+          return [item.title, ...item.cover.nodes.map((box) => box.text)].some(
+            (text) => text.toLocaleLowerCase().includes(q)
+          );
+        });
       }
       buildResults() {
         const visible = this.visibleItems();
-        if (!visible.length) {
-          return this.buildEmpty(this.query.trim().length > 0);
+        const extraKeys = this.filterMode === "all" && !this.query.trim()
+          ? boardFolderGroupKeys(this.app, this.noval.novalFolder)
+          : [];
+        if (!visible.length && !(this.groupMode === "folder" && extraKeys.length)) {
+          return this.buildEmpty(this.query.trim().length > 0 || this.filterMode !== "all");
         }
-        const grid = node("div", "vw-grid");
-        for (const item of visible) grid.appendChild(this.buildCard(item));
-        return grid;
+        if (this.groupMode !== "folder") {
+          const grid2 = node("div", "nvg-grid");
+          for (const item of visible) grid2.appendChild(this.buildCard(item));
+          return grid2;
+        }
+        const wrap = node("div", "nvg-groups");
+        for (const group of boardGroupBoards(visible, this.noval.novalFolder, extraKeys)) {
+          wrap.appendChild(this.buildGroupSection(group));
+        }
+        return wrap;
+      }
+      buildGroupSection(group) {
+        const section = node("div", "nvg-group");
+        const collapsed = this.collapsed.has(group.key);
+        if (collapsed) section.classList.add("is-collapsed");
+        if (!group.key) section.classList.add("is-root");
+        const head = node("div", "nvg-ghead");
+        const chev = node("button", "nvg-chev");
+        chev.setAttribute("title", collapsed ? "\u5C55\u5F00\u5206\u7EC4" : "\u6298\u53E0\u5206\u7EC4");
+        setIcon2(chev, collapsed ? "chevron-right" : "chevron-down");
+        chev.addEventListener("click", () => this.toggleGroup(group.key));
+        const icon = node("span", "nvg-folder");
+        setIcon2(icon, group.key ? "folder" : "folder-open");
+        const name = node("span", "nvg-gname");
+        name.textContent = group.label;
+        name.addEventListener("click", () => this.toggleGroup(group.key));
+        const count2 = node("span", "nvg-gcount");
+        count2.textContent = String(group.items.length);
+        head.appendChild(chev);
+        head.appendChild(icon);
+        head.appendChild(name);
+        head.appendChild(count2);
+        head.appendChild(node("span", "nvg-gline"));
+        if (group.key) {
+          const add = simpleButton("+ \u65B0\u5EFA\u5230\u6B64\u7EC4", "nvg-ghost nvg-add", () => {
+            void this.createBoardIn(group.key);
+          });
+          add.setAttribute("title", "\u5728\u6B64\u5206\u7EC4\u65B0\u5EFA\u753B\u5E03");
+          head.appendChild(add);
+          const del = node("button", "nvg-ghost nvg-gdel");
+          del.setAttribute("title", "\u5220\u9664\u5206\u7EC4");
+          del.setAttribute("aria-label", "\u5220\u9664\u5206\u7EC4");
+          setIcon2(del, "trash-2");
+          del.addEventListener("click", (event) => {
+            event.stopPropagation();
+            this.toggleGroupDeleteConfirm(group, head);
+          });
+          head.appendChild(del);
+        }
+        head.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          head.classList.add("is-drop-target");
+        });
+        head.addEventListener("dragleave", () => head.classList.remove("is-drop-target"));
+        head.addEventListener("drop", (event) => {
+          event.preventDefault();
+          head.classList.remove("is-drop-target");
+          void this.dropIntoGroup(group.key);
+        });
+        section.appendChild(head);
+        if (!collapsed) {
+          const grid2 = node("div", "nvg-grid");
+          for (const item of group.items) grid2.appendChild(this.buildCard(item));
+          section.appendChild(grid2);
+        }
+        if (!group.key && group.items.length) {
+          const hint = node("div", "nvg-roothint");
+          hint.textContent = "\u628A\u753B\u5E03\u62D6\u5230\u4E0A\u9762\u7684\u5206\u7EC4\uFF0C\u5373\u53EF\u5F52\u6863\u3002";
+          section.appendChild(hint);
+        }
+        return section;
+      }
+      toggleGroup(key) {
+        if (this.collapsed.has(key)) this.collapsed.delete(key);
+        else this.collapsed.add(key);
+        this.updateResults();
+      }
+      setGroupMode(mode) {
+        if (this.groupMode === mode) return;
+        this.groupMode = mode;
+        this.renderWall();
+      }
+      setFilter(mode) {
+        if (this.filterMode === mode) return;
+        this.filterMode = mode;
+        this.renderWall();
+      }
+      async toggleFavorite(item) {
+        const settings = this.noval && this.noval.settings;
+        if (!settings) return;
+        const map = { ...settings.boardStars || {} };
+        if (map[item.file.path]) delete map[item.file.path];
+        else map[item.file.path] = true;
+        settings.boardStars = map;
+        await this.noval.saveSettings();
+        this.renderWall();
+      }
+      async createBoardIn(groupKey) {
+        const root = boardRootFolder(this.noval.novalFolder);
+        const folder = groupKey ? (root ? root + "/" + groupKey : groupKey) : root;
+        try {
+          await this.noval.createGalleryBoardIn(folder);
+          await this.loadItems();
+        } catch (error) {
+          new Notice2(error instanceof Error ? error.message : "\u65B0\u5EFA\u753B\u5E03\u5931\u8D25");
+        }
+      }
+      async dropIntoGroup(groupKey) {
+        const paths = this.dragPaths && this.dragPaths.length ? [...this.dragPaths] : [];
+        this.dragPaths = null;
+        if (!paths.length) return;
+        const files = paths.map((path) => this.app.vault.getAbstractFileByPath(path)).filter(
+          (file) => file && file.extension === "noval"
+        );
+        let moved = 0;
+        for (const file of files) {
+          try {
+            if (await moveBoardToFolder(this.app, file, this.noval.novalFolder, groupKey)) moved += 1;
+          } catch (e) {
+          }
+        }
+        if (moved) {
+          await this.loadItems();
+          new Notice2(`\u5DF2\u79FB\u52A8 ${moved} \u5757\u753B\u5E03`);
+        }
       }
       buildEmpty(searching) {
         const empty = node("div", "vw-empty");
@@ -16656,12 +17491,16 @@ var require_noval_gallery = __commonJS({
         button.className = "vw-primary is-large";
         if (searching) {
           const label = document.createElement("span");
-          label.textContent = "\u6E05\u9664\u641C\u7D22";
+          label.textContent = this.filterMode !== "all" ? "\u67E5\u770B\u5168\u90E8" : "\u6E05\u9664\u641C\u7D22";
           button.appendChild(label);
           button.addEventListener("click", () => {
+            if (this.filterMode !== "all") {
+              this.setFilter("all");
+              return;
+            }
             this.query = "";
             this.renderWall();
-            const input = this.root ? this.root.querySelector(".vw-search-input") : null;
+            const input = this.root ? this.root.querySelector(".nvg-search-input") : null;
             if (input) input.focus();
           });
         } else {
@@ -16682,56 +17521,59 @@ var require_noval_gallery = __commonJS({
         return empty;
       }
       buildHead() {
-        const head = node("div", "vw-head");
-        const intro = node("div", "vw-intro");
-        const title = node("div", "vw-title");
+        const head = node("header", "nvg-head");
+        const row1 = node("div", "nvg-row1");
+        const titleWrap = node("div", "nvg-titlewrap");
         const h1 = document.createElement("h1");
         h1.textContent = "\u753B\u5E03\u96C6";
-        const count = node("span", "vw-count");
+        const count = node("span", "nvg-count");
         const visible = this.visibleItems();
-        count.textContent = this.query ? `${visible.length} / ${this.items.length} \u5757` : `${this.items.length} \u5757`;
-        title.appendChild(h1);
-        title.appendChild(count);
-        intro.appendChild(title);
-        head.appendChild(intro);
-        const actions = node("div", "vw-actions");
+        count.textContent = visible.length === this.items.length ? `${this.items.length} \u5757` : `${visible.length} / ${this.items.length} \u5757`;
+        titleWrap.appendChild(h1);
+        titleWrap.appendChild(count);
+        row1.appendChild(titleWrap);
+        const actions = node("div", "nvg-actions");
         if (this.multi) {
-          const info = node("span", "vw-multi-count");
+          const info = node("span", "nvg-multi-count");
           info.textContent = `\u5DF2\u9009 ${this.selected.size} \u5757`;
           actions.appendChild(info);
-          actions.appendChild(simpleButton("\u5168\u9009", "vw-ghost", () => {
+          actions.appendChild(simpleButton("\u5168\u9009", "nvg-ghost", () => {
             for (const item of this.visibleItems()) this.selected.add(item.file.path);
             this.syncSelectionUI();
           }));
-          const remove = simpleButton("\u5220\u9664\u6240\u9009", "vw-primary vw-danger", () => {
+          const remove = simpleButton("\u5220\u9664\u6240\u9009", "nvg-primary nvg-danger", () => {
             const chosen = this.items.filter((item) => this.selected.has(item.file.path));
             this.confirmDelete(chosen, true);
           });
           if (!this.selected.size) remove.disabled = true;
           actions.appendChild(remove);
-          actions.appendChild(simpleButton("\u9000\u51FA\u591A\u9009", "vw-ghost", () => this.setMulti(false)));
-          head.appendChild(actions);
+          actions.appendChild(simpleButton("\u9000\u51FA\u591A\u9009", "nvg-ghost", () => this.setMulti(false)));
+          row1.appendChild(actions);
+          head.appendChild(row1);
           return head;
         }
-        const search = node("div", "vw-search");
-        const glass = node("span", "vw-ico");
+        const search = node("label", "nvg-search");
+        const glass = node("span", "nvg-ico");
         setIcon2(glass, "search");
         const input = document.createElement("input");
-        input.type = "search";
-        input.className = "vw-search-input";
-        input.placeholder = "\u641C\u7D22\u753B\u5E03";
-        input.style.cssText = "all: unset !important; display: block !important; width: 116px !important;padding: 0 !important; border: 0 !important; box-shadow: none !important;outline: none !important; background: transparent !important;font: inherit !important; font-size: 12px !important; line-height: 1.3 !important;color: var(--text-normal) !important; cursor: text !important;";
+        input.type = "text";
+        input.className = "nvg-search-input";
+        input.placeholder = "\u641C\u7D22\u753B\u5E03\u6807\u9898\u2026";
         input.value = this.query;
         input.addEventListener("input", () => {
           this.query = input.value;
           this.updateResults();
         });
+        const kbd = node("kbd", "nvg-kbd");
+        kbd.textContent = "\u2318K";
         search.appendChild(glass);
         search.appendChild(input);
+        search.appendChild(kbd);
         actions.appendChild(search);
+        const createWrap = node("div", "nvg-split");
         const create = document.createElement("button");
-        create.className = "vw-primary";
-        const plus = node("span", "vw-ico");
+        create.className = "nvg-primary nvg-new";
+        const plus = node("span", "nvg-ico");
         setIcon2(plus, "plus");
         const createLabel = document.createElement("span");
         createLabel.textContent = "\u65B0\u5EFA\u753B\u5E03";
@@ -16740,19 +17582,61 @@ var require_noval_gallery = __commonJS({
         create.addEventListener("click", () => {
           void this.createBoard();
         });
-        actions.appendChild(create);
-        const more = node("button", "vw-sort vw-more");
+        const caret = document.createElement("button");
+        caret.className = "nvg-primary nvg-caret";
+        caret.setAttribute("title", "\u65B0\u5EFA\u5230\u5206\u7EC4");
+        caret.textContent = "\u25BE";
+        caret.addEventListener("click", (event) => this.showCreateMenu(event));
+        createWrap.appendChild(create);
+        createWrap.appendChild(caret);
+        actions.appendChild(createWrap);
+        const more = node("button", "nvg-iconbtn");
         more.setAttribute("title", "\u66F4\u591A\u64CD\u4F5C");
-        const moreIcon = node("span", "vw-ico");
-        setIcon2(moreIcon, "more-horizontal");
-        more.appendChild(moreIcon);
+        setIcon2(more, "more-horizontal");
         more.addEventListener("click", (event) => this.showMoreMenu(event));
         actions.appendChild(more);
-        head.appendChild(actions);
+        row1.appendChild(actions);
+        head.appendChild(row1);
+        const row2 = node("div", "nvg-row2");
+        const seg = node("div", "nvg-seg");
+        for (const [key, label] of [["all", "\u5168\u90E8"], ["recent", "\u6700\u8FD1"], ["favorites", "\u6536\u85CF"]]) {
+          const btn = document.createElement("button");
+          btn.textContent = label;
+          if (this.filterMode === key) btn.classList.add("is-on");
+          btn.addEventListener("click", () => this.setFilter(key));
+          seg.appendChild(btn);
+        }
+        row2.appendChild(seg);
+        row2.appendChild(node("span", "nvg-spacer"));
+        row2.appendChild(
+          simpleButton(
+            this.groupMode === "folder" ? "\u6309\u6587\u4EF6\u5939\u5206\u7EC4" : "\u4E0D\u5206\u7EC4",
+            "nvg-ghost" + (this.groupMode === "folder" ? " is-on" : ""),
+            () => this.setGroupMode(this.groupMode === "folder" ? "flat" : "folder")
+          )
+        );
+        const sortLabel = this.sortMode === "created" ? "\u6309\u521B\u5EFA\u65F6\u95F4" : this.sortMode === "modified" ? "\u6309\u4FEE\u6539\u65F6\u95F4" : "\u6309\u540D\u79F0";
+        row2.appendChild(simpleButton(sortLabel, "nvg-ghost", (event) => this.showSortMenu(event)));
+        head.appendChild(row2);
         return head;
       }
-      /** 唯一的「...」按钮收纳排序与多选，和文件树顶部菜单一致。 */
-      showMoreMenu(event) {
+      showCreateMenu(event) {
+        const menu = new Menu2();
+        menu.addItem((mi) => mi.setTitle("\u65B0\u5EFA\u7A7A\u767D\u753B\u5E03").setIcon("plus").onClick(() => {
+          void this.createBoard();
+        }));
+        const groups = boardGroupBoards(this.items, this.noval.novalFolder, boardFolderGroupKeys(this.app, this.noval.novalFolder));
+        if (groups.length) {
+          menu.addSeparator();
+          for (const group of groups) {
+            menu.addItem((mi) => mi.setTitle("\u65B0\u5EFA\u5230 " + group.label).setIcon("folder").onClick(() => {
+              void this.createBoardIn(group.key);
+            }));
+          }
+        }
+        this.placeMenuRight(menu, event);
+      }
+      showSortMenu(event) {
         const menu = new Menu2();
         const options = [
           ["created", "\u6309\u521B\u5EFA\u65F6\u95F4"],
@@ -16764,11 +17648,152 @@ var require_noval_gallery = __commonJS({
             (item) => item.setTitle(label).setChecked(this.sortMode === value).onClick(() => this.setSort(value))
           );
         }
-        menu.addSeparator();
-        menu.addItem(
-          (item) => item.setTitle(this.multi ? "\u9000\u51FA\u591A\u9009" : "\u591A\u9009").setChecked(this.multi).onClick(() => this.setMulti(!this.multi))
-        );
         anchorMenuBelow2(menu, event.currentTarget ?? event.target);
+      }
+      /** 顶栏 ⋯ 只放全局动作；排序与多选在第二行各有一处入口，不重复。 */
+      showMoreMenu(event) {
+        const menu = new Menu2();
+        menu.addItem((item) => item.setTitle("\u65B0\u5EFA\u5206\u7EC4\u2026").setIcon("folder-plus").onClick(() => {
+          void this.createGroup();
+        }));
+        menu.addItem((item) => item.setTitle("\u591A\u9009").setIcon("check").onClick(() => this.setMulti(true)));
+        menu.addSeparator();
+        menu.addItem((item) => item.setTitle("\u5237\u65B0\u5217\u8868").setIcon("refresh-cw").onClick(() => {
+          this.signature = "";
+          void this.loadItems();
+        }));
+        this.placeMenuRight(menu, event);
+      }
+      /** 贴右侧按钮的菜单右对齐，保证下拉不越出画布集面板。 */
+      placeMenuRight(menu, event, gap = 6) {
+        const anchor = event.currentTarget ?? event.target;
+        const rect = anchor?.getBoundingClientRect?.();
+        if (!rect) {
+          menu.showAtMouseEvent(event);
+          return;
+        }
+        this.placeMenuAtRight(menu, rect, gap);
+      }
+      placeMenuAtRight(menu, rect, gap = 6) {
+        const root = this.root;
+        const rootRect = root ? root.getBoundingClientRect() : null;
+        const guess = 200;
+        menu.showAtPosition({ x: Math.max(rect.right - guess, 8), y: rect.bottom + gap });
+        const apply = () => {
+          const dom = menu.dom;
+          if (!dom) return;
+          const w = dom.offsetWidth;
+          const h = dom.offsetHeight;
+          if (!w) return;
+          let left = rect.right - w;
+          let top = rect.bottom + gap;
+          if (rootRect) {
+            left = Math.max(rootRect.left + 8, Math.min(left, rootRect.right - w - 8));
+            if (top + h > rootRect.bottom - 8)
+              top = Math.max(rootRect.top + 8, rect.top - h - gap);
+          }
+          dom.style.left = Math.round(left) + "px";
+          dom.style.top = Math.round(top) + "px";
+        };
+        apply();
+        window.requestAnimationFrame(apply);
+      }
+      createGroup() {
+        const root = boardRootFolder(this.noval.novalFolder);
+        new RenameBoardModal2(this.app, "", (value) => {
+          void this.createGroupFolder(root, value);
+        }, "\u65B0\u5EFA\u5206\u7EC4", "\u65B0\u5EFA").open();
+      }
+      async createGroupFolder(root, value) {
+        const name = String(value || "").trim().replace(/[\\/:*?"<>|]/g, "").trim();
+        if (!name) {
+          new Notice2("\u5206\u7EC4\u540D\u79F0\u4E0D\u80FD\u4E3A\u7A7A");
+          return;
+        }
+        const path = root ? root + "/" + name : name;
+        try {
+          if (this.app.vault.getAbstractFileByPath(path)) {
+            new Notice2("\u540C\u540D\u5206\u7EC4\u5DF2\u5B58\u5728");
+            return;
+          }
+          await this.app.vault.createFolder(path);
+          this.groupMode = "folder";
+          this.signature = "";
+          await this.loadItems();
+        } catch (e) {
+          new Notice2("\u65B0\u5EFA\u5206\u7EC4\u5931\u8D25\uFF1A" + (e && e.message ? e.message : e));
+        }
+      }
+      toggleGroupDeleteConfirm(group, head) {
+        if (!group || !group.key || !head) return;
+        const next = head.nextElementSibling;
+        if (next && next.classList.contains("nvg-gconfirm")) {
+          next.remove();
+          return;
+        }
+        const bar = node("div", "nvg-gconfirm");
+        const text = node("span", "nvg-gconfirm-text");
+        text.textContent = group.items.length
+          ? `删除分组「${group.label}」？组内 ${group.items.length} 块画布将移到未分组。`
+          : `删除空分组「${group.label}」？`;
+        const cancel = simpleButton("取消", "nvg-ghost", () => bar.remove());
+        const ok = simpleButton("删除分组", "nvg-ghost nvg-gdanger", () => {
+          bar.remove();
+          void this.deleteGroup(group);
+        });
+        bar.appendChild(text);
+        bar.appendChild(cancel);
+        bar.appendChild(ok);
+        head.insertAdjacentElement("afterend", bar);
+      }
+      async deleteGroup(group) {
+        if (!group || !group.key) return;
+        const root = boardRootFolder(this.noval.novalFolder);
+        const path = root ? root + "/" + group.key : group.key;
+        const folder = this.app.vault.getAbstractFileByPath(path);
+        if (!folder) {
+          new Notice2("分组文件夹不存在");
+          return;
+        }
+        const hasChildFolder = Array.isArray(folder.children) && folder.children.some(
+          (child) => child && Array.isArray(child.children) && typeof child.extension === "undefined"
+        );
+        if (hasChildFolder) {
+          new Notice2("该分组下还有子分组，请先删除子分组");
+          return;
+        }
+        const items = [...group.items || []];
+        let moved = 0;
+        for (const item of items) {
+          try {
+            if (await moveBoardToFolder(this.app, item.file, this.noval.novalFolder, "")) moved += 1;
+          } catch (e) {
+          }
+        }
+        if (moved < items.length) {
+          await this.loadItems();
+          new Notice2("部分画布移动失败，已取消删除分组");
+          return;
+        }
+        let remaining = [];
+        try {
+          const listing = await this.app.vault.adapter.list(path);
+          remaining = [...listing.files || [], ...listing.folders || []];
+        } catch (e) {
+        }
+        if (remaining.length) {
+          await this.loadItems();
+          new Notice2("分组文件夹里还有其它文件，已取消删除分组");
+          return;
+        }
+        try {
+          await this.app.vault.adapter.rmdir(path, true);
+          this.signature = "";
+          await this.loadItems();
+          new Notice2(moved ? `分组已删除，${moved} 块画布已移到未分组` : "分组已删除");
+        } catch (e) {
+          new Notice2("删除分组失败：" + (e && e.message ? e.message : e));
+        }
       }
       setSort(value) {
         if (this.sortMode === value) return;
@@ -16776,35 +17801,88 @@ var require_noval_gallery = __commonJS({
         void this.loadItems();
       }
       buildCard(item) {
-        const card = node("div", "vw-card");
+        const card = node("div", "nvg-card");
         card.setAttribute("data-path", item.file.path);
         if (this.multi && this.selected.has(item.file.path)) card.classList.add("is-selected");
-        card.appendChild(this.buildCover(item));
+        const thumb = node("div", "nvg-thumb");
+        thumb.setAttribute("data-tint", boardTintFor(item.file, this.noval && this.noval.settings));
+        thumb.appendChild(this.buildCover(item));
         if (this.multi) {
-          const check = node("span", "vw-check");
+          const check = node("span", "nvg-check");
           setIcon2(check, "check");
-          card.appendChild(check);
+          thumb.appendChild(check);
         }
-        const del = document.createElement("button");
-        del.className = "vw-card-del";
-        del.setAttribute("title", "\u5220\u9664\u753B\u5E03");
-        setIcon2(del, "trash-2");
-        del.addEventListener("click", (event) => {
+        const acts = node("div", "nvg-acts");
+        if (!this.multi) {
+          const favorite = isFavoriteBoard(this.noval.settings, item.file.path);
+          const star = node("button", "nvg-star" + (favorite ? " is-on" : ""));
+          star.setAttribute("title", favorite ? "\u53D6\u6D88\u6536\u85CF" : "\u6536\u85CF");
+          setIcon2(star, "star");
+          star.addEventListener("click", (event) => {
+            event.stopPropagation();
+            void this.toggleFavorite(item);
+          });
+          acts.appendChild(star);
+        }
+        const more = node("button", "nvg-more");
+        more.setAttribute("title", "\u66F4\u591A");
+        setIcon2(more, "more-horizontal");
+        more.addEventListener("click", (event) => {
           event.stopPropagation();
-          this.confirmDelete([item]);
+          const anchor2 = event.currentTarget ?? event.target;
+          const rect2 = anchor2?.getBoundingClientRect?.();
+          const menu = new Menu2();
+          menu.addItem(
+            (mi) => mi.setTitle("\u91CD\u547D\u540D\u2026").setIcon("pencil").onClick(() => this.promptRename(item))
+          );
+          menu.addItem(
+            (mi) => mi.setTitle(isFavoriteBoard(this.noval.settings, item.file.path) ? "\u53D6\u6D88\u6536\u85CF" : "\u6536\u85CF").setIcon("star").onClick(() => {
+              void this.toggleFavorite(item);
+            })
+          );
+          menu.addItem(
+            (mi) => mi.setTitle("\u5C01\u9762\u914D\u8272").setIcon("palette").onClick(() => {
+              window.setTimeout(() => this.openTintMenu(rect2, item), 0);
+            })
+          );
+          menu.addSeparator();
+          menu.addItem(
+            (mi) => mi.setTitle("\u5220\u9664").setIcon("trash-2").onClick(() => this.confirmDelete([item]))
+          );
+          this.placeMenuRight(menu, event);
         });
-        card.appendChild(del);
-        const body = node("div", "vw-card-body");
-        const title = node("div", "vw-card-title");
+        acts.appendChild(more);
+        thumb.appendChild(acts);
+        card.appendChild(thumb);
+        card.draggable = !this.multi;
+        card.addEventListener("dragstart", (event) => {
+          const paths = this.multi && this.selected.size ? [...this.selected] : [item.file.path];
+          this.dragPaths = paths;
+          card.classList.add("is-dragging");
+          if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", paths.join("\n"));
+          }
+        });
+        card.addEventListener("dragend", () => {
+          card.classList.remove("is-dragging");
+          this.dragPaths = null;
+        });
+        const body = node("div", "nvg-body");
+        const title = node("div", "nvg-title");
         title.textContent = item.title;
+        const meta = node("div", "nvg-meta");
+        const time = node("span", "nvg-time");
+        time.textContent = item.updated;
+        meta.appendChild(time);
+        const rootFolder = boardRootFolder(this.noval.novalFolder);
+        const groupKey = boardGroupOf(item.file, rootFolder);
+        if (groupKey) {
+          const chip = node("span", "nvg-chip");
+          chip.textContent = groupKey.split("/").pop();
+          meta.appendChild(chip);
+        }
         body.appendChild(title);
-        const meta = node("div", "vw-card-meta");
-        const count = node("span", "vw-card-count");
-        count.textContent = item.nodes ? `${item.nodes} \u4E2A\u8282\u70B9` : "\u7A7A\u767D\u753B\u5E03";
-        const date = node("span", "vw-card-date");
-        date.textContent = item.updated;
-        meta.appendChild(count);
-        meta.appendChild(date);
         body.appendChild(meta);
         card.appendChild(body);
         card.addEventListener("click", () => {
@@ -16815,11 +17893,11 @@ var require_noval_gallery = __commonJS({
       }
       /** 封面是画布的真实微缩图：同样的布局、颜色和节点文字。 */
       buildCover(item) {
-        const cover = node("div", "vw-cover");
+        const cover = node("div", "nvg-cover");
         const { nodes, edges } = item.cover;
         if (!nodes.length) {
           cover.classList.add("is-blank");
-          const ghost = node("span", "vw-cover-ghost");
+          const ghost = node("span", "nvg-cover-ghost");
           ghost.appendChild(novalMark());
           cover.appendChild(ghost);
           return cover;
@@ -16838,6 +17916,35 @@ var require_noval_gallery = __commonJS({
           cover.appendChild(chip);
         }
         return cover;
+      }
+      openTintMenu(rect, item) {
+        const map = this.noval && this.noval.settings.boardTints || {};
+        const current = map[item.file.path] || "";
+        const menu = new Menu2();
+        for (const [key, label] of BOARD_TINT_LABELS) {
+          menu.addItem(
+            (mi) => mi.setTitle(label).setChecked(current === key).onClick(() => {
+              void this.setBoardTint(item, key);
+            })
+          );
+        }
+        menu.addSeparator();
+        menu.addItem(
+          (mi) => mi.setTitle("\u81EA\u52A8\uFF08\u8DDF\u968F\u6587\u4EF6\u5939\uFF09").setChecked(!current).onClick(() => {
+            void this.setBoardTint(item, "");
+          })
+        );
+        if (rect) this.placeMenuAtRight(menu, rect);
+      }
+      async setBoardTint(item, key) {
+        const settings = this.noval && this.noval.settings;
+        if (!settings) return;
+        const map = { ...(settings.boardTints || {}) };
+        if (key) map[item.file.path] = key;
+        else delete map[item.file.path];
+        settings.boardTints = map;
+        await this.noval.saveSettings();
+        this.renderWall();
       }
       openBoard(item) {
         void this.noval.openBoardFile(item.file.path);
@@ -16860,9 +17967,9 @@ var require_noval_gallery = __commonJS({
           const path = card.getAttribute("data-path") ?? "";
           card.classList.toggle("is-selected", this.selected.has(path));
         }
-        const count = root.querySelector(".vw-multi-count");
+        const count = root.querySelector(".nvg-multi-count");
         if (count) count.textContent = `\u5DF2\u9009 ${this.selected.size} \u5757`;
-        const remove = root.querySelector(".vw-danger");
+        const remove = root.querySelector(".nvg-danger");
         if (remove) remove.disabled = this.selected.size === 0;
       }
       confirmDelete(items, exitMulti = false) {
@@ -16870,6 +17977,22 @@ var require_noval_gallery = __commonJS({
         new DeleteBoardsModal(this.app, items.map((item) => item.title), () => {
           void this.deleteBoards(items.map((item) => item.file), exitMulti);
         }).open();
+      }
+      promptRename(item) {
+        new RenameBoardModal2(this.app, item.file.basename, (value) => {
+          void this.renameBoardFile(item.file, value);
+        }).open();
+      }
+      async renameBoardFile(file, value) {
+        if (!value || value === file.basename) return;
+        const folder = file.parent ? file.parent.path : "";
+        const nextPath = (folder && folder !== "/" ? folder + "/" : "") + value + "." + (file.extension || BOARD_EXTENSION);
+        try {
+          await this.app.fileManager.renameFile(file, nextPath);
+          await this.loadItems();
+        } catch (e) {
+          new Notice2("\u91CD\u547D\u540D\u5931\u8D25\uFF1A" + (e && e.message ? e.message : e));
+        }
       }
       async deleteBoards(files, exitMulti = false) {
         let removed = 0;
@@ -18938,6 +20061,46 @@ var NovalBundle = require_noval_notes_core();
 var NovalBoardBundle = require_noval_board_core();
 var { NovalGalleryPanel } = require_noval_gallery();
 var { NovalNotesPanel } = require_noval_notes();
+var RenameFileModal = class extends Modal {
+  constructor(app, initial, onSubmit, heading) {
+    super(app);
+    this.initial = initial;
+    this.onSubmit = onSubmit;
+    this.heading = heading || "\u91CD\u547D\u540D";
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h3", { text: this.heading });
+    const input = contentEl.createEl("input", { type: "text" });
+    input.value = this.initial;
+    input.addClass("noval-rename-input");
+    input.focus();
+    input.select();
+    const submit = () => {
+      const value = input.value.trim();
+      if (!value) return;
+      this.close();
+      this.onSubmit(value);
+    };
+    input.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter") {
+        evt.preventDefault();
+        submit();
+      }
+      if (evt.key === "Escape") {
+        evt.preventDefault();
+        this.close();
+      }
+    });
+    new Setting(contentEl).addButton(
+      (button) => button.setButtonText("\u91CD\u547D\u540D").setCta().onClick(submit)
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
 function resolvePluginClass(bundle, fallbackName) {
   if (typeof bundle === "function") return bundle;
   if (bundle && typeof bundle.default === "function") return bundle.default;
@@ -19228,7 +20391,11 @@ var DEFAULT_SETTINGS = {
   // 素材归属表：路径 -> 模块 id。
   // 素材没有 frontmatter，归入模块后靠这张表记住归属；
   // 收件箱据此判断是否已处理，模块页据此决定素材属于谁。
-  inboxAssigned: {}
+  inboxAssigned: {},
+  // 画布集封面配色覆盖：画布路径 -> 色板 key；缺省时按所在文件夹自动取色
+  boardTints: {},
+  // 画布收藏：画布路径 -> true
+  boardStars: {}
 };
 var ACTIVE_STATUSES = [
   "active",
@@ -20177,6 +21344,573 @@ var AddFilesModal = class extends Modal {
     this.contentEl.empty();
   }
 };
+/* ==================== Noval 全局搜索（仅插件内） ====================
+   完全独立于 Obsidian 搜索：自绘 Modal、只读插件范围内的文件、
+   不注册全局热键、不读写 Obsidian 搜索状态。 */
+var NVGS_KIND_LABEL = { note: "笔记", canvas: "画布", card: "速记", module: "模块" };
+var NVGS_KIND_ICON = { note: "file-text", canvas: "layout-grid", card: "sticky-note", module: "folder" };
+
+function openGlobalSearch(view) {
+  if (!view) return;
+  try {
+    new NovalGlobalSearchModal(view.app, view).open();
+  } catch (e) {
+  }
+}
+
+/** 跳到模块页后定位到具体笔记，滚动并短暂高亮 */
+function nvFocusNote(view, modId, path) {
+  if (!view) return;
+  view.go(modId);
+  const find = () => {
+    const nodes = view.contentEl.querySelectorAll(".cl-md-tile[data-path], .cl-mdv-row[data-path]");
+    for (const node of nodes) {
+      if (node.dataset.path === path) return node;
+    }
+    return null;
+  };
+  const attempt = (left) => {
+    const el = find();
+    if (!el) {
+      if (left > 0) window.setTimeout(() => attempt(left - 1), 70);
+      return;
+    }
+    try {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+    } catch (e) {
+      el.scrollIntoView();
+    }
+    el.classList.add("is-flash");
+    new Notice("已定位到笔记「" + String(path.split("/").pop() || "").replace(/\.md$/i, "") + "」");
+    window.setTimeout(() => el.classList.remove("is-flash"), 1900);
+  };
+  window.setTimeout(() => attempt(16), 50);
+}
+
+function nvSearchBody(raw) {
+  return String(raw || "").replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+}
+
+function nvAsList(value) {
+  if (Array.isArray(value)) return value.map((v) => String(v || "").trim()).filter(Boolean);
+  if (typeof value === "string") return value.split(/[,，\s]+/).map((v) => v.trim()).filter(Boolean);
+  return [];
+}
+
+function nvHighlight(text, words) {
+  const raw = String(text == null ? "" : text);
+  const esc = raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const list = (words || []).filter(Boolean);
+  if (!list.length) return esc;
+  const pattern = list
+    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .sort((a, b) => b.length - a.length)
+    .join("|");
+  if (!pattern) return esc;
+  try {
+    return esc.replace(new RegExp("(" + pattern + ")", "gi"), "<mark>$1</mark>");
+  } catch (e) {
+    return esc;
+  }
+}
+
+function nvSearchSnippet(text, words) {
+  const raw = String(text || "");
+  if (!raw) return "";
+  const lower = raw.toLowerCase();
+  let at = -1;
+  for (const word of words || []) {
+    const i = lower.indexOf(String(word).toLowerCase());
+    if (i >= 0 && (at < 0 || i < at)) at = i;
+  }
+  if (at < 0) return raw.replace(/\s+/g, " ").slice(0, 70);
+  const start = Math.max(0, at - 26);
+  const end = Math.min(raw.length, at + 44);
+  return (start > 0 ? "…" : "") + raw.slice(start, end).replace(/\s+/g, " ") + (end < raw.length ? "…" : "");
+}
+
+function nvParseSearchQuery(raw) {
+  const tokens = String(raw || "").trim().split(/\s+/).filter(Boolean);
+  const out = { text: [], tags: [], kinds: [] };
+  for (const token of tokens) {
+    if (token.startsWith("#") && token.length > 1) {
+      out.tags.push(token.slice(1).toLowerCase());
+    } else if (/^kind:(note|canvas|card|module)$/i.test(token)) {
+      out.kinds.push(token.split(":")[1].toLowerCase());
+    } else {
+      out.text.push(token.toLowerCase());
+    }
+  }
+  return out;
+}
+
+function nvDocScore(doc, q) {
+  if (q.kinds.length && !q.kinds.includes(doc.kind)) return -1;
+  for (const tag of q.tags) {
+    if (!doc.tags.some((item) => String(item).toLowerCase().includes(tag))) return -1;
+  }
+  let score = 0;
+  const title = String(doc.title || "").toLowerCase();
+  for (const word of q.text) {
+    const inTitle = title.indexOf(word);
+    if (inTitle >= 0) {
+      score += inTitle === 0 ? (title === word ? 1000 : 800) : 620;
+      continue;
+    }
+    if (doc.aliases.some((item) => item.toLowerCase().includes(word))) { score += 500; continue; }
+    if (doc.tags.some((item) => item.toLowerCase().includes(word))) { score += 460; continue; }
+    if (doc.headings.some((item) => item.toLowerCase().includes(word))) { score += 420; continue; }
+    if (String(doc.path || "").toLowerCase().includes(word)) { score += 280; continue; }
+    const body = doc.text || "";
+    if (body.indexOf(word) < 0) return -1;
+    let hits = 0;
+    let from = 0;
+    while (hits < 8) {
+      const i = body.indexOf(word, from);
+      if (i < 0) break;
+      hits += 1;
+      from = i + word.length;
+    }
+    score += 160 + hits * 18;
+  }
+  if (doc.starred) score += 24;
+  return score + Math.min(30, Math.max(0, (Number(doc.mtime) || 0) / 1e12 * 4));
+}
+
+function nvModuleForPath(view, path, modules) {
+  let best = null;
+  let bestLen = -1;
+  for (const mod of modules || view.getModules()) {
+    const folder = String(view.moduleTargetFolder(mod) || "").replace(/^\/+|\/+$/g, "");
+    if (!folder) continue;
+    if ((path === folder || path.startsWith(folder + "/")) && folder.length > bestLen) {
+      best = mod;
+      bestLen = folder.length;
+    }
+  }
+  return best;
+}
+
+async function nvBuildSearchDocs(view) {
+  const app = view.app;
+  const plugin = view.plugin;
+  const docs = [];
+  const seen = new Set();
+  const modules = view.getModules();
+  const notesPlugin = (plugin && plugin.childPlugins && plugin.childPlugins[NOTES_ID]) ||
+    (app.plugins && app.plugins.plugins && app.plugins.plugins[LEGACY.notesId]);
+  const cardFolder = String((notesPlugin && notesPlugin.settings && notesPlugin.settings.folderPath) || CARD_FOLDER)
+    .replace(/^\/+|\/+$/g, "");
+
+  const addNote = (file) => {
+    if (!file || seen.has(file.path)) return;
+    if (String(file.extension || "").toLowerCase() !== "md") return;
+    if (cardFolder && (file.path === cardFolder || String(file.path || "").startsWith(cardFolder + "/"))) return;
+    seen.add(file.path);
+    docs.push({
+      key: "note:" + file.path,
+      kind: "note",
+      title: file.basename,
+      subtitle: "",
+      path: file.path,
+      moduleName: "",
+      group: "",
+      tags: [],
+      aliases: [],
+      headings: [],
+      text: "",
+      mtime: (file.stat && file.stat.mtime) || 0,
+      file
+    });
+  };
+
+  for (const mod of modules) {
+    docs.push({
+      key: "module:" + (mod.id || mod.name),
+      kind: "module",
+      title: mod.name || mod.folder || mod.id,
+      subtitle: "模块",
+      path: String(view.moduleTargetFolder(mod) || ""),
+      moduleName: mod.name || "",
+      group: "",
+      tags: [],
+      aliases: [],
+      headings: [],
+      text: String(mod.name || "") + " " + String(mod.folder || ""),
+      mtime: 0,
+      modId: mod.id,
+      mod
+    });
+    const dir = String(view.moduleTargetFolder(mod) || "");
+    if (!dir) continue;
+    let files = [];
+    try {
+      files = view.folderFiles(dir, true);
+    } catch (e) {
+      files = [];
+    }
+    for (const file of files) addNote(file);
+  }
+
+  try {
+    for (const file of view.inboxFiles()) addNote(file);
+  } catch (e) {
+  }
+
+  const noteDocs = docs.filter((doc) => doc.kind === "note");
+  await Promise.all(noteDocs.map(async (doc) => {
+    const mod = nvModuleForPath(view, doc.path, modules);
+    doc.moduleName = mod ? mod.name : "";
+    doc.subtitle = doc.moduleName || "收件箱";
+    try {
+      const raw = await app.vault.cachedRead(doc.file);
+      const body = nvSearchBody(raw);
+      doc.text = body.toLowerCase();
+      doc.sample = body;
+      const cache = app.metadataCache.getFileCache(doc.file);
+      const fm = (cache && cache.frontmatter) || {};
+      doc.aliases = nvAsList(fm.aliases || fm.alias);
+      doc.tags = nvAsList(fm.tags)
+        .concat(((cache && cache.tags) || []).map((item) => String((item && item.tag) || "")))
+        .map((tag) => tag.replace(/^#/, ""))
+        .filter(Boolean);
+      doc.headings = ((cache && cache.headings) || [])
+        .map((item) => String((item && item.heading) || ""))
+        .filter(Boolean);
+    } catch (e) {
+    }
+  }));
+
+  const rootFolder = String((plugin && plugin.novalFolder) || "").replace(/^\/+|\/+$/g, "");
+  const boards = app.vault.getFiles().filter((file) => {
+    if (String(file.extension || "").toLowerCase() !== BOARD_EXT) return false;
+    if (!rootFolder) return true;
+    return String(file.path || "").startsWith(rootFolder + "/");
+  });
+  for (const file of boards) {
+    let text = "";
+    try {
+      const data = JSON.parse(await app.vault.cachedRead(file));
+      const list = Array.isArray(data && data.nodes) ? data.nodes : [];
+      const parts = [];
+      for (const node of list) {
+        if (!node) continue;
+        if (node.text) parts.push(String(node.text));
+        if (node.label) parts.push(String(node.label));
+        if (node.file) parts.push(String(node.file));
+        if (parts.join(" ").length > 4000) break;
+      }
+      text = parts.join(" ");
+    } catch (e) {
+    }
+    const rel = rootFolder ? String(file.path || "").slice(rootFolder.length + 1) : String(file.path || "");
+    const slash = rel.lastIndexOf("/");
+    const group = slash > 0 ? rel.slice(0, slash) : "";
+    const stars = (plugin && plugin.settings && plugin.settings.boardStars) || {};
+    docs.push({
+      key: "canvas:" + file.path,
+      kind: "canvas",
+      title: file.basename,
+      subtitle: group || "画布",
+      path: file.path,
+      moduleName: "",
+      group,
+      tags: [],
+      aliases: [],
+      headings: [],
+      text: text.toLowerCase(),
+      sample: text,
+      mtime: (file.stat && file.stat.mtime) || 0,
+      starred: !!stars[file.path],
+      file
+    });
+  }
+
+  try {
+    if (notesPlugin && typeof notesPlugin.readAllCards === "function") {
+      const cards = await notesPlugin.readAllCards();
+      for (const card of cards || []) {
+        if (!card) continue;
+        const text = String(card.body != null ? card.body : card.text || "").trim();
+        const title = text ? text.split(/\n/)[0].slice(0, 46) : "速记 " + (card.date || "") + " " + (card.time || "");
+        const stamp = Date.parse(String(card.date || "") + "T" + String(card.time || "00:00")) || 0;
+        const filePath = card.filePath || (card.file && card.file.path ? card.file.path : String(card.file || ""));
+        docs.push({
+          key: "card:" + filePath + ":" + (card.date || "") + ":" + (card.time || "") + ":" + (card.id || ""),
+          kind: "card",
+          title,
+          subtitle: [card.date, card.time].filter(Boolean).join(" "),
+          path: filePath,
+          moduleName: "速记",
+          group: "",
+          tags: (card.tags || []).map((tag) => String(tag)),
+          aliases: [],
+          headings: [],
+          text: String(card.bodyLower || text.toLowerCase()),
+          sample: text,
+          mtime: stamp,
+          card
+        });
+      }
+    }
+  } catch (e) {
+  }
+
+  return docs;
+}
+
+async function nvEnsureSearchDocs(view) {
+  if (view._nvSearchDocs && !view._nvSearchDirty) return view._nvSearchDocs;
+  view._nvSearchDocs = await nvBuildSearchDocs(view);
+  view._nvSearchDirty = false;
+  return view._nvSearchDocs;
+}
+
+var NovalGlobalSearchModal = class extends Modal {
+  constructor(app, view) {
+    super(app);
+    this.view = view;
+    this.filter = "all";
+    this.docs = null;
+    this.query = "";
+    this.rows = [];
+    this.sel = 0;
+    this.loading = false;
+  }
+  onOpen() {
+    this.modalEl.addClass("nvgs-modal");
+    this.contentEl.addClass("nvgs-body");
+    this.contentEl.empty();
+
+    const head = this.contentEl.createDiv({ cls: "nvgs-head" });
+    const headIcon = head.createSpan({ cls: "nvgs-headico" });
+    setIcon(headIcon, "search");
+    this.input = head.createEl("input", {
+      cls: "nvgs-input",
+      attr: { type: "text", placeholder: "搜索笔记、画布、速记、模块…", spellcheck: "false" }
+    });
+    this.countEl = head.createSpan({ cls: "nvgs-headcount" });
+    head.createEl("kbd", { cls: "nvgs-esckbd", text: "Esc" });
+
+    const chips = this.contentEl.createDiv({ cls: "nvgs-chips" });
+    this.chipEls = new Map();
+    for (const item of [
+      { key: "all", label: "全部" },
+      { key: "note", label: "笔记" },
+      { key: "canvas", label: "画布" },
+      { key: "card", label: "速记" },
+      { key: "module", label: "模块" }
+    ]) {
+      const chip = chips.createDiv({ cls: "nvgs-chip" + (item.key === "all" ? " is-on" : ""), text: item.label });
+      chip.onclick = () => {
+        this.filter = item.key;
+        this.syncChips();
+        this.runQuery();
+      };
+      this.chipEls.set(item.key, chip);
+    }
+
+    this.listEl = this.contentEl.createDiv({ cls: "nvgs-list" });
+    this.listEl.createDiv({ cls: "nvgs-empty", text: "正在建立搜索索引…" });
+
+    const foot = this.contentEl.createDiv({ cls: "nvgs-foot" });
+    foot.createSpan({ text: "↑↓ 选择" });
+    foot.createSpan({ text: "↵ 打开" });
+    foot.createSpan({ text: "⌘↵ 新标签" });
+    foot.createSpan({ text: "#标签 / kind:note 精确筛选" });
+
+    this.input.addEventListener("input", () => {
+      this.query = this.input.value;
+      this.runQuery();
+    });
+    this.input.addEventListener("keydown", (event) => this.onKey(event));
+    window.setTimeout(() => {
+      if (this.input) this.input.focus();
+    }, 0);
+    this.loadIndex();
+  }
+  onClose() {
+    this.contentEl.empty();
+    this.input = null;
+  }
+  syncChips() {
+    for (const [key, el] of this.chipEls) el.classList.toggle("is-on", key === this.filter);
+  }
+  async loadIndex() {
+    this.loading = true;
+    try {
+      this.docs = await nvEnsureSearchDocs(this.view);
+    } catch (e) {
+      this.docs = [];
+    }
+    this.loading = false;
+    this.runQuery();
+  }
+  runQuery() {
+    if (!this.docs || this.loading) return;
+    const q = nvParseSearchQuery(this.query);
+    const pool = this.filter === "all" ? this.docs : this.docs.filter((doc) => doc.kind === this.filter);
+    const matched = [];
+    for (const doc of pool) {
+      const score = nvDocScore(doc, q);
+      if (score >= 0) matched.push({ doc, score });
+    }
+    matched.sort((a, b) => b.score - a.score || (Number(b.doc.mtime) || 0) - (Number(a.doc.mtime) || 0));
+    const limited = [];
+    const perKind = {};
+    for (const item of matched) {
+      const kind = item.doc.kind;
+      perKind[kind] = perKind[kind] || 0;
+      if (perKind[kind] >= 8) continue;
+      limited.push(item.doc);
+      perKind[kind] += 1;
+      if (limited.length >= 48) break;
+    }
+    this.rows = limited;
+    this.sel = 0;
+    this.renderList(q.text);
+  }
+  renderList(words) {
+    const list = this.listEl;
+    if (!list) return;
+    list.empty();
+    const hasQuery = !!String(this.query || "").trim();
+    this.countEl.setText(hasQuery ? String(this.rows.length) + " 项" : "");
+    if (this.loading) {
+      list.createDiv({ cls: "nvgs-empty", text: "正在建立搜索索引…" });
+      return;
+    }
+    if (!hasQuery) {
+      const map = new Map((this.docs || []).map((doc) => [doc.key, doc]));
+      const recent = (this.view.plugin._nvSearchRecent || [])
+        .map((key) => map.get(key))
+        .filter((doc) => doc && (this.filter === "all" || doc.kind === this.filter));
+      this.rows = recent;
+      this.sel = 0;
+      if (!recent.length) {
+        list.createDiv({
+          cls: "nvgs-empty",
+          text: "输入关键词开始搜索：标题、正文、#标签、kind:note"
+        });
+        return;
+      }
+      list.createDiv({ cls: "nvgs-ghead", text: "最近访问" });
+      recent.forEach((doc, index) => this.renderRow(doc, index, words));
+      this.markSelection();
+      return;
+    }
+    if (!this.rows.length) {
+      list.createDiv({ cls: "nvgs-empty", text: "没有匹配的结果" });
+      return;
+    }
+    let lastKind = "";
+    this.rows.forEach((doc, index) => {
+      if (this.filter === "all" && doc.kind !== lastKind) {
+        lastKind = doc.kind;
+        list.createDiv({ cls: "nvgs-ghead", text: NVGS_KIND_LABEL[doc.kind] || "" });
+      }
+      this.renderRow(doc, index, words);
+    });
+    this.markSelection();
+  }
+  renderRow(doc, index, words) {
+    const row = this.listEl.createDiv({ cls: "nvgs-row" });
+    row.dataset.index = String(index);
+    const icon = row.createSpan({ cls: "nvgs-rowico nvgs-kind-" + doc.kind });
+    setIcon(icon, NVGS_KIND_ICON[doc.kind] || "file");
+    const main = row.createDiv({ cls: "nvgs-rowmain" });
+    const title = main.createDiv({ cls: "nvgs-rowtitle" });
+    title.innerHTML = nvHighlight(doc.title, words);
+    const snippet = words.length && doc.kind !== "card" ? nvSearchSnippet(doc.sample || doc.text, words) : "";
+    const sub = main.createDiv({ cls: "nvgs-rowsub" });
+    sub.innerHTML = nvHighlight(snippet || doc.subtitle || doc.path || "", words);
+    row.createSpan({
+      cls: "nvgs-rowmeta",
+      text: doc.kind === "note" ? (doc.moduleName || "收件箱") : (doc.subtitle || "")
+    });
+    row.onclick = () => {
+      this.sel = index;
+      this.openRow(index, false);
+    };
+    row.onauxclick = (event) => {
+      if (event.button === 1) {
+        event.preventDefault();
+        this.openRow(index, true);
+      }
+    };
+    row.onmouseenter = () => {
+      this.sel = index;
+      this.markSelection();
+    };
+  }
+  markSelection() {
+    if (!this.listEl) return;
+    const rows = this.listEl.querySelectorAll(".nvgs-row");
+    rows.forEach((el) => {
+      const on = Number(el.dataset.index) === this.sel;
+      el.classList.toggle("is-sel", on);
+      if (on) el.scrollIntoView({ block: "nearest" });
+    });
+  }
+  onKey(event) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      this.move(1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      this.move(-1);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      this.openRow(this.sel, event.metaKey || event.ctrlKey);
+    }
+  }
+  move(step) {
+    if (!this.rows.length) return;
+    this.sel = (this.sel + step + this.rows.length) % this.rows.length;
+    this.markSelection();
+  }
+  openRow(index, newTab) {
+    const doc = this.rows[index];
+    if (!doc) return;
+    this.remember(doc);
+    this.close();
+    const view = this.view;
+    const app = this.app;
+    try {
+      if (doc.kind === "module") {
+        view.go(doc.modId);
+        return;
+      }
+      if (doc.kind === "card") {
+        if (newTab) {
+          const path = doc.path;
+          if (path) app.workspace.openLinkText(path + (doc.card && doc.card.id ? "#^" + doc.card.id : ""), "", true);
+        } else {
+          view.openCardInNotes(doc.card);
+        }
+        return;
+      }
+      if (doc.kind === "canvas" || newTab) {
+        app.workspace.getLeaf("tab").openFile(doc.file);
+        return;
+      }
+      const mod = view.moduleForFile ? view.moduleForFile(doc.file) : null;
+      if (mod) {
+        nvFocusNote(view, moduleIdOf(mod), doc.path);
+        return;
+      }
+      app.workspace.getLeaf("tab").openFile(doc.file);
+    } catch (e) {
+    }
+  }
+  remember(doc) {
+    const plugin = this.view && this.view.plugin;
+    if (!plugin) return;
+    const list = Array.isArray(plugin._nvSearchRecent) ? plugin._nvSearchRecent : [];
+    plugin._nvSearchRecent = [doc.key].concat(list.filter((key) => key !== doc.key)).slice(0, 10);
+  }
+};
+
 var NovalView = class extends ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -20206,6 +21940,21 @@ var NovalView = class extends ItemView {
     this.contentEl.addClass("cl-content");
     this.render();
     this.watchWidth();
+    const markSearchDirty = () => {
+      this._nvSearchDirty = true;
+    };
+    this.registerEvent(this.app.vault.on("create", markSearchDirty));
+    this.registerEvent(this.app.vault.on("modify", markSearchDirty));
+    this.registerEvent(this.app.vault.on("delete", markSearchDirty));
+    this.registerEvent(this.app.vault.on("rename", markSearchDirty));
+    this.registerDomEvent(this.containerEl, "keydown", (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+      if (String(event.key || "").toLowerCase() !== "k") return;
+      const target = event.target;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      event.preventDefault();
+      openGlobalSearch(this);
+    });
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf) => {
         if (leaf === this.leaf && this._needsRefresh) this.refresh();
@@ -20945,6 +22694,106 @@ var NovalView = class extends ItemView {
       else this.render();
     }).open();
   }
+  showFileMenu(event, file) {
+    const menu = new Menu();
+    menu.addItem(
+      (item) => item.setTitle("\u91CD\u547D\u540D\u2026").setIcon("pencil").onClick(() => this.promptRenameFile(file, "\u91CD\u547D\u540D\u7B14\u8BB0"))
+    );
+    menu.addSeparator();
+    menu.addItem(
+      (item) => item.setTitle("\u5220\u9664").setIcon("trash-2").onClick(() => this.deleteFiles([file]))
+    );
+    anchorMenuBelow(menu, event.currentTarget ?? event.target);
+  }
+  promptRenameFile(file, heading) {
+    new RenameFileModal(this.app, file.basename, (value) => {
+      void this.renameNoteFile(file, value);
+    }, heading).open();
+  }
+  async renameNoteFile(file, value) {
+    if (!value || value === file.basename) return;
+    const folder = file.parent ? file.parent.path : "";
+    const nextPath = (folder && folder !== "/" ? folder + "/" : "") + value + "." + (file.extension || "md");
+    try {
+      await this.app.fileManager.renameFile(file, nextPath);
+      this.refresh();
+    } catch (e) {
+      new Notice("\u91CD\u547D\u540D\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u662F\u5426\u91CD\u540D\u6216\u542B\u975E\u6CD5\u5B57\u7B26");
+    }
+  }
+  startFileDrag(event, file, paths) {
+    const list = paths && paths.length ? paths : this._mdMulti && this._mdSel.has(file.path) ? Array.from(this._mdSel) : [file.path];
+    this._dragPaths = list;
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", list.join("\n"));
+    }
+  }
+  endFileDrag() {
+    this._dragPaths = null;
+    this.clearDropHighlights();
+  }
+  clearDropHighlights() {
+    this.containerEl.querySelectorAll(".is-drop-target").forEach((el) => el.removeClass("is-drop-target"));
+  }
+  bindDropTarget(el, mode, mod) {
+    el.addEventListener("dragover", (evt) => {
+      if (!this._dragPaths || !this._dragPaths.length) return;
+      evt.preventDefault();
+      if (evt.dataTransfer) evt.dataTransfer.dropEffect = "move";
+      el.addClass("is-drop-target");
+    });
+    el.addEventListener("dragleave", (evt) => {
+      const next = evt.relatedTarget;
+      if (!next || !el.contains(next)) el.removeClass("is-drop-target");
+    });
+    el.addEventListener("drop", (evt) => {
+      if (!this._dragPaths || !this._dragPaths.length) return;
+      evt.preventDefault();
+      evt.stopPropagation();
+      el.removeClass("is-drop-target");
+      const paths = this._dragPaths.slice();
+      this._dragPaths = null;
+      const files = paths.map((p) => this.app.vault.getAbstractFileByPath(p)).filter((f) => f && f.extension !== void 0);
+      if (!files.length) return;
+      if (mode === "root") void this.moveFilesToRoot(files);
+      else void this.assignToModule(files, mod);
+    });
+  }
+  async moveFilesToRoot(files) {
+    if (!files || !files.length) return;
+    const assigned = this.ownershipMap();
+    let done = 0;
+    let failed = 0;
+    for (const file of files) {
+      try {
+        const oldPath = file.path;
+        const isNote = String(file.extension || "").toLowerCase() === "md";
+        if (isNote) {
+          await this.app.fileManager.processFrontMatter(file, (fm) => {
+            delete fm.module;
+          });
+          await this.waitForMetadata(file);
+        }
+        const target = this.uniqueFilePath("", file);
+        if (target && target !== oldPath) {
+          await this.app.fileManager.renameFile(file, target);
+          delete assigned[oldPath];
+          delete assigned[target];
+        } else {
+          delete assigned[oldPath];
+        }
+        done += 1;
+      } catch (e) {
+        failed += 1;
+      }
+    }
+    this._ownership = null;
+    if (this._mdSel) this._mdSel.clear();
+    await this.plugin.saveSettings();
+    new Notice("\u5DF2\u79FB\u56DE\u5E93\u6839\u76EE\u5F55\uFF1A" + done + " \u9879" + (failed ? "\uFF0C\u5931\u8D25 " + failed + " \u9879" : ""));
+    this.render();
+  }
   ignoreModuleValue(value) {
     const list = (this.plugin.settings.ignoredModuleValues || []).slice();
     if (!list.includes(value)) list.push(value);
@@ -21209,6 +23058,20 @@ var NovalView = class extends ItemView {
     collapseBtn.setAttribute("aria-label", "\u6536\u8D77 Noval \u4FA7\u680F");
     setIcon(collapseBtn, "chevrons-left");
     collapseBtn.onclick = () => this.setNavCollapsed(true);
+    const navSearch = nav.createDiv({
+      cls: "cl-navsearch",
+      attr: { role: "button", tabindex: "0", "aria-label": "搜索工作台" }
+    });
+    setIcon(navSearch.createSpan({ cls: "cl-navsearch-ico" }), "search");
+    navSearch.createSpan({ cls: "cl-navsearch-ph", text: "搜索工作台…" });
+    navSearch.createEl("kbd", { cls: "cl-navsearch-kbd", text: "⌘K" });
+    navSearch.onclick = () => openGlobalSearch(this);
+    navSearch.onkeydown = (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openGlobalSearch(this);
+      }
+    };
     const navList = nav.createDiv({ cls: "cl-navlist" });
     const group = (caption) => {
       const g = navList.createDiv({ cls: "cl-navgroup" });
@@ -21255,13 +23118,14 @@ var NovalView = class extends ItemView {
       active: this.active === "home",
       onClick: () => this.go("home")
     });
-    addItem(overview, {
+    const inboxItem = addItem(overview, {
       label: "\u6536\u96C6\u7BB1",
       icon: "inbox",
       active: this.active === "inbox",
       count: this.inboxFiles().length,
       onClick: () => this.go("inbox")
     });
+    this.bindDropTarget(inboxItem, "root");
     const modules = navList.createDiv({ cls: "cl-navgroup" });
     const capRow = modules.createDiv({ cls: "cl-navcap-row" });
     capRow.createDiv({ cls: "cl-navcap", text: "MODULES" });
@@ -21281,7 +23145,7 @@ var NovalView = class extends ItemView {
       const children = this.submodulesOf(mod);
       const expanded = this._navExpanded.has(key);
       const index = allModules.indexOf(mod);
-      addItem(modules, {
+      const navItem = addItem(modules, {
         label: mod.name,
         icon: mod.icon || (children.length ? "folder" : "file-text"),
         tile: "cl-tint-" + (index >= 0 ? index % 5 : depth % 5),
@@ -21307,6 +23171,7 @@ var NovalView = class extends ItemView {
           this.go(key);
         }
       });
+      this.bindDropTarget(navItem, "module", mod);
       if (expanded) children.forEach((child) => drawModule(child, depth + 1));
     };
     roots.forEach((mod) => drawModule(mod, 0));
@@ -21357,26 +23222,19 @@ var NovalView = class extends ItemView {
     const WEEKNAMES = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
     const MONTHNAMES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
     let captureInput = null;
-    const top = page.createDiv({ cls: "cl-hm-top" });
-    const crumb = top.createDiv({ cls: "cl-hm-crumb" });
-    crumb.createEl("b", { text: "\u603B\u89C8" });
-    crumb.createSpan({ text: " / \u9996\u9875" });
-    top.createDiv({ cls: "cl-hm-topspace" });
-    const cmd = top.createDiv({ cls: "cl-hm-cmd" });
-    setIcon(cmd.createDiv({ cls: "cl-hm-cmdico" }), "search");
-    cmd.createSpan({ text: "\u5FEB\u901F\u8BB0\u4E00\u6761" });
-    cmd.createDiv({ cls: "cl-hm-kbd", text: "\u21B5" });
-    cmd.onclick = () => {
-      if (captureInput) captureInput.focus();
-    };
-    const gear = top.createDiv({ cls: "cl-hm-iconbtn" });
-    gear.setAttribute("aria-label", "\u8BBE\u7F6E");
-    setIcon(gear, "settings");
-    gear.onclick = () => this.openSettings();
-    top.createDiv({
-      cls: "cl-hm-avatar",
-      text: workspaceName.slice(0, 2) || "C"
-    });
+    const top = page.createDiv({ cls: "cl-hm-top cl-hm-topbot" });
+    const topBranch = top.createDiv({ cls: "cl-hm-branch" });
+    topBranch.innerHTML = '<svg viewBox="0 0 60 36" aria-hidden="true"><path d="M3 33C17 29 31 21 46 6" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/><g fill="currentColor"><ellipse cx="17" cy="27" rx="7" ry="2.8" transform="rotate(-38 17 27)" opacity=".55"/><ellipse cx="25" cy="22" rx="7" ry="2.8" transform="rotate(-42 25 22)" opacity=".42"/><ellipse cx="28" cy="29" rx="6" ry="2.5" transform="rotate(-14 28 29)" opacity=".36"/><ellipse cx="33" cy="16" rx="6.5" ry="2.6" transform="rotate(-48 33 16)" opacity=".5"/><ellipse cx="40" cy="11" rx="5.5" ry="2.4" transform="rotate(-52 40 11)" opacity=".34"/></g></svg>';
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const weekNoTop = Math.ceil(((now - yearStart) / 864e5 + yearStart.getDay() + 1) / 7);
+    top.createDiv({ cls: "cl-hm-topmid", text: MONTHNAMES[now.getMonth()] + " \u00B7 \u7B2C " + weekNoTop + " \u5468" });
+    const topClock = top.createDiv({ cls: "cl-hm-topclk" });
+    topClock.createEl("b", { text: String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0") });
+    topClock.createSpan({ text: "\u5468" + "\u65E5\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D"[now.getDay()] });
+    const topGear = top.createDiv({ cls: "cl-hm-topgear" });
+    topGear.setAttribute("aria-label", "\u8BBE\u7F6E");
+    setIcon(topGear, "more-horizontal");
+    topGear.onclick = () => this.openSettings();
     const grid = page.createDiv({ cls: "cl-hm-bento" });
     const hero = grid.createDiv({ cls: "cl-hm-card cl-hm-hero cl-hm-s5" });
     hero.createDiv({ cls: "cl-hm-bigdate", text: String(now.getDate()) });
@@ -21432,58 +23290,91 @@ var NovalView = class extends ItemView {
     });
     sendBtn.onclick = submitCapture;
     const weekCard = grid.createDiv({ cls: "cl-hm-card cl-hm-week cl-hm-s4" });
-    const weekHead = weekCard.createDiv({ cls: "cl-hm-head" });
-    weekHead.createDiv({ cls: "cl-hm-title", text: "\u672C\u5468\u8282\u594F" });
-    weekHead.createDiv({ cls: "cl-hm-sub", text: "\u8FC7\u53BB 12 \u5468" });
     const dayMs = 864e5;
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
     const todayTime = today.getTime();
     const monday = todayTime - (today.getDay() + 6) % 7 * dayMs;
+    const onejan = new Date(today.getFullYear(), 0, 1);
+    const weekNo = Math.ceil((((today - onejan) / dayMs) + onejan.getDay() + 1) / 7);
+    const weekCn = "\u65E5\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D"[today.getDay()];
+    const weekHead = weekCard.createDiv({ cls: "cl-hm-head" });
+    weekHead.createDiv({ cls: "cl-hm-title", text: "\u672C\u5468\u8282\u594F" });
+    weekHead.createDiv({ cls: "cl-hm-sub", text: "\u7B2C " + weekNo + " \u5468 \u00B7 " + (today.getMonth() + 1) + "/" + today.getDate() + " \u5468" + weekCn });
     const buckets = /* @__PURE__ */ new Map();
     let recentCount = 0;
-    let prevCount = 0;
     const recentFrom = todayTime - 6 * dayMs;
-    const prevFrom = todayTime - 13 * dayMs;
     for (const file of [...this._contentFiles, ...boards]) {
       const d = new Date(file.stat.mtime);
       d.setHours(0, 0, 0, 0);
       const key = d.getTime();
       buckets.set(key, (buckets.get(key) || 0) + 1);
       if (key >= recentFrom) recentCount += 1;
-      else if (key >= prevFrom) prevCount += 1;
     }
-    const trend = prevCount ? Math.round((recentCount - prevCount) / prevCount * 100) : null;
-    const weekNum = weekCard.createDiv({ cls: "cl-hm-weeknum" });
-    weekNum.createEl("strong", { text: String(recentCount) });
-    weekNum.createSpan({ text: "\u6B21\u7F16\u8F91" });
-    const trendEl = weekNum.createDiv({
-      cls: "cl-hm-trend" + (trend !== null && trend < 0 ? " is-down" : ""),
-      text: trend === null ? "\u2014" : (trend > 0 ? "+" : "") + trend + "%"
-    });
-    const heat = weekCard.createDiv({ cls: "cl-hm-heat" });
-    const levels = [0, 1, 2, 4, 6];
-    for (let i = 0; i < 84; i++) {
-      const weekIndex = Math.floor(i / 7);
-      const weekday = i % 7;
-      const time = monday - (11 - weekIndex) * 7 * dayMs + weekday * dayMs;
-      const cell = heat.createEl("i");
-      if (time > todayTime) {
-        cell.addClass("is-future");
+    const weekCounts = [];
+    for (let i = 0; i < 7; i++) weekCounts.push(buckets.get(monday + i * dayMs) || 0);
+    const todayIdx = (today.getDay() + 6) % 7;
+    const todayCount = weekCounts[todayIdx] || 0;
+    let streak = 0;
+    for (let i = todayIdx; i >= 0; i--) { if (weekCounts[i] > 0) streak++; else break; }
+    let thisWeekActive = 0;
+    for (let i = 0; i <= todayIdx; i++) if (weekCounts[i] > 0) thisWeekActive++;
+    let lastWeekActive = 0;
+    for (let i = 0; i <= todayIdx; i++) if ((buckets.get(monday - 7 * dayMs + i * dayMs) || 0) > 0) lastWeekActive++;
+    const dayDelta = thisWeekActive - lastWeekActive;
+    const wkTop = weekCard.createDiv({ cls: "cl-hm-wktop" });
+    const wkNum = wkTop.createDiv({ cls: "cl-hm-wknum" });
+    wkNum.createEl("strong", { text: String(recentCount) });
+    wkNum.createSpan({ text: "\u6B21\u7F16\u8F91" });
+    const wkStats = wkTop.createDiv({ cls: "cl-hm-wkstats" });
+    wkStats.createDiv({ cls: "cl-hm-streak", text: "\uD83D\uDD25 \u8FDE\u7EED " + streak + " \u5929" });
+    const cmpCls = dayDelta > 0 ? "cl-hm-cmp up" : dayDelta < 0 ? "cl-hm-cmp down" : "cl-hm-cmp";
+    const cmpText = dayDelta > 0 ? "\u25B2 \u8F83\u4E0A\u5468 +" + dayDelta + " \u5929" : dayDelta < 0 ? "\u25BC \u8F83\u4E0A\u5468 " + dayDelta + " \u5929" : "\u2014 \u8F83\u4E0A\u5468 \u6301\u5E73";
+    wkStats.createDiv({ cls: cmpCls, text: cmpText });
+    const wkChart = weekCard.createDiv({ cls: "cl-hm-wkchart" });
+    const maxC = Math.max(1, ...weekCounts);
+    const W = 300, H = 74, baseY = 66, maxH = 56, barW = 22;
+    let svgInner = '<defs><linearGradient id="wkBarGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fbf6f"/><stop offset="1" stop-color="#6f9a5e"/></linearGradient></defs>';
+    svgInner += '<line x1="0" y1="' + baseY + '" x2="' + W + '" y2="' + baseY + '" stroke="var(--hm-line)" stroke-width="1"/>';
+    for (let i = 0; i < 7; i++) {
+      const x = 13 + i * 42;
+      const isToday = i === todayIdx;
+      const isFuture = i > todayIdx;
+      const c = weekCounts[i];
+      if (isFuture) {
+        svgInner += '<rect x="' + x + '" y="60" width="' + barW + '" height="6" rx="4" fill="none" stroke="var(--hm-line-strong)" stroke-dasharray="2 2"/>';
       } else {
-        const count = buckets.get(time) || 0;
-        let level = 0;
-        for (let k = 1; k < levels.length; k++) {
-          if (count >= levels[k]) level = k;
+        const h = Math.max(4, Math.round(maxH * c / maxC));
+        const y = baseY - h;
+        const fill = isToday ? "url(#wkBarGrad)" : c > 0 ? "rgba(169,201,138,0.55)" : "var(--hm-track)";
+        svgInner += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + h + '" rx="4" fill="' + fill + '"/>';
+        if (isToday) {
+          const cx = x + barW / 2;
+          svgInner += '<line x1="' + cx + '" y1="4" x2="' + cx + '" y2="8" stroke="#6f9a5e" stroke-width="1.5"/>';
+          svgInner += '<circle cx="' + cx + '" cy="4" r="2.5" fill="#6f9a5e"/>';
         }
-        if (level) cell.addClass("l" + level);
       }
     }
-    const heatFoot = weekCard.createDiv({ cls: "cl-hm-heatfoot" });
-    heatFoot.createSpan({ text: "\u5C11" });
-    const legend = heatFoot.createDiv({ cls: "cl-hm-legend" });
-    for (let i = 0; i < 5; i++) legend.createEl("i", { cls: "l" + i });
-    heatFoot.createSpan({ text: "\u591A" });
+    wkChart.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' + svgInner + '</svg>';
+    const wkLabels = wkChart.createDiv({ cls: "cl-hm-wklabels" });
+    const dayLabels = ["\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D", "\u65E5"];
+    for (let i = 0; i < 7; i++) {
+      const sp = wkLabels.createSpan({ text: dayLabels[i] + (i === todayIdx ? " \u00B7 \u4ECA\u5929" : "") });
+      if (i === todayIdx) sp.addClass("is-today");
+    }
+    const wkFoot = weekCard.createDiv({ cls: "cl-hm-wkfoot" });
+    const todayEl = wkFoot.createDiv({ cls: "cl-hm-wktoday" + (todayCount > 0 ? "" : " idle") });
+    todayEl.createSpan({ cls: "dot" });
+    todayEl.createSpan({ text: todayCount > 0 ? "\u4ECA\u65E5\u5DF2\u7F16\u8F91 " + todayCount + " \u4E2A\u6587\u4EF6" : "\u4ECA\u65E5\u8FD8\u6CA1\u52A8\u7B14" });
+    const prog = wkFoot.createDiv({ cls: "cl-hm-wkprog" });
+    prog.createSpan({ text: "\u672C\u5468\u6D3B\u8DC3" });
+    const progBar = prog.createSpan({ cls: "bar" });
+    progBar.createEl("i").style.width = Math.round(thisWeekActive / 7 * 100) + "%";
+    prog.createEl("b", { text: thisWeekActive + "/7 \u5929" });
+    if (todayCount === 0) {
+      const nudge = weekCard.createDiv({ cls: "cl-hm-wknudge", text: "\u4ECA\u5929\u8FD8\u6CA1\u52A8\u7B14\uFF0C\u53BB\u901F\u8BB0\u4E00\u6761 \u2192" });
+      nudge.onclick = () => { if (captureInput) captureInput.focus(); };
+    }
     const inboxCard = grid.createDiv({ cls: "cl-hm-card cl-hm-inbox cl-hm-s3" });
     const inboxHead = inboxCard.createDiv({ cls: "cl-hm-head" });
     inboxHead.createDiv({ cls: "cl-hm-title", text: "\u6536\u4EF6\u7BB1" });
@@ -21602,7 +23493,7 @@ var NovalView = class extends ItemView {
     addTile.onclick = () => this.openModuleEditor(null);
     const boardCard = grid.createDiv({ cls: "cl-hm-card cl-hm-s7" });
     const boardHead = boardCard.createDiv({ cls: "cl-hm-head" });
-    boardHead.createDiv({ cls: "cl-hm-title", text: "\u6700\u8FD1\u767D\u677F" });
+    boardHead.createDiv({ cls: "cl-hm-title", text: "\u6700\u8FD1\u753B\u5E03" });
     boardHead.createDiv({ cls: "cl-hm-sub", text: boards.length + " \u5757" });
     const boardMore = boardHead.createDiv({ cls: "cl-hm-more", text: "\u753B\u5E03\u96C6 \u203A" });
     boardMore.onclick = () => this.openNovalGallery();
@@ -22007,6 +23898,12 @@ var NovalView = class extends ItemView {
         const tile = grid.createDiv({
           cls: "cl-md-tile cl-inbox-tile cl-md-kind-" + info.key + (selected ? " is-selected" : "")
         });
+        tile.setAttribute("draggable", "true");
+        tile.addEventListener("dragstart", (event) => {
+          const paths = this._inboxSel.has(file.path) ? current.filter((f) => this._inboxSel.has(f.path)).map((f) => f.path) : null;
+          this.startFileDrag(event, file, paths);
+        });
+        tile.addEventListener("dragend", () => this.endFileDrag());
         const thumb = tile.createDiv({ cls: "cl-md-thumb" });
         if (info.key === "note") {
           paintNoteThumb(this.app, thumb, file);
@@ -22135,6 +24032,12 @@ var NovalView = class extends ItemView {
           const card = group.createDiv({
             cls: "cl-inbox-card" + (selected ? " is-selected" : "")
           });
+          card.setAttribute("draggable", "true");
+          card.addEventListener("dragstart", (event) => {
+            const paths = this._inboxSel.has(file.path) ? current.filter((f) => this._inboxSel.has(f.path)).map((f) => f.path) : null;
+            this.startFileDrag(event, file, paths);
+          });
+          card.addEventListener("dragend", () => this.endFileDrag());
           const check = card.createDiv({ cls: "cl-inbox-check" });
           const box = check.createEl("input", {
             attr: { type: "checkbox", "aria-label": "\u9009\u62E9 " + file.basename }
@@ -22530,6 +24433,10 @@ var NovalView = class extends ItemView {
           const row = body.createDiv({
             cls: "cl-mdv-row" + (this._mdMulti && picked ? " is-selected" : "")
           });
+          row.setAttribute("draggable", "true");
+          row.dataset.path = file.path;
+          row.addEventListener("dragstart", (event) => this.startFileDrag(event, file));
+          row.addEventListener("dragend", () => this.endFileDrag());
           const rowHue = entry.owner && entry.owner.color ? entry.owner.color : depthHuePalette[(entry.depth || 0) % depthHuePalette.length];
           row.style.setProperty("--hue", entry.depth > 0 ? rowHue : tint);
           if (entry.depth > 0 && entry.owner) {
@@ -22565,14 +24472,14 @@ var NovalView = class extends ItemView {
           });
           row.createDiv({ cls: "cl-mdv-date", text: fmtDate(file.stat.mtime) });
           if (!this._mdMulti) {
-            const del = row.createDiv({
-              cls: "cl-mdv-del",
-              attr: { "aria-label": "\u5220\u9664 " + file.basename, role: "button" }
+            const more = row.createDiv({
+              cls: "cl-mdv-more",
+              attr: { "aria-label": "\u66F4\u591A " + file.basename, role: "button" }
             });
-            setIcon(del, "trash-2");
-            del.onclick = (event) => {
+            setIcon(more, "more-horizontal");
+            more.onclick = (event) => {
               event.stopPropagation();
-              this.deleteFiles([file]);
+              this.showFileMenu(event, file);
             };
           }
           row.onclick = () => {
@@ -22590,6 +24497,10 @@ var NovalView = class extends ItemView {
         const tile = grid.createDiv({
           cls: "cl-md-tile cl-md-kind-note" + (this._mdMulti && picked ? " is-selected" : "")
         });
+        tile.setAttribute("draggable", "true");
+        tile.dataset.path = file.path;
+        tile.addEventListener("dragstart", (event) => this.startFileDrag(event, file));
+        tile.addEventListener("dragend", () => this.endFileDrag());
         const thumb = tile.createDiv({ cls: "cl-md-thumb" });
         paintNoteThumb(this.app, thumb, file);
         if (this._mdMulti) {
@@ -22614,14 +24525,14 @@ var NovalView = class extends ItemView {
           tile.classList.add("has-child-note");
         }
         if (!this._mdMulti) {
-          const del = tile.createEl("button", {
-            cls: "cl-md-tiledel",
-            attr: { "aria-label": "\u5220\u9664 " + file.basename }
+          const more = tile.createEl("button", {
+            cls: "cl-md-tilemore",
+            attr: { "aria-label": "\u66F4\u591A " + file.basename }
           });
-          setIcon(del, "trash-2");
-          del.onclick = (event) => {
+          setIcon(more, "more-horizontal");
+          more.onclick = (event) => {
             event.stopPropagation();
-            this.deleteFiles([file]);
+            this.showFileMenu(event, file);
           };
         }
         tile.onclick = () => {
@@ -22969,6 +24880,15 @@ module.exports = class NovalPlugin extends Plugin {
         await this.activateView();
         const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (leaf && leaf.view && leaf.view.go) leaf.view.go("canvas");
+      }
+    });
+    this.addCommand({
+      id: "global-search",
+      name: "\u5168\u5C40\u641C\u7D22",
+      callback: async () => {
+        await this.activateView();
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+        if (leaf && leaf.view) openGlobalSearch(leaf.view);
       }
     });
     this.addSettingTab(new NovalSettingTab(this.app, this));
