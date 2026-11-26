@@ -26,7 +26,7 @@ if (result.status !== 0) {
 }
 
 // 2) 三段样式拼接：宿主 → 速记卡片 → 画布集
-const parts = ["build/noval-host.css", "build/noval-notes.css", "build/noval-board.css"].map(
+const parts = ["build/noval-host.css", "build/noval-notes.css", "build/noval-ai-tag.css", "build/noval-board.css"].map(
   (p) => "/* ==================== " + path.basename(p) + " ==================== */\n" + read(p)
 );
 fs.writeFileSync(path.join(dist, "styles.css"), parts.join("\n\n"), "utf8");
@@ -35,7 +35,7 @@ fs.writeFileSync(path.join(dist, "styles.css"), parts.join("\n\n"), "utf8");
 const manifest = {
   id: "noval",
   name: "Noval",
-  version: "0.8.4",
+  version: "0.9.0",
   minAppVersion: "1.13.0",
   description: "本地工作台：模块视图、速记卡片与画布集合并为一个插件.",
   author: "Lak",
@@ -81,10 +81,12 @@ const sources = [
   "src/main.js",
   "src/noval-notes.js",
   "src/noval-gallery.js",
+  "src/noval-ai-tag.js",
   "vendor/noval-notes-core.js",
   "vendor/noval-board-core.js",
   "build/noval-host.css",
   "build/noval-notes.css",
+  "build/noval-ai-tag.css",
   "build/noval-board.css"
 ];
 let esbuildVersion = "unknown";

@@ -1,5 +1,6 @@
 var { Notice: Notice2, setIcon: setIcon2, TFile } = require("obsidian");
 var NovalBundle2 = require("../vendor/noval-notes-core.js");
+var { openTagBar, openTagFix, openBatchTag, openTagHealth } = require("./noval-ai-tag.js");
 var ICONS = {
   search: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>',
   review: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4.3l2.8 1.7"/></svg>',
@@ -305,6 +306,11 @@ var NovalNotesPanel2 = class {
     const nextKeys = cards.map((c) => this.cardKey(c));
     const sameOrder = prevKeys.length === nextKeys.length && prevKeys.every((k, i) => k === nextKeys[i]);
     this.cards = cards;
+    // 导航栏「卡片笔记」徽标：卡片页只走局部刷新，导航不会重建，
+    // 所以每次数据落地都把总数推给宿主视图，免得多加一条要切页才更新。
+    if (this.hostView && typeof this.hostView.syncCardNavCount === "function") {
+      this.hostView.syncCardNavCount(cards.length);
+    }
     if (!sameOrder || !this.currentListEl || !this.renderPlan) {
       this.renderList();
       return;
@@ -1358,6 +1364,13 @@ var NovalNotesPanel2 = class {
           ev.stopPropagation();
           this.setFilterTags([tagValue]);
         };
+        // 右键标签 = 改标签（AI 纠错）；左键保持原有筛选行为不变
+        tag.oncontextmenu = (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          openTagFix(this, card, tagValue, tag);
+        };
+        tag.setAttribute("title", "#" + tagValue + " · 左键筛选 · 右键改标签");
       }
       last = match.index + match[0].length;
     }
@@ -1424,6 +1437,10 @@ var NovalNotesPanel2 = class {
     if (this.tags.length) {
       lab.createSpan({ cls: "qm-pop-sel", text: "\u5DF2\u9009 " + this.tags.length });
     }
+    const healthBtn = lab.createEl("button", { cls: "qm-tai-btn qm-tai-health", text: "\u5065\u5EB7" });
+    healthBtn.setAttribute("type", "button");
+    healthBtn.setAttribute("title", "\u6807\u7B7E\u5065\u5EB7\uFF1A\u5B64\u513F\u3001\u8FD1\u4E49\u3001\u590D\u7528\u7387");
+    healthBtn.onclick = (e) => { e.stopPropagation(); this.closePop(); openTagHealth(this); };
     const treeWrap = el.createDiv({ cls: "qm-tree-wrap" });
     const tree = treeWrap.createDiv({ cls: "qm-tagtree" });
     this.treeEl = tree;
@@ -1436,6 +1453,12 @@ var NovalNotesPanel2 = class {
     un.createSpan({ cls: "qm-caret is-blank" });
     un.createSpan({ cls: "qm-tname", text: "\u65E0\u6807\u7B7E" });
     un.createSpan({ cls: "qm-tcount", text: String(forest.untagged) });
+    if (forest.untagged > 0) {
+      const aiBtn = un.createEl("button", { cls: "qm-tai-btn", text: "AI \u6253\u6807" });
+      aiBtn.setAttribute("type", "button");
+      aiBtn.setAttribute("title", "AI \u7ED9\u5168\u90E8 " + forest.untagged + " \u5F20\u65E0\u6807\u7B7E\u5361\u7247\u6253\u6807\u7B7E");
+      aiBtn.onclick = (e) => { e.stopPropagation(); this.closePop(); openBatchTag(this); };
+    }
     un.createSpan({ cls: "qm-tmark", text: "\u2713" });
     un.onclick = () => {
       this.untagged = !this.untagged;
@@ -1522,6 +1545,7 @@ var NovalNotesPanel2 = class {
     const capNote = cap > 0 && hit > cap ? " \xB7 \u663E\u793A\u6700\u8FD1 " + cap : "";
     const countLine = (hit === total ? "\u5171 " + total + " \u6761\u5361\u7247" : "\u5171 " + total + " \u6761 \xB7 \u547D\u4E2D " + hit + " \u6761") + capNote;
     const n = (this.noval.settings && this.noval.settings.trash || []).length;
+    const untaggedCount = this.cards.filter((c) => !(c.tags || []).length).length;
     const items = [
       { title: countLine, icon: "arrow-right", disabled: true },
       { separator: true },
@@ -1544,6 +1568,16 @@ var NovalNotesPanel2 = class {
         title: "\u68C0\u67E5\u5B64\u513F\u5361\u7247",
         icon: "search-check",
         onClick: () => new NovalBundle2.OrphanModal(this.app, this.noval).open()
+      },
+      {
+        title: "AI \u6574\u7406\u65E0\u6807\u7B7E" + (untaggedCount ? " (" + untaggedCount + ")" : ""),
+        icon: "sparkles",
+        onClick: () => openBatchTag(this)
+      },
+      {
+        title: "\u6807\u7B7E\u5065\u5EB7",
+        icon: "search-check",
+        onClick: () => openTagHealth(this)
       },
       { separator: true },
       {
@@ -1821,6 +1855,11 @@ var NovalNotesPanel2 = class {
       { title: "\u590D\u5236\u94FE\u63A5", icon: "link", onClick: () => this.copyRef(card) },
       { title: "\u7F16\u8F91", icon: "pencil", onClick: () => this.beginEdit(card) },
       { title: "\u8FFD\u52A0", icon: "plus", onClick: () => this.beginAppend(card) },
+      {
+        title: "AI \u6253\u6807\u7B7E",
+        icon: "sparkles",
+        onClick: () => openTagBar(this, cardEl, card)
+      },
       { separator: true }
     ];
     if (this.noval.refsReady && !this.noval.refsReady()) {

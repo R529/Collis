@@ -14,6 +14,7 @@ var NovalBundle = require("../vendor/noval-notes-core.js");
 var NovalBoardBundle = require("../vendor/noval-board-core.js");
 var { NovalGalleryPanel } = require("./noval-gallery.js");
 var { NovalNotesPanel } = require("./noval-notes.js");
+var NovalAiTag = require("./noval-ai-tag.js");
 var RenameFileModal = class extends Modal {
   constructor(app, initial, onSubmit, heading) {
     super(app);
@@ -1877,6 +1878,8 @@ var NovalView = class extends ItemView {
     this._needsRefresh = false;
     this.gallery = null;
     this.notes = null;
+    this._navSyncTimer = null;
+    this._cardNavTimer = null;
     this._navExpanded = /* @__PURE__ */ new Set();
   }
   getViewType() {
@@ -1900,6 +1903,36 @@ var NovalView = class extends ItemView {
     this.registerEvent(this.app.vault.on("modify", markSearchDirty));
     this.registerEvent(this.app.vault.on("delete", markSearchDirty));
     this.registerEvent(this.app.vault.on("rename", markSearchDirty));
+    // 画布集里新建/删除画布只做局部刷新，导航栏不会重绘，
+    // 所以这里跟画布集用同一个 60ms 节拍把「画布」徽标校准一次。
+    // 只在画布页补：其他页面走的是整页重绘，数字本来就是新的。
+    const syncBoardNavSoon = () => {
+      if (this.active !== "canvas") return;
+      if (this._navSyncTimer) window.clearTimeout(this._navSyncTimer);
+      this._navSyncTimer = window.setTimeout(() => {
+        this._navSyncTimer = null;
+        this.syncBoardNavCount();
+      }, 60);
+    };
+    // 不只看 .noval：删掉整个分组文件夹时事件落在文件夹上，子文件不再单独报事件
+    this.registerEvent(this.app.vault.on("create", () => syncBoardNavSoon()));
+    this.registerEvent(this.app.vault.on("delete", () => syncBoardNavSoon()));
+    this.registerEvent(this.app.vault.on("rename", () => syncBoardNavSoon()));
+    // 卡片笔记徽标：在卡片页由面板读完后自己推数；
+    // 停在画布页时用快速记录写进来的卡片没人管，这里补一次（其它页面会整页重绘）。
+    const inCardFolder = (path) => String(path || "").indexOf(CARD_FOLDER + "/") === 0;
+    const syncCardNavSoon = (file, oldPath) => {
+      if (this.active !== "canvas") return;
+      if (!inCardFolder(file && file.path) && !inCardFolder(oldPath)) return;
+      if (this._cardNavTimer) window.clearTimeout(this._cardNavTimer);
+      this._cardNavTimer = window.setTimeout(() => {
+        this._cardNavTimer = null;
+        void this.recountCardNav();
+      }, 300);
+    };
+    this.registerEvent(this.app.vault.on("create", (file) => syncCardNavSoon(file)));
+    this.registerEvent(this.app.vault.on("delete", (file) => syncCardNavSoon(file)));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => syncCardNavSoon(file, oldPath)));
     this.registerDomEvent(this.containerEl, "keydown", (event) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
       if (String(event.key || "").toLowerCase() !== "k") return;
@@ -1918,6 +1951,14 @@ var NovalView = class extends ItemView {
     if (this._ro) {
       this._ro.disconnect();
       this._ro = null;
+    }
+    if (this._navSyncTimer) {
+      window.clearTimeout(this._navSyncTimer);
+      this._navSyncTimer = null;
+    }
+    if (this._cardNavTimer) {
+      window.clearTimeout(this._cardNavTimer);
+      this._cardNavTimer = null;
     }
     document.body.classList.remove("noval-focus");
     this.focus = false;
@@ -2810,6 +2851,7 @@ var NovalView = class extends ItemView {
     this._ownership = null;
     if (this.active === "canvas" && this.gallery) {
       this.gallery.refresh();
+      this.syncBoardNavCount();
       return;
     }
     if (this.active === "notes" && this.notes) {
@@ -2857,6 +2899,59 @@ var NovalView = class extends ItemView {
   }
   getBoardFiles() {
     return this.app.vault.getFiles().filter((f) => f.extension === BOARD_EXT).sort((a, b) => b.stat.mtime - a.stat.mtime);
+  }
+  // 导航栏「画布」徽标。切页时整页重绘，数字自然会跟上；
+  // 但在画布集里增删画布走的是局部刷新，导航不会重绘，
+  // 所以这里单独把徽标补一次，否则要切走再切回来才同步。
+  // 口径跟画布集保持一致：只数画布文件夹里的 .noval，散在别处的旧文件不算。
+  boardCount() {
+    const board = this.plugin.childPlugins && this.plugin.childPlugins[BOARD_ID];
+    const folder = String(board && board.novalFolder || "").replace(/^\/+|\/+$/g, "");
+    const prefix = folder ? folder + "/" : "";
+    return this.app.vault.getFiles().filter((f) => {
+      if (f.extension !== BOARD_EXT) return false;
+      return !prefix || f.path.startsWith(prefix);
+    }).length;
+  }
+  syncBoardNavCount() {
+    if (!this.appEl) return;
+    const item = this.appEl.querySelector('.cl-navitem[data-nav="canvas"]');
+    if (!item) return;
+    const total = this.boardCount();
+    let badge = item.querySelector(".cl-navcount");
+    if (!total) {
+      if (badge) badge.remove();
+      return;
+    }
+    if (!badge) badge = item.createDiv({ cls: "cl-navcount" });
+    const next = String(total);
+    if (badge.textContent !== next) badge.setText(next);
+  }
+  // 卡片笔记徽标：卡片页同样只做局部刷新，数字由面板读完全部卡片后推过来。
+  syncCardNavCount(total) {
+    if (!this.appEl) return;
+    const item = this.appEl.querySelector('.cl-navitem[data-nav="notes"]');
+    if (!item) return;
+    const n = typeof total === "number" ? total : this._cardCount || 0;
+    this._cardCount = n;
+    let badge = item.querySelector(".cl-navcount");
+    if (!n) {
+      if (badge) badge.remove();
+      return;
+    }
+    if (!badge) badge = item.createDiv({ cls: "cl-navcount" });
+    const next = String(n);
+    if (badge.textContent !== next) badge.setText(next);
+  }
+  // 卡片页以外（此刻停在画布）没有面板缓存，只能重读一次卡片文件。
+  async recountCardNav() {
+    const noval = this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID] || this.app.plugins.plugins && this.app.plugins.plugins[LEGACY.notesId];
+    if (!noval || typeof noval.readAllCards !== "function") return;
+    try {
+      const cards = await noval.readAllCards();
+      this.syncCardNavCount(Array.isArray(cards) ? cards.length : 0);
+    } catch (e) {
+    }
   }
   getCardFiles() {
     return this.app.vault.getFiles().filter((f) => f.extension === "md" && f.path.startsWith(CARD_FOLDER + "/")).sort((a, b) => b.stat.mtime - a.stat.mtime);
@@ -3031,11 +3126,12 @@ var NovalView = class extends ItemView {
       g.createDiv({ cls: "cl-navcap", text: caption });
       return g;
     };
-    const addItem = (parent, { label, icon, tile, color, active, count, onClick, onContextMenu, depth = 0, chevron = false, hasChildren = false, expanded = false, onToggle }) => {
+    const addItem = (parent, { label, icon, tile, color, active, count, navKey, onClick, onContextMenu, depth = 0, chevron = false, hasChildren = false, expanded = false, onToggle }) => {
       const item = parent.createDiv({
         cls: "cl-navitem" + (active ? " is-active" : "") + (depth > 0 ? " is-sub" : "")
       });
       item.setAttribute("aria-label", label);
+      if (navKey) item.setAttribute("data-nav", navKey);
       if (depth > 0) item.style.paddingLeft = 9 + depth * 14 + "px";
       if (chevron) {
         const chev = item.createDiv({ cls: "cl-navchev" + (hasChildren ? "" : " is-blank") });
@@ -3133,7 +3229,8 @@ var NovalView = class extends ItemView {
       label: "\u753B\u5E03",
       icon: "presentation",
       active: this.active === "canvas",
-      count: this.getBoardFiles().length,
+      count: this.boardCount(),
+      navKey: "canvas",
       onClick: () => this.go("canvas")
     });
     const cardsItem = addItem(workspace, {
@@ -3141,6 +3238,7 @@ var NovalView = class extends ItemView {
       icon: "sticky-note",
       active: this.active === "notes",
       count: this._cardCount || 0,
+      navKey: "notes",
       onClick: () => this.go("notes")
     });
     this.fillCardCount(cardsItem);
@@ -4630,6 +4728,135 @@ var NovalView = class extends ItemView {
     this.notes.mount(el);
   }
 };
+// 卡片笔记自己的 AI 设置：只决定打标签的方式，模型配置仍共用画布的 profiles。
+function renderNotesAiSettings(containerEl, plugin) {
+  new Setting(containerEl).setName("卡片笔记 · AI").setHeading();
+  const notes = plugin.childPlugins && plugin.childPlugins[NOTES_ID];
+  if (!notes || !notes.settings) {
+    containerEl.createEl("p", {
+      cls: "cl-settings-hint",
+      text: "卡片笔记组件未加载，暂时无法配置。请重载插件后再试。"
+    });
+    return;
+  }
+  notes.settings.aiTag = Object.assign({}, NovalAiTag.AI_TAG_DEFAULTS, notes.settings.aiTag || {});
+  const opts = notes.settings.aiTag;
+  const save = async () => {
+    await notes.saveSettings(false);
+  };
+
+  new Setting(containerEl).setName("AI 打标签").setDesc(
+    "插件不预设任何标签，标签从你自己的卡片里长出来。只发送当前这张卡的正文，不读全库。"
+  ).addToggle((toggle) => toggle.setValue(opts.enabled !== false).onChange(async (value) => {
+    opts.enabled = value;
+    await save();
+  }));
+
+  new Setting(containerEl).setName("打标签模式").setDesc(
+    "建议 = AI 一次给一组候选，你自己勾（默认，可多选）；自动 = AI 直接写入，只进已有标签；手动 = AI 只给参考，一个都不预选。"
+  ).addDropdown((drop) => drop
+    .addOption("suggest", "建议（推荐）")
+    .addOption("auto", "自动")
+    .addOption("manual", "手动")
+    .setValue(["suggest", "auto", "manual"].indexOf(opts.mode) === -1 ? "suggest" : opts.mode)
+    .onChange(async (value) => {
+      opts.mode = value;
+      await save();
+    }));
+
+  const boardForNotes = plugin.childPlugins && plugin.childPlugins[BOARD_ID];
+  const ai = boardForNotes && boardForNotes.settings && boardForNotes.settings.ai;
+  const profiles = ai && Array.isArray(ai.profiles) ? ai.profiles : [];
+  const active = ai && NovalBoardBundle.activeProfile ? NovalBoardBundle.activeProfile(ai) : null;
+  const modelSetting = new Setting(containerEl).setName("打标签用哪个模型").setDesc(
+    "和画布问答共用同一份模型配置，不用重新填密钥。"
+  );
+  modelSetting.addDropdown((drop) => {
+    drop.addOption("", "跟随画布当前" + (active ? "（" + (active.name || active.model) + "）" : ""));
+    for (const p of profiles) {
+      drop.addOption(p.id, (p.name || p.model || p.id) + " · " + (p.model || ""));
+    }
+    drop.setValue(opts.profileId || "").onChange(async (value) => {
+      opts.profileId = value;
+      await save();
+    });
+  });
+  if (!profiles.length) {
+    modelSetting.setDesc("还没有模型配置：先到下方 画布 → AI 里添加一个，这里会自动共用。");
+  }
+
+  new Setting(containerEl).setName("标签宽窄").setDesc(
+    "跟随 = 从你现有标签的习惯里自动推断（推荐）。宽 = 多给「时间、成长、关系」这类常用词；中 = 可以给「时间管理」；细 = 可以给「年龄焦虑、告别」这类具体词。"
+  ).addDropdown((drop) => drop
+    .addOption("follow", "跟随我的习惯（推荐）")
+    .addOption("broad", "宽")
+    .addOption("medium", "中")
+    .addOption("fine", "细")
+    .setValue(["follow", "broad", "medium", "fine"].indexOf(opts.granularity) === -1 ? "follow" : opts.granularity)
+    .onChange(async (value) => {
+      opts.granularity = value;
+      await save();
+    }));
+
+  new Setting(containerEl).setName("一次给几个候选").setDesc(
+    "AI 一次给出的候选数量。给得多、角度散，你挑中的概率才高；自己也能随时加词。"
+  ).addDropdown((drop) => drop
+    .addOption("4", "4 个")
+    .addOption("6", "6 个（推荐）")
+    .addOption("8", "8 个")
+    .setValue(String(NovalAiTag.CAND_CHOICES && NovalAiTag.CAND_CHOICES.indexOf(Number(opts.maxCand)) !== -1 ? Number(opts.maxCand) : 6))
+    .onChange(async (value) => {
+      opts.maxCand = Number(value);
+      await save();
+    }));
+
+
+  const casesSetting = new Setting(containerEl).setName("决策记忆").setDesc(
+    "你每次确认或纠正标签，都会记下来喂给 AI，让建议向你的习惯靠拢。只存插件设置，不写笔记文件。"
+  );
+  const caseCount = Array.isArray(opts.cases) ? opts.cases.length : 0;
+  casesSetting.setDesc("已记住 " + caseCount + " 条决定。你每次确认或纠正标签都会记下来，让 AI 向你的习惯靠拢。");
+  casesSetting.addButton((button) => button.setButtonText("清空记忆").onClick(async () => {
+    opts.cases = [];
+    await save();
+    casesSetting.setDesc("已记住 0 条决定。你每次确认或纠正标签都会记下来，让 AI 向你的习惯靠拢。");
+    new Notice("已清空 AI 打标签的决策记忆。");
+  }));
+
+  let extraTimer = null;
+  new Setting(containerEl).setName("我常想用的标签").setDesc(
+    "可留空。写进来的词会让 AI 优先复用它们。AI 给你挑中的新词也会自动进这份表，不用手工维护。"
+  ).addTextArea((text) => {
+    text.setPlaceholder("一行一个，例如：\n时间\n产品\n写作");
+    text.setValue((opts.extraVocab || []).join("\n"));
+    text.inputEl.rows = 3;
+    text.onChange((value) => {
+      if (extraTimer) clearTimeout(extraTimer);
+      extraTimer = setTimeout(async () => {
+        opts.extraVocab = value.split("\n").map((s) => s.trim().replace(/^#+/, "")).filter(Boolean).slice(0, 60);
+        await save();
+      }, 600);
+    });
+  });
+
+  const vocabDesc = containerEl.createEl("p", { cls: "cl-settings-hint", text: "正在统计当前词表…" });
+  (async () => {
+    try {
+      const cards = await notes.cardsForSuggest();
+      const vocab = NovalAiTag.collectVocab(cards, opts.extraVocab);
+      if (!vocab.length) {
+        vocabDesc.setText("标签表还是空的：第一次打标签时 AI 会按这张卡自己给词。");
+        return;
+      }
+      const top = vocab.slice(0, 12).map((x) => x.label + "(" + x.count + ")").join("、");
+      vocabDesc.setText(
+        "你在用的标签 " + vocab.length + " 个：" + top + (vocab.length > 12 ? " …" : "") + "。次数为 0 的是上面手填的。"
+      );
+    } catch (error) {
+      vocabDesc.setText("");
+    }
+  })();
+}
 var NovalSettingTab = class extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
@@ -4687,6 +4914,7 @@ var NovalSettingTab = class extends PluginSettingTab {
       cls: "cl-settings-hint",
       text: "\u8BE5\u76EE\u5F55\u4E0D\u4F1A\u51FA\u73B0\u5728\u6A21\u5757\u5BFC\u822A\u91CC\uFF0C\u4E5F\u4E0D\u4F1A\u8FDB\u5165\u6536\u4EF6\u7BB1\u3002\u628A\u5361\u7247\u6587\u4EF6\u79FB\u51FA\u8FD9\u4E2A\u76EE\u5F55\uFF0C\u5B83\u5C31\u4F1A\u53D8\u6210\u666E\u901A\u7B14\u8BB0\u3002"
     });
+    renderNotesAiSettings(containerEl, this.plugin);
     new Setting(containerEl).setName("\u753B\u5E03").setHeading();
     const board = this.plugin.childPlugins && this.plugin.childPlugins[BOARD_ID];
     if (!board) {

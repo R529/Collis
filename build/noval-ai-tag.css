@@ -1,0 +1,595 @@
+/* ==========================================================================
+   卡片笔记 · AI 打标签（V6）
+   独立文件：所有选择器都限定在 .noval-aitag / .noval-taghealth / .qm-tai-btn
+   之内，不改动任何现有卡片样式与布局。
+   颜色优先取现有 --qm-* 令牌，取不到时回落到 Obsidian 主题变量，
+   所以浅色 / 深色主题都不需要单独写规则。
+   ========================================================================== */
+
+/* ---------------- 单卡建议栏 ---------------- */
+
+.noval-aitag {
+  margin: 8px 2px 2px;
+  padding: 9px 10px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: var(--qm-accent-weak, rgba(127, 109, 242, 0.05));
+  color: var(--qm-text, var(--text-normal));
+  font-size: 12.5px;
+  line-height: 1.5;
+  animation: noval-aitag-in 0.12s ease-out;
+}
+
+@keyframes noval-aitag-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.noval-aitag-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.noval-aitag-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--qm-accent, var(--interactive-accent));
+}
+
+.noval-aitag-title::before {
+  content: "\2726";
+  margin-right: 4px;
+  font-weight: 400;
+}
+
+.noval-aitag-close {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--qm-muted, var(--text-muted));
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.noval-aitag-close:hover {
+  background: var(--qm-field-bg, var(--background-modifier-hover));
+  color: var(--qm-text, var(--text-normal));
+}
+
+.noval-aitag-reason {
+  margin-bottom: 6px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--qm-muted, var(--text-muted));
+}
+
+/* 只在「读卡片 / 出错 / 没词」时出现，正常出结果就整行收起 */
+.noval-aitag-reason:empty {
+  display: none;
+}
+
+.noval-aitag-rows {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.noval-aitag-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border-radius: 13px;
+  cursor: pointer;
+}
+
+.noval-aitag-chip {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: 13px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: transparent;
+  color: var(--qm-text, var(--text-normal));
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: color 0.1s ease, border-color 0.1s ease, background 0.1s ease;
+}
+
+.noval-aitag-chip:hover {
+  border-color: var(--qm-accent, var(--interactive-accent));
+  color: var(--qm-accent, var(--interactive-accent));
+}
+
+.noval-aitag-row.is-on .noval-aitag-chip {
+  border-color: var(--qm-accent, var(--interactive-accent));
+  background: var(--qm-accent, var(--interactive-accent));
+  color: var(--text-on-accent, #ffffff);
+  font-weight: 600;
+}
+
+/* 新类目：虚线，和已有类目一眼分开；它不会被预选 */
+.noval-aitag-chip.is-new {
+  border-style: dashed;
+  border-color: var(--qm-accent, var(--interactive-accent));
+  color: var(--qm-accent, var(--interactive-accent));
+  background: transparent;
+}
+
+.noval-aitag-row.is-on .noval-aitag-chip.is-new {
+  color: var(--text-on-accent, #ffffff);
+  background: var(--qm-accent, var(--interactive-accent));
+}
+
+/* 「改」按钮：默认不占位，悬停这一颗或选中之后才出现 */
+.noval-aitag-editbtn {
+  display: none;
+  flex: 0 0 auto;
+  padding: 0 5px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: transparent;
+  color: var(--qm-muted, var(--text-muted));
+  font-size: 10.5px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.noval-aitag-row:hover .noval-aitag-editbtn,
+.noval-aitag-row.is-on .noval-aitag-editbtn {
+  display: inline-block;
+}
+
+/* 触屏没有悬停：宁可多露一个「改」，也别让改名摸不到 */
+@media (hover: none) {
+  .noval-aitag-editbtn {
+    display: inline-block;
+  }
+}
+
+.noval-aitag-editbtn:hover {
+  color: var(--qm-accent, var(--interactive-accent));
+  border-color: var(--qm-accent, var(--interactive-accent));
+}
+
+/* 行内改名输入框 */
+.noval-aitag-edit {
+  flex: 0 0 auto;
+  width: 150px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 5px;
+  border: 1px solid var(--qm-accent, var(--interactive-accent));
+  background: var(--qm-card-bg, var(--background-primary));
+  color: var(--qm-text, var(--text-normal));
+  font-size: 12px;
+}
+
+/* 自己加一个标签 */
+.noval-aitag-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.noval-aitag-input {
+  flex: 1;
+  min-width: 0;
+  height: 25px;
+  padding: 0 8px;
+  border-radius: 5px;
+  border: 1px dashed var(--qm-line, var(--background-modifier-border));
+  background: transparent;
+  color: var(--qm-text, var(--text-normal));
+  font-size: 11.5px;
+}
+
+.noval-aitag-input::placeholder {
+  color: var(--qm-muted, var(--text-muted));
+  opacity: 0.8;
+}
+
+.noval-aitag-input:focus {
+  border-style: solid;
+  border-color: var(--qm-accent, var(--interactive-accent));
+  outline: none;
+}
+
+.noval-aitag-addbtn {
+  flex: 0 0 auto;
+  height: 25px;
+  padding: 0 10px;
+  border-radius: 5px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: transparent;
+  color: var(--qm-muted, var(--text-muted));
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.noval-aitag-addbtn:hover:not(:disabled) {
+  color: var(--qm-text, var(--text-normal));
+  background: var(--qm-field-bg, var(--background-modifier-hover));
+}
+
+.noval-aitag-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.noval-aitag-grow {
+  flex: 1;
+}
+
+.noval-aitag-shuffle {
+  padding: 3px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: transparent;
+  color: var(--qm-accent, var(--interactive-accent));
+  font-size: 12px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.noval-aitag-shuffle:hover:not(:disabled) {
+  background: var(--qm-accent-soft, rgba(127, 109, 242, 0.1));
+}
+
+.noval-aitag-apply,
+.noval-aitag-none,
+.noval-aitag-cancel,
+.noval-aitag-retry {
+  padding: 3px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: transparent;
+  color: var(--qm-muted, var(--text-muted));
+  font-size: 12px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.noval-aitag-apply:hover:not(:disabled),
+.noval-aitag-none:hover,
+.noval-aitag-cancel:hover,
+.noval-aitag-retry:hover {
+  color: var(--qm-text, var(--text-normal));
+  background: var(--qm-field-bg, var(--background-modifier-hover));
+}
+
+.noval-aitag-apply {
+  border-color: var(--qm-accent, var(--interactive-accent));
+  background: var(--qm-accent, var(--interactive-accent));
+  color: var(--text-on-accent, #ffffff);
+  font-weight: 600;
+}
+
+.noval-aitag-apply:hover:not(:disabled) {
+  background: var(--qm-accent, var(--interactive-accent));
+  color: var(--text-on-accent, #ffffff);
+  filter: brightness(1.06);
+}
+
+.noval-aitag-apply:disabled {
+  background: transparent;
+  border-color: var(--qm-line, var(--background-modifier-border));
+  color: var(--qm-muted, var(--text-muted));
+  font-weight: 500;
+  opacity: 0.8;
+  cursor: default;
+}
+
+/* ---------------- 改标签浮层 ---------------- */
+
+.noval-aitag-fix {
+  position: fixed;
+  z-index: var(--layer-popover, 40);
+  width: 250px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: var(--qm-card-bg, var(--background-primary));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  color: var(--qm-text, var(--text-normal));
+  font-size: 12px;
+}
+
+.noval-aitag-fix-title {
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--qm-text, var(--text-normal));
+}
+
+.noval-aitag-fix-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-height: 132px;
+  overflow: auto;
+}
+
+.noval-aitag-fix-chip {
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: var(--qm-field-bg, var(--background-modifier-hover));
+  color: var(--qm-text, var(--text-normal));
+  font-size: 11.5px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.noval-aitag-fix-chip:hover {
+  border-color: var(--qm-accent, var(--interactive-accent));
+  color: var(--qm-accent, var(--interactive-accent));
+}
+
+.noval-aitag-fix-empty {
+  font-size: 11px;
+  color: var(--qm-muted, var(--text-muted));
+}
+
+.noval-aitag-fix-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--qm-line, var(--background-modifier-border));
+}
+
+.noval-aitag-fix-remove {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: transparent;
+  color: var(--qm-danger, var(--text-error));
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.noval-aitag-fix-custom {
+  display: flex;
+  gap: 5px;
+}
+
+.noval-aitag-fix-input {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 5px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: var(--qm-field-bg, var(--background-modifier-hover));
+  color: var(--qm-text, var(--text-normal));
+  font-size: 11.5px;
+}
+
+.noval-aitag-fix-ok {
+  padding: 2px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--qm-accent, var(--interactive-accent));
+  background: var(--qm-accent, var(--interactive-accent));
+  color: var(--text-on-accent, #ffffff);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+/* ---------------- 批量打标 ---------------- */
+
+.noval-aitag-batch {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  margin: 0 0 8px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: var(--qm-card-bg, var(--background-secondary));
+  color: var(--qm-text, var(--text-normal));
+  font-size: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.noval-aitag-batch-label {
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.noval-aitag-batch-detail {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--qm-muted, var(--text-muted));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.noval-aitag-batch-cancel,
+.noval-aitag-batch-make,
+.noval-aitag-batch-skip {
+  margin-top: 7px;
+  margin-right: 6px;
+  padding: 2px 9px;
+  border-radius: 5px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: transparent;
+  color: var(--qm-muted, var(--text-muted));
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.noval-aitag-batch-make {
+  border-color: var(--qm-accent, var(--interactive-accent));
+  background: var(--qm-accent, var(--interactive-accent));
+  color: var(--text-on-accent, #ffffff);
+  font-weight: 600;
+}
+
+.noval-aitag-batch-cancel:hover,
+.noval-aitag-batch-skip:hover {
+  color: var(--qm-text, var(--text-normal));
+  background: var(--qm-field-bg, var(--background-modifier-hover));
+}
+
+.noval-aitag-batch-prop {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.noval-aitag-batch-prop-text {
+  flex: 1;
+  min-width: 140px;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.noval-aitag-batch-prop .noval-aitag-batch-make,
+.noval-aitag-batch-prop .noval-aitag-batch-skip {
+  margin-top: 0;
+}
+
+.noval-aitag-batch-note {
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--qm-muted, var(--text-muted));
+}
+
+/* ---------------- 标签健康 ---------------- */
+
+.noval-taghealth {
+  max-height: 62vh;
+  overflow: auto;
+  font-size: 12.5px;
+  color: var(--qm-text, var(--text-normal));
+}
+
+.noval-taghealth-stats {
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: var(--qm-field-bg, var(--background-modifier-hover));
+  font-size: 11.5px;
+  color: var(--qm-muted, var(--text-muted));
+}
+
+.noval-taghealth-cap {
+  margin: 13px 0 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--qm-accent, var(--interactive-accent));
+}
+
+.noval-taghealth-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--qm-line, var(--background-modifier-border));
+}
+
+.noval-taghealth-name {
+  flex: 1;
+  min-width: 150px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.noval-taghealth-btn {
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: transparent;
+  color: var(--qm-muted, var(--text-muted));
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.noval-taghealth-btn:hover:not(:disabled) {
+  color: var(--qm-text, var(--text-normal));
+  background: var(--qm-field-bg, var(--background-modifier-hover));
+}
+
+.noval-taghealth-btn.is-danger {
+  color: var(--qm-danger, var(--text-error));
+}
+
+.noval-taghealth-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.noval-taghealth-empty {
+  margin-top: 8px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--qm-muted, var(--text-muted));
+}
+
+/* ---------------- 标签区里的小按钮 ---------------- */
+
+.qm-tai-btn {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  padding: 0 5px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--qm-line, var(--background-modifier-border));
+  background: transparent;
+  color: var(--qm-accent, var(--interactive-accent));
+  font-size: 10px;
+  line-height: 16px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.qm-tai-btn:hover {
+  opacity: 1;
+  background: var(--qm-accent-soft, rgba(127, 109, 242, 0.1));
+}
+
+/* 标签区标题右侧的「健康」入口：跟「已选 N」分开，不抢位置 */
+.qm-tai-health {
+  margin-left: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noval-aitag {
+    animation: none;
+  }
+}

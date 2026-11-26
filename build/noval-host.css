@@ -1604,6 +1604,9 @@ body.noval-focus .workspace-leaf-resize-handle {
 }
 
 .noval-view .cl-notes-listwrap > .qm-list {
+  /* 右侧留一点空隙：滚动条紧贴卡片边太挤，
+     滚动条本身挪不动，靠内边距把卡往里收一点 */
+  padding-right: 8px;
   padding-bottom: 12px;
 }
 

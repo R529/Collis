@@ -4969,6 +4969,22 @@ var require_noval_notes_core = __commonJS({
         else new Notice2("\u6CA1\u6709\u4FEE\u6539\uFF1A" + res.reason);
         return !!res.ok;
       }
+      /**
+       * 与 updateCard 完全相同的写回逻辑，但不弹任何提示：
+       * 供 AI 批量打标 / 标签合并等一次要写很多张卡的场景使用，
+       * 避免「已更新」提示刷屏。
+       */
+      async quietUpdateCard(card, newBody) {
+        const bodyLines = qmBodyLines(newBody);
+        if (!bodyLines.length) return false;
+        const res = await this.mutateCardFile(card, (lines, hit) => {
+          const sections = qmCardSections(qmBlockBody(lines, hit));
+          const id = hit.id || card.id || this.uniqueIdIn(lines.join("\n"));
+          const body = qmComposeBody(bodyLines.join("\n"), sections.appends);
+          return qmReplaceBlock(lines, hit, body, id);
+        });
+        return !!res.ok;
+      }
       /* ---------------- 追加 ---------------- */
       /** 在卡片末尾追加一段；原始内容一个字都不动 */
       async appendToCard(card, text) {
@@ -16712,6 +16728,8 @@ ${head.content}` }, ...recent.slice(1)] : [{ role: "user", content: block }, ...
       }
       return false;
     }
+    module2.exports.createProvider = createProvider;
+    module2.exports.activeProfile = activeProfile;
   }
 });
 
@@ -18006,11 +18024,1233 @@ var require_noval_gallery = __commonJS({
   }
 });
 
+// src/noval-ai-tag.js
+var require_noval_ai_tag = __commonJS({
+  "src/noval-ai-tag.js"(exports2, module2) {
+    var { Notice: Notice2, Modal: Modal2 } = require("obsidian");
+    var BoardBundle = require_noval_board_core();
+    var BOARD_ID2 = "noval-board";
+    var MAX_BODY_CHARS = 4e3;
+    var VOCAB_LIMIT = 40;
+    var REQUEST_TOKENS = 3e3;
+    var CACHE_LIMIT = 300;
+    var CASES_LIMIT = 100;
+    var FEW_SHOT_N = 8;
+    var BATCH_MIN_NEW = 3;
+    var AI_TAG_DEFAULTS = {
+      enabled: true,
+      profileId: "",
+      mode: "suggest",
+      // suggest | auto | manual
+      granularity: "follow",
+      // follow | broad | medium | fine
+      maxCand: 6,
+      // 一次摊开的候选数量 4-8
+      extraVocab: [],
+      cases: [],
+      // 决策记忆：{ s: 片段, t: 选的, r: 放弃的, at }
+      cache: {}
+      // 内容哈希 -> { r: 解析后的候选, at }
+    };
+    var CAND_CHOICES = [4, 6, 8];
+    var GRANULARITY_RULE = {
+      broad: "\u5BBD\u7A84\u504F\u597D\uFF1A\u504F\u5BBD\u3002\u591A\u7ED9\u300C\u65F6\u95F4\u300D\u300C\u6210\u957F\u300D\u300C\u5173\u7CFB\u300D\u8FD9\u7C7B\u5E38\u7528\u8BCD\uFF0C\u5B83\u4EEC\u8986\u76D6\u7684\u9762\u5927\u3001\u4EE5\u540E\u4E00\u5B9A\u80FD\u518D\u88C5\u4E0B\u522B\u7684\u5361\u3002",
+      medium: "\u5BBD\u7A84\u504F\u597D\uFF1A\u9002\u4E2D\u3002\u53EF\u4EE5\u7ED9\u300C\u65F6\u95F4\u7BA1\u7406\u300D\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u8FD9\u7C7B\u8BCD\uFF0C\u4F46\u6BCF\u4E2A\u8BCD\u4EE5\u540E\u4ECD\u7136\u8981\u80FD\u88C5\u4E0B\u522B\u7684\u5361\u3002",
+      fine: "\u5BBD\u7A84\u504F\u597D\uFF1A\u504F\u5177\u4F53\u3002\u53EF\u4EE5\u7ED9\u300C\u5E74\u9F84\u7126\u8651\u300D\u300C\u544A\u522B\u300D\u300C\u5F00\u59CB\u300D\u8FD9\u7C7B\u8BCD\uFF0C\u53EA\u8981\u5B83\u786E\u5B9E\u662F\u4F60\u4EE5\u540E\u4F1A\u641C\u7684\u3002"
+    };
+    function normalizeTag(raw) {
+      var t = String(raw == null ? "" : raw).trim();
+      if (!t) return "";
+      t = t.replace(/^#+/, "");
+      t = t.replace(/[\s,，。;；:：!！?？"'“”‘’()\[\]{}<>《》|\\~`@&*+=^]+/g, "");
+      t = t.replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
+      if (!t || t.length > 20) return "";
+      return t;
+    }
+    function sameFamily(a, b) {
+      if (!a || !b) return false;
+      if (a === b) return true;
+      return a.includes(b) || b.includes(a);
+    }
+    function sampleOf(text) {
+      var s = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
+      if (s.length > 26) return s.slice(0, 26) + "\u2026";
+      return s;
+    }
+    function hashBody(body) {
+      var s = String(body == null ? "" : body).slice(0, MAX_BODY_CHARS);
+      var h = 5381;
+      for (var i = 0; i < s.length; i++) {
+        h = (h << 5) + h + s.charCodeAt(i) | 0;
+      }
+      return (h >>> 0).toString(36);
+    }
+    function containsTag(text, tag) {
+      if (!text || !tag) return false;
+      var re = tagRegex(tag);
+      re.lastIndex = 0;
+      return re.test(text);
+    }
+    function tagRegex(tag) {
+      var esc = String(tag).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp("#" + esc + "(?![^\\s#\\[\\]()])", "g");
+    }
+    function removeTagFromBody(body, tag) {
+      var text = String(body == null ? "" : body);
+      var out = [];
+      var lines = text.split("\n");
+      for (var i = 0; i < lines.length; i += 1) {
+        var line = lines[i];
+        var had = false;
+        var next = line.replace(tagRegex(tag), function() {
+          had = true;
+          return "";
+        });
+        if (had) {
+          next = next.replace(/(\S)[ \t]{2,}/g, "$1 ").replace(/[ \t]+$/, "");
+          if (next.trim().charAt(0) === "#") next = next.trim();
+          if (!next.trim()) continue;
+        }
+        out.push(next);
+      }
+      return out.join("\n").replace(/\n{3,}/g, "\n\n").replace(/^\s+|\s+$/g, "");
+    }
+    function replaceTagInBody(body, oldTag, newTag) {
+      var text = String(body == null ? "" : body);
+      if (!newTag) return removeTagFromBody(text, oldTag);
+      if (containsTag(text, newTag)) return removeTagFromBody(text, oldTag);
+      return text.replace(tagRegex(oldTag), "#" + newTag);
+    }
+    function bodyWithTags(body, tags) {
+      var text = String(body == null ? "" : body).replace(/\s+$/, "");
+      var add = [];
+      for (var raw of tags) {
+        var t = normalizeTag(raw);
+        if (!t) continue;
+        if (containsTag(text, t)) continue;
+        if (add.indexOf(t) === -1) add.push(t);
+      }
+      if (!add.length) return text;
+      var addText = add.map(function(t2) {
+        return "#" + t2;
+      }).join(" ");
+      if (!text) return addText;
+      var lines = text.split("\n");
+      var last = lines[lines.length - 1];
+      var block = last.match(/^(.*?)(\s*\^[A-Za-z0-9-]+)\s*$/);
+      if (block) {
+        var before = block[1].replace(/[ \t]+$/, "");
+        lines[lines.length - 1] = (before ? before + " " : "") + addText + " " + block[2].trim();
+        return lines.join("\n");
+      }
+      lines[lines.length - 1] = last.replace(/[ \t]+$/, "") + " " + addText;
+      return lines.join("\n");
+    }
+    function getStore(panel) {
+      var host = panel && panel.noval;
+      if (!host || !host.settings) return null;
+      if (!host.settings.aiTag || typeof host.settings.aiTag !== "object") host.settings.aiTag = {};
+      var s = host.settings.aiTag;
+      if (!Array.isArray(s.extraVocab)) s.extraVocab = [];
+      if (!Array.isArray(s.cases)) s.cases = [];
+      if (!s.cache || typeof s.cache !== "object" || Array.isArray(s.cache)) s.cache = {};
+      return s;
+    }
+    function readOptions(panel) {
+      var store = getStore(panel);
+      var merged = Object.assign({}, AI_TAG_DEFAULTS, store || {});
+      if (["suggest", "auto", "manual"].indexOf(merged.mode) === -1) merged.mode = "suggest";
+      if (["follow", "broad", "medium", "fine"].indexOf(merged.granularity) === -1) merged.granularity = "follow";
+      if (CAND_CHOICES.indexOf(Number(merged.maxCand)) === -1) merged.maxCand = AI_TAG_DEFAULTS.maxCand;
+      merged.maxCand = Number(merged.maxCand);
+      merged.cases = store ? store.cases : merged.cases;
+      merged.cache = store ? store.cache : merged.cache;
+      merged.extraVocab = store ? store.extraVocab : merged.extraVocab;
+      return merged;
+    }
+    function saveStore(panel) {
+      var host = panel && panel.noval;
+      if (!host) return;
+      try {
+        if (typeof host.saveData === "function") {
+          var p = host.saveData(host.settings);
+          if (p && typeof p.catch === "function") p.catch(function() {
+          });
+          return;
+        }
+      } catch (error) {
+      }
+      if (typeof host.saveSettings === "function") host.saveSettings(false);
+    }
+    function collectVocab(cards, extra) {
+      var map = /* @__PURE__ */ new Map();
+      var ensure = function(label2) {
+        var key = label2.toLowerCase();
+        var slot2 = map.get(key);
+        if (!slot2) {
+          slot2 = { label: label2, count: 0, sample: "" };
+          map.set(key, slot2);
+        }
+        return slot2;
+      };
+      for (var raw of extra || []) {
+        var t = normalizeTag(raw);
+        if (t) ensure(t);
+      }
+      for (var card of cards || []) {
+        for (var tag of card.tags || []) {
+          var label = normalizeTag(tag);
+          if (!label) continue;
+          var slot = ensure(label);
+          slot.count++;
+          if (!slot.sample) slot.sample = sampleOf(card.body || "");
+        }
+      }
+      return Array.from(map.values()).sort(function(a, b) {
+        return b.count - a.count || a.label.localeCompare(b.label, "zh");
+      }).slice(0, VOCAB_LIMIT);
+    }
+    function effectiveGranularity(options, vocab) {
+      if (options.granularity !== "follow") return options.granularity;
+      var real = (vocab || []).filter(function(v) {
+        return v.count > 0;
+      });
+      if (real.length < 3) return "broad";
+      var top = real.slice(0, 20);
+      var avg = top.reduce(function(s, v) {
+        return s + v.label.length;
+      }, 0) / top.length;
+      if (avg <= 2.4) return "broad";
+      if (avg <= 3.4) return "medium";
+      return "fine";
+    }
+    function addCase(panel, snippet, chosen, rejected) {
+      var store = getStore(panel);
+      if (!store || !chosen) return;
+      store.cases.unshift({
+        s: sampleOf(snippet),
+        t: String(chosen),
+        r: String(rejected == null ? "" : rejected),
+        at: Date.now()
+      });
+      if (store.cases.length > CASES_LIMIT) store.cases.length = CASES_LIMIT;
+    }
+    function fewShotLines(options) {
+      var lines = [];
+      for (var c of (options.cases || []).slice(0, FEW_SHOT_N)) {
+        if (!c || !c.t) continue;
+        var line = '\u5361\u7247\uFF1A"' + (c.s || "") + '" \u2192 \u7528\u6237\u653E\u8FDB\uFF1A' + c.t;
+        if (c.r) line += "\uFF08\u6CA1\u9009\uFF1A" + c.r + "\uFF09";
+        lines.push(line);
+      }
+      return lines;
+    }
+    function cacheGet(options, key) {
+      var hit = options.cache && options.cache[key];
+      return hit && Array.isArray(hit.r) ? hit.r : null;
+    }
+    function cacheSet(options, key, parsed) {
+      if (!options.cache) return;
+      options.cache[key] = { r: parsed, at: Date.now() };
+      var keys = Object.keys(options.cache);
+      if (keys.length <= CACHE_LIMIT) return;
+      keys.map(function(k) {
+        return { k, at: (options.cache[k] || {}).at || 0 };
+      }).sort(function(a, b) {
+        return a.at - b.at;
+      }).slice(0, keys.length - CACHE_LIMIT).forEach(function(item) {
+        delete options.cache[item.k];
+      });
+    }
+    function buildSystemPrompt(options, granularity) {
+      return [
+        "\u4F60\u662F\u4E2D\u6587\u5361\u7247\u7B14\u8BB0\u7684\u6807\u7B7E\u52A9\u624B\u3002\u7528\u6237\u8BB0\u7684\u662F\u96F6\u6563\u7D20\u6750\uFF08\u91D1\u53E5\u3001\u89C2\u70B9\u3001\u6545\u4E8B\u3001\u65B9\u6CD5\uFF09\uFF0C\u4EE5\u540E\u5199\u4E1C\u897F\u65F6\u8981\u9760\u6807\u7B7E\u628A\u5B83\u4EEC\u7FFB\u51FA\u6765\u3002",
+        "\u4F60\u7684\u4EFB\u52A1\uFF1A\u4E3A\u8FD9\u5F20\u5361\u7247\u5217\u51FA 6-8 \u4E2A\u300C\u4ED6\u4EE5\u540E\u53EF\u80FD\u4F1A\u641C\u7684\u8BCD\u300D\uFF0C\u8BA9\u4ED6\u81EA\u5DF1\u6311\u3002\u4E0D\u8981\u66FF\u4ED6\u51B3\u5B9A\u552F\u4E00\u7B54\u6848\uFF0C\u4E5F\u4E0D\u8981\u53EA\u7ED9\u4E24\u4E09\u4E2A\u3002",
+        "",
+        "\u3010\u8BCD\u5E94\u8BE5\u957F\u4EC0\u4E48\u6837\u3011",
+        "\u6807\u51C6\u53EA\u6709\u4E00\u4E2A\uFF1A\u4E09\u4E2A\u6708\u540E\u4ED6\u60F3\u627E\u56DE\u8FD9\u6BB5\u5185\u5BB9\uFF0C\u4F1A\u5728\u641C\u7D22\u6846\u91CC\u6572\u8FD9\u4E2A\u8BCD\u3002",
+        "\u597D\u8BCD\uFF1A\u65F6\u95F4\u3001\u5E74\u9F84\u3001\u6210\u957F\u3001\u5173\u7CFB\u3001\u4E60\u60EF\u3001\u91D1\u94B1\u3001\u804C\u573A\u3001\u5199\u4F5C\u3001\u65B9\u6CD5\u3001\u6848\u4F8B\u3001\u91D1\u53E5\u3001\u544A\u522B\u3001\u5F00\u59CB\u3001\u62D6\u5EF6\u3001\u6469\u897F\u5976\u5976\u3002",
+        "\u574F\u8BCD\uFF08\u8FD9\u662F\u5BF9\u5185\u5BB9\u7684\u6982\u62EC\uFF0C\u4E0D\u662F\u641C\u7D22\u8BCD\uFF09\uFF1A\u751F\u547D\u6709\u9650\u3001\u65F6\u95F4\u7A00\u7F3A\u3001\u65F6\u95F4\u611F\u77E5\u3001\u4F59\u751F\u3001\u8BA4\u77E5\u8DC3\u8FC1\u3001\u91CD\u89C6\u79EF\u7D2F\u3002",
+        "\u81EA\u68C0\uFF1A\u4E00\u4E2A\u771F\u4EBA\u5728\u641C\u7D22\u6846\u91CC\u4F1A\u6572\u574F\u8BCD\u5417\uFF1F\u4E0D\u4F1A\u3002\u4ED6\u6572\u7684\u662F\u597D\u8BCD\u3002",
+        "",
+        "\u3010\u600E\u4E48\u7ED9\u3011",
+        "- \u4E00\u6B21\u7ED9 6-8 \u4E2A\uFF0C\u89D2\u5EA6\u8981\u6563\u5F00\uFF0C\u4E0D\u8981\u7528\u8FD1\u4E49\u8BCD\u51D1\u6570\uFF1A",
+        "  \u4E3B\u9898\u8BCD\uFF08\u8FD9\u6761\u8BB2\u4EC0\u4E48\u9886\u57DF\uFF09\u3001\u573A\u666F\u8BCD\uFF08\u4EC0\u4E48\u5904\u5883\u4E0B\u4F1A\u60F3\u8D77\u5B83\uFF09\u3001\u5BF9\u8C61\u8BCD\uFF08\u4EBA\u540D/\u4E66\u540D/\u4E8B\u7269\uFF09\u3001\u4F53\u88C1\u8BCD\uFF08\u91D1\u53E5/\u6848\u4F8B/\u65B9\u6CD5/\u89C2\u70B9\uFF09\u3002",
+        "- \u4E00\u4E2A\u8BCD\u53EA\u8981\u300C\u5927\u6982\u7387\u76F8\u5173\u300D\u5C31\u53EF\u4EE5\u7ED9\uFF0C\u4E0D\u5FC5\u7CBE\u786E\u3002\u7D20\u6750\u5E93\u9700\u8981\u5BBD\u4E00\u70B9\u7684\u5165\u53E3\uFF0C\u7528\u6237\u81EA\u5DF1\u4F1A\u7B5B\u3002",
+        "- \u5DF2\u6709\u6807\u7B7E\u5408\u9002\u5C31\u539F\u6837\u590D\u7528\uFF1B\u4E0D\u8D34\u5207\u5C31\u7EDD\u5BF9\u4E0D\u8981\u786C\u51D1\uFF0C\u7528\u4F60\u5224\u65AD\u66F4\u597D\u7684\u8BCD\u3002",
+        "- \u5141\u8BB8\u7ED9\u591A\u4E2A\u65B0\u8BCD\uFF0C\u6700\u591A 3 \u4E2A\u3002\u65B0\u8BCD\u4E0D\u7528\u89E3\u91CA\u4E3A\u4EC0\u4E48\u8BE5\u5EFA\u3002",
+        "- \u6309\u300C\u6700\u53EF\u80FD\u88AB\u641C\u5230\u300D\u6392\u5E8F\uFF0C\u7B2C\u4E00\u4E2A\u662F\u4F60\u8BA4\u4E3A\u6700\u8D34\u7684\u3002",
+        "",
+        GRANULARITY_RULE[granularity] || GRANULARITY_RULE.broad,
+        "",
+        "\u3010conf\u30110 \u5230 1\uFF0C\u8868\u793A\u8FD9\u4E2A\u8BCD\u88AB\u641C\u5230\u7684\u53EF\u80FD\u6027\uFF0C\u8BDA\u5B9E\u7ED9\uFF0C\u4E0D\u8981\u5168\u586B\u4E00\u6837\u3002",
+        "",
+        "\u3010\u8F93\u51FA\u3011\u53EA\u8F93\u51FA\u4E00\u884C JSON\uFF0C\u4E0D\u8981\u89E3\u91CA\uFF0C\u4E0D\u8981 Markdown \u4EE3\u7801\u5757\uFF1A",
+        '{"candidates":[{"tag":"\u8BCD","why":"\u4EE5\u540E\u4EC0\u4E48\u573A\u666F\u4F1A\u641C\u5B83\uFF0C15\u5B57\u5185","conf":0.7}]}'
+      ].join("\n");
+    }
+    function buildUserPrompt(body, vocab, options, exclude) {
+      var lines = ["\u5DF2\u6709\u6807\u7B7E\uFF08\u6807\u7B7E | \u7528\u8FC7\u51E0\u6B21 | \u5176\u4E2D\u4E00\u5F20\u5361\u7684\u7247\u6BB5\uFF09\uFF1A"];
+      if (!vocab.length) {
+        lines.push("\uFF08\u6682\u65E0\u3002\u8FD9\u5F20\u5361\u662F\u7B2C\u4E00\u6279\uFF0C\u4F60\u770B\u60C5\u51B5\u7ED9\u8BCD\u5C31\u884C\u3002\uFF09");
+      } else {
+        for (var v of vocab) {
+          lines.push(v.label + " | " + v.count + " | " + (v.sample || ""));
+        }
+      }
+      var shots = fewShotLines(options);
+      if (shots.length) {
+        lines.push("");
+        lines.push("\u3010\u53C2\u8003\u3011\u7528\u6237\u8FC7\u53BB\u7ED9\u7C7B\u4F3C\u5361\u7247\u7684\u51B3\u5B9A\uFF08\u5EFA\u8BAE\u8981\u5411\u4ED6\u81EA\u5DF1\u7684\u4E60\u60EF\u9760\u62E2\uFF09\uFF1A");
+        for (var s of shots) lines.push(s);
+      }
+      lines.push("");
+      lines.push("\u5361\u7247\u6B63\u6587\uFF1A");
+      lines.push(String(body == null ? "" : body).slice(0, MAX_BODY_CHARS));
+      lines.push("");
+      if (exclude && exclude.length) {
+        lines.push("\u3010\u4ED6\u521A\u521A\u5426\u51B3\u4E86\u8FD9\u4E9B\u3011" + exclude.join("\u3001"));
+        lines.push("\u6362\u4E00\u6279\u89D2\u5EA6\uFF1A\u4E0D\u8981\u548C\u4E0A\u9762\u4EFB\u4F55\u4E00\u4E2A\u91CD\u590D\u6216\u8FD1\u4E49\u3002");
+        lines.push("");
+      }
+      lines.push("\u5217\u51FA " + Math.max(6, options.maxCand) + " \u4E2A\u5019\u9009\u6807\u7B7E\uFF0C\u89D2\u5EA6\u6563\u5F00\u3002\u5DF2\u6709\u6807\u7B7E\u5408\u9002\u5C31\u7528\u539F\u6837\uFF0C\u4E0D\u5408\u9002\u5C31\u7ED9\u65B0\u8BCD\u3002");
+      return lines.join("\n");
+    }
+    function parseCandidates(text) {
+      var raw = String(text == null ? "" : text).trim();
+      var start = raw.indexOf("{");
+      var end = raw.lastIndexOf("}");
+      if (start === -1 || end <= start) throw new Error("AI \u8FD4\u56DE\u7684\u4E0D\u662F JSON");
+      var obj;
+      try {
+        obj = JSON.parse(raw.slice(start, end + 1));
+      } catch (e) {
+        throw new Error("AI \u8FD4\u56DE\u7684 JSON \u89E3\u6790\u5931\u8D25");
+      }
+      var arr = Array.isArray(obj.candidates) ? obj.candidates : [];
+      var out = [];
+      for (var item of arr) {
+        if (!item || typeof item !== "object") continue;
+        var label = normalizeTag(item.tag);
+        if (!label) continue;
+        var conf = Number(item.conf);
+        if (!isFinite(conf)) conf = 0.5;
+        conf = Math.max(0, Math.min(1, conf));
+        out.push({
+          label,
+          why: String(item.why == null ? item.scene || "" : item.why).slice(0, 30),
+          conf
+        });
+      }
+      return out;
+    }
+    function shapeCandidates(parsed, vocab, card, options) {
+      var existing = /* @__PURE__ */ new Set();
+      for (var tag of card.tags || []) {
+        var t = normalizeTag(tag);
+        if (t) existing.add(t.toLowerCase());
+      }
+      var seen = [];
+      var list = [];
+      var sorted = (parsed || []).slice().sort(function(a, b) {
+        return b.conf - a.conf;
+      });
+      for (var cand of sorted) {
+        var label = cand.label;
+        var key = label.toLowerCase();
+        if (existing.has(key)) continue;
+        var dup = seen.find(function(k) {
+          return sameFamily(k, key);
+        });
+        if (dup) continue;
+        var fold = vocab.find(function(v) {
+          return sameFamily(v.label.toLowerCase(), key);
+        });
+        var isNew = !fold;
+        if (fold) {
+          label = fold.label;
+          key = label.toLowerCase();
+          if (existing.has(key)) continue;
+        }
+        seen.push(key);
+        list.push({ label, why: cand.why, conf: cand.conf, isNew });
+        if (list.length >= options.maxCand) break;
+      }
+      var tight = false;
+      if (list.length >= 2) {
+        tight = Math.abs(list[0].conf - list[1].conf) < 0.1;
+      }
+      return { list, tight };
+    }
+    function pickAuto(list) {
+      var existing = (list || []).filter(function(c) {
+        return !c.isNew && c.conf >= 0.5;
+      });
+      if (!existing.length) return null;
+      existing = existing.slice().sort(function(a, b) {
+        return b.conf - a.conf || a.label.localeCompare(b.label, "zh");
+      });
+      return existing[0];
+    }
+    function addProposal(proposals, fresh, card) {
+      var key = null;
+      proposals.forEach(function(_info, k) {
+        if (!key && sameFamily(k.toLowerCase(), fresh.label.toLowerCase())) key = k;
+      });
+      if (!key) {
+        key = fresh.label;
+        proposals.set(key, { why: fresh.why, cards: [] });
+      }
+      proposals.get(key).cards.push(card);
+      return key;
+    }
+    function splitProposals(proposals) {
+      var viable = [];
+      var dropped = 0;
+      proposals.forEach(function(info, label) {
+        if (info.cards.length >= BATCH_MIN_NEW) viable.push([label, info]);
+        else dropped += info.cards.length;
+      });
+      return { viable, dropped };
+    }
+    function resolveAi(panel) {
+      var opts = readOptions(panel);
+      if (!opts.enabled) return { error: "AI \u6253\u6807\u7B7E\u5F00\u5173\u6CA1\u5F00\uFF1A\u8BBE\u7F6E \u2192 \u5361\u7247\u7B14\u8BB0 \xB7 AI\u3002" };
+      var board = findBoard(panel);
+      var ai = board && board.settings && board.settings.ai;
+      if (!ai) return { error: "\u6CA1\u627E\u5230 AI \u914D\u7F6E\uFF0C\u8BF7\u91CD\u8F7D\u63D2\u4EF6\u540E\u518D\u8BD5\u3002" };
+      if (!ai.enabled) return { error: "AI \u603B\u5F00\u5173\u6CA1\u5F00\uFF1A\u8BBE\u7F6E \u2192 \u753B\u5E03 \u2192 AI \u2192 \u542F\u7528 AI\u3002" };
+      var profile = null;
+      if (opts.profileId && Array.isArray(ai.profiles)) {
+        profile = ai.profiles.find(function(p) {
+          return p && p.id === opts.profileId;
+        }) || null;
+      }
+      if (!profile) profile = BoardBundle.activeProfile(ai);
+      if (!profile || !profile.apiKey || !profile.model || !String(profile.baseUrl || "").trim()) {
+        return { error: "\u8FD8\u6CA1\u914D\u597D\u6A21\u578B\uFF1A\u8BBE\u7F6E \u2192 \u753B\u5E03 \u2192 AI \u2192 \u6DFB\u52A0\u6A21\u578B\u914D\u7F6E\uFF0C\u586B\u63A5\u53E3\u5730\u5740\u3001\u6A21\u578B\u540D\u548C\u5BC6\u94A5\u3002" };
+      }
+      return { profile, opts };
+    }
+    function findBoard(panel) {
+      var host = panel && panel.hostView && panel.hostView.plugin;
+      var fromHost = host && host.childPlugins && host.childPlugins[BOARD_ID2];
+      if (fromHost) return fromHost;
+      var app = panel && panel.app;
+      var main = app && app.plugins && app.plugins.plugins && app.plugins.plugins["noval"];
+      return main && main.childPlugins && main.childPlugins[BOARD_ID2] || null;
+    }
+    function friendlyError(err) {
+      var msg = String(err && err.message || err || "");
+      if (/abort/i.test(msg)) return "\u8BF7\u6C42\u8D85\u65F6\u4E86\uFF0C\u7A0D\u540E\u518D\u8BD5\u3002";
+      if (/401|invalid.*key|api key|unauthorized/i.test(msg)) return "\u5BC6\u94A5\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF1A\u8BBE\u7F6E \u2192 \u753B\u5E03 \u2192 AI \u91CC\u68C0\u67E5\u4E00\u4E0B\u3002";
+      if (/402|insufficient|balance|quota|payment/i.test(msg)) return "\u989D\u5EA6\u7528\u5B8C\u4E86\u6216\u8D26\u6237\u6B20\u8D39\u3002";
+      if (/404|model/i.test(msg)) return "\u6A21\u578B\u540D\u53EF\u80FD\u5199\u9519\u4E86\uFF1A\u8BBE\u7F6E \u2192 \u753B\u5E03 \u2192 AI \u91CC\u6838\u5BF9\u4E00\u4E0B\u3002";
+      if (/429/i.test(msg)) return "\u8BF7\u6C42\u592A\u9891\u7E41\uFF0C\u88AB\u9650\u6D41\u4E86\uFF0C\u7A0D\u7B49\u518D\u8BD5\u3002";
+      return msg.slice(0, 120) || "\u8BF7\u6C42\u5931\u8D25";
+    }
+    async function requestCandidates(profile, card, vocab, options, exclude) {
+      var provider = BoardBundle.createProvider(profile);
+      var res = await provider.complete(
+        [{ role: "user", content: buildUserPrompt(card.body, vocab, options, exclude) }],
+        {
+          system: buildSystemPrompt(options, effectiveGranularity(options, vocab)),
+          maxTokens: REQUEST_TOKENS,
+          cache: false,
+          // false 等价于不传：glm-5.3-flash 这类模型传 disabled 会直接 400
+          thinking: false
+        }
+      );
+      return parseCandidates(res.text || "");
+    }
+    async function getCandidates(panel, card, vocab, options, profile, extra) {
+      var key = hashBody(card.body);
+      var force = !!(extra && extra.force);
+      var exclude = extra && extra.exclude || [];
+      if (!force) {
+        var cached = cacheGet(options, key);
+        if (cached) return { parsed: cached, fromCache: true };
+      }
+      var use = profile || (resolveAi(panel) || {}).profile;
+      if (!use) throw new Error("\u6CA1\u6709\u53EF\u7528\u7684\u6A21\u578B\u914D\u7F6E");
+      var parsed = await requestCandidates(use, card, vocab, options, exclude);
+      cacheSet(options, key, parsed);
+      return { parsed, fromCache: false };
+    }
+    function cardSnippet(card) {
+      return sampleOf(card.body || "");
+    }
+    async function writeTags(panel, card, labels) {
+      var next = bodyWithTags(card.body, labels);
+      if (next === String(card.body || "").replace(/\s+$/, "")) return false;
+      var plugin = panel.noval;
+      var write = typeof plugin.quietUpdateCard === "function" ? plugin.quietUpdateCard.bind(plugin) : plugin.updateCard.bind(plugin);
+      var ok = await write(card, next);
+      if (ok) card.body = next;
+      return ok;
+    }
+    async function openTagBar(panel, cardEl, card) {
+      if (!panel || !card) return;
+      var ai = resolveAi(panel);
+      if (ai.error) {
+        new Notice2(ai.error);
+        return;
+      }
+      var opts = ai.opts;
+      if (opts.mode === "auto") {
+        await autoTagCard(panel, card);
+        return;
+      }
+      openSuggestBar(panel, cardEl, card, opts, ai.profile);
+    }
+    async function autoTagCard(panel, card) {
+      var ai = resolveAi(panel);
+      if (ai.error) {
+        new Notice2(ai.error);
+        return;
+      }
+      var opts = ai.opts;
+      var vocab = collectVocab(panel.cards, opts.extraVocab);
+      try {
+        var got = await getCandidates(panel, card, vocab, opts, ai.profile);
+        var shaped = shapeCandidates(got.parsed, vocab, card, opts);
+        var pick = pickAuto(shaped.list);
+        if (!pick) {
+          new Notice2("AI \u6253\u6807\u7B7E\uFF1A\u6CA1\u6709\u5408\u9002\u7684\u5DF2\u6709\u6807\u7B7E\uFF1B\u6279\u91CF\u6574\u7406\u65F6\u4F1A\u63D0\u8BAE\u65B0\u5EFA\u3002");
+          saveStore(panel);
+          return;
+        }
+        var ok = await writeTags(panel, card, [pick.label]);
+        saveStore(panel);
+        if (ok) {
+          new Notice2("AI \u5DF2\u6253\u6807\uFF1A#" + pick.label);
+          await panel.reloadCards();
+        } else {
+          new Notice2("AI \u6253\u6807\u7B7E\uFF1A\u5199\u5165\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5\u3002");
+        }
+      } catch (err) {
+        new Notice2("AI \u6253\u6807\u7B7E\u5931\u8D25\uFF1A" + friendlyError(err));
+      }
+    }
+    function openSuggestBar(panel, cardEl, card, opts, profile) {
+      var prev = cardEl.querySelector(":scope > .noval-aitag");
+      if (prev) {
+        prev.remove();
+        return;
+      }
+      var bar = cardEl.createDiv({ cls: "noval-aitag" });
+      bar.addEventListener("click", function(ev) {
+        ev.stopPropagation();
+      });
+      var head = bar.createDiv({ cls: "noval-aitag-head" });
+      head.createSpan({ cls: "noval-aitag-title", text: "AI \u7ED9\u4E86\u4E00\u7EC4\u6807\u7B7E" });
+      var closeBtn = head.createEl("button", { cls: "noval-aitag-close", text: "\xD7" });
+      closeBtn.setAttribute("type", "button");
+      closeBtn.setAttribute("title", "\u5173\u95ED");
+      var reasonEl = bar.createDiv({ cls: "noval-aitag-reason", text: "\u6B63\u5728\u8BFB\u8FD9\u5F20\u5361\u7247\u2026" });
+      var rowsEl = bar.createDiv({ cls: "noval-aitag-rows" });
+      var addRow = bar.createDiv({ cls: "noval-aitag-add" });
+      var addInput = addRow.createEl("input", { cls: "noval-aitag-input", type: "text" });
+      addInput.placeholder = "\u81EA\u5B9A\u4E49\u6807\u7B7E";
+      var addBtn = addRow.createEl("button", { cls: "noval-aitag-addbtn", text: "\u6DFB\u52A0" });
+      addBtn.setAttribute("type", "button");
+      var foot = bar.createDiv({ cls: "noval-aitag-foot" });
+      var shuffleBtn = foot.createEl("button", { cls: "noval-aitag-shuffle", text: "\u6362\u4E00\u6279" });
+      shuffleBtn.setAttribute("type", "button");
+      shuffleBtn.setAttribute("title", "\u8BA9 AI \u6362\u4E00\u7EC4\u89D2\u5EA6\u91CD\u65B0\u7ED9");
+      var applyBtn = foot.createEl("button", { cls: "noval-aitag-apply", text: "\u5E94\u7528" });
+      applyBtn.setAttribute("type", "button");
+      foot.createDiv({ cls: "noval-aitag-grow" });
+      var cancelBtn = foot.createEl("button", { cls: "noval-aitag-cancel", text: "\u53D6\u6D88" });
+      cancelBtn.setAttribute("type", "button");
+      var state = {
+        list: [],
+        selected: /* @__PURE__ */ new Set(),
+        // 记标签文字而不是下标：编辑或换一批之后不会错位
+        vocab: [],
+        busy: false,
+        closed: false,
+        editing: null
+        // 正在改名的标签文字
+      };
+      function close() {
+        if (state.closed) return;
+        state.closed = true;
+        bar.remove();
+      }
+      closeBtn.onclick = close;
+      cancelBtn.onclick = close;
+      bar.addEventListener("keydown", function(ev) {
+        if (ev.key === "Escape" && !state.editing) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          close();
+        }
+      });
+      function renderRows() {
+        rowsEl.empty();
+        if (!state.list.length) return;
+        state.list.forEach(function(cand, idx) {
+          var on = state.selected.has(cand.label);
+          var row = rowsEl.createDiv({
+            cls: "noval-aitag-row" + (on ? " is-on" : "") + (cand.isNew ? " is-fresh" : "")
+          });
+          if (state.editing === cand.label) {
+            var input = row.createEl("input", { cls: "noval-aitag-edit", type: "text" });
+            input.value = cand.label;
+            input.placeholder = "\u56DE\u8F66\u786E\u8BA4";
+            input.addEventListener("click", function(ev) {
+              ev.stopPropagation();
+            });
+            input.addEventListener("mousedown", function(ev) {
+              ev.stopPropagation();
+            });
+            var commit = function() {
+              if (state.editing !== cand.label) return;
+              var next = normalizeTag(input.value);
+              state.editing = null;
+              if (!next) {
+                renderRows();
+                return;
+              }
+              if (next !== cand.label) {
+                var wasOn = state.selected.has(cand.label);
+                state.selected.delete(cand.label);
+                var dup = state.list.find(function(x) {
+                  return x !== cand && x.label.toLowerCase() === next.toLowerCase();
+                });
+                if (dup) {
+                  state.list = state.list.filter(function(x) {
+                    return x !== cand;
+                  });
+                  if (wasOn) state.selected.add(dup.label);
+                } else {
+                  cand.label = next;
+                  cand.why = "\u4F60\u6539\u7684\u8BCD";
+                  cand.edited = true;
+                  if (wasOn) state.selected.add(next);
+                }
+              }
+              renderRows();
+              renderFoot();
+            };
+            input.addEventListener("keydown", function(ev) {
+              if (ev.key === "Enter") {
+                ev.preventDefault();
+                ev.stopPropagation();
+                commit();
+              } else if (ev.key === "Escape") {
+                ev.preventDefault();
+                ev.stopPropagation();
+                state.editing = null;
+                renderRows();
+              }
+            });
+            input.addEventListener("blur", commit);
+            setTimeout(function() {
+              try {
+                input.focus();
+                input.select();
+              } catch (e) {
+              }
+            }, 0);
+            return;
+          }
+          var chip = row.createEl("button", { cls: "noval-aitag-chip" + (cand.isNew ? " is-new" : "") });
+          chip.setAttribute("type", "button");
+          chip.setText(cand.label);
+          if (cand.isNew && !cand.edited) {
+            chip.setAttribute("title", "\u8BCD\u8868\u91CC\u8FD8\u6CA1\u6709\u8FD9\u4E2A\u8BCD");
+          }
+          row.createDiv({ cls: "noval-aitag-grow" });
+          var editBtn = row.createEl("button", { cls: "noval-aitag-editbtn", text: "\u6539" });
+          editBtn.setAttribute("type", "button");
+          editBtn.setAttribute("title", "\u6539\u8FD9\u4E2A\u8BCD");
+          editBtn.onclick = function(ev) {
+            ev.stopPropagation();
+            state.editing = cand.label;
+            renderRows();
+          };
+          row.onclick = function() {
+            if (state.selected.has(cand.label)) state.selected.delete(cand.label);
+            else state.selected.add(cand.label);
+            renderRows();
+            renderFoot();
+          };
+        });
+      }
+      function renderFoot() {
+        var n = state.selected.size;
+        applyBtn.setText(n ? "\u5E94\u7528 " + n + " \u4E2A" : "\u5E94\u7528");
+        applyBtn.disabled = !n || state.busy;
+        shuffleBtn.disabled = state.busy;
+        addBtn.disabled = state.busy;
+      }
+      function addOwn() {
+        var t = normalizeTag(addInput.value);
+        if (!t) return;
+        addInput.value = "";
+        var dup = state.list.find(function(x) {
+          return x.label.toLowerCase() === t.toLowerCase();
+        });
+        if (dup) {
+          state.selected.add(dup.label);
+        } else {
+          var known = state.vocab.some(function(v) {
+            return v.label.toLowerCase() === t.toLowerCase();
+          });
+          state.list.push({ label: t, why: "\u4F60\u81EA\u5DF1\u52A0\u7684", conf: 0, isNew: !known, edited: true });
+          state.selected.add(t);
+        }
+        renderRows();
+        renderFoot();
+      }
+      addBtn.onclick = addOwn;
+      addInput.addEventListener("keydown", function(ev) {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          ev.stopPropagation();
+          addOwn();
+        }
+      });
+      async function shuffle() {
+        if (state.busy) return;
+        state.busy = true;
+        state.editing = null;
+        shuffleBtn.setText("\u6362\u2026");
+        renderFoot();
+        reasonEl.setText("\u6362\u4E00\u7EC4\u89D2\u5EA6\uFF0C\u91CD\u65B0\u8BFB\u8FD9\u5F20\u5361\u7247\u2026");
+        var exclude = state.list.map(function(c) {
+          return c.label;
+        });
+        try {
+          state.vocab = collectVocab(panel.cards, opts.extraVocab);
+          var got = await getCandidates(panel, card, state.vocab, opts, profile, {
+            force: true,
+            exclude
+          });
+          if (state.closed) return;
+          var shaped = shapeCandidates(got.parsed, state.vocab, card, opts);
+          var fresh = shaped.list.filter(function(c) {
+            return !exclude.some(function(x) {
+              return sameFamily(x.toLowerCase(), c.label.toLowerCase());
+            });
+          });
+          state.list = fresh.length ? fresh : shaped.list;
+          state.selected.clear();
+          if (!state.list.length) {
+            reasonEl.setText("\u6CA1\u5217\u51FA\u5408\u9002\u7684\u8BCD\uFF1A\u81EA\u5DF1\u52A0\u4E00\u4E2A\uFF0C\u6216\u8005\u5148\u4E0D\u6253\u3002");
+          } else {
+            reasonEl.setText("");
+          }
+          renderRows();
+          renderFoot();
+          saveStore(panel);
+        } catch (err) {
+          if (state.closed) return;
+          reasonEl.setText("\u6362\u4E00\u6279\u5931\u8D25\uFF1A" + friendlyError(err));
+        } finally {
+          state.busy = false;
+          if (!state.closed) {
+            shuffleBtn.setText("\u6362\u4E00\u6279");
+            renderFoot();
+          }
+        }
+      }
+      shuffleBtn.onclick = shuffle;
+      applyBtn.onclick = async function() {
+        if (state.busy) return;
+        var chosen = state.list.filter(function(c) {
+          return state.selected.has(c.label);
+        });
+        if (!chosen.length) return;
+        state.busy = true;
+        applyBtn.setText("\u5199\u5165\u4E2D\u2026");
+        renderFoot();
+        var labels = chosen.map(function(c) {
+          return c.label;
+        });
+        var rejected = state.list.filter(function(c) {
+          return !state.selected.has(c.label);
+        }).map(function(c) {
+          return c.label;
+        });
+        try {
+          var ok = await writeTags(panel, card, labels);
+          if (ok) {
+            addCase(panel, cardSnippet(card), labels.join("\u3001"), rejected.join("\u3001"));
+            saveStore(panel);
+            new Notice2("\u5DF2\u6253\u6807\u7B7E\uFF1A" + labels.map(function(t) {
+              return "#" + t;
+            }).join(" "));
+            close();
+            await panel.reloadCards();
+          } else {
+            new Notice2("\u6CA1\u6709\u5199\u5165\uFF1A\u5361\u7247\u53EF\u80FD\u5DF2\u88AB\u4FEE\u6539\uFF0C\u8BF7\u91CD\u8BD5\u3002");
+            state.busy = false;
+            applyBtn.setText("\u5E94\u7528");
+            renderFoot();
+          }
+        } catch (err) {
+          new Notice2("\u5199\u5165\u5931\u8D25\uFF1A" + friendlyError(err));
+          state.busy = false;
+          applyBtn.setText("\u5E94\u7528");
+          renderFoot();
+        }
+      };
+      async function run() {
+        state.busy = true;
+        reasonEl.setText("\u6B63\u5728\u8BFB\u8FD9\u5F20\u5361\u7247\u2026");
+        renderFoot();
+        try {
+          state.vocab = collectVocab(panel.cards, opts.extraVocab);
+          var got = await getCandidates(panel, card, state.vocab, opts, profile);
+          if (state.closed) return;
+          var shaped = shapeCandidates(got.parsed, state.vocab, card, opts);
+          state.list = shaped.list;
+          if (!state.list.length) {
+            reasonEl.setText("\u6CA1\u5217\u51FA\u5408\u9002\u7684\u8BCD\uFF1A\u81EA\u5DF1\u52A0\u4E00\u4E2A\uFF0C\u6216\u8005\u5148\u4E0D\u6253\u3002");
+            renderFoot();
+            return;
+          }
+          reasonEl.setText("");
+          renderRows();
+          renderFoot();
+        } catch (err) {
+          if (state.closed) return;
+          reasonEl.setText("\u51FA\u9519\u4E86\uFF1A" + friendlyError(err));
+          var retry = foot.createEl("button", { cls: "noval-aitag-retry", text: "\u91CD\u8BD5" });
+          retry.setAttribute("type", "button");
+          retry.onclick = function() {
+            retry.remove();
+            run();
+          };
+        } finally {
+          state.busy = false;
+          if (!state.closed) renderFoot();
+        }
+      }
+      renderFoot();
+      run();
+    }
+    function openTagFix(panel, card, tag, anchorEl) {
+      if (!panel || !card || !tag) return;
+      document.querySelectorAll(".noval-aitag-fix").forEach(function(el) {
+        el.remove();
+      });
+      var opts = readOptions(panel);
+      var vocab = collectVocab(panel.cards, opts.extraVocab);
+      var cardTags = new Set((card.tags || []).map(function(t) {
+        return normalizeTag(t).toLowerCase();
+      }));
+      var pop = document.body.createDiv({ cls: "noval-aitag-fix" });
+      var rect = anchorEl && anchorEl.getBoundingClientRect ? anchorEl.getBoundingClientRect() : null;
+      pop.style.left = "12px";
+      pop.style.top = "12px";
+      pop.createDiv({ cls: "noval-aitag-fix-title", text: "\u628A #" + tag + " \u6539\u6210\uFF1A" });
+      var chips = pop.createDiv({ cls: "noval-aitag-fix-chips" });
+      var candidates = vocab.filter(function(v) {
+        return v.count > 0 && !cardTags.has(v.label.toLowerCase());
+      }).slice(0, 12);
+      if (!candidates.length) {
+        chips.createSpan({ cls: "noval-aitag-fix-empty", text: "\u8BCD\u8868\u91CC\u6682\u65F6\u6CA1\u6709\u5176\u5B83\u6807\u7B7E" });
+      }
+      candidates.forEach(function(v) {
+        var b = chips.createEl("button", { cls: "noval-aitag-fix-chip", text: v.label });
+        b.setAttribute("type", "button");
+        b.onclick = function() {
+          applyFix(v.label);
+        };
+      });
+      var actions = pop.createDiv({ cls: "noval-aitag-fix-actions" });
+      var removeBtn = actions.createEl("button", { cls: "noval-aitag-fix-remove", text: "\u79FB\u9664\u8FD9\u4E2A\u6807\u7B7E" });
+      removeBtn.setAttribute("type", "button");
+      removeBtn.onclick = function() {
+        applyFix(null);
+      };
+      var custom = actions.createDiv({ cls: "noval-aitag-fix-custom" });
+      var input = custom.createEl("input", { cls: "noval-aitag-fix-input", type: "text", placeholder: "\u81EA\u5DF1\u5199\u4E00\u4E2A\u2026" });
+      var customBtn = custom.createEl("button", { cls: "noval-aitag-fix-ok", text: "\u6539" });
+      customBtn.setAttribute("type", "button");
+      customBtn.onclick = function() {
+        var t = normalizeTag(input.value);
+        if (!t) return;
+        applyFix(t);
+      };
+      input.addEventListener("keydown", function(ev) {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          customBtn.click();
+        }
+      });
+      var busy = false;
+      async function applyFix(newTag) {
+        if (busy) return;
+        busy = true;
+        var next = replaceTagInBody(card.body, tag, newTag);
+        if (next === String(card.body || "")) {
+          close();
+          return;
+        }
+        try {
+          var ok = await panel.noval.quietUpdateCard(card, next);
+          if (ok) {
+            card.body = next;
+            if (newTag) addCase(panel, cardSnippet(card), newTag, tag);
+            saveStore(panel);
+            new Notice2(newTag ? "\u5DF2\u628A #" + tag + " \u6539\u6210 #" + newTag : "\u5DF2\u79FB\u9664 #" + tag);
+            await panel.reloadCards();
+          } else {
+            new Notice2("\u4FEE\u6539\u5931\u8D25\uFF1A\u5361\u7247\u53EF\u80FD\u5DF2\u88AB\u6539\u52A8\uFF0C\u8BF7\u91CD\u8BD5\u3002");
+          }
+        } catch (err) {
+          new Notice2("\u4FEE\u6539\u5931\u8D25\uFF1A" + friendlyError(err));
+        }
+        close();
+      }
+      function close() {
+        pop.remove();
+        document.removeEventListener("mousedown", onDocDown, true);
+        document.removeEventListener("keydown", onKey, true);
+      }
+      function onDocDown(ev) {
+        if (!pop.contains(ev.target)) close();
+      }
+      function onKey(ev) {
+        if (ev.key === "Escape") close();
+      }
+      document.addEventListener("mousedown", onDocDown, true);
+      document.addEventListener("keydown", onKey, true);
+      if (rect) {
+        var pw = 250;
+        var left = Math.max(8, Math.min(rect.left, window.innerWidth - pw - 8));
+        var top = rect.bottom + 6;
+        if (top + 220 > window.innerHeight) top = Math.max(8, rect.top - 226);
+        pop.style.left = Math.round(left) + "px";
+        pop.style.top = Math.round(top) + "px";
+      }
+      input.focus();
+    }
+    async function openBatchTag(panel) {
+      if (!panel) return;
+      if (panel._aiBatchRunning) {
+        new Notice2("\u6279\u91CF\u6253\u6807\u6B63\u5728\u8FDB\u884C\u4E2D\u3002");
+        return;
+      }
+      var ai = resolveAi(panel);
+      if (ai.error) {
+        new Notice2(ai.error);
+        return;
+      }
+      var opts = ai.opts;
+      var targets = (panel.cards || []).filter(function(c) {
+        return !(c.tags || []).length;
+      });
+      if (!targets.length) {
+        new Notice2("\u6CA1\u6709\u65E0\u6807\u7B7E\u7684\u5361\u7247\u3002");
+        return;
+      }
+      panel._aiBatchRunning = true;
+      var hostEl = panel.listWrap && panel.listWrap.parentElement;
+      if (!hostEl) {
+        panel._aiBatchRunning = false;
+        new Notice2("\u9762\u677F\u8FD8\u6CA1\u51C6\u5907\u597D\uFF0C\u7A0D\u540E\u518D\u8BD5\u3002");
+        return;
+      }
+      var bar = hostEl.createDiv({ cls: "noval-aitag-batch" });
+      hostEl.insertBefore(bar, panel.listWrap);
+      var labelEl = bar.createDiv({ cls: "noval-aitag-batch-label", text: "AI \u6253\u6807\u4E2D 0/" + targets.length });
+      var detailEl = bar.createDiv({ cls: "noval-aitag-batch-detail", text: "" });
+      var cancelBtn = bar.createEl("button", { cls: "noval-aitag-batch-cancel", text: "\u53D6\u6D88" });
+      cancelBtn.setAttribute("type", "button");
+      var state = { cancelled: false, done: 0, skipped: 0, errors: 0 };
+      var proposals = /* @__PURE__ */ new Map();
+      cancelBtn.onclick = function() {
+        state.cancelled = true;
+      };
+      var vocab = collectVocab(panel.cards, opts.extraVocab);
+      try {
+        for (var i = 0; i < targets.length; i++) {
+          if (state.cancelled) break;
+          var card = targets[i];
+          labelEl.setText("AI \u6253\u6807\u4E2D " + (i + 1) + "/" + targets.length);
+          detailEl.setText(sampleOf(card.body));
+          try {
+            var got = await getCandidates(panel, card, vocab, opts, ai.profile);
+            var shaped = shapeCandidates(got.parsed, vocab, card, opts);
+            var pick = pickAuto(shaped.list);
+            if (pick) {
+              var ok = await writeTags(panel, card, [pick.label]);
+              if (ok) state.done++;
+              else state.errors++;
+            } else {
+              var fresh = shaped.list.find(function(c) {
+                return c.isNew;
+              });
+              if (fresh) {
+                addProposal(proposals, fresh, card);
+              } else {
+                state.skipped++;
+              }
+            }
+          } catch (err) {
+            state.errors++;
+            detailEl.setText("\u51FA\u9519\uFF1A" + friendlyError(err));
+          }
+        }
+        saveStore(panel);
+        await panel.reloadCards();
+        var split = splitProposals(proposals);
+        var viable = split.viable;
+        var dropped = split.dropped;
+        if (state.cancelled) {
+          finishBar("\u5DF2\u53D6\u6D88\uFF1A\u6253\u6807 " + state.done + " \u5F20\u3002");
+          return;
+        }
+        if (!viable.length) {
+          finishBar("\u5B8C\u6210\uFF1A\u6253\u6807 " + state.done + " \u5F20" + (dropped ? "\uFF1B" + dropped + " \u5F20\u7684\u4E3B\u9898\u8FD8\u4E0D\u591F " + BATCH_MIN_NEW + " \u5F20\uFF0C\u5148\u7559\u7740" : "") + (state.skipped ? "\uFF1B" + state.skipped + " \u5F20\u6CA1\u627E\u5230\u5408\u9002\u6807\u7B7E" : "") + (state.errors ? "\uFF1B" + state.errors + " \u5F20\u51FA\u9519" : "") + "\u3002");
+          return;
+        }
+        renderProposals(viable, dropped);
+      } catch (err) {
+        finishBar("\u6279\u91CF\u6253\u6807\u51FA\u9519\uFF1A" + friendlyError(err));
+      } finally {
+        panel._aiBatchRunning = false;
+      }
+      function finishBar(text) {
+        labelEl.setText(text);
+        detailEl.setText("");
+        cancelBtn.setText("\u5173\u95ED");
+        cancelBtn.onclick = function() {
+          bar.remove();
+        };
+      }
+      function renderProposals(viable2, dropped2) {
+        labelEl.setText("\u5B8C\u6210\uFF1A\u6253\u6807 " + state.done + " \u5F20\u3002\u4E0B\u9762\u8FD9\u4E9B\u6807\u7B7E\u8FD8\u592A\u5B64\u5355\uFF0C\u6512\u591F 3 \u5F20\u624D\u5EFA\u8BAE\u65B0\u5EFA\uFF1A");
+        detailEl.setText("");
+        cancelBtn.remove();
+        viable2.forEach(function(entry) {
+          var label = entry[0], info = entry[1];
+          var row = bar.createDiv({ cls: "noval-aitag-batch-prop" });
+          row.createSpan({
+            cls: "noval-aitag-batch-prop-text",
+            text: "\u300C" + label + "\u300D" + info.cards.length + " \u5F20 \xB7 " + (info.why || "")
+          });
+          var makeBtn = row.createEl("button", { cls: "noval-aitag-batch-make", text: "\u5EFA\u7C7B\u5E76\u6253\u4E0A" });
+          makeBtn.setAttribute("type", "button");
+          var skipBtn = row.createEl("button", { cls: "noval-aitag-batch-skip", text: "\u5148\u4E0D\u5EFA" });
+          skipBtn.setAttribute("type", "button");
+          makeBtn.onclick = async function() {
+            makeBtn.disabled = true;
+            skipBtn.disabled = true;
+            makeBtn.setText("\u5199\u5165\u4E2D\u2026");
+            var n = 0;
+            for (var c of info.cards) {
+              var ok2 = await writeTags(panel, c, [label]);
+              if (ok2) n++;
+            }
+            saveStore(panel);
+            await panel.reloadCards();
+            row.setText("\u5DF2\u65B0\u5EFA #" + label + "\uFF0C\u6253\u4E0A " + n + " \u5F20\u3002");
+          };
+          skipBtn.onclick = function() {
+            row.remove();
+          };
+        });
+        if (dropped2) {
+          bar.createDiv({ cls: "noval-aitag-batch-note", text: "\u53E6\u6709 " + dropped2 + " \u5F20\u7684\u4E3B\u9898\u8FD8\u4E0D\u591F " + BATCH_MIN_NEW + " \u5F20\uFF0C\u5148\u7559\u7740\u4E0D\u5EFA\u7C7B\u3002" });
+        }
+        var closeBtn = bar.createEl("button", { cls: "noval-aitag-batch-cancel", text: "\u5173\u95ED" });
+        closeBtn.setAttribute("type", "button");
+        closeBtn.onclick = function() {
+          bar.remove();
+        };
+      }
+    }
+    function tagStats(cards) {
+      var counts = /* @__PURE__ */ new Map();
+      for (var card of cards || []) {
+        for (var tag of card.tags || []) {
+          var label = normalizeTag(tag);
+          if (!label) continue;
+          var key = label.toLowerCase();
+          var slot = counts.get(key);
+          if (!slot) {
+            slot = { label, count: 0 };
+            counts.set(key, slot);
+          }
+          slot.count++;
+        }
+      }
+      var all = Array.from(counts.values()).sort(function(a, b) {
+        return b.count - a.count || a.label.localeCompare(b.label, "zh");
+      });
+      var orphans = all.filter(function(t) {
+        return t.count <= 1;
+      });
+      var pairs = [];
+      for (var i = 0; i < all.length; i++) {
+        for (var j = i + 1; j < all.length; j++) {
+          if (sameFamily(all[i].label.toLowerCase(), all[j].label.toLowerCase())) {
+            pairs.push([all[i], all[j]]);
+          }
+        }
+      }
+      var instances = all.reduce(function(s, t) {
+        return s + t.count;
+      }, 0);
+      var avg = all.length ? Number((instances / all.length).toFixed(1)) : 0;
+      return { all, orphans, pairs, instances, avg };
+    }
+    function openTagHealth(panel) {
+      if (!panel) return;
+      var cards = panel.cards || [];
+      var stats = tagStats(cards);
+      var all = stats.all;
+      var orphans = stats.orphans;
+      var pairs = stats.pairs;
+      var instances = stats.instances;
+      var avg = stats.avg.toFixed(1);
+      var modal = new Modal2(panel.app);
+      modal.titleEl.setText("\u6807\u7B7E\u5065\u5EB7");
+      var box = modal.contentEl.createDiv({ cls: "noval-taghealth" });
+      box.createDiv({
+        cls: "noval-taghealth-stats",
+        text: "\u5171 " + all.length + " \u4E2A\u6807\u7B7E \xB7 " + instances + " \u5904\u5F15\u7528 \xB7 \u5E73\u5747\u6BCF\u4E2A\u6807\u7B7E " + avg + " \u5F20\u5361"
+      });
+      if (!all.length) {
+        box.createDiv({ cls: "noval-taghealth-empty", text: "\u8FD8\u6CA1\u6709\u4EFB\u4F55\u6807\u7B7E\u3002\u5728\u5361\u7247 \u22EF \u91CC\u7528\u300CAI \u6253\u6807\u7B7E\u300D\uFF0C\u6216\u5728\u300C\u65E0\u6807\u7B7E\u300D\u91CC\u6279\u91CF\u6574\u7406\u3002" });
+      }
+      async function applyAcross(matchTag, transform) {
+        var writes = 0;
+        for (var c of cards.slice()) {
+          var has = (c.tags || []).some(function(t) {
+            return normalizeTag(t).toLowerCase() === matchTag;
+          });
+          if (!has) continue;
+          var next = transform(String(c.body == null ? "" : c.body));
+          if (next === String(c.body == null ? "" : c.body)) continue;
+          var ok = await panel.noval.quietUpdateCard(c, next);
+          if (ok) {
+            c.body = next;
+            writes++;
+          }
+        }
+        await panel.reloadCards();
+        return writes;
+      }
+      if (pairs.length) {
+        box.createDiv({ cls: "noval-taghealth-cap", text: "\u7591\u4F3C\u8FD1\u4E49\uFF08\u5EFA\u8BAE\u5408\u5E76\uFF0C\u4FDD\u7559\u7528\u5F97\u591A\u7684\u90A3\u4E2A\uFF09" });
+        pairs.forEach(function(pair) {
+          var a = pair[0], b = pair[1];
+          var keep = a.count >= b.count ? a : b;
+          var drop = a.count >= b.count ? b : a;
+          var row = box.createDiv({ cls: "noval-taghealth-row" });
+          row.createSpan({ cls: "noval-taghealth-name", text: "#" + drop.label + " (" + drop.count + ") \u2192 #" + keep.label + " (" + keep.count + ")" });
+          var btn = row.createEl("button", { cls: "noval-taghealth-btn", text: "\u5408\u5E76" });
+          btn.setAttribute("type", "button");
+          btn.onclick = async function() {
+            btn.disabled = true;
+            btn.setText("\u5408\u5E76\u4E2D\u2026");
+            var n = await applyAcross(drop.label.toLowerCase(), function(body) {
+              return replaceTagInBody(body, drop.label, keep.label);
+            });
+            new Notice2("\u5DF2\u628A #" + drop.label + " \u5408\u5E76\u8FDB #" + keep.label + "\uFF08" + n + " \u5F20\u5361\uFF09\u3002");
+            modal.close();
+            openTagHealth(panel);
+          };
+        });
+      }
+      if (orphans.length) {
+        box.createDiv({ cls: "noval-taghealth-cap", text: "\u5B64\u513F\u6807\u7B7E\uFF08\u53EA\u7528\u8FC7 1 \u6B21\uFF0C\u5EFA\u8BAE\u5408\u5E76\u6216\u5220\u9664\uFF09" });
+        orphans.forEach(function(t) {
+          var row = box.createDiv({ cls: "noval-taghealth-row" });
+          row.createSpan({ cls: "noval-taghealth-name", text: "#" + t.label + " (" + t.count + " \u5F20)" });
+          var delBtn = row.createEl("button", { cls: "noval-taghealth-btn is-danger", text: "\u5220\u9664" });
+          delBtn.setAttribute("type", "button");
+          delBtn.onclick = async function() {
+            delBtn.disabled = true;
+            delBtn.setText("\u5220\u9664\u4E2D\u2026");
+            var n = await applyAcross(t.label.toLowerCase(), function(body) {
+              return removeTagFromBody(body, t.label);
+            });
+            new Notice2("\u5DF2\u4ECE " + n + " \u5F20\u5361\u79FB\u9664 #" + t.label + "\u3002");
+            modal.close();
+            openTagHealth(panel);
+          };
+          var mergeBtn = row.createEl("button", { cls: "noval-taghealth-btn", text: "\u5408\u5E76\u5230\u2026" });
+          mergeBtn.setAttribute("type", "button");
+          mergeBtn.onclick = function() {
+            if (row.querySelector(".noval-taghealth-pick")) return;
+            var pick = row.createDiv({ cls: "noval-taghealth-pick" });
+            var targets = all.filter(function(v) {
+              return v.label.toLowerCase() !== t.label.toLowerCase();
+            }).slice(0, 10);
+            if (!targets.length) {
+              pick.setText("\u6CA1\u6709\u5176\u5B83\u6807\u7B7E\u53EF\u5408\u5E76\u3002");
+              return;
+            }
+            targets.forEach(function(v) {
+              var b = pick.createEl("button", { cls: "noval-taghealth-btn", text: "#" + v.label });
+              b.setAttribute("type", "button");
+              b.onclick = async function() {
+                mergeBtn.disabled = true;
+                mergeBtn.setText("\u5408\u5E76\u4E2D\u2026");
+                var n = await applyAcross(t.label.toLowerCase(), function(body) {
+                  return replaceTagInBody(body, t.label, v.label);
+                });
+                new Notice2("\u5DF2\u628A #" + t.label + " \u5408\u5E76\u8FDB #" + v.label + "\uFF08" + n + " \u5F20\u5361\uFF09\u3002");
+                modal.close();
+                openTagHealth(panel);
+              };
+            });
+          };
+        });
+      }
+      if (all.length && !pairs.length && !orphans.length) {
+        box.createDiv({ cls: "noval-taghealth-empty", text: "\u5F88\u5065\u5EB7\uFF1A\u6CA1\u6709\u5B64\u513F\u6807\u7B7E\uFF0C\u4E5F\u6CA1\u6709\u7591\u4F3C\u8FD1\u4E49\u3002" });
+      }
+      modal.open();
+    }
+    module2.exports = {
+      AI_TAG_DEFAULTS,
+      readOptions,
+      collectVocab,
+      effectiveGranularity,
+      addCase,
+      fewShotLines,
+      cacheGet,
+      cacheSet,
+      normalizeTag,
+      sameFamily,
+      hashBody,
+      bodyWithTags,
+      replaceTagInBody,
+      removeTagFromBody,
+      containsTag,
+      parseCandidates,
+      shapeCandidates,
+      CAND_CHOICES,
+      pickAuto,
+      addProposal,
+      splitProposals,
+      tagStats,
+      buildSystemPrompt,
+      buildUserPrompt,
+      openTagBar,
+      openTagFix,
+      openBatchTag,
+      openTagHealth
+    };
+  }
+});
+
 // src/noval-notes.js
 var require_noval_notes = __commonJS({
   "src/noval-notes.js"(exports2, module2) {
     var { Notice: Notice2, setIcon: setIcon2, TFile } = require("obsidian");
     var NovalBundle2 = require_noval_notes_core();
+    var { openTagBar, openTagFix, openBatchTag, openTagHealth } = require_noval_ai_tag();
     var ICONS = {
       search: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>',
       review: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4.3l2.8 1.7"/></svg>',
@@ -18316,6 +19556,9 @@ var require_noval_notes = __commonJS({
         const nextKeys = cards.map((c) => this.cardKey(c));
         const sameOrder = prevKeys.length === nextKeys.length && prevKeys.every((k, i) => k === nextKeys[i]);
         this.cards = cards;
+        if (this.hostView && typeof this.hostView.syncCardNavCount === "function") {
+          this.hostView.syncCardNavCount(cards.length);
+        }
         if (!sameOrder || !this.currentListEl || !this.renderPlan) {
           this.renderList();
           return;
@@ -19369,6 +20612,12 @@ var require_noval_notes = __commonJS({
               ev.stopPropagation();
               this.setFilterTags([tagValue]);
             };
+            tag.oncontextmenu = (ev) => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              openTagFix(this, card, tagValue, tag);
+            };
+            tag.setAttribute("title", "#" + tagValue + " \xB7 \u5DE6\u952E\u7B5B\u9009 \xB7 \u53F3\u952E\u6539\u6807\u7B7E");
           }
           last = match.index + match[0].length;
         }
@@ -19435,6 +20684,14 @@ var require_noval_notes = __commonJS({
         if (this.tags.length) {
           lab.createSpan({ cls: "qm-pop-sel", text: "\u5DF2\u9009 " + this.tags.length });
         }
+        const healthBtn = lab.createEl("button", { cls: "qm-tai-btn qm-tai-health", text: "\u5065\u5EB7" });
+        healthBtn.setAttribute("type", "button");
+        healthBtn.setAttribute("title", "\u6807\u7B7E\u5065\u5EB7\uFF1A\u5B64\u513F\u3001\u8FD1\u4E49\u3001\u590D\u7528\u7387");
+        healthBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.closePop();
+          openTagHealth(this);
+        };
         const treeWrap = el.createDiv({ cls: "qm-tree-wrap" });
         const tree = treeWrap.createDiv({ cls: "qm-tagtree" });
         this.treeEl = tree;
@@ -19447,6 +20704,16 @@ var require_noval_notes = __commonJS({
         un.createSpan({ cls: "qm-caret is-blank" });
         un.createSpan({ cls: "qm-tname", text: "\u65E0\u6807\u7B7E" });
         un.createSpan({ cls: "qm-tcount", text: String(forest.untagged) });
+        if (forest.untagged > 0) {
+          const aiBtn = un.createEl("button", { cls: "qm-tai-btn", text: "AI \u6253\u6807" });
+          aiBtn.setAttribute("type", "button");
+          aiBtn.setAttribute("title", "AI \u7ED9\u5168\u90E8 " + forest.untagged + " \u5F20\u65E0\u6807\u7B7E\u5361\u7247\u6253\u6807\u7B7E");
+          aiBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.closePop();
+            openBatchTag(this);
+          };
+        }
         un.createSpan({ cls: "qm-tmark", text: "\u2713" });
         un.onclick = () => {
           this.untagged = !this.untagged;
@@ -19533,6 +20800,7 @@ var require_noval_notes = __commonJS({
         const capNote = cap > 0 && hit > cap ? " \xB7 \u663E\u793A\u6700\u8FD1 " + cap : "";
         const countLine = (hit === total ? "\u5171 " + total + " \u6761\u5361\u7247" : "\u5171 " + total + " \u6761 \xB7 \u547D\u4E2D " + hit + " \u6761") + capNote;
         const n = (this.noval.settings && this.noval.settings.trash || []).length;
+        const untaggedCount = this.cards.filter((c) => !(c.tags || []).length).length;
         const items = [
           { title: countLine, icon: "arrow-right", disabled: true },
           { separator: true },
@@ -19555,6 +20823,16 @@ var require_noval_notes = __commonJS({
             title: "\u68C0\u67E5\u5B64\u513F\u5361\u7247",
             icon: "search-check",
             onClick: () => new NovalBundle2.OrphanModal(this.app, this.noval).open()
+          },
+          {
+            title: "AI \u6574\u7406\u65E0\u6807\u7B7E" + (untaggedCount ? " (" + untaggedCount + ")" : ""),
+            icon: "sparkles",
+            onClick: () => openBatchTag(this)
+          },
+          {
+            title: "\u6807\u7B7E\u5065\u5EB7",
+            icon: "search-check",
+            onClick: () => openTagHealth(this)
           },
           { separator: true },
           {
@@ -19832,6 +21110,11 @@ var require_noval_notes = __commonJS({
           { title: "\u590D\u5236\u94FE\u63A5", icon: "link", onClick: () => this.copyRef(card) },
           { title: "\u7F16\u8F91", icon: "pencil", onClick: () => this.beginEdit(card) },
           { title: "\u8FFD\u52A0", icon: "plus", onClick: () => this.beginAppend(card) },
+          {
+            title: "AI \u6253\u6807\u7B7E",
+            icon: "sparkles",
+            onClick: () => openTagBar(this, cardEl, card)
+          },
           { separator: true }
         ];
         if (this.noval.refsReady && !this.noval.refsReady()) {
@@ -20037,6 +21320,7 @@ var NovalBundle = require_noval_notes_core();
 var NovalBoardBundle = require_noval_board_core();
 var { NovalGalleryPanel } = require_noval_gallery();
 var { NovalNotesPanel } = require_noval_notes();
+var NovalAiTag = require_noval_ai_tag();
 var RenameFileModal = class extends Modal {
   constructor(app, initial, onSubmit, heading) {
     super(app);
@@ -21871,6 +23155,8 @@ var NovalView = class extends ItemView {
     this._needsRefresh = false;
     this.gallery = null;
     this.notes = null;
+    this._navSyncTimer = null;
+    this._cardNavTimer = null;
     this._navExpanded = /* @__PURE__ */ new Set();
   }
   getViewType() {
@@ -21894,6 +23180,30 @@ var NovalView = class extends ItemView {
     this.registerEvent(this.app.vault.on("modify", markSearchDirty));
     this.registerEvent(this.app.vault.on("delete", markSearchDirty));
     this.registerEvent(this.app.vault.on("rename", markSearchDirty));
+    const syncBoardNavSoon = () => {
+      if (this.active !== "canvas") return;
+      if (this._navSyncTimer) window.clearTimeout(this._navSyncTimer);
+      this._navSyncTimer = window.setTimeout(() => {
+        this._navSyncTimer = null;
+        this.syncBoardNavCount();
+      }, 60);
+    };
+    this.registerEvent(this.app.vault.on("create", () => syncBoardNavSoon()));
+    this.registerEvent(this.app.vault.on("delete", () => syncBoardNavSoon()));
+    this.registerEvent(this.app.vault.on("rename", () => syncBoardNavSoon()));
+    const inCardFolder = (path) => String(path || "").indexOf(CARD_FOLDER + "/") === 0;
+    const syncCardNavSoon = (file, oldPath) => {
+      if (this.active !== "canvas") return;
+      if (!inCardFolder(file && file.path) && !inCardFolder(oldPath)) return;
+      if (this._cardNavTimer) window.clearTimeout(this._cardNavTimer);
+      this._cardNavTimer = window.setTimeout(() => {
+        this._cardNavTimer = null;
+        void this.recountCardNav();
+      }, 300);
+    };
+    this.registerEvent(this.app.vault.on("create", (file) => syncCardNavSoon(file)));
+    this.registerEvent(this.app.vault.on("delete", (file) => syncCardNavSoon(file)));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => syncCardNavSoon(file, oldPath)));
     this.registerDomEvent(this.containerEl, "keydown", (event) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
       if (String(event.key || "").toLowerCase() !== "k") return;
@@ -21912,6 +23222,14 @@ var NovalView = class extends ItemView {
     if (this._ro) {
       this._ro.disconnect();
       this._ro = null;
+    }
+    if (this._navSyncTimer) {
+      window.clearTimeout(this._navSyncTimer);
+      this._navSyncTimer = null;
+    }
+    if (this._cardNavTimer) {
+      window.clearTimeout(this._cardNavTimer);
+      this._cardNavTimer = null;
     }
     document.body.classList.remove("noval-focus");
     this.focus = false;
@@ -22804,6 +24122,7 @@ var NovalView = class extends ItemView {
     this._ownership = null;
     if (this.active === "canvas" && this.gallery) {
       this.gallery.refresh();
+      this.syncBoardNavCount();
       return;
     }
     if (this.active === "notes" && this.notes) {
@@ -22851,6 +24170,59 @@ var NovalView = class extends ItemView {
   }
   getBoardFiles() {
     return this.app.vault.getFiles().filter((f) => f.extension === BOARD_EXT).sort((a, b) => b.stat.mtime - a.stat.mtime);
+  }
+  // 导航栏「画布」徽标。切页时整页重绘，数字自然会跟上；
+  // 但在画布集里增删画布走的是局部刷新，导航不会重绘，
+  // 所以这里单独把徽标补一次，否则要切走再切回来才同步。
+  // 口径跟画布集保持一致：只数画布文件夹里的 .noval，散在别处的旧文件不算。
+  boardCount() {
+    const board = this.plugin.childPlugins && this.plugin.childPlugins[BOARD_ID];
+    const folder = String(board && board.novalFolder || "").replace(/^\/+|\/+$/g, "");
+    const prefix = folder ? folder + "/" : "";
+    return this.app.vault.getFiles().filter((f) => {
+      if (f.extension !== BOARD_EXT) return false;
+      return !prefix || f.path.startsWith(prefix);
+    }).length;
+  }
+  syncBoardNavCount() {
+    if (!this.appEl) return;
+    const item = this.appEl.querySelector('.cl-navitem[data-nav="canvas"]');
+    if (!item) return;
+    const total = this.boardCount();
+    let badge = item.querySelector(".cl-navcount");
+    if (!total) {
+      if (badge) badge.remove();
+      return;
+    }
+    if (!badge) badge = item.createDiv({ cls: "cl-navcount" });
+    const next = String(total);
+    if (badge.textContent !== next) badge.setText(next);
+  }
+  // 卡片笔记徽标：卡片页同样只做局部刷新，数字由面板读完全部卡片后推过来。
+  syncCardNavCount(total) {
+    if (!this.appEl) return;
+    const item = this.appEl.querySelector('.cl-navitem[data-nav="notes"]');
+    if (!item) return;
+    const n = typeof total === "number" ? total : this._cardCount || 0;
+    this._cardCount = n;
+    let badge = item.querySelector(".cl-navcount");
+    if (!n) {
+      if (badge) badge.remove();
+      return;
+    }
+    if (!badge) badge = item.createDiv({ cls: "cl-navcount" });
+    const next = String(n);
+    if (badge.textContent !== next) badge.setText(next);
+  }
+  // 卡片页以外（此刻停在画布）没有面板缓存，只能重读一次卡片文件。
+  async recountCardNav() {
+    const noval = this.plugin.childPlugins && this.plugin.childPlugins[NOTES_ID] || this.app.plugins.plugins && this.app.plugins.plugins[LEGACY.notesId];
+    if (!noval || typeof noval.readAllCards !== "function") return;
+    try {
+      const cards = await noval.readAllCards();
+      this.syncCardNavCount(Array.isArray(cards) ? cards.length : 0);
+    } catch (e) {
+    }
   }
   getCardFiles() {
     return this.app.vault.getFiles().filter((f) => f.extension === "md" && f.path.startsWith(CARD_FOLDER + "/")).sort((a, b) => b.stat.mtime - a.stat.mtime);
@@ -23025,11 +24397,12 @@ var NovalView = class extends ItemView {
       g.createDiv({ cls: "cl-navcap", text: caption });
       return g;
     };
-    const addItem = (parent, { label, icon, tile, color, active, count, onClick, onContextMenu, depth = 0, chevron = false, hasChildren = false, expanded = false, onToggle }) => {
+    const addItem = (parent, { label, icon, tile, color, active, count, navKey, onClick, onContextMenu, depth = 0, chevron = false, hasChildren = false, expanded = false, onToggle }) => {
       const item = parent.createDiv({
         cls: "cl-navitem" + (active ? " is-active" : "") + (depth > 0 ? " is-sub" : "")
       });
       item.setAttribute("aria-label", label);
+      if (navKey) item.setAttribute("data-nav", navKey);
       if (depth > 0) item.style.paddingLeft = 9 + depth * 14 + "px";
       if (chevron) {
         const chev = item.createDiv({ cls: "cl-navchev" + (hasChildren ? "" : " is-blank") });
@@ -23127,7 +24500,8 @@ var NovalView = class extends ItemView {
       label: "\u753B\u5E03",
       icon: "presentation",
       active: this.active === "canvas",
-      count: this.getBoardFiles().length,
+      count: this.boardCount(),
+      navKey: "canvas",
       onClick: () => this.go("canvas")
     });
     const cardsItem = addItem(workspace, {
@@ -23135,6 +24509,7 @@ var NovalView = class extends ItemView {
       icon: "sticky-note",
       active: this.active === "notes",
       count: this._cardCount || 0,
+      navKey: "notes",
       onClick: () => this.go("notes")
     });
     this.fillCardCount(cardsItem);
@@ -24629,6 +26004,109 @@ var NovalView = class extends ItemView {
     this.notes.mount(el);
   }
 };
+function renderNotesAiSettings(containerEl, plugin) {
+  new Setting(containerEl).setName("\u5361\u7247\u7B14\u8BB0 \xB7 AI").setHeading();
+  const notes = plugin.childPlugins && plugin.childPlugins[NOTES_ID];
+  if (!notes || !notes.settings) {
+    containerEl.createEl("p", {
+      cls: "cl-settings-hint",
+      text: "\u5361\u7247\u7B14\u8BB0\u7EC4\u4EF6\u672A\u52A0\u8F7D\uFF0C\u6682\u65F6\u65E0\u6CD5\u914D\u7F6E\u3002\u8BF7\u91CD\u8F7D\u63D2\u4EF6\u540E\u518D\u8BD5\u3002"
+    });
+    return;
+  }
+  notes.settings.aiTag = Object.assign({}, NovalAiTag.AI_TAG_DEFAULTS, notes.settings.aiTag || {});
+  const opts = notes.settings.aiTag;
+  const save = async () => {
+    await notes.saveSettings(false);
+  };
+  new Setting(containerEl).setName("AI \u6253\u6807\u7B7E").setDesc(
+    "\u63D2\u4EF6\u4E0D\u9884\u8BBE\u4EFB\u4F55\u6807\u7B7E\uFF0C\u6807\u7B7E\u4ECE\u4F60\u81EA\u5DF1\u7684\u5361\u7247\u91CC\u957F\u51FA\u6765\u3002\u53EA\u53D1\u9001\u5F53\u524D\u8FD9\u5F20\u5361\u7684\u6B63\u6587\uFF0C\u4E0D\u8BFB\u5168\u5E93\u3002"
+  ).addToggle((toggle) => toggle.setValue(opts.enabled !== false).onChange(async (value) => {
+    opts.enabled = value;
+    await save();
+  }));
+  new Setting(containerEl).setName("\u6253\u6807\u7B7E\u6A21\u5F0F").setDesc(
+    "\u5EFA\u8BAE = AI \u4E00\u6B21\u7ED9\u4E00\u7EC4\u5019\u9009\uFF0C\u4F60\u81EA\u5DF1\u52FE\uFF08\u9ED8\u8BA4\uFF0C\u53EF\u591A\u9009\uFF09\uFF1B\u81EA\u52A8 = AI \u76F4\u63A5\u5199\u5165\uFF0C\u53EA\u8FDB\u5DF2\u6709\u6807\u7B7E\uFF1B\u624B\u52A8 = AI \u53EA\u7ED9\u53C2\u8003\uFF0C\u4E00\u4E2A\u90FD\u4E0D\u9884\u9009\u3002"
+  ).addDropdown((drop) => drop.addOption("suggest", "\u5EFA\u8BAE\uFF08\u63A8\u8350\uFF09").addOption("auto", "\u81EA\u52A8").addOption("manual", "\u624B\u52A8").setValue(["suggest", "auto", "manual"].indexOf(opts.mode) === -1 ? "suggest" : opts.mode).onChange(async (value) => {
+    opts.mode = value;
+    await save();
+  }));
+  const boardForNotes = plugin.childPlugins && plugin.childPlugins[BOARD_ID];
+  const ai = boardForNotes && boardForNotes.settings && boardForNotes.settings.ai;
+  const profiles = ai && Array.isArray(ai.profiles) ? ai.profiles : [];
+  const active = ai && NovalBoardBundle.activeProfile ? NovalBoardBundle.activeProfile(ai) : null;
+  const modelSetting = new Setting(containerEl).setName("\u6253\u6807\u7B7E\u7528\u54EA\u4E2A\u6A21\u578B").setDesc(
+    "\u548C\u753B\u5E03\u95EE\u7B54\u5171\u7528\u540C\u4E00\u4EFD\u6A21\u578B\u914D\u7F6E\uFF0C\u4E0D\u7528\u91CD\u65B0\u586B\u5BC6\u94A5\u3002"
+  );
+  modelSetting.addDropdown((drop) => {
+    drop.addOption("", "\u8DDF\u968F\u753B\u5E03\u5F53\u524D" + (active ? "\uFF08" + (active.name || active.model) + "\uFF09" : ""));
+    for (const p of profiles) {
+      drop.addOption(p.id, (p.name || p.model || p.id) + " \xB7 " + (p.model || ""));
+    }
+    drop.setValue(opts.profileId || "").onChange(async (value) => {
+      opts.profileId = value;
+      await save();
+    });
+  });
+  if (!profiles.length) {
+    modelSetting.setDesc("\u8FD8\u6CA1\u6709\u6A21\u578B\u914D\u7F6E\uFF1A\u5148\u5230\u4E0B\u65B9 \u753B\u5E03 \u2192 AI \u91CC\u6DFB\u52A0\u4E00\u4E2A\uFF0C\u8FD9\u91CC\u4F1A\u81EA\u52A8\u5171\u7528\u3002");
+  }
+  new Setting(containerEl).setName("\u6807\u7B7E\u5BBD\u7A84").setDesc(
+    "\u8DDF\u968F = \u4ECE\u4F60\u73B0\u6709\u6807\u7B7E\u7684\u4E60\u60EF\u91CC\u81EA\u52A8\u63A8\u65AD\uFF08\u63A8\u8350\uFF09\u3002\u5BBD = \u591A\u7ED9\u300C\u65F6\u95F4\u3001\u6210\u957F\u3001\u5173\u7CFB\u300D\u8FD9\u7C7B\u5E38\u7528\u8BCD\uFF1B\u4E2D = \u53EF\u4EE5\u7ED9\u300C\u65F6\u95F4\u7BA1\u7406\u300D\uFF1B\u7EC6 = \u53EF\u4EE5\u7ED9\u300C\u5E74\u9F84\u7126\u8651\u3001\u544A\u522B\u300D\u8FD9\u7C7B\u5177\u4F53\u8BCD\u3002"
+  ).addDropdown((drop) => drop.addOption("follow", "\u8DDF\u968F\u6211\u7684\u4E60\u60EF\uFF08\u63A8\u8350\uFF09").addOption("broad", "\u5BBD").addOption("medium", "\u4E2D").addOption("fine", "\u7EC6").setValue(["follow", "broad", "medium", "fine"].indexOf(opts.granularity) === -1 ? "follow" : opts.granularity).onChange(async (value) => {
+    opts.granularity = value;
+    await save();
+  }));
+  new Setting(containerEl).setName("\u4E00\u6B21\u7ED9\u51E0\u4E2A\u5019\u9009").setDesc(
+    "AI \u4E00\u6B21\u7ED9\u51FA\u7684\u5019\u9009\u6570\u91CF\u3002\u7ED9\u5F97\u591A\u3001\u89D2\u5EA6\u6563\uFF0C\u4F60\u6311\u4E2D\u7684\u6982\u7387\u624D\u9AD8\uFF1B\u81EA\u5DF1\u4E5F\u80FD\u968F\u65F6\u52A0\u8BCD\u3002"
+  ).addDropdown((drop) => drop.addOption("4", "4 \u4E2A").addOption("6", "6 \u4E2A\uFF08\u63A8\u8350\uFF09").addOption("8", "8 \u4E2A").setValue(String(NovalAiTag.CAND_CHOICES && NovalAiTag.CAND_CHOICES.indexOf(Number(opts.maxCand)) !== -1 ? Number(opts.maxCand) : 6)).onChange(async (value) => {
+    opts.maxCand = Number(value);
+    await save();
+  }));
+  const casesSetting = new Setting(containerEl).setName("\u51B3\u7B56\u8BB0\u5FC6").setDesc(
+    "\u4F60\u6BCF\u6B21\u786E\u8BA4\u6216\u7EA0\u6B63\u6807\u7B7E\uFF0C\u90FD\u4F1A\u8BB0\u4E0B\u6765\u5582\u7ED9 AI\uFF0C\u8BA9\u5EFA\u8BAE\u5411\u4F60\u7684\u4E60\u60EF\u9760\u62E2\u3002\u53EA\u5B58\u63D2\u4EF6\u8BBE\u7F6E\uFF0C\u4E0D\u5199\u7B14\u8BB0\u6587\u4EF6\u3002"
+  );
+  const caseCount = Array.isArray(opts.cases) ? opts.cases.length : 0;
+  casesSetting.setDesc("\u5DF2\u8BB0\u4F4F " + caseCount + " \u6761\u51B3\u5B9A\u3002\u4F60\u6BCF\u6B21\u786E\u8BA4\u6216\u7EA0\u6B63\u6807\u7B7E\u90FD\u4F1A\u8BB0\u4E0B\u6765\uFF0C\u8BA9 AI \u5411\u4F60\u7684\u4E60\u60EF\u9760\u62E2\u3002");
+  casesSetting.addButton((button) => button.setButtonText("\u6E05\u7A7A\u8BB0\u5FC6").onClick(async () => {
+    opts.cases = [];
+    await save();
+    casesSetting.setDesc("\u5DF2\u8BB0\u4F4F 0 \u6761\u51B3\u5B9A\u3002\u4F60\u6BCF\u6B21\u786E\u8BA4\u6216\u7EA0\u6B63\u6807\u7B7E\u90FD\u4F1A\u8BB0\u4E0B\u6765\uFF0C\u8BA9 AI \u5411\u4F60\u7684\u4E60\u60EF\u9760\u62E2\u3002");
+    new Notice("\u5DF2\u6E05\u7A7A AI \u6253\u6807\u7B7E\u7684\u51B3\u7B56\u8BB0\u5FC6\u3002");
+  }));
+  let extraTimer = null;
+  new Setting(containerEl).setName("\u6211\u5E38\u60F3\u7528\u7684\u6807\u7B7E").setDesc(
+    "\u53EF\u7559\u7A7A\u3002\u5199\u8FDB\u6765\u7684\u8BCD\u4F1A\u8BA9 AI \u4F18\u5148\u590D\u7528\u5B83\u4EEC\u3002AI \u7ED9\u4F60\u6311\u4E2D\u7684\u65B0\u8BCD\u4E5F\u4F1A\u81EA\u52A8\u8FDB\u8FD9\u4EFD\u8868\uFF0C\u4E0D\u7528\u624B\u5DE5\u7EF4\u62A4\u3002"
+  ).addTextArea((text) => {
+    text.setPlaceholder("\u4E00\u884C\u4E00\u4E2A\uFF0C\u4F8B\u5982\uFF1A\n\u65F6\u95F4\n\u4EA7\u54C1\n\u5199\u4F5C");
+    text.setValue((opts.extraVocab || []).join("\n"));
+    text.inputEl.rows = 3;
+    text.onChange((value) => {
+      if (extraTimer) clearTimeout(extraTimer);
+      extraTimer = setTimeout(async () => {
+        opts.extraVocab = value.split("\n").map((s) => s.trim().replace(/^#+/, "")).filter(Boolean).slice(0, 60);
+        await save();
+      }, 600);
+    });
+  });
+  const vocabDesc = containerEl.createEl("p", { cls: "cl-settings-hint", text: "\u6B63\u5728\u7EDF\u8BA1\u5F53\u524D\u8BCD\u8868\u2026" });
+  (async () => {
+    try {
+      const cards = await notes.cardsForSuggest();
+      const vocab = NovalAiTag.collectVocab(cards, opts.extraVocab);
+      if (!vocab.length) {
+        vocabDesc.setText("\u6807\u7B7E\u8868\u8FD8\u662F\u7A7A\u7684\uFF1A\u7B2C\u4E00\u6B21\u6253\u6807\u7B7E\u65F6 AI \u4F1A\u6309\u8FD9\u5F20\u5361\u81EA\u5DF1\u7ED9\u8BCD\u3002");
+        return;
+      }
+      const top = vocab.slice(0, 12).map((x) => x.label + "(" + x.count + ")").join("\u3001");
+      vocabDesc.setText(
+        "\u4F60\u5728\u7528\u7684\u6807\u7B7E " + vocab.length + " \u4E2A\uFF1A" + top + (vocab.length > 12 ? " \u2026" : "") + "\u3002\u6B21\u6570\u4E3A 0 \u7684\u662F\u4E0A\u9762\u624B\u586B\u7684\u3002"
+      );
+    } catch (error) {
+      vocabDesc.setText("");
+    }
+  })();
+}
 var NovalSettingTab = class extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
@@ -24686,6 +26164,7 @@ var NovalSettingTab = class extends PluginSettingTab {
       cls: "cl-settings-hint",
       text: "\u8BE5\u76EE\u5F55\u4E0D\u4F1A\u51FA\u73B0\u5728\u6A21\u5757\u5BFC\u822A\u91CC\uFF0C\u4E5F\u4E0D\u4F1A\u8FDB\u5165\u6536\u4EF6\u7BB1\u3002\u628A\u5361\u7247\u6587\u4EF6\u79FB\u51FA\u8FD9\u4E2A\u76EE\u5F55\uFF0C\u5B83\u5C31\u4F1A\u53D8\u6210\u666E\u901A\u7B14\u8BB0\u3002"
     });
+    renderNotesAiSettings(containerEl, this.plugin);
     new Setting(containerEl).setName("\u753B\u5E03").setHeading();
     const board = this.plugin.childPlugins && this.plugin.childPlugins[BOARD_ID];
     if (!board) {

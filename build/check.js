@@ -34,10 +34,12 @@ const SOURCES = [
   "src/main.js",
   "src/noval-notes.js",
   "src/noval-gallery.js",
+  "src/noval-ai-tag.js",
   "vendor/noval-notes-core.js",
   "vendor/noval-board-core.js",
   "build/noval-host.css",
   "build/noval-notes.css",
+  "build/noval-ai-tag.css",
   "build/noval-board.css"
 ];
 const ASSETS = ["main.js", "styles.css", "manifest.json", "versions.json"];

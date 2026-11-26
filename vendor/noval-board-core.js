@@ -11426,3 +11426,8 @@ function isNodeSelected(view, node2, nodeId) {
   }
   return false;
 }
+
+// 供宿主其它模块复用同一套 AI 客户端与配置解析。
+// 只追加导出，不改变本文件任何现有行为。
+module.exports.createProvider = createProvider;
+module.exports.activeProfile = activeProfile;

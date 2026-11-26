@@ -3,7 +3,7 @@
 > 一个插件，三样东西：**工作台模块视图**、**速记卡片**、**画布集**。启用这一个就够了。
 
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7c6df2)](https://obsidian.md)
-[![Version](https://img.shields.io/badge/version-0.8.4-blue)](https://github.com/R529/Noval/releases)
+[![Version](https://img.shields.io/badge/version-0.9.0-blue)](https://github.com/R529/Noval/releases)
 [![Desktop only](https://img.shields.io/badge/platform-desktop-lightgrey)](#)
 
 ## 它能做什么
@@ -25,6 +25,7 @@
 - `Ctrl/Cmd + Shift + C` 把编辑器里选中的内容直接存成卡片。
 - `Ctrl/Cmd + Shift + K` 在笔记里插入卡片（引用或全文）。
 - 侧栏卡片视图：按月回看、标签管理与联想、父/子标签聚合、全文复制或复制块引用。
+- **AI 建议标签**：在卡片「···」里点「AI 打标签」，AI 读这张卡给出一组不同角度的词（默认都不预选），勾选要用的、可就地改名或自己加一个；不合适直接退出，卡片一个字不动。写回保留原排版与块 ID，模型配置与画布 AI 共用。
 - 列表 / 卡片双视图，详情内直接编辑正文与追加内容；搜索防抖、分批加载，卡片多了也不卡。
 
 ### 3. 画布集

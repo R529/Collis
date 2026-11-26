@@ -4957,6 +4957,22 @@ var QuickMemoPlugin = class extends Plugin2 {
     else new Notice2("\u6CA1\u6709\u4FEE\u6539\uFF1A" + res.reason);
     return !!res.ok;
   }
+  /**
+   * 与 updateCard 完全相同的写回逻辑，但不弹任何提示：
+   * 供 AI 批量打标 / 标签合并等一次要写很多张卡的场景使用，
+   * 避免「已更新」提示刷屏。
+   */
+  async quietUpdateCard(card, newBody) {
+    const bodyLines = qmBodyLines(newBody);
+    if (!bodyLines.length) return false;
+    const res = await this.mutateCardFile(card, (lines, hit) => {
+      const sections = qmCardSections(qmBlockBody(lines, hit));
+      const id = hit.id || card.id || this.uniqueIdIn(lines.join("\n"));
+      const body = qmComposeBody(bodyLines.join("\n"), sections.appends);
+      return qmReplaceBlock(lines, hit, body, id);
+    });
+    return !!res.ok;
+  }
   /* ---------------- 追加 ---------------- */
   /** 在卡片末尾追加一段；原始内容一个字都不动 */
   async appendToCard(card, text) {
