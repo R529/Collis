@@ -155,6 +155,38 @@ function bodyWithTags(body, tags) {
   return lines.join("\n");
 }
 
+/**
+ * 把一块卡片正文切成「原始内容区」和「追加段」。
+ *
+ * 内核的 updateCard / quietUpdateCard 契约是：只收原始内容区，
+ * 追加段由它自己从文件里读出来再拼回去。以前这里传的是整块 card.body，
+ * 内核又把读到的追加段拼一遍，于是有追加的卡片一打标签追加内容就多出一份，
+ * 标签也跟着落在最后一条追加的末尾。
+ */
+var APPEND_HEAD_RE = /^〔追加[ \t]+[^〕]+〕$/;
+
+function splitOriginal(body) {
+  var text = String(body == null ? "" : body).replace(/\r\n?/g, "\n");
+  var lines = text.split("\n");
+  var cut = -1;
+  for (var i = 0; i < lines.length; i++) {
+    if (APPEND_HEAD_RE.test(lines[i].trim())) {
+      cut = i;
+      break;
+    }
+  }
+  if (cut < 0) return { original: text, tail: "" };
+  var head = lines.slice(0, cut);
+  while (head.length && !head[head.length - 1].trim()) head.pop();
+  return { original: head.join("\n"), tail: lines.slice(cut).join("\n") };
+}
+
+function joinOriginal(original, tail) {
+  if (!tail) return original;
+  return original ? original + "\n" + tail : tail;
+}
+
+
 /* ---------------- 设置存取 ---------------- */
 
 /**
@@ -547,13 +579,21 @@ function cardSnippet(card) {
 }
 
 async function writeTags(panel, card, labels) {
-  var next = bodyWithTags(card.body, labels);
+  var parts = splitOriginal(card.body);
+  // 追加段里已经有的标签不再往原文加一遍，否则同一张卡会出现两处同名标签。
+  var use = labels.filter(function (raw) {
+    var t = normalizeTag(raw);
+    return t && !containsTag(parts.tail, t);
+  });
+  var nextOriginal = bodyWithTags(parts.original, use);
+  var next = joinOriginal(nextOriginal, parts.tail);
   if (next === String(card.body || "").replace(/\s+$/, "")) return false;
   var plugin = panel.noval;
   var write = typeof plugin.quietUpdateCard === "function"
     ? plugin.quietUpdateCard.bind(plugin)
     : plugin.updateCard.bind(plugin);
-  var ok = await write(card, next);
+  // 只交原文区给内核，追加段它自己会原样拼回
+  var ok = await write(card, nextOriginal);
   if (ok) card.body = next;
   return ok;
 }
@@ -959,13 +999,15 @@ function openTagFix(panel, card, tag, anchorEl) {
   async function applyFix(newTag) {
     if (busy) return;
     busy = true;
-    var next = replaceTagInBody(card.body, tag, newTag);
-    if (next === String(card.body || "")) {
+    var parts = splitOriginal(card.body);
+    var nextOriginal = replaceTagInBody(parts.original, tag, newTag);
+    var next = joinOriginal(nextOriginal, parts.tail);
+    if (next === String(card.body || "").replace(/\s+$/, "")) {
       close();
       return;
     }
     try {
-      var ok = await panel.noval.quietUpdateCard(card, next);
+      var ok = await panel.noval.quietUpdateCard(card, nextOriginal);
       if (ok) {
         card.body = next;
         if (newTag) addCase(panel, cardSnippet(card), newTag, tag);
@@ -1208,9 +1250,11 @@ function openTagHealth(panel) {
     for (var c of cards.slice()) {
       var has = (c.tags || []).some(function (t) { return normalizeTag(t).toLowerCase() === matchTag; });
       if (!has) continue;
-      var next = transform(String(c.body == null ? "" : c.body));
-      if (next === String(c.body == null ? "" : c.body)) continue;
-      var ok = await panel.noval.quietUpdateCard(c, next);
+      var parts = splitOriginal(String(c.body == null ? "" : c.body));
+      var nextOriginal = transform(parts.original);
+      var next = joinOriginal(nextOriginal, parts.tail);
+      if (next === String(c.body == null ? "" : c.body).replace(/\s+$/, "")) continue;
+      var ok = await panel.noval.quietUpdateCard(c, nextOriginal);
       if (ok) {
         c.body = next;
         writes++;
@@ -1307,6 +1351,9 @@ module.exports = {
   sameFamily: sameFamily,
   hashBody: hashBody,
   bodyWithTags: bodyWithTags,
+  splitOriginal: splitOriginal,
+  joinOriginal: joinOriginal,
+  writeTags: writeTags,
   replaceTagInBody: replaceTagInBody,
   removeTagFromBody: removeTagFromBody,
   containsTag: containsTag,

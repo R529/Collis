@@ -18146,6 +18146,26 @@ var require_noval_ai_tag = __commonJS({
       lines[lines.length - 1] = last.replace(/[ \t]+$/, "") + " " + addText;
       return lines.join("\n");
     }
+    var APPEND_HEAD_RE = /^〔追加[ \t]+[^〕]+〕$/;
+    function splitOriginal(body) {
+      var text = String(body == null ? "" : body).replace(/\r\n?/g, "\n");
+      var lines = text.split("\n");
+      var cut = -1;
+      for (var i = 0; i < lines.length; i++) {
+        if (APPEND_HEAD_RE.test(lines[i].trim())) {
+          cut = i;
+          break;
+        }
+      }
+      if (cut < 0) return { original: text, tail: "" };
+      var head = lines.slice(0, cut);
+      while (head.length && !head[head.length - 1].trim()) head.pop();
+      return { original: head.join("\n"), tail: lines.slice(cut).join("\n") };
+    }
+    function joinOriginal(original, tail) {
+      if (!tail) return original;
+      return original ? original + "\n" + tail : tail;
+    }
     function getStore(panel) {
       var host = panel && panel.noval;
       if (!host || !host.settings) return null;
@@ -18481,11 +18501,17 @@ var require_noval_ai_tag = __commonJS({
       return sampleOf(card.body || "");
     }
     async function writeTags(panel, card, labels) {
-      var next = bodyWithTags(card.body, labels);
+      var parts = splitOriginal(card.body);
+      var use = labels.filter(function(raw) {
+        var t = normalizeTag(raw);
+        return t && !containsTag(parts.tail, t);
+      });
+      var nextOriginal = bodyWithTags(parts.original, use);
+      var next = joinOriginal(nextOriginal, parts.tail);
       if (next === String(card.body || "").replace(/\s+$/, "")) return false;
       var plugin = panel.noval;
       var write = typeof plugin.quietUpdateCard === "function" ? plugin.quietUpdateCard.bind(plugin) : plugin.updateCard.bind(plugin);
-      var ok = await write(card, next);
+      var ok = await write(card, nextOriginal);
       if (ok) card.body = next;
       return ok;
     }
@@ -18887,13 +18913,15 @@ var require_noval_ai_tag = __commonJS({
       async function applyFix(newTag) {
         if (busy) return;
         busy = true;
-        var next = replaceTagInBody(card.body, tag, newTag);
-        if (next === String(card.body || "")) {
+        var parts = splitOriginal(card.body);
+        var nextOriginal = replaceTagInBody(parts.original, tag, newTag);
+        var next = joinOriginal(nextOriginal, parts.tail);
+        if (next === String(card.body || "").replace(/\s+$/, "")) {
           close();
           return;
         }
         try {
-          var ok = await panel.noval.quietUpdateCard(card, next);
+          var ok = await panel.noval.quietUpdateCard(card, nextOriginal);
           if (ok) {
             card.body = next;
             if (newTag) addCase(panel, cardSnippet(card), newTag, tag);
@@ -19128,9 +19156,11 @@ var require_noval_ai_tag = __commonJS({
             return normalizeTag(t).toLowerCase() === matchTag;
           });
           if (!has) continue;
-          var next = transform(String(c.body == null ? "" : c.body));
-          if (next === String(c.body == null ? "" : c.body)) continue;
-          var ok = await panel.noval.quietUpdateCard(c, next);
+          var parts = splitOriginal(String(c.body == null ? "" : c.body));
+          var nextOriginal = transform(parts.original);
+          var next = joinOriginal(nextOriginal, parts.tail);
+          if (next === String(c.body == null ? "" : c.body).replace(/\s+$/, "")) continue;
+          var ok = await panel.noval.quietUpdateCard(c, nextOriginal);
           if (ok) {
             c.body = next;
             writes++;
@@ -19225,6 +19255,9 @@ var require_noval_ai_tag = __commonJS({
       sameFamily,
       hashBody,
       bodyWithTags,
+      splitOriginal,
+      joinOriginal,
+      writeTags,
       replaceTagInBody,
       removeTagFromBody,
       containsTag,
