@@ -2287,6 +2287,16 @@ var CardsView = class extends ItemView2 {
     if ((this.state.tags || []).length) {
       lab.createSpan({ cls: "qm-pop-sel", text: "\u5DF2\u9009 " + this.state.tags.length });
     }
+    const healthBtn = lab.createEl("button", { cls: "qm-tai-btn qm-tai-health", text: "\u5065\u5EB7" });
+    healthBtn.setAttr("type", "button");
+    healthBtn.setAttr("title", "\u6807\u7B7E\u5065\u5EB7\uFF1A\u5B64\u513F\u3001\u8FD1\u4E49\u3001\u590D\u7528\u7387");
+    healthBtn.onclick = (e) => {
+      if (e && e.stopPropagation) e.stopPropagation();
+      const ai = this.aiModule();
+      if (!ai) return;
+      this.closeFilterPanel();
+      ai.openTagHealth(this.aiPanel());
+    };
     const treeWrap = el.createDiv({ cls: "qm-tree-wrap" });
     const tree = treeWrap.createDiv({ cls: "qm-tagtree" });
     this.treeEl = tree;
@@ -2299,6 +2309,18 @@ var CardsView = class extends ItemView2 {
     un.createSpan({ cls: "qm-caret is-blank" });
     un.createSpan({ cls: "qm-tname", text: "\u65E0\u6807\u7B7E" });
     un.createSpan({ cls: "qm-tcount", text: String(forest.untagged) });
+    if (forest.untagged > 0) {
+      const aiBtn = un.createEl("button", { cls: "qm-tai-btn", text: "AI \u6253\u6807" });
+      aiBtn.setAttr("type", "button");
+      aiBtn.setAttr("title", "AI \u7ED9\u5168\u90E8 " + forest.untagged + " \u5F20\u65E0\u6807\u7B7E\u5361\u7247\u6253\u6807\u7B7E");
+      aiBtn.onclick = (e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
+        const ai = this.aiModule();
+        if (!ai) return;
+        this.closeFilterPanel();
+        ai.openBatchTag(this.aiPanel());
+      };
+    }
     un.createSpan({ cls: "qm-tmark", text: "\u2713" });
     un.onclick = () => {
       this.state.untagged = !this.state.untagged;
@@ -2459,6 +2481,7 @@ var CardsView = class extends ItemView2 {
     const anchor = this.moreBtnEl || evt && evt.currentTarget || null;
     const hit = this.filtered().length;
     const total = this.state.cards.length;
+    const untaggedCount = (this.state.cards || []).filter((c) => !((c.tags || []).length)).length;
     const cap = this.plugin.settings.maxCards;
     const capNote = cap > 0 && hit > cap ? " \xB7 \u663E\u793A\u6700\u8FD1 " + cap : "";
     const countLine = (hit === total ? "\u5171 " + total + " \u6761\u5361\u7247" : "\u5171 " + total + " \u6761 \xB7 \u547D\u4E2D " + hit + " \u6761") + capNote;
@@ -2485,6 +2508,22 @@ var CardsView = class extends ItemView2 {
         title: "\u68C0\u67E5\u5B64\u513F\u5361\u7247",
         icon: "search-check",
         onClick: () => new OrphanModal(this.app, this.plugin).open()
+      },
+      {
+        title: "AI \u6574\u7406\u65E0\u6807\u7B7E" + (untaggedCount ? " (" + untaggedCount + ")" : ""),
+        icon: "sparkles",
+        onClick: () => {
+          const ai = this.aiModule();
+          if (ai) ai.openBatchTag(this.aiPanel());
+        }
+      },
+      {
+        title: "\u6807\u7B7E\u5065\u5EB7",
+        icon: "search-check",
+        onClick: () => {
+          const ai = this.aiModule();
+          if (ai) ai.openTagHealth(this.aiPanel());
+        }
       }
     ];
     return this.showMenu(items, anchor);
@@ -2657,6 +2696,13 @@ var CardsView = class extends ItemView2 {
             if (this.searchEl) this.searchEl.value = "";
             if (this.syncSearchClear) this.syncSearchClear();
             this.setFilterTags([seg.value]);
+          };
+          tag.oncontextmenu = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const ai = this.aiModule();
+            if (!ai) return;
+            ai.openTagFix(this.aiPanel(), card, seg.value, tag);
           };
         } else {
           body.createSpan({ cls: "qm-rv-url", text: seg.text });
@@ -3027,6 +3073,15 @@ var CardsView = class extends ItemView2 {
           }
           this.setFilterTags([seg.value]);
         };
+        // 左键筛选不动，右键 = 改标签（AI 纠错），与工作台卡片一致
+        tag.oncontextmenu = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (this.state.selectMode) return;
+          const ai = this.aiModule();
+          if (!ai) return;
+          ai.openTagFix(this.aiPanel(), card, seg.value, tag);
+        };
         continue;
       }
       const link = body.createEl("a", { cls: "qm-url", text: seg.text });
@@ -3053,6 +3108,26 @@ var CardsView = class extends ItemView2 {
     this.bindCardDrag(box, card);
   }
   /* ---------------- 卡片上的交互 ---------------- */
+  /**
+   * AI 打标签模块（src/noval-ai-tag.js）要的「面板」形状。
+   * 侧栏视图的字段与工作台面板不同（卡片在 state 里、刷新叫 refresh），
+   * 这里做一层适配，AI 那边不用关心自己挂在哪个视图上。
+   */
+  aiPanel() {
+    return {
+      noval: this.plugin,
+      app: this.app,
+      hostView: null,
+      cards: this.state.cards,
+      reloadCards: () => this.refresh()
+    };
+  }
+  /** 取 AI 模块；产物里没带就明确说一声，别点了没反应 */
+  aiModule() {
+    const ai = this.plugin && this.plugin.aiTag;
+    if (!ai) new Notice2("\u5F53\u524D\u7248\u672C\u6CA1\u52A0\u8F7D AI \u6A21\u5757\uFF0C\u8BF7\u91CD\u8F7D\u63D2\u4EF6\u540E\u518D\u8BD5");
+    return ai || null;
+  }
   mountCardMenuButton(head, card) {
     const more = head.createEl("button", { cls: "qm-more" });
     more.setAttr("type", "button");
@@ -3082,6 +3157,21 @@ var CardsView = class extends ItemView2 {
       { title: "\u590D\u5236\u94FE\u63A5", icon: "link", onClick: () => this.copyRef(card) },
       { title: "\u7F16\u8F91", icon: "pencil", onClick: () => this.requestEdit(card) },
       { title: "\u8FFD\u52A0", icon: "plus", onClick: () => this.beginAppend(card) },
+      {
+        title: "AI \u6253\u6807\u7B7E",
+        icon: "sparkles",
+        onClick: () => {
+          const ai = this.aiModule();
+          if (!ai) return;
+          const btn = evt && evt.currentTarget;
+          const cardEl =
+            (btn && typeof btn.closest === "function" && btn.closest(".qm-card, .qm-rv-card")) ||
+            (this._cardEls && this._cardEls.get(this.cardKey(card))) ||
+            null;
+          if (!cardEl) return;
+          ai.openTagBar(this.aiPanel(), cardEl, card);
+        }
+      },
       { separator: true }
     ];
     if (!this.plugin.refsReady()) {

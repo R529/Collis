@@ -5411,6 +5411,9 @@ module.exports = class NovalPlugin extends Plugin {
       };
       child._loaded = true;
       this.bundled.push(child);
+      // AI 打标签模块由宿主注入给卡片子插件：侧栏视图（CardsView）通过 plugin.aiTag 取用，
+      // 内核不用去 require src 层文件，vendor 仍可单独读。
+      if (spec.id === NOTES_ID) child.aiTag = NovalAiTag;
       await child.onload();
       this.childPlugins = this.childPlugins || {};
       this.childPlugins[spec.id] = child;
