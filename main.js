@@ -22107,11 +22107,12 @@ var ModuleEditorModal = class extends Modal {
     contentEl.createEl("h2", { text: this.module ? "\u7F16\u8F91\u6A21\u5757" : "\u65B0\u5EFA\u6A21\u5757" });
     contentEl.createDiv({
       cls: "cl-modal-hint",
-      text: "\u6A21\u5757\u5C31\u662F\u6587\u4EF6\u5939\uFF1A\u4FDD\u5B58\u65F6\u4F1A\u540C\u6B65\u5728\u6587\u4EF6\u6811\u91CC\u521B\u5EFA\u5BF9\u5E94\u76EE\u5F55\uFF0C\u6A21\u5757\u5185\u5BB9\u53EA\u8BA4\u8FD9\u4E2A\u76EE\u5F55\u91CC\u7684\u6587\u4EF6\u3002"
+      text: this.module ? "\u6A21\u5757\u5C31\u662F\u6587\u4EF6\u5939\uFF1A\u540D\u5B57\u6539\u4E86\u6587\u4EF6\u5939\u8DDF\u7740\u6539\uFF0C\u6A21\u5757\u5185\u5BB9\u59CB\u7EC8\u662F\u90A3\u4E2A\u6587\u4EF6\u5939\u91CC\u7684\u6587\u4EF6\u3002" : "\u6A21\u5757\u5C31\u662F\u6587\u4EF6\u5939\uFF1A\u4FDD\u5B58\u65F6\u4F1A\u5728\u5E93\u6839\u76EE\u5F55\u5EFA\u4E00\u4E2A\u540C\u540D\u6587\u4EF6\u5939\uFF0C\u5C31\u50CF\u5728\u6587\u4EF6\u6811\u91CC\u65B0\u5EFA\u6587\u4EF6\u5939\u4E00\u6837\u3002"
     });
     let name = this.module ? this.module.name || "" : this.initialName;
-    let folder = this.module && this.module.folder || "";
-    new Setting(contentEl).setName("\u540D\u79F0").setDesc("\u663E\u793A\u5728\u5BFC\u822A\u91CC\u7684\u540D\u5B57").addText(
+    new Setting(contentEl).setName("\u540D\u79F0").setDesc(
+      this.module ? "\u4E0E\u6587\u4EF6\u5939\u540C\u540D\uFF0C\u4FDD\u5B58\u65F6\u4E00\u5E76\u91CD\u547D\u540D" : "\u540C\u65F6\u662F\u6587\u4EF6\u5939\u540D\uFF0C\u5EFA\u5728\u5E93\u6839\u76EE\u5F55"
+    ).addText(
       (t) => t.setValue(name).setPlaceholder("\u4F8B\u5982\uFF1A\u5065\u8EAB\u8BB0\u5F55").onChange((v) => {
         name = v;
       })
@@ -22148,23 +22149,6 @@ var ModuleEditorModal = class extends Modal {
       };
       colorDots.push(dot);
     });
-    let folderInput = null;
-    new Setting(contentEl).setName("\u6A21\u5757\u6587\u4EF6\u5939").setDesc("\u4FDD\u5B58\u65F6\u81EA\u52A8\u521B\u5EFA\u3002\u4E0D\u586B\u5219\u7528\u6A21\u5757\u540D\uFF1B\u586B\u5199\u591A\u7EA7\u8DEF\u5F84\uFF08\u5982 \u5A92\u4F53\u6587\u4EF6/\u5BA2\u6237\uFF09\u4E5F\u53EF\u4EE5\u3002").addText((t) => {
-      folderInput = t;
-      t.setValue(folder).setPlaceholder("\u672A\u9009\u62E9").onChange((v) => {
-        folder = v;
-      });
-    }).addButton((b) => {
-      b.setButtonText("\u9009\u62E9").onClick(() => {
-        new FolderPickerModal(this.app, {
-          current: String(folder || "").trim(),
-          onPick: (path) => {
-            folder = path;
-            if (folderInput) folderInput.setValue(path);
-          }
-        }).open();
-      });
-    });
     const foot = contentEl.createDiv({ cls: "cl-modalfoot" });
     if (this.module && this.options.onDelete) {
       const del = foot.createEl("button", { cls: "cl-btn cl-btn-danger", text: "\u5220\u9664\u6A21\u5757" });
@@ -22185,24 +22169,31 @@ var ModuleEditorModal = class extends Modal {
     const cancel = foot.createEl("button", { cls: "cl-btn", text: "\u53D6\u6D88" });
     cancel.onclick = () => this.close();
     const save = foot.createEl("button", { cls: "cl-btn cl-btn-accent", text: "\u4FDD\u5B58" });
-    save.onclick = () => {
+    save.onclick = async () => {
       const finalName = String(name || "").trim();
       if (!finalName) {
         new Notice("\u8BF7\u5148\u586B\u5199\u6A21\u5757\u540D\u79F0");
         return;
       }
-      const folderValue = String(folder || "").trim().replace(/^\/+|\/+$/g, "");
       const id = this.module && this.module.id ? this.module.id : "mod-" + Date.now().toString(36);
       const next = Object.assign({}, this.module || {}, {
         id,
         module: this.module && this.module.module ? this.module.module : id,
         name: finalName,
         icon: this.icon,
-        color: this.color,
-        folder: folderValue || sanitizeFolderName(finalName)
+        color: this.color
       });
-      this.close();
-      if (this.options.onSave) this.options.onSave(next);
+      if (!this.module) next.folder = sanitizeFolderName(finalName);
+      else if (!next.folder) next.folder = sanitizeFolderName(this.module.name || finalName);
+      if (save.disabled) return;
+      save.disabled = true;
+      let ok = true;
+      try {
+        if (this.options.onSave) ok = await this.options.onSave(next);
+      } finally {
+        save.disabled = false;
+      }
+      if (ok !== false) this.close();
     };
   }
   onClose() {
@@ -23421,6 +23412,18 @@ var NovalView = class extends ItemView {
   moduleTargetFolder(mod) {
     return moduleFolderOf(mod);
   }
+  /* 写入模块条目。一个文件夹只对应一个模块——文件树里也不可能有两个同名文件夹，
+   * 所以同一个文件夹上的其它条目（自动同步的 dir:、旧版留下的重复）一律让位。 */
+  setModuleEntry(next) {
+    const folder = this.moduleTargetFolder(next).toLowerCase();
+    const list = this.getModules().slice();
+    const idx = list.findIndex((m) => m.id === next.id);
+    if (idx >= 0) list[idx] = next;
+    else list.push(next);
+    this.plugin.settings.modules = list.filter(
+      (m) => m === next || !folder || this.moduleTargetFolder(m).toLowerCase() !== folder
+    );
+  }
   // 目标同名时加 -1 / -2，避免覆盖模块目录里已有的文件。
   uniqueFilePath(dir, file) {
     const ext = file.extension ? "." + file.extension : "";
@@ -23592,10 +23595,10 @@ var NovalView = class extends ItemView {
     }
     return chain;
   }
-  promptSubmodule(parent) {
+  promptSubmodule(parent, title) {
     const parentDir = this.moduleTargetFolder(parent);
     new NamePromptModal(this.app, {
-      title: "\u65B0\u5EFA\u5B50\u6A21\u5757",
+      title: title || "\u65B0\u5EFA\u5B50\u6A21\u5757",
       hint: "\u4F1A\u5728\u300C" + (parentDir || "\u5E93\u6839\u76EE\u5F55") + "\u300D\u4E0B\u65B0\u5EFA\u540C\u540D\u6587\u4EF6\u5939\uFF1B\u5B50\u6A21\u5757\u8DDF\u968F\u6587\u4EF6\u5939\uFF0C\u4E0D\u4F1A\u91CD\u590D\u5B58\u5C42\u7EA7\u914D\u7F6E\u3002",
       placeholder: "\u4F8B\u5982\uFF1A\u5BA2\u6237",
       onSubmit: async (raw) => {
@@ -23603,29 +23606,35 @@ var NovalView = class extends ItemView {
         if (!name) return;
         const dir = parentDir ? parentDir + "/" + name : name;
         const existing = this.getModules().find(
-          (mod) => this.moduleTargetFolder(mod) === dir
+          (mod) => this.moduleTargetFolder(mod).toLowerCase() === dir.toLowerCase()
         );
         if (existing) {
           this.go(moduleIdOf(existing));
           return;
         }
-        try {
-          await ensureVaultFolder(this.app, dir);
-        } catch (error) {
-          new Notice("\u521B\u5EFA\u6587\u4EF6\u5939\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
+        const node = this.app.vault.getAbstractFileByPath(dir);
+        if (node && !Array.isArray(node.children)) {
+          new Notice("\u5DF2\u5B58\u5728\u540C\u540D\u6587\u4EF6\u300C" + dir + "\u300D\uFF0C\u6362\u4E2A\u540D\u5B57\u5427");
           return;
         }
         const id = "mod-" + Date.now().toString(36);
-        const list = this.getModules().slice();
-        list.push({
+        const entry = {
           id,
           module: id,
           name,
           folder: dir,
           icon: "folder",
           color: parent.color || void 0
-        });
-        this.plugin.settings.modules = list;
+        };
+        const prevList = this.getModules();
+        this.setModuleEntry(entry);
+        try {
+          await ensureVaultFolder(this.app, dir);
+        } catch (error) {
+          this.plugin.settings.modules = prevList;
+          new Notice("\u521B\u5EFA\u6587\u4EF6\u5939\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
+          return;
+        }
         this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => path !== dir);
         this._ownership = null;
         await this.plugin.saveSettings();
@@ -23801,10 +23810,29 @@ var NovalView = class extends ItemView {
     this._ownership = null;
     await this.plugin.saveSettings();
   }
-  /* 模块右键菜单：和文件树一样，就地重命名或删除，操作同步到文件夹。 */
+  /* 模块右键菜单：和文件树一样，先新建、再改、最后删，操作全部落到文件夹上。
+   *   新建文件 / 新建模块 / 创建副本 —— 对应 Obsidian 文件夹菜单的前三项；
+   *   重命名 / 编辑模块 —— 就地改文件夹名与模块外观；
+   *   删除模块 —— 按 Obsidian 删除文件夹的规则处理。 */
   showModuleMenu(mod, event) {
     if (!mod) return;
     const menu = new Menu();
+    menu.addItem(
+      (item) => item.setTitle("\u65B0\u5EFA\u6587\u4EF6").setIcon("file-plus").onClick(() => {
+        void this.createFileInModule(mod);
+      })
+    );
+    menu.addItem(
+      (item) => item.setTitle("\u65B0\u5EFA\u6A21\u5757\u2026").setIcon("folder-plus").onClick(() => {
+        this.promptSubmodule(mod, "\u65B0\u5EFA\u6A21\u5757");
+      })
+    );
+    menu.addItem(
+      (item) => item.setTitle("\u521B\u5EFA\u526F\u672C").setIcon("copy").onClick(() => {
+        void this.duplicateModule(mod);
+      })
+    );
+    menu.addSeparator();
     menu.addItem(
       (item) => item.setTitle("\u91CD\u547D\u540D\u2026").setIcon("pencil").onClick(() => this.renameModule(mod))
     );
@@ -23818,6 +23846,99 @@ var NovalView = class extends ItemView {
       })
     );
     menu.showAtMouseEvent(event);
+  }
+  /* 新建文件 = 文件树里的「新建笔记」：在模块文件夹里建一个空笔记并打开。
+   * 重名依次加 " 1"、" 2"，和 Obsidian 新建笔记的重名规则一致，绝不覆盖已有文件。 */
+  async createFileInModule(mod) {
+    const dir = this.moduleTargetFolder(mod);
+    if (!dir) {
+      new Notice("\u8FD9\u4E2A\u6A21\u5757\u8FD8\u6CA1\u6709\u5BF9\u5E94\u7684\u6587\u4EF6\u5939");
+      return;
+    }
+    try {
+      await ensureVaultFolder(this.app, dir);
+    } catch (error) {
+      new Notice("\u521B\u5EFA\u6A21\u5757\u6587\u4EF6\u5939\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
+      return;
+    }
+    const path = this.uniqueNotePath(dir, "\u672A\u547D\u540D");
+    let created = null;
+    try {
+      created = await this.app.vault.create(path, "");
+    } catch (error) {
+      new Notice("\u521B\u5EFA\u6587\u4EF6\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
+      return;
+    }
+    this._ownership = null;
+    this.render();
+    if (created) this.openFile(created);
+  }
+  // 「未命名」「未命名 1」「未命名 2」……文件树里新建笔记就是这个重名规则
+  uniqueNotePath(dir, base) {
+    const prefix = dir ? dir + "/" : "";
+    let path = prefix + base + ".md";
+    let n = 1;
+    while (this.app.vault.getAbstractFileByPath(path)) {
+      path = prefix + base + " " + n + ".md";
+      n += 1;
+    }
+    return path;
+  }
+  /* 创建副本 = 文件树里的「创建副本」：整棵文件夹（含子文件夹、笔记、附件）复制一份，
+   * 副本落在同一个父目录下，名字加 " 1"、" 2"；文件夹即模块，副本随即出现在导航里。 */
+  async duplicateModule(mod) {
+    const dir = this.moduleTargetFolder(mod);
+    const node = dir ? this.app.vault.getAbstractFileByPath(dir) : null;
+    if (!dir || !node || !Array.isArray(node.children)) {
+      new Notice("\u6CA1\u627E\u5230\u6A21\u5757\u5BF9\u5E94\u7684\u6587\u4EF6\u5939\uFF0C\u65E0\u6CD5\u521B\u5EFA\u526F\u672C");
+      return;
+    }
+    const parent = dir.indexOf("/") === -1 ? "" : dir.slice(0, dir.lastIndexOf("/"));
+    const base = dir.split("/").pop();
+    const target = this.uniqueFolderPath(parent, base);
+    try {
+      await ensureVaultFolder(this.app, target);
+      await this.copyFolderTree(node, target);
+    } catch (error) {
+      new Notice("\u521B\u5EFA\u526F\u672C\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
+      return;
+    }
+    this._ownership = null;
+    await this.plugin.saveSettings();
+    this.render();
+    new Notice("\u5DF2\u521B\u5EFA\u526F\u672C\u300C" + target.split("/").pop() + "\u300D");
+    const created = this.moduleForFolder(target);
+    if (created) this.go(moduleIdOf(created));
+  }
+  // 副本重名规则与文件树一致：原名还在就依次加 " 1"、" 2"
+  uniqueFolderPath(parentDir, base) {
+    const prefix = parentDir ? parentDir + "/" : "";
+    let path = prefix + base;
+    let n = 1;
+    while (this.app.vault.getAbstractFileByPath(path)) {
+      path = prefix + base + " " + n;
+      n += 1;
+    }
+    return path;
+  }
+  // 递归复制整棵文件夹：vault.copy 只收文件，文件夹得自己逐层走
+  async copyFolderTree(source, targetDir) {
+    const children = Array.isArray(source && source.children) ? source.children.slice() : [];
+    for (const child of children) {
+      if (!child) continue;
+      const dest = targetDir + "/" + child.name;
+      if (Array.isArray(child.children)) {
+        await ensureVaultFolder(this.app, dest);
+        await this.copyFolderTree(child, dest);
+        continue;
+      }
+      if (typeof this.app.vault.copy === "function") {
+        await this.app.vault.copy(child, dest);
+      } else {
+        const data = await this.app.vault.adapter.readBinary(child.path);
+        await this.app.vault.adapter.writeBinary(dest, data);
+      }
+    }
   }
   renameModule(mod) {
     if (!mod) return;
@@ -23882,30 +24003,92 @@ var NovalView = class extends ItemView {
       // 内置模块没有 color 字段，打开编辑器时用它在导航里的预设色，避免一编辑就变色
       initialColor: index >= 0 ? MODULE_COLORS[index % MODULE_COLORS.length] : MODULE_COLORS[0],
       onSave: async (next) => {
-        const folder = this.moduleTargetFolder(next);
+        const isNew = !mod;
+        const oldFolder = isNew ? "" : this.moduleTargetFolder(mod);
+        let folder = isNew ? this.moduleTargetFolder(next) : oldFolder || this.moduleTargetFolder(next);
+        if (!folder) {
+          new Notice("\u6A21\u5757\u540D\u4E0D\u80FD\u4E3A\u7A7A");
+          return false;
+        }
+        if (!isNew && oldFolder && folder === oldFolder) {
+          const oldBase = oldFolder.split("/").pop();
+          const parent2 = oldFolder.indexOf("/") === -1 ? "" : oldFolder.slice(0, oldFolder.lastIndexOf("/"));
+          const wanted = sanitizeFolderName(next.name);
+          if (wanted && oldBase === String(mod.name || "").trim() && wanted !== oldBase) {
+            const moved = parent2 ? parent2 + "/" + wanted : wanted;
+            if (this.app.vault.getAbstractFileByPath(moved)) {
+              new Notice("\u5DF2\u5B58\u5728\u540C\u540D\u6587\u4EF6\u5939\uFF1A" + moved + "\uFF0C\u6362\u4E2A\u540D\u5B57\u5427");
+              return false;
+            }
+            const node = this.app.vault.getAbstractFileByPath(oldFolder);
+            if (node) {
+              try {
+                await this.app.fileManager.renameFile(node, moved);
+              } catch (error) {
+                new Notice("\u91CD\u547D\u540D\u6587\u4EF6\u5939\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
+                return false;
+              }
+            }
+            this.plugin.remapModuleFolder(oldFolder, moved);
+            const oldId = "dir:" + oldFolder;
+            const newId = "dir:" + moved;
+            const remapId = (id) => {
+              if (id === oldId) return newId;
+              if (String(id).indexOf(oldId + "/") === 0) return newId + String(id).slice(oldId.length);
+              return id;
+            };
+            this.active = remapId(this.active);
+            const expanded = /* @__PURE__ */ new Set();
+            this._navExpanded.forEach((id) => expanded.add(remapId(id)));
+            this._navExpanded = expanded;
+            folder = moved;
+          }
+        }
+        if (isNew) {
+          const node = this.app.vault.getAbstractFileByPath(folder);
+          if (node && !Array.isArray(node.children)) {
+            new Notice("\u5DF2\u5B58\u5728\u540C\u540D\u6587\u4EF6\u300C" + folder + "\u300D\uFF0C\u6362\u4E2A\u540D\u5B57\u5427");
+            return false;
+          }
+          const taken = this.getModules().find(
+            (m) => this.moduleTargetFolder(m).toLowerCase() === folder.toLowerCase()
+          );
+          if (taken) {
+            const takenDir = this.moduleTargetFolder(taken);
+            this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => path !== takenDir);
+            if (!this.app.vault.getAbstractFileByPath(takenDir)) {
+              try {
+                await ensureVaultFolder(this.app, takenDir);
+              } catch (error) {
+                new Notice("\u521B\u5EFA\u6A21\u5757\u6587\u4EF6\u5939\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
+                return false;
+              }
+            }
+            await this.plugin.saveSettings();
+            new Notice("\u5DF2\u6709\u540C\u540D\u6A21\u5757\u300C" + taken.name + "\u300D\uFF0C\u5DF2\u6253\u5F00");
+            this.go(moduleIdOf(taken));
+            return true;
+          }
+        }
+        next.folder = folder;
+        this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => path !== folder && (!oldFolder || path !== oldFolder));
+        const prevList = this.getModules();
+        this.setModuleEntry(next);
+        this._ownership = null;
         try {
           await ensureVaultFolder(this.app, folder);
         } catch (error) {
+          this.plugin.settings.modules = prevList;
           new Notice("\u521B\u5EFA\u6A21\u5757\u6587\u4EF6\u5939\u5931\u8D25\uFF1A" + (error && error.message ? error.message : error));
-          return;
+          return false;
         }
-        next.folder = folder;
-        this.plugin.settings.hiddenModuleFolders = (this.plugin.settings.hiddenModuleFolders || []).filter((path) => path !== folder);
-        const list = this.getModules().slice();
-        let idx = list.findIndex((m) => m.id === next.id);
-        if (idx < 0) {
-          idx = list.findIndex((m) => this.moduleTargetFolder(m) === folder);
-        }
-        if (idx >= 0) list[idx] = next;
-        else list.push(next);
-        this.plugin.settings.modules = list;
-        this._ownership = null;
         await this.plugin.saveSettings();
         new Notice("\u5DF2\u4FDD\u5B58\u6A21\u5757\u300C" + next.name + "\u300D");
         const pending = this._pendingAssign;
         this._pendingAssign = null;
         if (pending && pending.length) this.assignToModule(pending, next);
         else if (!mod) this.go(next.id);
+        else this.render();
       },
       onDelete: mod ? async (target) => {
         await this.deleteModule(target);
@@ -24249,6 +24432,21 @@ var NovalView = class extends ItemView {
       return;
     }
     this.render();
+  }
+  /* 只重建左侧导航：文件树里增删、重命名文件夹后模块列表变了，
+   * 但不该整页重绘（画布、卡片面板重绘会丢当前状态），所以只换掉 .cl-nav 这棵。 */
+  refreshNav() {
+    if (!this.appEl) return;
+    const main = this.appEl.querySelector(":scope > .cl-main");
+    const old = this.appEl.querySelector(":scope > .cl-nav");
+    if (!main || !old) return;
+    const tmp = document.createElement("div");
+    this.renderNav(tmp);
+    const nav = tmp.firstElementChild;
+    if (!nav) return;
+    this.appEl.insertBefore(nav, main);
+    old.remove();
+    this.applyLayout();
   }
   /** 卡片文件写入后只刷新卡片数据，通知里有文件路径时不再整页 load */
   applyFileCards(path, content) {
@@ -26353,8 +26551,13 @@ module.exports = class NovalPlugin extends Plugin {
         this.settings.modules = kept;
         settingsDirty = true;
       }
+      const ordered2 = this.settings.modules.slice().sort((a, b) => {
+        const aa = String(a.id || "").startsWith("dir:") ? 1 : 0;
+        const bb = String(b.id || "").startsWith("dir:") ? 1 : 0;
+        return aa - bb;
+      });
       const seenFolders = /* @__PURE__ */ new Set();
-      const deduped = this.settings.modules.filter((mod) => {
+      const deduped = ordered2.filter((mod) => {
         const key = String(mod.folder || "").replace(/^\/+|\/+$/g, "").toLowerCase();
         if (!key) return true;
         if (seenFolders.has(key)) return false;
@@ -26481,21 +26684,25 @@ module.exports = class NovalPlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on("create", (file) => {
         this.requestRefresh();
-        const path = String(file && file.path || "");
-        if (file && Array.isArray(file.children) && path && path.indexOf("/") === -1) {
-          const hidden = this.settings.hiddenModuleFolders || [];
-          if (hidden.includes(path)) {
-            this.settings.hiddenModuleFolders = hidden.filter((item) => item !== path);
-          }
+        if (!file || !Array.isArray(file.children)) return;
+        const path = String(file.path || "");
+        if (!path) return;
+        const hidden = this.settings.hiddenModuleFolders || [];
+        if (hidden.includes(path)) {
+          this.settings.hiddenModuleFolders = hidden.filter((item) => item !== path);
+        }
+        if (path.indexOf("/") === -1) {
           if (this.syncModulesFromVault()) this.persistSettings();
         }
+        this.refreshNavs();
       })
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
         this.dropOwnership(file.path);
-        if (file && Array.isArray(file.children) && this.pruneMissingAutoModules()) {
-          this.persistSettings();
+        if (file && Array.isArray(file.children)) {
+          if (this.pruneMissingModules()) this.persistSettings();
+          this.refreshNavs();
         }
         this.requestRefresh();
       })
@@ -26504,6 +26711,7 @@ module.exports = class NovalPlugin extends Plugin {
       this.app.vault.on("rename", (file, oldPath) => {
         this.remapOwnership(oldPath, file.path);
         this.remapModuleFolder(oldPath, file.path);
+        if (file && Array.isArray(file.children)) this.refreshNavs();
         this.requestRefresh();
       })
     );
@@ -26538,12 +26746,15 @@ module.exports = class NovalPlugin extends Plugin {
   remapModuleFolder(oldPath, newPath) {
     const modules = this.settings && this.settings.modules || [];
     if (!oldPath || !newPath || oldPath === newPath) return;
+    const oldBase = oldPath.split("/").pop();
+    const newBase = newPath.split("/").pop();
     let changed = false;
     for (const mod of modules) {
       const folder = String(mod.folder || "");
       if (!folder) continue;
       if (folder === oldPath) {
         mod.folder = newPath;
+        if (String(mod.name || "") === oldBase) mod.name = newBase;
         changed = true;
       } else if (folder.indexOf(oldPath + "/") === 0) {
         mod.folder = newPath + folder.slice(oldPath.length);
@@ -26850,6 +27061,29 @@ module.exports = class NovalPlugin extends Plugin {
       (mod) => keyOf(mod.folder) !== canvasKey
     );
     let changed = this.settings.modules.length !== beforeCount;
+    const byFolder = /* @__PURE__ */ new Map();
+    const deduped = [];
+    this.settings.modules.forEach((mod) => {
+      const key = keyOf(mod.folder);
+      if (!key) {
+        deduped.push(mod);
+        return;
+      }
+      const prev = byFolder.get(key);
+      if (!prev) {
+        byFolder.set(key, mod);
+        deduped.push(mod);
+        return;
+      }
+      const prevAuto = String(prev.id || "").startsWith("dir:");
+      const curAuto = String(mod.id || "").startsWith("dir:");
+      if (prevAuto && !curAuto) {
+        deduped[deduped.indexOf(prev)] = mod;
+        byFolder.set(key, mod);
+      }
+      changed = true;
+    });
+    this.settings.modules = deduped;
     const hidden = new Set((this.settings.hiddenModuleFolders || []).map(keyOf));
     const configured = new Set(
       (this.settings.modules || []).map((mod) => keyOf(mod.folder)).filter(Boolean)
@@ -26881,11 +27115,11 @@ module.exports = class NovalPlugin extends Plugin {
   }
   /* 文件树里的文件夹被删掉后，清掉对应的自动模块；
    * 手动创建的模块保留配置，等文件夹恢复后还能继续用。 */
-  pruneMissingAutoModules() {
+  /* 文件夹被删掉之后，指向它的模块条目一并清掉：文件夹没了，模块也不该留在导航里。
+   * 没登记文件夹的内置模块不受影响。 */
+  pruneMissingModules() {
     const before = (this.settings.modules || []).length;
     this.settings.modules = (this.settings.modules || []).filter((mod) => {
-      const id = String(mod.id || "");
-      if (!id.startsWith("dir:")) return true;
       const folder = String(mod.folder || "").replace(/^\/+|\/+$/g, "");
       if (!folder) return true;
       return Boolean(this.app.vault.getAbstractFileByPath(folder));
@@ -26912,6 +27146,12 @@ module.exports = class NovalPlugin extends Plugin {
   refreshAll() {
     this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach((leaf) => {
       if (leaf.view && leaf.view.refresh) leaf.view.refresh();
+    });
+  }
+  // 模块列表变了：只让视图重建左侧导航，不整页重绘（会丢画布/卡片面板的状态）
+  refreshNavs() {
+    this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach((leaf) => {
+      if (leaf.view && typeof leaf.view.refreshNav === "function") leaf.view.refreshNav();
     });
   }
   async activateView(forceFocus) {
